@@ -58,7 +58,7 @@ $ source .venv/bin/activate
 
 ### run the count_words task
 
-$ cedra publish count_words --url https://github.com
+$ cedra publish count-words --url https://github.com
 
 ### check result output on serve console
 ```

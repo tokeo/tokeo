@@ -20,10 +20,20 @@ class Publish(Controller):
 
         self.app.args.print_help()
 
+
     @ex(
-        help='publish example task',
-        arguments=[],
+        help='publish an url to the count_words task',
+        arguments = [
+            (
+                ['--url'],
+                dict(
+                    action='store',
+                    required=True,
+                    help='Link to the resource get\'s counted',
+                ),
+            ),
+        ]
     )
-    def example(self):
-        self.app.log.info('Publish the example task')
-        tasks.actors.count_words.send('https://github.com')
+    def count_words(self):
+        self.app.log.info('Publish task and paramters ...')
+        tasks.actors.count_words.send(self.app.pargs.url)
