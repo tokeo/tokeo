@@ -1,30 +1,87 @@
-# The Cedra CLI contains all the dramatiq workers and publishers.
+# Cedra is the starter when it comes to EDA
 
-## Installation
+In an an Event-Driven Architecture ([EDA](https://en.wikipedia.org/wiki/Event-driven_architecture)) world you need a fast and reliable development cycle even for small projects.
 
-```
+[Cement](https://builtoncement.com) is a well known [python](https://www.python.org) project and allows to build fast and super documented CLI apps with easyness.
+
+The [Dramatiq](https://dramatiq.io) background task processing library in combination with [RabbitMQ Message Broker](https://www.rabbitmq.com) runs a reliable and solid EDA environment.
+
+An integrated [Grpc](https://grpc.io) service gives access to the available tasks and workflows from outside.
+
+Kickstart your EDA projects with Cedra and experience a seamless development cycle.
+
+Cheers<br/>
+Tom
+
+<br/>
+
+# Cedra CLI handles all the workers, publishers and functions
+
+<br/>
+
+## Installation on production
+
+```bash
+$ make virtualenv
+
+$ source .venv/bin/activate
+
 $ pip install -r requirements.txt
 
 $ python setup.py install
 ```
 
+<br/>
+
+## Run the message broker workers
+
+```bash
+$ source .venv/bin/activate
+
+### run the dramatiq workers for the implemented tasks
+
+$ cedra serve
+```
+
+<br/>
+
+## Run a task by publisher
+
+```bash
+$ source .venv/bin/activate
+
+### run the count_words task
+
+$ cedra publish count_words --url https://github.com
+
+### check result output on serve console
+```
+
+<br/>
+
 ## Development
 
 This project includes a number of helpers in the `Makefile` to streamline common development tasks.
+
+<br/>
 
 ### Environment Setup
 
 The following demonstrates setting up and working with a development environment:
 
-```
+```bash
 ### create a virtualenv for development
 
 $ make virtualenv
 
 $ source .venv/bin/activate
 
+$ pip install -r requirements-dev.txt
 
-### run cedra cli application
+$ python setup.py install
+
+
+### check cedra cli application
 
 $ cedra --help
 
@@ -34,6 +91,7 @@ $ cedra --help
 $ make test
 ```
 
+<br/>
 
 ### Releasing to PyPi
 
@@ -55,7 +113,11 @@ $ make dist
 $ make dist-upload
 ```
 
+<br/>
+
 ## Deployments
+
+<br/>
 
 ### Docker
 
