@@ -1,0 +1,7 @@
+cement==3.0.8
+cement[jinja2]
+cement[yaml]
+cement[colorlog]
+dramatiq[rabbitmq, watch]
+lazy_loader
+requests
