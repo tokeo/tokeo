@@ -1,3 +1,7 @@
+![image](https://github.com/TomFreudenberg/cedra/assets/410087/52b705f1-14a1-464f-8939-f02da974ee1f)
+
+<br/>
+
 # Cedra is the starter when it comes to EDA
 
 <br/>
