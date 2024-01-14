@@ -1,5 +1,7 @@
 # Cedra is the starter when it comes to EDA
 
+<br/>
+
 In an an Event-Driven Architecture ([EDA](https://en.wikipedia.org/wiki/Event-driven_architecture)) world you need a fast and reliable development cycle even for small projects.
 
 [Cement](https://builtoncement.com) is a well known [python](https://www.python.org) project and allows to build fast and super documented CLI apps with easyness.
