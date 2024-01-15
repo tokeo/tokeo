@@ -2,7 +2,7 @@
 
 <br/>
 
-# Cedra is the starter when it comes to EDA
+# CEDRA: Unleashing the Power of Cement, Dramatiq, and Grpc for Superior EDA Solutions!
 
 <br/>
 
@@ -21,7 +21,7 @@ Tom
 
 <br/>
 
-# Cedra CLI handles all the workers, services, tasks, jobs and functions
+# CEDRA CLI handles all the workers, services, tasks, jobs and functions
 
 <br/>
 
