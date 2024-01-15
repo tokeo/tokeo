@@ -32,7 +32,7 @@ $ make virtualenv
 
 $ source .venv/bin/activate
 
-$ python setup.py install
+$ python setup.py develop # currently install will cause an error on lazy-load
 ```
 
 <br/>
