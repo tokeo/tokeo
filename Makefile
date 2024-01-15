@@ -1,4 +1,4 @@
-.PHONY: clean virtualenv test docker dist dist-upload
+.PHONY: clean virtualenv proto test fmt docker dist dist-upload
 
 clean:
 	find . -name '*.py[co]' -delete
@@ -7,8 +7,7 @@ clean:
 
 virtualenv:
 	virtualenv -q --prompt '> cedra <' .venv
-	.venv/bin/pip install -r requirements-dev.txt
-	.venv/bin/python setup.py develop
+	.venv/bin/pip install -r requirements.txt
 	@echo
 	@echo "VirtualENV Setup Complete. Now run: source .venv/bin/activate"
 	@echo
@@ -43,7 +42,7 @@ test:
 		-k "$(tests)" \
 		tests/$(files)
 
-fmt.all.fix:
+fmt:
 	pyink --pyink-use-majority-quotes --line-length 115 --include "\.py$"" cedra tests docs setup.py
 
 docker: clean

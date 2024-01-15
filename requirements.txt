@@ -4,5 +4,6 @@ cement[yaml]
 cement[colorlog]
 dramatiq[rabbitmq, watch]
 grpcio
+grpcio-tools
 lazy_loader
 requests
