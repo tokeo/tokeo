@@ -21,7 +21,7 @@ Tom
 
 <br/>
 
-# Cedra CLI handles all the workers, publishers and functions
+# Cedra CLI handles all the workers, services, tasks, jobs and functions
 
 <br/>
 
@@ -51,14 +51,14 @@ $ cedra dramatiq serve
 
 <br/>
 
-## Run a task by publisher
+## Run a task by emitter
 
 ```bash
 $ source .venv/bin/activate
 
 ### run the count_words task
 
-$ cedra publish count-words --url https://github.com
+$ cedra emit count-words --url https://github.com
 
 ### check result output on dramatiq serve console
 ```

@@ -2,18 +2,18 @@ from cement import Controller, ex
 from cedra.core import tasks
 
 
-class Publish(Controller):
+class Emit(Controller):
 
     class Meta:
-        label = 'publish'
+        label = 'emit'
         stacked_type = 'nested'
         stacked_on = 'base'
 
         # text displayed at the top of --help output
-        description = 'Publish tasks to the message queue.'
+        description = 'Emit tasks to the message queue.'
 
         # text displayed at the bottom of --help output
-        epilog = 'Example: cedra publish task --option --param value'
+        epilog = 'Example: cedra emit task --option --param value'
 
     def _default(self):
         """Default command action if no sub-command is passed."""
@@ -21,7 +21,7 @@ class Publish(Controller):
         self.app.args.print_help()
 
     @ex(
-        help='publish an url to the count_words task',
+        help='emit the count-words task for an url',
         arguments=[
             (
                 ['--url'],
@@ -34,5 +34,5 @@ class Publish(Controller):
         ],
     )
     def count_words(self):
-        self.app.log.info('Publish task and paramters ...')
+        self.app.log.info('Emit count-words task with url: ' + self.app.pargs.url)
         tasks.actors.count_words.send(self.app.pargs.url)
