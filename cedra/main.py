@@ -7,7 +7,7 @@ from .core.exc import CedraError
 from .core.hooks import hook_dramatiq_setup
 from .controllers.base import Base
 from .controllers.publish import Publish
-from .controllers.serve import Serve
+from .controllers.dramatiq import Dramatiq
 from .controllers.grpc import Grpc
 
 
@@ -49,7 +49,7 @@ class Cedra(App):
         handlers = [
             Base,
             Publish,
-            Serve,
+            Dramatiq,
             Grpc,
         ]
 

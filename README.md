@@ -46,7 +46,7 @@ $ source .venv/bin/activate
 
 ### run the dramatiq workers for the implemented tasks
 
-$ cedra serve
+$ cedra dramatiq serve
 ```
 
 <br/>
@@ -60,7 +60,7 @@ $ source .venv/bin/activate
 
 $ cedra publish count-words --url https://github.com
 
-### check result output on serve console
+### check result output on dramatiq serve console
 ```
 
 <br/>
@@ -70,7 +70,7 @@ $ cedra publish count-words --url https://github.com
 ```bash
 $ source .venv/bin/activate
 
-### run the dramatiq workers for the implemented tasks
+### run the grpc service for the exported methods
 
 $ cedra grpc serve
 ```
@@ -86,7 +86,7 @@ $ source .venv/bin/activate
 
 $ cedra grpc count-words --url https://github.com
 
-### check result output on serve console
+### check result output on dramatiq serve console
 ```
 
 <br/>

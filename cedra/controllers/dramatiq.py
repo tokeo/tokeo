@@ -5,21 +5,22 @@ from dramatiq import cli
 from cedra.core import tasks
 
 
-class Serve(Controller):
+class Dramatiq(Controller):
 
     class Meta:
-        label = 'serve'
+        label = 'dramatiq'
         stacked_type = 'nested'
         stacked_on = 'base'
 
         # text displayed at the top of --help output
-        description = 'Run the dramatiq service.'
+        description = 'Manage the dramatiq service.'
 
         # text displayed at the bottom of --help output
-        epilog = 'Example: cedra serve --option --param value'
+        epilog = 'Example: cedra dramatiq serve --option --param value'
 
-        # apply arguments to the _default method as well
-        arguments = [
+    @ex(
+        help='spin up the dramatiq service workers',
+        arguments=[
             (
                 ['--watch'],
                 dict(
@@ -27,9 +28,9 @@ class Serve(Controller):
                     help='Reload actors on changes and restart workers',
                 ),
             ),
-        ]
-
-    def _default(self):
+        ],
+    )
+    def serve(self):
         self.app.log.info('Spinning up the damatiq workers ...')
         # prepare a sys.argv array to contorl the dramatiq main instance
         # initialize with "this" script (should by cedra)
