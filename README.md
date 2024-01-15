@@ -65,6 +65,32 @@ $ cedra publish count-words --url https://github.com
 
 <br/>
 
+## Run the grpc service
+
+```bash
+$ source .venv/bin/activate
+
+### run the dramatiq workers for the implemented tasks
+
+$ cedra grpc serve
+```
+
+<br/>
+
+## Run a task by grpc call
+
+```bash
+$ source .venv/bin/activate
+
+### run the count_words task
+
+$ cedra grpc count-words --url https://github.com
+
+### check result output on serve console
+```
+
+<br/>
+
 ## Development
 
 This project includes a number of helpers in the `Makefile` to streamline common development tasks.

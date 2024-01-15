@@ -27,14 +27,22 @@ cedra:
 rabbitmq:
 
 ### connection url to rabbitmq server
-  url: amqp://guest:guest:test@localhost:5672/
+# url: amqp://guest:guest@localhost:5672/
 
 worker:
 ### number of processes to run the dramatiq workers
-# processes: 1
+# processes: 2
 
 ### number of threads to run the dramatiq workers
 # threads: 1
+
+grpc:
+
+### serve and connect to the grpc service
+# url: localhost:50051
+
+### Thread Pool max-workers for grpc service
+# worker_threads: 2
 
 log.colorlog:
 

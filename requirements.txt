@@ -3,5 +3,6 @@ cement[jinja2]
 cement[yaml]
 cement[colorlog]
 dramatiq[rabbitmq, watch]
+grpcio
 lazy_loader
 requests

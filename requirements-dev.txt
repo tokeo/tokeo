@@ -1,5 +1,6 @@
 -r requirements.txt
 
+grpcio-tools
 pytest
 pytest-cov
 coverage

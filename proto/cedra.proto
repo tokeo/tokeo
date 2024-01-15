@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package cedra;
+
+// The grpc service on Cedra
+service Cedra {
+  // Sends a greeting
+  rpc CountWords (CountWordsRequest) returns (google.protobuf.Empty) {}
+}
+
+// The request message containing the url.
+message CountWordsRequest {
+  string url = 1;
+}

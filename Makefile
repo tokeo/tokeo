@@ -13,6 +13,9 @@ virtualenv:
 	@echo "VirtualENV Setup Complete. Now run: source .venv/bin/activate"
 	@echo
 
+proto:
+	python -m grpc_tools.protoc -I. --python_out=. --pyi_out=. --grpc_python_out=. ./proto/cedra.proto
+
 doc:
 	rm -rf html
 	pdoc3 --html braavos tests

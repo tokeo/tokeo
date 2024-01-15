@@ -8,6 +8,7 @@ from .core.hooks import hook_dramatiq_setup
 from .controllers.base import Base
 from .controllers.publish import Publish
 from .controllers.serve import Serve
+from .controllers.grpc import Grpc
 
 
 class Cedra(App):
@@ -49,6 +50,7 @@ class Cedra(App):
             Base,
             Publish,
             Serve,
+            Grpc,
         ]
 
         # register hooks
