@@ -45,7 +45,7 @@ test:
 
 fmt:
 	# align with https://google.github.io/styleguide/pyguide.html
-	pyink --pyink-use-majority-quotes --line-length 115 --include "\.py$"" --exclude "\/__pycache__\/" fairy proto tests docs setup.py
+	pyink --pyink-use-majority-quotes --line-length 115 --include "\.py$"" --exclude "\/__pycache__\/" tokeo proto tests docs setup.py
 
 docker: clean
 	docker build -t tokeo:latest .
