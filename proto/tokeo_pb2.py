@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11proto/tokeo.proto\x12\x05\x63\x65\x64ra\x1a\x1bgoogle/protobuf/empty.proto\" \n\x11\x43ountWordsRequest\x12\x0b\n\x03url\x18\x01 \x01(\t2I\n\x05\x43\x65\x64ra\x12@\n\nCountWords\x12\x18.tokeo.CountWordsRequest\x1a\x16.google.protobuf.Empty\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11proto/tokeo.proto\x12\x05tokeo\x1a\x1bgoogle/protobuf/empty.proto\" \n\x11\x43ountWordsRequest\x12\x0b\n\x03url\x18\x01 \x01(\t2I\n\x05Tokeo\x12@\n\nCountWords\x12\x18.tokeo.CountWordsRequest\x1a\x16.google.protobuf.Empty\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
