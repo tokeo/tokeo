@@ -7,8 +7,7 @@ from proto import tokeo_pb2 as proto_dot_tokeo__pb2
 
 
 class TokeoStub(object):
-    """The grpc service on Tokeo
-    """
+    """The grpc service on Tokeo"""
 
     def __init__(self, channel):
         """Constructor.
@@ -17,19 +16,17 @@ class TokeoStub(object):
             channel: A grpc.Channel.
         """
         self.CountWords = channel.unary_unary(
-                '/tokeo.Tokeo/CountWords',
-                request_serializer=proto_dot_tokeo__pb2.CountWordsRequest.SerializeToString,
-                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                )
+            '/tokeo.Tokeo/CountWords',
+            request_serializer=proto_dot_tokeo__pb2.CountWordsRequest.SerializeToString,
+            response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+        )
 
 
 class TokeoServicer(object):
-    """The grpc service on Tokeo
-    """
+    """The grpc service on Tokeo"""
 
     def CountWords(self, request, context):
-        """Sends a greeting
-        """
+        """Sends a greeting"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -37,35 +34,45 @@ class TokeoServicer(object):
 
 def add_TokeoServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'CountWords': grpc.unary_unary_rpc_method_handler(
-                    servicer.CountWords,
-                    request_deserializer=proto_dot_tokeo__pb2.CountWordsRequest.FromString,
-                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            ),
+        'CountWords': grpc.unary_unary_rpc_method_handler(
+            servicer.CountWords,
+            request_deserializer=proto_dot_tokeo__pb2.CountWordsRequest.FromString,
+            response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+        ),
     }
-    generic_handler = grpc.method_handlers_generic_handler(
-            'tokeo.Tokeo', rpc_method_handlers)
+    generic_handler = grpc.method_handlers_generic_handler('tokeo.Tokeo', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
- # This class is part of an EXPERIMENTAL API.
+# This class is part of an EXPERIMENTAL API.
 class Tokeo(object):
-    """The grpc service on Tokeo
-    """
+    """The grpc service on Tokeo"""
 
     @staticmethod
-    def CountWords(request,
+    def CountWords(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/tokeo.Tokeo/CountWords',
+            '/tokeo.Tokeo/CountWords',
             proto_dot_tokeo__pb2.CountWordsRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )

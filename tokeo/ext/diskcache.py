@@ -34,7 +34,6 @@ class TokeoDiscCacheHandler(cache.CacheHandler):
             expire_time=None,
         )
 
-
     def __init__(self, *args, **kw):
         super(TokeoDiscCacheHandler, self).__init__(*args, **kw)
 
@@ -151,9 +150,7 @@ class TokeoDiscCacheHandler(cache.CacheHandler):
         """
 
         def decorator(func):
-
             def wrapper(*args, **kwargs):
-
                 # create key from @decorated function name
                 _key = func.__name__ if key is None or key == '' else key
                 # prepend some prefix if set

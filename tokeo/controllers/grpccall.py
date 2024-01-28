@@ -14,7 +14,7 @@ class GrpcCall(Controller):
         stacked_on = 'base'
 
         # disable the ugly curly command doubled listening
-        subparser_options = dict(metavar = '')
+        subparser_options = dict(metavar='')
 
         # text displayed at the top of --help output
         description = 'Call remote grpc methods.'

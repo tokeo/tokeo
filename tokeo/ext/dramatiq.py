@@ -16,7 +16,6 @@ Classes
 -------
 Dramatiq
     A Cement controller for managing Dramatiq service workers.
-
 """
 
 import sys
@@ -62,7 +61,6 @@ class TokeoDramatiq(MetaMixin):
             broker='rabbitmq',
             rabbitmq_url='amqp://guest:guest@localhost:5672/',
         )
-
 
     def __init__(self, app, *args, **kw):
         super(TokeoDramatiq, self).__init__(*args, **kw)
@@ -150,7 +148,7 @@ class TokeoDramatiqController(Controller):
         label = 'dramatiq'
         stacked_type = 'nested'
         stacked_on = 'base'
-        subparser_options = dict(metavar = '')
+        subparser_options = dict(metavar='')
         help = 'Manage the dramatiq service'
         description = 'Provides command-line interfaces to manage Dramatiq workers, enabling task processing in a distributed system.'
         epilog = f'Example: {basename(sys.argv[0])} dramatiq serve --skip-logging\n '
@@ -232,8 +230,10 @@ def tokeo_dramatiq_extend_app(app):
     app.extend('dramatiq', TokeoDramatiq(app))
     app.dramatiq._setup(app)
 
+
 def tokeo_dramatiq_shutdown(app):
     app.dramatiq.close()
+
 
 def load(app):
     app.handler.register(TokeoDramatiqController)

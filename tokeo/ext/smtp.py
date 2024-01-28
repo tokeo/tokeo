@@ -173,6 +173,7 @@ class TokeoSMTPMailHandler(SMTPMailHandler):
 
         server.send_message(msg)
 
+
 def load(app):
     app._meta.mail_handler = TokeoSMTPMailHandler.Meta.label
     app.handler.register(TokeoSMTPMailHandler)
