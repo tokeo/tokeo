@@ -3,17 +3,18 @@
 clean:
 	find . -name '*.py[co]' -delete
 	find . -type d -name '__pycache__' -delete
+	rm -rf coverage-report
 	rm -rf tmp
 
 virtualenv:
-	virtualenv -q --prompt '> cedra <' .venv
+	virtualenv -q --prompt '> tokeo <' .venv
 	.venv/bin/pip install -r requirements.txt
 	@echo
 	@echo "VirtualENV Setup Complete. Now run: source .venv/bin/activate"
 	@echo
 
 proto:
-	python -m grpc_tools.protoc -I. --python_out=. --pyi_out=. --grpc_python_out=. ./proto/cedra.proto
+	python -m grpc_tools.protoc -I. --python_out=. --pyi_out=. --grpc_python_out=. ./proto/tokeo.proto
 
 doc:
 	rm -rf html
@@ -34,7 +35,7 @@ test:
 	mkdir -p tmp/tests
 	python -m pytest \
 		-v \
-		--cov=cedra \
+		--cov=tokeo \
 		--cov-report=term \
 		--cov-report=html:coverage-report \
 		--basetemp=tmp/tests \
@@ -43,10 +44,11 @@ test:
 		tests/$(files)
 
 fmt:
-	pyink --pyink-use-majority-quotes --line-length 115 --include "\.py$"" cedra tests docs setup.py
+	# align with https://google.github.io/styleguide/pyguide.html
+	pyink --pyink-use-majority-quotes --line-length 115 --include "\.py$"" --exclude "\/__pycache__\/" fairy proto tests docs setup.py
 
 docker: clean
-	docker build -t cedra:latest .
+	docker build -t tokeo:latest .
 
 dist: clean
 	rm -rf dist/*

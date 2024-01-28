@@ -1,5 +1,5 @@
 from cement import Controller, ex
-from cedra.core import tasks
+from tokeo.core import tasks
 
 
 class Emit(Controller):
@@ -13,7 +13,7 @@ class Emit(Controller):
         description = 'Emit tasks to the message queue.'
 
         # text displayed at the bottom of --help output
-        epilog = 'Example: cedra emit task --option --param value'
+        epilog = 'Example: tokeo emit task --option --param value'
 
     def _default(self):
         """Default command action if no sub-command is passed."""

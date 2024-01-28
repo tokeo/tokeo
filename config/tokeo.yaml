@@ -1,19 +1,19 @@
-### The Cedra Configuration Settings
+### The Tokeo Configuration Settings
 ---
 
-cedra:
+tokeo:
 
 ### Toggle application level debug (does not toggle framework debugging)
 # debug: false
 
 ### Where external (third-party) plugins are loaded from
-# plugin_dir: /var/lib/cedra/plugins/
+# plugin_dir: /var/lib/tokeo/plugins/
 
 ### Where all plugin configurations are loaded from
-# plugin_config_dir: /etc/cedra/plugins.d/
+# plugin_config_dir: /etc/tokeo/plugins.d/
 
 ### Where external templates are loaded from
-# template_dir: /var/lib/cedra/templates/
+# template_dir: /var/lib/tokeo/templates/
 
 ### The log handler label
 # log_handler: colorlog
@@ -28,6 +28,7 @@ rabbitmq:
 
 ### connection url to rabbitmq server
 # url: amqp://guest:guest@localhost:5672/
+  url: amqp://test_user:test@10.0.16.108:5672/dev
 
 worker:
 ### number of processes to run the dramatiq workers

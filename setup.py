@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages
-from cedra.core.version import get_version
+from tokeo.core.version import get_version
 
 VERSION = get_version()
 
@@ -8,9 +8,9 @@ LONG_DESCRIPTION = f.read()
 f.close()
 
 setup(
-    name='cedra',
+    name='tokeo',
     version=VERSION,
-    description='The Cedra CLI contains all the dramatiq workers and publishers.',
+    description='The Tokeo CLI contains all the dramatiq workers and publishers.',
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/markdown',
     author='Tom Freudenberg',
@@ -18,10 +18,10 @@ setup(
     url='about:none',
     license='MIT',
     packages=find_packages(exclude=['ez_setup', 'tests*']),
-    package_data={'cedra': ['templates/*']},
+    package_data={'tokeo': ['templates/*']},
     include_package_data=True,
     entry_points="""
         [console_scripts]
-        cedra = cedra.main:main
+        tokeo = tokeo.main:main
     """,
 )

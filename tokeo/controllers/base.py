@@ -3,7 +3,7 @@ from cement.utils.version import get_version_banner
 from ..core.version import get_version
 
 VERSION_BANNER = """
-The Cedra CLI contains all tasks, jobs and management for your Event-Driven Backend. %s
+The Tokeo CLI contains all tasks, jobs and management for your Event-Driven Backend. %s
 %s
 """ % (
     get_version(),
@@ -17,12 +17,12 @@ class Base(Controller):
         label = 'base'
 
         # text displayed at the top of --help output
-        description = 'The Cedra CLI contains all tasks, jobs and management for your Event-Driven Backend.'
+        description = 'The Tokeo CLI contains all tasks, jobs and management for your Event-Driven Backend.'
 
         # text displayed at the bottom of --help output
-        epilog = 'Example: cedra command --option --param value'
+        epilog = 'Example: tokeo command --option --param value'
 
-        # controller level arguments. ex: 'cedra --version'
+        # controller level arguments. ex: 'tokeo --version'
         arguments = [
             ### add a version banner
             (

@@ -2,10 +2,10 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
-package cedra;
+package tokeo;
 
-// The grpc service on Cedra
-service Cedra {
+// The grpc service on Tokeo
+service Tokeo {
   // Sends a greeting
   rpc CountWords (CountWordsRequest) returns (google.protobuf.Empty) {}
 }

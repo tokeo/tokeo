@@ -1,8 +1,8 @@
 from concurrent import futures
 from cement import Controller, ex
-from cedra.core.grpc import cedra_servicer
-from proto import cedra_pb2_grpc
-from proto import cedra_pb2
+from tokeo.core.grpc import tokeo_servicer
+from proto import tokeo_pb2_grpc
+from proto import tokeo_pb2
 import grpc
 
 
@@ -17,7 +17,7 @@ class Grpc(Controller):
         description = 'Manage grpc service and methods.'
 
         # text displayed at the bottom of --help output
-        epilog = 'Example: cedra grpc serve --option --param value'
+        epilog = 'Example: tokeo grpc serve --option --param value'
 
     @ex(
         help='spin up the grpc service',
@@ -26,10 +26,10 @@ class Grpc(Controller):
     def serve(self):
         self.app.log.info('Spinning up grpc service ...')
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=self.app.config.get('grpc', 'worker_threads')))
-        cedra_pb2_grpc.add_CedraServicer_to_server(cedra_servicer.CedraServicer(), server)
+        tokeo_pb2_grpc.add_TokeoServicer_to_server(tokeo_servicer.TokeoServicer(), server)
         server.add_insecure_port(self.app.config.get('grpc', 'url'))
         server.start()
-        self.app.log.info('Cedra grpc server started, listening on ' + self.app.config.get('grpc', 'url'))
+        self.app.log.info('Tokeo grpc server started, listening on ' + self.app.config.get('grpc', 'url'))
         try:
             while True:
                 server.wait_for_termination()
@@ -55,5 +55,5 @@ class Grpc(Controller):
         # of the code.
         self.app.log.info('Try to call CountWords by grpc ...')
         with grpc.insecure_channel(self.app.config.get('grpc', 'url')) as channel:
-            stub = cedra_pb2_grpc.CedraStub(channel)
-            response = stub.CountWords(cedra_pb2.CountWordsRequest(url=self.app.pargs.url))
+            stub = tokeo_pb2_grpc.TokeoStub(channel)
+            response = stub.CountWords(tokeo_pb2.CountWordsRequest(url=self.app.pargs.url))

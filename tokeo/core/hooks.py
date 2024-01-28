@@ -1,4 +1,4 @@
-from cedra.core.dramatiq import broker
+from tokeo.core.dramatiq import broker
 
 
 def hook_dramatiq_setup(app):

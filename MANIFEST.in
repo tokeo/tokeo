@@ -3,4 +3,4 @@ recursive-include proto/*.proto
 include setup.cfg
 include README.md CHANGELOG.md LICENSE.md
 include *.txt
-recursive-include cedra/templates *
+recursive-include tokeo/templates *

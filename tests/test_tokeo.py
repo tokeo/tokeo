@@ -1,17 +1,17 @@
 from pytest import raises
-from cedra.main import CedraTest
+from tokeo.main import TokeoTest
 
 
-def test_cedra():
-    # test cedra without any subcommands or arguments
-    with CedraTest() as app:
+def test_tokeo():
+    # test tokeo without any subcommands or arguments
+    with TokeoTest() as app:
         app.run()
         assert app.exit_code == 0
 
 
-def test_cedra_debug():
+def test_tokeo_debug():
     # test that debug mode is functional
     argv = ['--debug']
-    with CedraTest(argv=argv) as app:
+    with TokeoTest(argv=argv) as app:
         app.run()
         assert app.debug is True

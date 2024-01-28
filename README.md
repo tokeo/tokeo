@@ -1,8 +1,8 @@
-![image](https://github.com/TomFreudenberg/cedra/assets/410087/52b705f1-14a1-464f-8939-f02da974ee1f)
+![image](https://github.com/TomFreudenberg/tokeo/assets/410087/52b705f1-14a1-464f-8939-f02da974ee1f)
 
 <br/>
 
-# CEDRA: Unleashing the Power of Cement, Dramatiq, and Grpc for Superior EDA Solutions!
+# TOKEO: Unleashing the Power of Cement, Dramatiq, and Grpc for Superior EDA Solutions!
 
 <br/>
 
@@ -14,14 +14,14 @@ The [Dramatiq](https://dramatiq.io) background task processing library in combin
 
 An integrated [Grpc](https://grpc.io) service gives access to the available tasks and workflows from outside.
 
-Kickstart your EDA projects with Cedra and experience a seamless development cycle.
+Kickstart your EDA projects with Tokeo and experience a seamless development cycle.
 
 Cheers<br/>
 Tom
 
 <br/>
 
-# CEDRA CLI handles all the workers, services, tasks, jobs and functions
+# TOKEO CLI handles all the workers, services, tasks, jobs and functions
 
 <br/>
 
@@ -44,7 +44,7 @@ $ source .venv/bin/activate
 
 ### run the dramatiq workers for the implemented tasks
 
-$ cedra dramatiq serve
+$ tokeo dramatiq serve
 ```
 
 <br/>
@@ -56,7 +56,7 @@ $ source .venv/bin/activate
 
 ### run the count_words task
 
-$ cedra emit count-words --url https://github.com
+$ tokeo emit count-words --url https://github.com
 
 ### check result output on dramatiq serve console
 ```
@@ -70,7 +70,7 @@ $ source .venv/bin/activate
 
 ### run the grpc service for the exported methods
 
-$ cedra grpc serve
+$ tokeo grpc serve
 ```
 
 <br/>
@@ -82,9 +82,26 @@ $ source .venv/bin/activate
 
 ### run the count_words task
 
-$ cedra grpc count-words --url https://github.com
+$ tokeo grpc count-words --url https://github.com
 
 ### check result output on dramatiq serve console
+```
+
+<br/>
+
+## Controlling log level
+
+The log level for the app can be set by config file (`config/tokeo.yaml`) or an environment variable.
+
+```bash
+### this enables the app debug level output
+$ TOKEO_LOG_COLORLOG_LEVEL=debug tokeo command
+
+### Instead this enables also the framework debug log
+$ tokeo --debug command
+
+### At least this enables framework debug log only
+$ CEMENT_LOG=1 tokeo command
 ```
 
 <br/>
@@ -111,9 +128,9 @@ $ pip install -r requirements-dev.txt
 $ python setup.py develop
 
 
-### check cedra cli application
+### check tokeo cli application
 
-$ cedra --help
+$ tokeo --help
 
 
 ### run pytest / coverage
@@ -151,11 +168,11 @@ $ make dist-upload
 
 ### Docker
 
-Included is a basic `Dockerfile` for building and distributing `The Cedra`,
+Included is a basic `Dockerfile` for building and distributing `The Tokeo`,
 and can be built with the included `make` helper:
 
 ```
 $ make docker
 
-$ docker run -it cedra --help
+$ docker run -it tokeo --help
 ```

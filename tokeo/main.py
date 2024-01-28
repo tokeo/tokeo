@@ -3,7 +3,7 @@ from cement import App, TestApp
 from cement.core.exc import CaughtSignal
 from cement.utils import fs
 from .config import config_defaults
-from .core.exc import CedraError
+from .core.exc import TokeoError
 from .core.hooks import hook_dramatiq_setup
 from .controllers.base import Base
 from .controllers.emit import Emit
@@ -11,11 +11,11 @@ from .controllers.dramatiq import Dramatiq
 from .controllers.grpc import Grpc
 
 
-class Cedra(App):
-    """The Cedra primary application."""
+class Tokeo(App):
+    """The Tokeo primary application."""
 
     class Meta:
-        label = 'cedra'
+        label = 'tokeo'
 
         # configuration defaults
         config_defaults = config_defaults()
@@ -59,15 +59,15 @@ class Cedra(App):
         ]
 
 
-class CedraTest(TestApp, Cedra):
-    """A sub-class of Cedra that is better suited for testing."""
+class TokeoTest(TestApp, Tokeo):
+    """A sub-class of Tokeo that is better suited for testing."""
 
     class Meta:
-        label = 'cedra'
+        label = 'tokeo'
 
 
 def main():
-    with Cedra() as app:
+    with Tokeo() as app:
         try:
             app.run()
 
@@ -80,8 +80,8 @@ def main():
 
                 traceback.print_exc()
 
-        except CedraError as e:
-            print('CedraError > %s' % e.args[0])
+        except TokeoError as e:
+            print('TokeoError > %s' % e.args[0])
             app.exit_code = 1
 
             if app.debug is True:

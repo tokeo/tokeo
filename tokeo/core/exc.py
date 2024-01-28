@@ -1,4 +1,4 @@
-class CedraError(Exception):
+class TokeoError(Exception):
     """Generic errors."""
 
     pass

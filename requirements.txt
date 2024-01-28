@@ -1,8 +1,11 @@
-cement==3.0.8
+cement @ git+https://github.com/datafolklabs/cement.git@main
 cement[jinja2]
 cement[yaml]
 cement[colorlog]
-dramatiq[rabbitmq, watch]
+dramatiq
+dramatiq[rabbitmq]
+dramatiq[watch]
+gevent
 grpcio
 grpcio-tools
 lazy_loader

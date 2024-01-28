@@ -1,4 +1,4 @@
-# The Cedra Change History
+# The Tokeo Change History
 
 ## 0.1.0
 

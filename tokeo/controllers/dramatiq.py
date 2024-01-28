@@ -2,7 +2,7 @@ import sys
 import os
 from cement import Controller, ex
 from dramatiq import cli
-from cedra.core import tasks
+from tokeo.core import tasks
 
 
 class Dramatiq(Controller):
@@ -16,7 +16,7 @@ class Dramatiq(Controller):
         description = 'Manage the dramatiq service.'
 
         # text displayed at the bottom of --help output
-        epilog = 'Example: cedra dramatiq serve --option --param value'
+        epilog = 'Example: tokeo dramatiq serve --option --param value'
 
     @ex(
         help='spin up the dramatiq service workers',
@@ -33,7 +33,7 @@ class Dramatiq(Controller):
     def serve(self):
         self.app.log.info('Spinning up the damatiq workers ...')
         # prepare a sys.argv array to contorl the dramatiq main instance
-        # initialize with "this" script (should by cedra)
+        # initialize with "this" script (should by tokeo)
         sys.argv = [sys.argv[0]]
         # append some worker settings
         sys.argv.extend(
@@ -50,7 +50,7 @@ class Dramatiq(Controller):
             )
         # add the broker and actors
         sys.argv.extend(
-            ['cedra.core.dramatiq.broker:setup', 'cedra.core.tasks.actors'],
+            ['tokeo.core.dramatiq.broker:setup', 'tokeo.core.tasks.actors'],
         )
         # parse sys.argv as dramatiq command line options
         args = cli.make_argument_parser().parse_args()

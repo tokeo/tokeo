@@ -3,11 +3,11 @@
 import grpc
 
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
-from proto import cedra_pb2 as proto_dot_cedra__pb2
+from proto import tokeo_pb2 as proto_dot_tokeo__pb2
 
 
-class CedraStub(object):
-    """The grpc service on Cedra
+class TokeoStub(object):
+    """The grpc service on Tokeo
     """
 
     def __init__(self, channel):
@@ -17,14 +17,14 @@ class CedraStub(object):
             channel: A grpc.Channel.
         """
         self.CountWords = channel.unary_unary(
-                '/cedra.Cedra/CountWords',
-                request_serializer=proto_dot_cedra__pb2.CountWordsRequest.SerializeToString,
+                '/tokeo.Tokeo/CountWords',
+                request_serializer=proto_dot_tokeo__pb2.CountWordsRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 )
 
 
-class CedraServicer(object):
-    """The grpc service on Cedra
+class TokeoServicer(object):
+    """The grpc service on Tokeo
     """
 
     def CountWords(self, request, context):
@@ -35,22 +35,22 @@ class CedraServicer(object):
         raise NotImplementedError('Method not implemented!')
 
 
-def add_CedraServicer_to_server(servicer, server):
+def add_TokeoServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'CountWords': grpc.unary_unary_rpc_method_handler(
                     servicer.CountWords,
-                    request_deserializer=proto_dot_cedra__pb2.CountWordsRequest.FromString,
+                    request_deserializer=proto_dot_tokeo__pb2.CountWordsRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'cedra.Cedra', rpc_method_handlers)
+            'tokeo.Tokeo', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
  # This class is part of an EXPERIMENTAL API.
-class Cedra(object):
-    """The grpc service on Cedra
+class Tokeo(object):
+    """The grpc service on Tokeo
     """
 
     @staticmethod
@@ -64,8 +64,8 @@ class Cedra(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/cedra.Cedra/CountWords',
-            proto_dot_cedra__pb2.CountWordsRequest.SerializeToString,
+        return grpc.experimental.unary_unary(request, target, '/tokeo.Tokeo/CountWords',
+            proto_dot_tokeo__pb2.CountWordsRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

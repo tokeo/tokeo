@@ -6,9 +6,9 @@ from dramatiq import middleware
 def setup():
     # the import within the function broker_setup has been moved
     # to the inside of the function to avoid circular imports
-    from cedra.main import Cedra
-    # instantiate a Cedra() app to get config etc. when starting as broker module via dramatiq
-    app = Cedra()
+    from tokeo.main import Tokeo
+    # instantiate a Tokeo() app to get config etc. when starting as broker module via dramatiq
+    app = Tokeo()
     # run some of the _setup_handlers to get a functional App object
     app._setup_extension_handler()
     app._setup_config_handler()

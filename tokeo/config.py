@@ -1,7 +1,7 @@
 def config_defaults():
     # application configuration defaults
     return dict(
-        cedra=dict(
+        tokeo=dict(
             debug=False,
         ),
         rabbitmq=dict(
