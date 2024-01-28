@@ -2,23 +2,23 @@ import os
 from cement import App, TestApp
 from cement.core.exc import CaughtSignal
 from cement.utils import fs
-from .config import config_defaults
 from .core.exc import TokeoError
-from .core.hooks import hook_dramatiq_setup
 from .controllers.base import Base
 from .controllers.emit import Emit
-from .controllers.dramatiq import Dramatiq
-from .controllers.grpc import Grpc
+from .controllers.grpccall import GrpcCall
 
 
 class Tokeo(App):
     """The Tokeo primary application."""
 
     class Meta:
+        # this app name
         label = 'tokeo'
 
         # configuration defaults
-        config_defaults = config_defaults()
+        config_defaults = dict(
+            debug=False,
+        )
 
         # call sys.exit() on close
         exit_on_close = True
@@ -28,6 +28,20 @@ class Tokeo(App):
             'yaml',
             'colorlog',
             'jinja2',
+            'tokeo.ext.appshare',
+            'tokeo.ext.smtp',
+            'tokeo.ext.scheduler',
+            'tokeo.ext.diskcache',
+            'tokeo.ext.pocketbase',
+            'tokeo.ext.dramatiq',
+            'tokeo.ext.grpc',
+        ]
+
+        # register handlers
+        handlers = [
+            Base,
+            Emit,
+            GrpcCall,
         ]
 
         # configuration handler
@@ -37,7 +51,9 @@ class Tokeo(App):
         config_file_suffix = '.yaml'
 
         # add local config to app
-        config_dirs = [fs.abspath(os.path.dirname(__file__) + '/../config')]
+        config_dirs = [
+            fs.abspath(os.path.dirname(fs.abspath(__file__)) + '/../config'),
+        ]
 
         # set the log handler
         log_handler = 'colorlog'
@@ -45,25 +61,22 @@ class Tokeo(App):
         # set the output handler
         output_handler = 'jinja2'
 
-        # register handlers
-        handlers = [
-            Base,
-            Emit,
-            Dramatiq,
-            Grpc,
-        ]
-
-        # register hooks
-        hooks = [
-            ('post_setup', hook_dramatiq_setup),
-        ]
-
 
 class TokeoTest(TestApp, Tokeo):
     """A sub-class of Tokeo that is better suited for testing."""
 
     class Meta:
-        label = 'tokeo'
+        # this app test name
+        label = f'{Tokeo.Meta.label}:test'
+
+
+def dramatiq():
+    # instantiate app to get config etc. when starting as module via dramatiq
+    app = Tokeo()
+    # disable signal catching when started as module by dramatiq
+    app._meta.catch_signals = None
+    # run setup to inintializes config, handlers and hooks
+    app.setup()
 
 
 def main():
