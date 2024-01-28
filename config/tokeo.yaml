@@ -3,64 +3,66 @@
 
 tokeo:
 
-### Toggle application level debug (does not toggle framework debugging)
-# debug: false
+  ### Toggle application level debug (does not toggle framework debugging)
+  # debug: false
 
-### Where external (third-party) plugins are loaded from
-# plugin_dir: /var/lib/tokeo/plugins/
+  ### Where external (third-party) plugins are loaded from
+  # plugin_dir: /var/lib/tokeo/plugins/
 
-### Where all plugin configurations are loaded from
-# plugin_config_dir: /etc/tokeo/plugins.d/
+  ### Where all plugin configurations are loaded from
+  # plugin_config_dir: /etc/tokeo/plugins.d/
 
-### Where external templates are loaded from
-# template_dir: /var/lib/tokeo/templates/
+  ### Where external templates are loaded from
+  # template_dir: /var/lib/tokeo/templates/
 
-### The log handler label
-# log_handler: colorlog
+  ### The log handler label
+  # log_handler: colorlog
 
-### The output handler label
-# output_handler: jinja2
+  ### The output handler label
+  # output_handler: jinja2
 
-### sample foo option
-# foo: bar
+  ### sample foo option
+  # foo: bar
 
-rabbitmq:
+dramatiq:
 
-### connection url to rabbitmq server
-# url: amqp://guest:guest@localhost:5672/
-  url: amqp://test_user:test@10.0.16.108:5672/dev
-
-worker:
-### number of processes to run the dramatiq workers
-# processes: 2
-
-### number of threads to run the dramatiq workers
-# threads: 1
+  ### module and method to launch dramatiq serve service
+  serve: tokeo.main:dramatiq
+  ### actors module to launch with services
+  actors: tokeo.core.tasks.actors
+  ### number of processes to run the dramatiq workers
+  worker_processes: 2
+  ### number of threads to run the dramatiq workers
+  worker_threads: 2
+  ### broker to use for backend
+  broker: rabbitmq
+  ### connection url to rabbitmq server
+  rabbitmq_url: amqp://guest:guest@localhost:5672
 
 grpc:
 
-### serve and connect to the grpc service
-# url: localhost:50051
+  ### serve and connect to the grpc service
+  # url: localhost:50051
 
-### Thread Pool max-workers for grpc service
-# worker_threads: 2
+  ### Thread Pool max-workers for grpc service
+  # worker_threads: 2
 
 log.colorlog:
 
-### Where the log file lives (no log file by default)
-# file: null
+  ### Where the log file lives (no log file by default)
+  # file: null
 
-### The level for which to log.  One of: info, warning, error, fatal, debug
-# level: info
+  ### The level for which to log.  One of: info, warning, error, fatal, debug
+  # level: info
 
-### Whether or not to log to console
-# to_console: true
+  ### Whether or not to log to console
+  # to_console: true
 
-### Whether or not to rotate the log file when it reaches `max_bytes`
-# rotate: false
+  ### Whether or not to rotate the log file when it reaches `max_bytes`
+  # rotate: false
 
-### Max size in bytes that a log file can grow until it is rotated.
-# max_bytes: 512000
+  ### Max size in bytes that a log file can grow until it is rotated.
+  # max_bytes: 512000
 
-### The maximum number of log files to maintain when rotating
-# max_files: 4
+  ### The maximum number of log files to maintain when rotating
+  # max_files: 4
