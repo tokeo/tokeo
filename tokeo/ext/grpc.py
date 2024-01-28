@@ -54,14 +54,12 @@ class TokeoGrpc(MetaMixin):
     @property
     def server(self):
         if self._server is None:
-            self._server = grpc.server(
-                futures.ThreadPoolExecutor(
-                    max_workers=self._config('max_worker')
-                )
-            )
+            self._server = grpc.server(futures.ThreadPoolExecutor(max_workers=self._config('max_worker')))
             # get dynamic methods for proto and service
             proto_add_service_to_server_module = importlib.import_module(self._proto_add_service_to_server_module)
-            proto_add_service_to_server_method = getattr(proto_add_service_to_server_module, self._proto_add_service_to_server_method)
+            proto_add_service_to_server_method = getattr(
+                proto_add_service_to_server_module, self._proto_add_service_to_server_method
+            )
             grpc_service_handler_module = importlib.import_module(self._grpc_service_handler_module)
             grpc_service_handler_method = getattr(grpc_service_handler_module, self._grpc_service_handler_method)
             # append services
@@ -104,9 +102,9 @@ class TokeoGrpcController(Controller):
         self._parser.print_help()
 
     @ex(
-        help = 'serve',
-        description = 'Spin up the grpc service',
-        epilog = "",
+        help='serve',
+        description='Spin up the grpc service',
+        epilog='',
         arguments=[],
     )
     def serve(self):
@@ -116,6 +114,7 @@ class TokeoGrpcController(Controller):
 def tokeo_grpc_extend_app(app):
     app.extend('grpc', TokeoGrpc(app))
     app.grpc._setup(app)
+
 
 def load(app):
     app.handler.register(TokeoGrpcController)

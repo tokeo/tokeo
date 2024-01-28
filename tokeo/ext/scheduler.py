@@ -62,7 +62,8 @@ class TokeoScheduler(MetaMixin):
         return self._config('tasks')
 
     def add_crontab_task(self, module, func, crontab, kwargs={}, title=''):
-        if title == '': title = func
+        if title == '':
+            title = func
         self._taskid += 1
 
         self.scheduler.add_job(
@@ -130,9 +131,11 @@ class TokeoScheduler(MetaMixin):
         )
 
     def shell_history(self):
-        return InMemoryHistory([
-            'exit',
-        ])
+        return InMemoryHistory(
+            [
+                'exit',
+            ]
+        )
 
     def handle_command_list(self, args):
         self._scheduler.print_jobs()
@@ -147,14 +150,16 @@ class TokeoScheduler(MetaMixin):
         # save running state
         is_running = self._scheduler.state == STATE_RUNNING
         # pause if running to prevent events while updating tasks
-        if is_running: self._scheduler.pause()
+        if is_running:
+            self._scheduler.pause()
         # drop the job queue
         self._scheduler.remove_all_jobs()
         # fill in from config again
         # attention: config get's not reload
         self.init_tasks()
         # set scheduler to running if was running or forced
-        if is_running or args.restart: self._scheduler.resume()
+        if is_running or args.restart:
+            self._scheduler.resume()
 
     def handle_command_restart(self, args):
         args.restart = True
@@ -185,10 +190,10 @@ class TokeoScheduler(MetaMixin):
         if self._command_parser is None:
             # if not created, generate the nested command parser
             self._command_parser = ArgumentParser(
-                    prog='',
-                    description='control the task scheduler',
-                    epilog='',
-                )
+                prog='',
+                description='control the task scheduler',
+                epilog='',
+            )
 
             # prepare for sub-commands
             sub = self._command_parser.add_subparsers(metavar='')
@@ -248,7 +253,7 @@ class TokeoScheduler(MetaMixin):
         # execute command
         if 'func' in args:
             try:
-                print("")
+                print('')
                 args.func(args)
                 return True
             except Exception as err:
@@ -301,7 +306,8 @@ class TokeoScheduler(MetaMixin):
                     self.app.log.debug(f'Logged unknown exception: {err}')
 
                 # make one line space
-                print("")
+                print('')
+
 
 class TokeoSchedulerController(Controller):
 
@@ -321,9 +327,9 @@ class TokeoSchedulerController(Controller):
         self._parser.print_help()
 
     @ex(
-        help = 'launch',
-        description = 'Spin up the scheduler',
-        epilog = "",
+        help='launch',
+        description='Spin up the scheduler',
+        epilog='',
         arguments=[
             (
                 ['--background'],
@@ -339,8 +345,10 @@ def tokeo_scheduler_extend_app(app):
     app.extend('scheduler', TokeoScheduler(app))
     app.scheduler._setup(app)
 
+
 def tokeo_scheduler_shutdown(app):
     app.scheduler.shutdown()
+
 
 def load(app):
     app.handler.register(TokeoSchedulerController)

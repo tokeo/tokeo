@@ -13,10 +13,10 @@ Functions
 ---------
 load(app_to_share)
     Sets the Cement app object to be shared globally.
-
 """
 
-class App():
+
+class App:
     """
     A proxy class to access the shared app object.
 
@@ -61,11 +61,13 @@ class App():
         """
         # test _app object
         if self._app is None:
-            raise AttributeError(f'\'App\' object has no attribute \'{key}\'')
+            raise AttributeError(f"'App' object has no attribute '{key}'")
         # return attribute
         return getattr(self._app, key)
 
+
 app = App()
+
 
 def load(app_to_share):
     """
