@@ -1,8 +1,8 @@
-![image](https://github.com/TomFreudenberg/tokeo/assets/410087/52b705f1-14a1-464f-8939-f02da974ee1f)
+![image]()
 
 <br/>
 
-# TOKEO: Unleashing the Power of Cement, Dramatiq, and Grpc for Superior EDA Solutions!
+# tokeo: Unleashing the Power of Cement, Dramatiq, and Grpc for Superior EDA Solutions!
 
 <br/>
 
@@ -14,14 +14,14 @@ The [Dramatiq](https://dramatiq.io) background task processing library in combin
 
 An integrated [Grpc](https://grpc.io) service gives access to the available tasks and workflows from outside.
 
-Kickstart your EDA projects with Tokeo and experience a seamless development cycle.
+Kickstart your EDA projects with **tokeo** and experience a seamless development cycle.
 
 Cheers<br/>
 Tom
 
 <br/>
 
-# TOKEO CLI handles all the workers, services, tasks, jobs and functions
+# tokeo CLI handles all the workers, services, tasks, jobs and functions
 
 <br/>
 
@@ -82,7 +82,7 @@ $ source .venv/bin/activate
 
 ### run the count_words task
 
-$ tokeo grpc count-words --url https://github.com
+$ tokeo grpc-client count-words --url https://github.com
 
 ### check result output on dramatiq serve console
 ```
@@ -168,7 +168,7 @@ $ make dist-upload
 
 ### Docker
 
-Included is a basic `Dockerfile` for building and distributing `The Tokeo`,
+Included is a basic `Dockerfile` for building and distributing `The tokeo`,
 and can be built with the included `make` helper:
 
 ```
