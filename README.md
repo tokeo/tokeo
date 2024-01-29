@@ -2,8 +2,16 @@
 
 <br/>
 
-# tokeo
-## Unleashing the Power of Cement, Dramatiq, and Grpc for Superior EDA Solutions!
+<h1 align="center">tokeo</h1>
+
+<p align="center">
+  <strong>Unleashing the Power of Python, Cement, Dramatiq, Apschedule and Grpc for Superior EDA Solutions!</strong>
+</p>
+<p align="center">
+-- Event-Driven Architecture, Backend-Automation, Event-Driven Automation --
+</p>
+
+<br/>
 
 <br/>
 
@@ -24,11 +32,11 @@ Tom
 
 <br/>
 
-# tokeo CLI handles all the workers, services, tasks, jobs and functions
+## tokeo CLI handles all the workers, services, tasks, jobs and functions
 
 <br/>
 
-## Installation on production
+### Installation on production
 
 ```bash
 $ make virtualenv
@@ -40,7 +48,7 @@ $ python setup.py develop # currently install will cause an error on lazy-load
 
 <br/>
 
-## Run the message broker workers
+### Run the message broker workers
 
 ```bash
 $ source .venv/bin/activate
@@ -52,7 +60,7 @@ $ tokeo dramatiq serve
 
 <br/>
 
-## Run a task by emitter
+### Run a task by emitter
 
 ```bash
 $ source .venv/bin/activate
@@ -66,7 +74,7 @@ $ tokeo emit count-words --url https://github.com
 
 <br/>
 
-## Run the grpc service
+### Run the grpc service
 
 ```bash
 $ source .venv/bin/activate
@@ -78,7 +86,7 @@ $ tokeo grpc serve
 
 <br/>
 
-## Run a task by grpc call
+### Run a task by grpc call
 
 ```bash
 $ source .venv/bin/activate
@@ -86,6 +94,26 @@ $ source .venv/bin/activate
 ### run the count_words task
 
 $ tokeo grpc-client count-words --url https://github.com
+
+### check result output on dramatiq serve console
+```
+
+<br/>
+
+### Run tasks by scheduler
+
+```bash
+$ source .venv/bin/activate
+
+### run the scheduler
+
+$ tokeo scheduler launch
+
+### now you are in the interactive scheduler shell
+
+Scheduler> list
+
+### will print the active running tasks and their next execution time
 
 ### check result output on dramatiq serve console
 ```
