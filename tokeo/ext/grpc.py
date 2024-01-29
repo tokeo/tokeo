@@ -23,27 +23,27 @@ class TokeoGrpc(MetaMixin):
         config_defaults = dict(
             url='localhost:50051',
             max_worker=1,
-            proto_add_service_to_server='proto.module:add_service_to_server',
-            grpc_service_handler='tokeo.core.grpc.tokeo_service_handler:TokeoGrpcServiceHandler',
+            proto_add_servicer_to_server='proto.module:add_servicer_to_server',
+            grpc_servicer='tokeo.core.grpc.tokeo_servicer:TokeoServicer',
         )
 
     def __init__(self, app, *args, **kw):
         super(TokeoGrpc, self).__init__(*args, **kw)
         self.app = app
         self._server = None
-        self._proto_add_service_to_server_module = ''
-        self._proto_add_service_to_server_method = ''
-        self._grpc_service_handler_module = ''
-        self._grpc_service_handler_method = ''
+        self._proto_add_servicer_to_server_module = ''
+        self._proto_add_servicer_to_server_method = ''
+        self._grpc_servicer_module = ''
+        self._grpc_servicer_method = ''
 
     def _setup(self, app):
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
-        a = self._config('proto_add_service_to_server').split(':')
-        self._proto_add_service_to_server_module = a[0]
-        self._proto_add_service_to_server_method = a[1]
-        a = self._config('grpc_service_handler').split(':')
-        self._grpc_service_handler_module = a[0]
-        self._grpc_service_handler_method = a[1]
+        a = self._config('proto_add_servicer_to_server').split(':')
+        self._proto_add_servicer_to_server_module = a[0]
+        self._proto_add_servicer_to_server_method = a[1]
+        a = self._config('grpc_servicer').split(':')
+        self._grpc_servicer_module = a[0]
+        self._grpc_servicer_method = a[1]
 
     def _config(self, key, default=None):
         """
@@ -56,14 +56,14 @@ class TokeoGrpc(MetaMixin):
         if self._server is None:
             self._server = grpc.server(futures.ThreadPoolExecutor(max_workers=self._config('max_worker')))
             # get dynamic methods for proto and service
-            proto_add_service_to_server_module = importlib.import_module(self._proto_add_service_to_server_module)
-            proto_add_service_to_server_method = getattr(
-                proto_add_service_to_server_module, self._proto_add_service_to_server_method
+            proto_add_servicer_to_server_module = importlib.import_module(self._proto_add_servicer_to_server_module)
+            proto_add_servicer_to_server_method = getattr(
+                proto_add_servicer_to_server_module, self._proto_add_servicer_to_server_method
             )
-            grpc_service_handler_module = importlib.import_module(self._grpc_service_handler_module)
-            grpc_service_handler_method = getattr(grpc_service_handler_module, self._grpc_service_handler_method)
+            grpc_servicer_module = importlib.import_module(self._grpc_servicer_module)
+            grpc_servicer_method = getattr(grpc_servicer_module, self._grpc_servicer_method)
             # append services
-            proto_add_service_to_server_method(grpc_service_handler_method(), self._server)
+            proto_add_servicer_to_server_method(grpc_servicer_method(), self._server)
             self._server.add_insecure_port(self._config('url'))
 
         return self._server
