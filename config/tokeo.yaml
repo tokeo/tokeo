@@ -15,14 +15,7 @@ tokeo:
   ### Where external templates are loaded from
   # template_dir: /var/lib/tokeo/templates/
 
-  ### The log handler label
-  # log_handler: colorlog
-
-  ### The output handler label
-  # output_handler: jinja2
-
-  ### sample foo option
-  # foo: bar
+#####################################
 
 dramatiq:
 
@@ -37,15 +30,89 @@ dramatiq:
   ### broker to use for backend
   broker: rabbitmq
   ### connection url to rabbitmq server
-  rabbitmq_url: amqp://guest:guest@localhost:5672
+  rabbitmq_url: amqp://guest:guest@localhost:5672/
+
+#####################################
 
 grpc:
 
   ### serve and connect to the grpc service
-  # url: localhost:50051
-
+  url: localhost:50051
   ### Thread Pool max-workers for grpc service
-  # worker_threads: 2
+  max_worker: 2
+  ### module and method to launch grpc server
+  proto_add_servicer_to_server: proto.tokeo_pb2_grpc:add_TokeoServicer_to_server
+  ### module and servicer for grpc implementations
+  grpc_servicer: tokeo.core.grpc.tokeo_servicer:TokeoServicer
+
+#####################################
+
+diskcache:
+
+  ### file path to allow and store permanent content
+  directory: ./tokeo_diskcache
+
+#####################################
+
+pocketbase:
+
+  ### connection string to database
+  # url: http://localhost:10110
+
+#####################################
+
+smtp:
+
+  ### define one or more standard recipients
+  # to: null
+  ### define the senders address
+  # from_addr: no-reply@example.com
+  ### define one or more carbon copy recipients
+  # cc: null
+  ### define one or more blind copy recipients
+  # bcc: null
+  ### define a default subject
+  # subject: null
+  ### define a defeault prefix on subjects
+  # subject_prefix: null
+  ### SMTP server address to connect for service
+  # host: localhost
+  ### SMTP port to connect fro service
+  # port: 25
+  ### default timeout when connection will cause an error
+  # timeout: 30
+  ### enable SSL connection
+  # ssl: false
+  ### enable TLS on connection, available for SSL and non SSL connections
+  # tls: false
+  ### enable authentication for service
+  # auth: false
+  ### auth username
+  # username: null
+  ### auth password
+  # password: null
+  ### attach one or more files by default to the messages
+  # files: null
+
+#####################################
+
+scheduler:
+
+  ### list of tasks to plan in a crontab style
+  tasks:
+      ### each entry is defined by its method to call
+    - task: count_word_timer
+      ### module where the method is located
+      module: tokeo.core.tasks.agents
+      ### a name for the entry in schedule list
+      name: count-word timer
+      ### one or multiple entries in crontab style when to run the task
+      crontab: '*/5 * * * *'
+      ### optional arguments send by named args to the method
+      kwargs:
+        url: https://github.com
+
+#####################################
 
 log.colorlog:
 
