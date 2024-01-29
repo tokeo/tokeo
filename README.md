@@ -15,6 +15,8 @@ The [Dramatiq](https://dramatiq.io) background task processing library in combin
 
 An integrated [Grpc](https://grpc.io) service gives access to the available tasks and workflows from outside.
 
+For timed jobs excution there is an integrated interactive [Apscheduler](https://apscheduler.readthedocs.io/en/master/) cron service.
+
 Kickstart your EDA projects with **tokeo** and experience a seamless development cycle.
 
 Cheers<br/>
