@@ -20,8 +20,9 @@ Dramatiq
 
 import sys
 from os.path import basename, dirname, abspath
+from tokeo.ext.argparse import Controller
 from cement.core.meta import MetaMixin
-from cement import Controller, ex
+from cement import ex
 import dramatiq
 from dramatiq import middleware, cli
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
@@ -151,7 +152,7 @@ class TokeoDramatiqController(Controller):
         subparser_options = dict(metavar='')
         help = 'Manage the dramatiq service'
         description = 'Provides command-line interfaces to manage Dramatiq workers, enabling task processing in a distributed system.'
-        epilog = f'Example: {basename(sys.argv[0])} dramatiq serve --skip-logging\n '
+        epilog = f'Example: {basename(sys.argv[0])} dramatiq serve --skip-logging'
 
     def _setup(self, app):
         super(TokeoDramatiqController, self)._setup(app)
