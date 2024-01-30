@@ -1,4 +1,5 @@
-from cement import Controller, ex
+from tokeo.ext.argparse import Controller
+from cement import ex
 from tokeo.core import tasks
 
 

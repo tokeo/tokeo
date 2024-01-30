@@ -1,7 +1,8 @@
 from sys import argv
 from os.path import basename
+from tokeo.ext.argparse import Controller
 from cement.core.meta import MetaMixin
-from cement import Controller, ex
+from cement import ex
 from concurrent import futures
 import grpc
 import importlib
@@ -93,7 +94,7 @@ class TokeoGrpcController(Controller):
         subparser_options = dict(metavar='')
         help = 'serve and manage grpc methods with tokeo grpc service'
         description = 'Manage grpc service and methods.'
-        epilog = f'Example: {basename(argv[0])} grpc serve\n '
+        epilog = f'Example: {basename(argv[0])} grpc serve'
 
     def _setup(self, app):
         super(TokeoGrpcController, self)._setup(app)

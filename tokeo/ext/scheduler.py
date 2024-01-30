@@ -1,7 +1,8 @@
 from sys import argv
 from os.path import basename
+from tokeo.ext.argparse import Controller
 from cement.core.meta import MetaMixin
-from cement import Controller, ex
+from cement import ex
 from cement.core.foundation import SIGNALS
 from cement.core.exc import CaughtSignal
 from apscheduler.schedulers.base import STATE_RUNNING
@@ -318,7 +319,7 @@ class TokeoSchedulerController(Controller):
         subparser_options = dict(metavar='')
         help = 'launch and manage timed tasks with tokeo scheduler'
         description = 'Launch the tokeo scheduler to control and manage running repeating tasks. Utilize a range of scheduler commands and a shell for an interactive task handling.'
-        epilog = f'Example: {basename(argv[0])} scheduler launch --background\n '
+        epilog = f'Example: {basename(argv[0])} scheduler launch --background'
 
     def _setup(self, app):
         super(TokeoSchedulerController, self)._setup(app)
