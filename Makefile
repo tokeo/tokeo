@@ -4,6 +4,7 @@ clean:
 	find . -name '*.py[co]' -delete
 	find . -type d -name '__pycache__' -delete
 	rm -rf coverage-report
+	rm -rf html
 	rm -rf tmp
 
 virtualenv:
@@ -18,9 +19,9 @@ proto:
 
 doc:
 	rm -rf html
-	pdoc3 --html braavos tests
+	pdoc3 --html tokeo tests
 	open http://localhost:9999
-	pdoc3 --html --http localhost:9999 braavos tests
+	pdoc3 --html --http localhost:9999 tokeo tests
 
 # check that a log-level is set
 # for testing purposes at least use info
