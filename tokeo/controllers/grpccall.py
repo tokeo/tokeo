@@ -1,7 +1,7 @@
 from tokeo.ext.argparse import Controller
-from concurrent import futures
-from cement import ex
 from tokeo.core.grpc import tokeo_servicer
+from cement import ex
+from concurrent import futures
 from proto import tokeo_pb2_grpc
 from proto import tokeo_pb2
 import grpc

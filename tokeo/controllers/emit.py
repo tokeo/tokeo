@@ -1,6 +1,6 @@
 from tokeo.ext.argparse import Controller
-from cement import ex
 from tokeo.core import tasks
+from cement import ex
 
 
 class Emit(Controller):
