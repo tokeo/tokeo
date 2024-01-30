@@ -16,12 +16,12 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
 
         if type(action) == argparse._SubParsersAction._ChoicesPseudoAction:
             # format subcommand help line
-            subcommand = self._format_action_invocation(action) # type: str
+            subcommand = self._format_action_invocation(action)  # type: str
             width = self._subcommand_max_length
-            help_text = ""
+            help_text = ''
             if action.help:
                 help_text = self._expand_help(action)
-            return "  {:{width}}    {}\n".format(subcommand, help_text, width=width)
+            return '  {:{width}}    {}\n'.format(subcommand, help_text, width=width)
 
         else:
             return super()._format_action(action)
@@ -30,5 +30,4 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
 class Controller(ArgparseController):
 
     class Meta:
-
         argument_formatter = TokeoHelpFormatter

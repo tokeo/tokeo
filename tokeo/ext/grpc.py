@@ -57,7 +57,9 @@ class TokeoGrpc(MetaMixin):
         if self._server is None:
             self._server = grpc.server(futures.ThreadPoolExecutor(max_workers=self._config('max_worker')))
             # get dynamic methods for proto and service
-            proto_add_servicer_to_server_module = importlib.import_module(self._proto_add_servicer_to_server_module)
+            proto_add_servicer_to_server_module = importlib.import_module(
+                self._proto_add_servicer_to_server_module
+            )
             proto_add_servicer_to_server_method = getattr(
                 proto_add_servicer_to_server_module, self._proto_add_servicer_to_server_method
             )
