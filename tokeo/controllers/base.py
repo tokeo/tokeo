@@ -27,6 +27,9 @@ class Base(Controller):
         # text displayed at the bottom of --help output
         epilog = 'Example: tokeo command --option --param value'
 
+        # short help is empty on base
+        help = ''
+
         # controller level arguments. ex: 'tokeo --version'
         arguments = [
             ### add a version banner
@@ -38,7 +41,3 @@ class Base(Controller):
                 ),
             ),
         ]
-
-    def _default(self):
-        """Default application action if no sub-command is passed."""
-        self.app.args.print_help()

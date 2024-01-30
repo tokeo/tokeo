@@ -23,6 +23,9 @@ class GrpcCall(Controller):
         # text displayed at the bottom of --help output
         epilog = 'Example: tokeo grpc count-words --url value'
 
+        # short help information
+        help = 'call remote grpc methods manually'
+
     @ex(
         help='call the CountWords method by grpc client',
         arguments=[
