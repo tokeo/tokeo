@@ -19,6 +19,9 @@ class Emit(Controller):
         # text displayed at the bottom of --help output
         epilog = 'Example: tokeo emit task --option --param value'
 
+        # short help information
+        help = 'emit tasks manually'
+
     def _default(self):
         """Default command action if no sub-command is passed."""
 
