@@ -3,6 +3,7 @@ from cement import ex
 from cement.utils.version import get_version_banner
 from ..core.version import get_version
 
+
 VERSION_BANNER = """
 The Tokeo CLI contains all tasks, jobs and management for your Event-Driven Backend. %s
 %s
@@ -40,5 +41,4 @@ class Base(Controller):
 
     def _default(self):
         """Default application action if no sub-command is passed."""
-
         self.app.args.print_help()
