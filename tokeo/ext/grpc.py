@@ -105,9 +105,8 @@ class TokeoGrpcController(Controller):
         self._parser.print_help()
 
     @ex(
-        help='serve',
-        description='Spin up the grpc service',
-        epilog='',
+        help='start grpc service',
+        description='Spin up the grpc service.',
         arguments=[],
     )
     def serve(self):
