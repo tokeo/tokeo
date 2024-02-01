@@ -328,13 +328,15 @@ class TokeoSchedulerController(Controller):
         self._parser.print_help()
 
     @ex(
-        help='launch',
-        description='Spin up the scheduler',
-        epilog='',
+        help='launch the scheduler service',
+        description='Spin up the scheduler.',
         arguments=[
             (
                 ['--background'],
-                dict(action='store_true', help='do not startup in interactive shell'),
+                dict(
+                    action='store_true',
+                    help='do not startup in interactive shell',
+                ),
             ),
         ],
     )

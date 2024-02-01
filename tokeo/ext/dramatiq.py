@@ -150,7 +150,7 @@ class TokeoDramatiqController(Controller):
         stacked_type = 'nested'
         stacked_on = 'base'
         subparser_options = dict(metavar='')
-        help = 'Manage the dramatiq service'
+        help = 'manage the dramatiq service'
         description = 'Provides command-line interfaces to manage Dramatiq workers, enabling task processing in a distributed system.'
         epilog = f'Example: {basename(sys.argv[0])} dramatiq serve --skip-logging'
 
@@ -161,7 +161,7 @@ class TokeoDramatiqController(Controller):
         self._parser.print_help()
 
     @ex(
-        help='Spin up the dramatiq service workers',
+        help='spin up the dramatiq service workers',
         description='Starts Dramatiq workers, allowing for configuration of worker processes and threads. Optional flags for logging and file watching.',
         epilog=f'Use "{basename(sys.argv[0])} dramatiq serve" with options like "--skip-logging" for custom logging or "--watch" for automatic actor reloading.',
         arguments=[
@@ -169,14 +169,14 @@ class TokeoDramatiqController(Controller):
                 ['--skip-logging'],
                 dict(
                     action='store_true',
-                    help='Do not call dramatiq logging.basicConfig()',
+                    help='do not call dramatiq logging.basicConfig()',
                 ),
             ),
             (
                 ['--watch'],
                 dict(
                     action='store',
-                    help='Reload actors on changes and restart workers',
+                    help='reload actors on changes and restart workers',
                 ),
             ),
         ],
