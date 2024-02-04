@@ -7,7 +7,7 @@ from proto import tokeo_pb2
 import grpc
 
 
-class GrpcCall(Controller):
+class GrpcCallController(Controller):
 
     class Meta:
         label = 'grpccall'

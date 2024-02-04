@@ -3,7 +3,7 @@ from tokeo.core import tasks
 from cement import ex
 
 
-class Emit(Controller):
+class EmitController(Controller):
 
     class Meta:
         label = 'emit'
