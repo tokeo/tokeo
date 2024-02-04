@@ -3,9 +3,9 @@ from cement import App, TestApp
 from cement.core.exc import CaughtSignal
 from cement.utils import fs
 from .core.exc import TokeoError
-from .controllers.base import Base
-from .controllers.emit import Emit
-from .controllers.grpccall import GrpcCall
+from .controllers.base import BaseController
+from .controllers.emit import EmitController
+from .controllers.grpccall import GrpcCallController
 
 
 class Tokeo(App):
@@ -39,9 +39,9 @@ class Tokeo(App):
 
         # register handlers
         handlers = [
-            Base,
-            Emit,
-            GrpcCall,
+            BaseController,
+            EmitController,
+            GrpcCallController,
         ]
 
         # configuration handler

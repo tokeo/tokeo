@@ -13,7 +13,7 @@ The Tokeo CLI contains all tasks, jobs and management for your Event-Driven Back
 )
 
 
-class Base(Controller):
+class BaseController(Controller):
 
     class Meta:
         label = 'base'
