@@ -1,6 +1,7 @@
-recursive-include *.py
-recursive-include proto/*.proto
-include setup.cfg
-include README.md CHANGELOG.md LICENSE.md
-include *.txt
+recursive-include config *.yaml
+recursive-include tokeo *.py
 recursive-include tokeo/templates *
+recursive-include proto *.proto *.py
+include setup.py setup.cfg
+include README.md CHANGELOG.md LICENSE.md
+include requirements*.txt

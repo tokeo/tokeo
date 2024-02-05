@@ -51,9 +51,12 @@ fmt:
 docker: clean
 	docker build -t tokeo:latest .
 
-dist: clean
+sdist: clean
 	rm -rf dist/*
 	python setup.py sdist
+
+wheel: clean
+	rm -rf dist/*
 	python setup.py bdist_wheel
 
 dist-upload:
