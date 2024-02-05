@@ -26,6 +26,10 @@ from cement import ex
 import dramatiq
 from dramatiq import middleware, cli
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
+import inspect
+import functools
+import diskcache
+import time
 
 
 class ExtendedRabbitmqBrocker(RabbitmqBroker):
@@ -61,6 +65,7 @@ class TokeoDramatiq(MetaMixin):
             worker_processes=2,
             broker='rabbitmq',
             rabbitmq_url='amqp://guest:guest@localhost:5672/',
+            lock_cache_directory=None,
         )
 
     def __init__(self, app, *args, **kw):
@@ -69,6 +74,11 @@ class TokeoDramatiq(MetaMixin):
 
     def _setup(self, app):
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
+        # create a key/value store for locks
+        self.locks = diskcache.Cache(
+            directory=self._config('lock_cache_directory'),
+        )
+        # dramatiq register
         self.register()
 
     def _config(self, key, default=None):
@@ -115,6 +125,202 @@ class TokeoDramatiq(MetaMixin):
             self.app.log.debug('Closed registered ExtendedRabbitmqBrocker')
         else:
             self.app.log.debug('Dramatiq broker instance is not a ExtendedRabbitmqBrocker')
+
+    ### --------------------------------------------------------------------------------------
+
+    def purge_locks(self):
+        self.locks.clear()
+
+    ### --------------------------------------------------------------------------------------
+
+    def throttle(
+        self,
+        count,
+        per_seconds,
+        name=None,
+        name_f=None,
+        expire=None,
+        tag=None,
+        time_func=time.time,
+        sleep_func=time.sleep,
+        cb_on_locked=None,
+    ):
+        """
+
+        Decorator to throttle calls to function.
+
+        """
+
+        def decorator(func):
+            # create the full name of the @decorated function
+            func_full_name = diskcache.core.full_name(func)
+            # calc the rate
+            rate = count / float(per_seconds)
+
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                # flag for function call to use
+                use_cb = False
+                # unpack arguments in dictionary
+                arguments = dict(
+                    func_name = func.__name__,
+                    func_full_name = func_full_name,
+                    **unpack_func_args(func, *args),
+                    **kwargs,
+                )
+                # create key from @decorated function name or formatted string
+                if isinstance(name, str) and name != '':
+                    # just use the name
+                    key = name
+                elif isinstance(name_f, str) and name_f != '':
+                    # expand the string in name_f with dict from args
+                    key = name_f.format(**arguments)
+                else:
+                    # use full_name as key
+                    key = func_full_name
+
+                # some outputr info
+                self.app.log.info(f'@throttle {func.__name__} using key {key}')
+
+                # run in a transaction
+                with self.locks.transact(retry=True):
+                    # check if already initialized
+                    if self.locks.get(key) is None:
+                        # initialize the timer
+                        now = time_func()
+                        # set the cache
+                        self.locks.set(key, (now, count), expire=expire, tag=tag, retry=True)
+
+                # loop
+                while True:
+                    # run in a transaction
+                    with self.locks.transact(retry=True):
+                        last, tally = self.locks.get(key)
+                        now = time_func()
+                        tally += (now - last) * rate
+                        delay = 0
+
+                        if tally > count:
+                            self.locks.set(key, (now, count - 1), expire)
+                        elif tally >= 1:
+                            self.locks.set(key, (now, tally - 1), expire)
+                        else:
+                            delay = (1 - tally) / rate
+
+                    if delay:
+                        # with callback break and call callback outside the transaction
+                        if cb_on_locked:
+                            use_cb = True
+                            break
+                        # without callback stay here and sleep
+                        else:
+                            sleep_func(delay)
+                    else:
+                        # break and call func
+                        break
+
+                # call the wrapped function or callback if set
+                result = func(*args, **kwargs) if not use_cb else cb_on_locked(**arguments)
+
+                # return the @decorated result
+                return result
+
+            return wrapper
+
+        return decorator
+
+    ### --------------------------------------------------------------------------------------
+
+    def temper(
+        self,
+        count=1,
+        name=None,
+        name_f=None,
+        expire=None,
+        tag=None,
+        sleep_func=time.sleep,
+        cb_on_locked=None,
+    ):
+        """
+
+        Decorator to temper calls to function.
+
+        """
+
+        def decorator(func):
+            # create the full name of the @decorated function
+            func_full_name = diskcache.core.full_name(func)
+
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                # flag for function call to use
+                use_cb = False
+                # unpack arguments in dictionary
+                arguments = dict(
+                    func_name = func.__name__,
+                    func_full_name = func_full_name,
+                    **unpack_func_args(func, *args),
+                    **kwargs,
+                )
+                # create key from @decorated function name or formatted string
+                if isinstance(name, str) and name != '':
+                    # just use the name
+                    key = name
+                elif isinstance(name_f, str) and name_f != '':
+                    # expand the string in name_f with dict from args
+                    key = name_f.format(**arguments)
+                else:
+                    # use full_name as key
+                    key = func_full_name
+
+                # some outputr info
+                self.app.log.info(f'@temper {func.__name__} using key {key}')
+
+                # run in a transaction
+                with self.locks.transact(retry=True):
+                    # check if already initialized
+                    if self.locks.get(key) is None:
+                        # set the cache
+                        self.locks.set(key, count, expire=expire, tag=tag, retry=True)
+
+                # loop
+                while True:
+                    # run in a transaction
+                    with self.locks.transact(retry=True):
+                        available = self.locks.get(key)
+                        delay = 0
+
+                        if available >= 1:
+                            self.locks.set(key, available - 1, expire)
+                        else:
+                            delay = 0.05
+
+                    if delay:
+                        # with callback break and call callback outside the transaction
+                        if cb_on_locked:
+                            use_cb = True
+                            break
+                        # without callback stay here and sleep
+                        else:
+                            sleep_func(delay)
+                    else:
+                        # break and call func
+                        break
+
+                # call the wrapped function or callback if set
+                result = func(*args, **kwargs) if not use_cb else cb_on_locked(**arguments)
+
+                # run in a transaction
+                with self.locks.transact(retry=True):
+                    # add to counter
+                    self.locks.set(key, self.locks.get(key) + 1, expire)
+
+                # return the @decorated result
+                return result
+
+            return wrapper
+
+        return decorator
 
 
 class TokeoDramatiqController(Controller):
@@ -223,8 +429,18 @@ class TokeoDramatiqController(Controller):
         args = cli.make_argument_parser().parse_args()
         # restore the sys.argv content for later restart etc. from inside dramatiq
         sys.argv = [sys.argv[0]] + self.app.argv
+        # initialize locks on service start
+        self.app.dramatiq.purge_locks()
+        # signal hook
+        for res in self.app.hook.run('tokeo_dramatiq_pre_start', self.app):
+            pass
         # go and run dramatiq workers with the parsed args
-        sys.exit(cli.main(args))
+        result = cli.main(args)
+        # signal hook
+        for res in self.app.hook.run('tokeo_dramatiq_post_end', self.app):
+            pass
+        # signal result as exit code
+        sys.exit(result)
 
 
 def tokeo_dramatiq_extend_app(app):
@@ -237,6 +453,21 @@ def tokeo_dramatiq_shutdown(app):
 
 
 def load(app):
+    app.hook.define('tokeo_dramatiq_pre_start')
+    app.hook.define('tokeo_dramatiq_post_end')
     app.handler.register(TokeoDramatiqController)
     app.hook.register('post_setup', tokeo_dramatiq_extend_app)
     app.hook.register('pre_close', tokeo_dramatiq_shutdown)
+
+
+def unpack_func_args(func, *args):
+    # create a dict for return
+    d = dict()
+    # init loop var
+    n = 0
+    # get paramters from inspect
+    for p in inspect.signature(func).parameters:
+        d[p] = args[n]
+        n += 1
+    # return
+    return d
