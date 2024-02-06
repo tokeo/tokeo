@@ -733,7 +733,13 @@ def unpack_func_args(func, *args):
     n = 0
     # get paramters from inspect
     for p in inspect.signature(func).parameters:
-        d[p] = args[n]
-        n += 1
+        try:
+            d[p] = args[n]
+            n += 1
+        except:
+            # if some of positional args given as kwargs then those
+            # values will come in kwargs dict, so all positional args
+            # processed by now
+            break
     # return
     return d
