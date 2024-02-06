@@ -70,6 +70,7 @@ class TokeoDiskCacheLocksHandler():
         per_seconds=1,
         name=None,
         name_f=None,
+        expire=None,
         time_func=time.time,
         sleep_func=time.sleep,
         cb_on_locked=None,
@@ -118,7 +119,7 @@ class TokeoDiskCacheLocksHandler():
                         # initialize the timer
                         now = time_func()
                         # set the cache
-                        self._cache.set(key, (now, count), tag=self._tag)
+                        self._cache.set(key, (now, count), expire=expire, tag=self._tag)
 
                 # loop
                 while True:
@@ -130,9 +131,9 @@ class TokeoDiskCacheLocksHandler():
                         delay = 0
 
                         if tally > count:
-                            self._cache.set(key, (now, count - 1), tag=self._tag)
+                            self._cache.set(key, (now, count - 1), expire=expire, tag=self._tag)
                         elif tally >= 1:
-                            self._cache.set(key, (now, tally - 1), tag=self._tag)
+                            self._cache.set(key, (now, tally - 1), expire=expire, tag=self._tag)
                         else:
                             delay = (1 - tally) / rate
 
@@ -165,6 +166,7 @@ class TokeoDiskCacheLocksHandler():
         count=1,
         name=None,
         name_f=None,
+        expire=None,
         sleep_func=time.sleep,
         cb_on_locked=None,
     ):
@@ -208,7 +210,7 @@ class TokeoDiskCacheLocksHandler():
                     # check if already initialized
                     if self._cache.get(key) is None:
                         # set the cache
-                        self._cache.set(key, count, tag=self._tag)
+                        self._cache.set(key, count, expire=expire, tag=self._tag)
 
                 # loop
                 while True:
@@ -218,7 +220,7 @@ class TokeoDiskCacheLocksHandler():
                         delay = 0
 
                         if available >= 1:
-                            self._cache.set(key, available - 1, tag=self._tag)
+                            self._cache.set(key, available - 1, expire=expire, tag=self._tag)
                         else:
                             delay = 0.05
 
@@ -240,7 +242,7 @@ class TokeoDiskCacheLocksHandler():
                 # run in a transaction
                 with self._cache.transact(retry=True):
                     # add to counter
-                    self._cache.set(key, self._cache.get(key) + 1, tag=self._tag)
+                    self._cache.set(key, self._cache.get(key) + 1, expire=expire, tag=self._tag)
 
                 # return the @decorated result
                 return result
@@ -418,6 +420,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
     def volume(self):
         return self._cache.volume()
 
+
 class TokeoDiskCacheController(Controller):
     """
 
@@ -443,6 +446,7 @@ class TokeoDiskCacheController(Controller):
         description = 'Provides command-line interfaces to manage diskcache content.'
         epilog = f'Example: {basename(sys.argv[0])} cache command --options'
 
+    ### --------------------------------------------------------------------------------------
 
     @ex(
         help='verify the cache',
@@ -461,6 +465,7 @@ class TokeoDiskCacheController(Controller):
         cnt = self.app.cache._cache.__len__()
         print(f'Currently {cnt} keys in cache.')
 
+    ### --------------------------------------------------------------------------------------
 
     @ex(
         help='list the current cache content',
@@ -493,7 +498,7 @@ class TokeoDiskCacheController(Controller):
                 ['--with-expires'],
                 dict(
                     action='store_true',
-                    help='show expire time for keys',
+                    help='show expires time for keys',
                 ),
             ),
             (
@@ -506,6 +511,8 @@ class TokeoDiskCacheController(Controller):
         ],
     )
     def list(self):
+        # drop all expired keys
+        num = self.app.cache.expire(retry=True)
         # iter over all keys stored in cache
         for key in self.app.cache._cache.iterkeys():
             # check for keys parameter and try to match regex
@@ -534,6 +541,8 @@ class TokeoDiskCacheController(Controller):
                         value = ''
                     if expire_time is None:
                         expire_time = ''
+                    else:
+                        expire_time = expire_time - time.time()
                     if tag is None:
                         tag = ''
                     # check if need to compare with tag filter from command line
@@ -550,6 +559,8 @@ class TokeoDiskCacheController(Controller):
             if _show:
                 print(out.format(key=key, value=value, expire_time=expire_time, tag=tag))
 
+    ### --------------------------------------------------------------------------------------
+
     @ex(
         help='purge the cache',
         description='Purge current cache content from diskcache.',
@@ -562,12 +573,22 @@ class TokeoDiskCacheController(Controller):
                     help='show keys for tag only',
                 ),
             ),
+            (
+                ['--locks'],
+                dict(
+                    action='store_true',
+                    help='purge locks cache',
+                ),
+            ),
         ],
     )
     def purge(self):
         self.app.cache.set('hallo','Huhu')
+        # check if parameter for locks cache
+        if self.app.pargs.locks:
+            num = self.app.cache.locks.purge()
         # check if parameter for tag
-        if self.app.pargs.tag is not None:
+        elif self.app.pargs.tag is not None:
             if self.app.pargs.tag == '':
                 print('Can not purge from cache with empty tag. Need to be purged completely.')
                 return
@@ -577,6 +598,8 @@ class TokeoDiskCacheController(Controller):
           num = self.app.cache.purge(retry=True)
 
         print(f'Purged {num} items from cache.')
+
+    ### --------------------------------------------------------------------------------------
 
     @ex(
         help='delete keys from cache content',
@@ -612,6 +635,8 @@ class TokeoDiskCacheController(Controller):
 
         print(f'In total {num} keys deleted.')
 
+    ### --------------------------------------------------------------------------------------
+
     @ex(
         help='set key with value',
         description='Set key with on current cache with optional tag.',
@@ -641,16 +666,28 @@ class TokeoDiskCacheController(Controller):
                     default=None,
                 ),
             ),
+            (
+                ['--expire'],
+                dict(
+                    action='store',
+                    help='use expire time (float) for key',
+                    default=None,
+                    type=float,
+                ),
+            ),
         ],
     )
     def set(self):
         key = self.app.pargs.key[0]
         value = self.app.pargs.value
         tag = self.app.pargs.tag
-        if self.app.cache.set(key, value, tag=tag, retry=True):
+        expire = self.app.pargs.expire
+        if self.app.cache.set(key, value, expire=expire, tag=tag, retry=True):
             print(f'Set: {key}')
         else:
             print(f'Error: {key}')
+
+    ### --------------------------------------------------------------------------------------
 
     @ex(
         help='get value by key',
@@ -679,7 +716,8 @@ class TokeoDiskCacheController(Controller):
         key = self.app.pargs.key[0]
         default = self.app.pargs.default
         value = self.app.cache.get(key, default=default, retry=True)
-        print(f'{key} = {value}')
+        if value is not None:
+            print(f'{key} = {value}')
 
 
 def load(app):
