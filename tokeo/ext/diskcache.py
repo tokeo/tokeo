@@ -66,8 +66,8 @@ class TokeoDiskCacheLocksHandler():
 
     def throttle(
         self,
-        count,
-        per_seconds,
+        count=1,
+        per_seconds=1,
         name=None,
         name_f=None,
         time_func=time.time,
