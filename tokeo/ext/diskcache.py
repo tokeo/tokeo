@@ -74,6 +74,7 @@ class TokeoDiskCacheLocksHandler():
         time_func=time.time,
         sleep_func=time.sleep,
         cb_on_locked=None,
+        verbose=True,
     ):
         """
 
@@ -110,7 +111,8 @@ class TokeoDiskCacheLocksHandler():
                     key = self._key_prefix + func_full_name
 
                 # some outputr info
-                self.app.log.info(f'@throttle {func.__name__} using key {key}')
+                if verbose:
+                    self.app.log.info(f'@throttle {func.__name__} using key {key}')
 
                 # run in a transaction
                 with self._cache.transact(retry=True):
@@ -169,6 +171,7 @@ class TokeoDiskCacheLocksHandler():
         expire=None,
         sleep_func=time.sleep,
         cb_on_locked=None,
+        verbose=True,
     ):
         """
 
@@ -203,7 +206,8 @@ class TokeoDiskCacheLocksHandler():
                     key = self._key_prefix + func_full_name
 
                 # some outputr info
-                self.app.log.info(f'@temper {func.__name__} using key {key}')
+                if verbose:
+                    self.app.log.info(f'@temper {func.__name__} using key {key}')
 
                 # run in a transaction
                 with self._cache.transact(retry=True):
