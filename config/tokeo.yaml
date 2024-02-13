@@ -31,6 +31,10 @@ dramatiq:
   broker: rabbitmq
   ### connection url to rabbitmq server
   rabbitmq_url: amqp://guest:guest@localhost:5672/
+  ### mark lock keys by tag
+  locks_tag: dramatiq_locks
+  ### mark lock keys with prefix
+  locks_key_prefix: dq_
 
 #####################################
 
@@ -49,8 +53,14 @@ grpc:
 
 diskcache:
 
-  ### file path to allow and store permanent content
+  ### file path to store permanent data content
   directory: ./tokeo_diskcache
+  ### default connection timeout
+  timeout: 60
+  ### mark lock keys by tag
+  locks_tag: diskcache_locks
+  ### mark lock keys with prefix
+  locks_key_prefix: dc_
 
 #####################################
 
@@ -77,7 +87,7 @@ smtp:
   # subject_prefix: null
   ### SMTP server address to connect for service
   # host: localhost
-  ### SMTP port to connect fro service
+  ### SMTP port to connect for service
   # port: 25
   ### default timeout when connection will cause an error
   # timeout: 30
@@ -111,6 +121,36 @@ scheduler:
       ### optional arguments send by named args to the method
       kwargs:
         url: https://github.com
+
+#####################################
+
+nicegui:
+  ### serve the web service
+  host: '127.0.0.1'
+  ### port for serving the web service
+  port: 8090
+  ### main module with pages to serve
+  pages: tokeo.core.pages.index
+  ### name of default route (/) function
+  default: default
+  ### web page title
+  title: Tokeo NiceGUI
+  ### relative filepath or absolute URL to a favicon
+  favicon: null
+  ### page meta viewport content
+  viewport: width=device-width, initial-scale=1
+  ### whether to use Quasar's dark mode (True, False, null = Auto)
+  dark: null
+  ### use tailwindcss
+  tailwind: True
+  ### secret key for browser-based storage
+  storage_secret: null
+  ### time between binding updates
+  binding_refresh_interval: 0.5
+  ### maximum time the server waits for the browser to reconnect
+  reconnect_timeout: 5.0
+  ### logging level for uvicorn server
+  logging_level: warning
 
 #####################################
 
