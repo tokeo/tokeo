@@ -35,6 +35,7 @@ class Tokeo(App):
             'tokeo.ext.pocketbase',
             'tokeo.ext.dramatiq',
             'tokeo.ext.grpc',
+            'tokeo.ext.nicegui',
         ]
 
         # register handlers
