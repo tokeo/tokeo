@@ -67,8 +67,8 @@ class TokeoNicegui(MetaMixin):
             dark=self._config('dark'),
             tailwind=self._config('tailwind'),
             storage_secret=self._config('storage_secret'),
-            binding_refresh_interval=self._config('binding_refresh_interval'),
-            reconnect_timeout=self._config('reconnect_timeout'),
+            binding_refresh_interval=float(self._config('binding_refresh_interval')),
+            reconnect_timeout=float(self._config('reconnect_timeout')),
             uvicorn_logging_level=self._config('logging_level'),
             # config fixed
             show=False,
