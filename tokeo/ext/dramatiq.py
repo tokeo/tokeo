@@ -75,7 +75,10 @@ class TokeoDramatiq(MetaMixin):
         # create a key/value store for locks if diskcache enabled
         if getattr(self.app._meta, 'cache_handler', None):
             try:
-                self._locks = self.app.cache.locks_handler(self._config('locks_tag'), self._config('locks_key_prefix'))
+                self._locks = self.app.cache.locks_handler(
+                    self._config('locks_tag'),
+                    self._config('locks_key_prefix'),
+                )
             except:
                 pass
         # dramatiq register
@@ -131,7 +134,7 @@ class TokeoDramatiq(MetaMixin):
         if self._locks:
             return self._locks
         else:
-            raise AttributeError("Enable tokeo diskcache extension to allow locks")
+            raise AttributeError('Enable tokeo diskcache extension to allow locks')
 
     def purge_locks(self):
         if self._locks:

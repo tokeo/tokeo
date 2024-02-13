@@ -17,7 +17,7 @@ class LockError(Exception):
     pass
 
 
-class TokeoDiskCacheLocksHandler():
+class TokeoDiskCacheLocksHandler:
 
     def __init__(self, app, cache, tag, key_prefix):
         self.app = app
@@ -94,8 +94,8 @@ class TokeoDiskCacheLocksHandler():
                 use_cb = False
                 # unpack arguments in dictionary
                 arguments = dict(
-                    func_name = func.__name__,
-                    func_full_name = func_full_name,
+                    func_name=func.__name__,
+                    func_full_name=func_full_name,
                     **unpack_func_args(func, *args),
                     **kwargs,
                 )
@@ -189,8 +189,8 @@ class TokeoDiskCacheLocksHandler():
                 use_cb = False
                 # unpack arguments in dictionary
                 arguments = dict(
-                    func_name = func.__name__,
-                    func_full_name = func_full_name,
+                    func_name=func.__name__,
+                    func_full_name=func_full_name,
                     **unpack_func_args(func, *args),
                     **kwargs,
                 )
@@ -540,7 +540,9 @@ class TokeoDiskCacheController(Controller):
                     out += ' [{tag}]'
                 if out != '{key}':
                     # read the full content from key
-                    value, expire_time, tag = self.app.cache._cache.get(key, default=None, expire_time=True, tag=True, retry=False)
+                    value, expire_time, tag = self.app.cache._cache.get(
+                        key, default=None, expire_time=True, tag=True, retry=False
+                    )
                     if value is None:
                         value = ''
                     if expire_time is None:
@@ -587,7 +589,6 @@ class TokeoDiskCacheController(Controller):
         ],
     )
     def purge(self):
-        self.app.cache.set('hallo','Huhu')
         # check if parameter for locks cache
         if self.app.pargs.locks:
             num = self.app.cache.locks.purge()
@@ -599,7 +600,7 @@ class TokeoDiskCacheController(Controller):
             else:
                 num = self.app.cache.evict(self.app.pargs.tag, retry=True)
         else:
-          num = self.app.cache.purge(retry=True)
+            num = self.app.cache.purge(retry=True)
 
         print(f'Purged {num} items from cache.')
 
