@@ -3,6 +3,7 @@ from os.path import basename, dirname, abspath
 from tokeo.ext.argparse import Controller
 from cement.core.meta import MetaMixin
 from cement import ex
+from nicegui import ui
 import importlib
 
 
@@ -55,7 +56,6 @@ class TokeoNicegui(MetaMixin):
         return self.app.config.get(self._meta.config_section, key)
 
     def startup(self):
-        from nicegui import ui
         # spin up service
         ui.run(
             # config
