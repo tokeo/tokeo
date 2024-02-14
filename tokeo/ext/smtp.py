@@ -54,6 +54,10 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             'files': None,
         }
 
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self._template_exists_cache = dict()
+
     def _get_params(self, **kw):
         params = dict()
 
@@ -189,11 +193,21 @@ class TokeoSMTPMailHandler(mail.MailHandler):
     def send_by_template(self, template, data={}, **kw):
         # test if template exists by loading it
         def _template_exists(template):
+            # check if stored in cache already
+            if template in self._template_exists_cache:
+                return self._template_exists_cache[template]
+            # do first time check from file or module
+            result = False
             try:
+                # successfully load when available
                 self.app.template.load(template)
-                return True
+                result = True
             except:
-                return False
+                pass
+            # store flag in cache list to prevent often load access
+            self._template_exists_cache[template] = result
+            # return state
+            return result
 
         # prepare email params
         params = dict(**kw)
