@@ -186,6 +186,31 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         server.send_message(msg)
 
+    def send_by_template(self, template, data={}, **kw):
+
+        # test if template exists by loading it
+        def _template_exists(template):
+            try:
+              self.app.template.load(template)
+              return True
+            except:
+              return False
+
+        # prepare email params
+        params = dict(**kw)
+        # check render subject
+        if 'subject' not in params:
+            if _template_exists(f'{template}.title.jinja2'):
+                params['subject'] = self.app.render(data, f'{template}.title.jinja2', out=None)
+        # build body
+        body = dict()
+        if _template_exists(f'{template}.plain.jinja2'):
+            body['text'] = self.app.render(dict(**data, mail_params=params), f'{template}.plain.jinja2', out=None)
+        if _template_exists(f'{template}.html.jinja2'):
+            body['html'] = self.app.render(dict(**data, mail_params=params), f'{template}.html.jinja2', out=None)
+        # send the message
+        self.send(body=body, **params)
+
 
 def load(app):
     app._meta.mail_handler = TokeoSMTPMailHandler.Meta.label
