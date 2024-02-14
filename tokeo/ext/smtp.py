@@ -187,14 +187,13 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         server.send_message(msg)
 
     def send_by_template(self, template, data={}, **kw):
-
         # test if template exists by loading it
         def _template_exists(template):
             try:
-              self.app.template.load(template)
-              return True
+                self.app.template.load(template)
+                return True
             except:
-              return False
+                return False
 
         # prepare email params
         params = dict(**kw)
