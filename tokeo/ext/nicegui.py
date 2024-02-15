@@ -3,8 +3,25 @@ from os.path import basename, dirname, abspath
 from tokeo.ext.argparse import Controller
 from cement.core.meta import MetaMixin
 from cement import ex
-from nicegui import ui
+from nicegui import ui, app as fastapi_app
+from nicegui.element import Element
+from nicegui.elements.mixins.text_element import TextElement
 import importlib
+
+
+class NiceguiTailwindHelper:
+
+    def _tailwind_element(self, tag, *args, **kwargs):
+        if 'text' in kwargs:
+            text = kwargs.pop('text')
+            return TextElement(tag=tag, text=text).tailwind(*args, **kwargs).element
+        else:
+            return Element(tag=tag).tailwind(*args, **kwargs).element
+
+    def __getattr__(self, tag):
+        def wrapper(*args, **kwargs):
+            return self._tailwind_element(tag, *args, **kwargs)
+        return wrapper
 
 
 class TokeoNicegui(MetaMixin):
@@ -41,6 +58,11 @@ class TokeoNicegui(MetaMixin):
         self.app = app
         # prepare the config
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
+        # allow easy access to ui and fastapi app
+        self.ui = ui
+        self.fastapi_app = fastapi_app
+        # add the tailwind ui helper
+        self.tw = NiceguiTailwindHelper()
         # lazy import pages modul
         module = importlib.import_module(self._config('pages'))
         # check default web handler
