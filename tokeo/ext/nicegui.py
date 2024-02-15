@@ -21,6 +21,7 @@ class NiceguiTailwindHelper:
     def __getattr__(self, tag):
         def wrapper(*args, **kwargs):
             return self._tailwind_element(tag, *args, **kwargs)
+
         return wrapper
 
 

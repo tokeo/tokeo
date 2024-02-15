@@ -1,11 +1,12 @@
 from tokeo.ext.appshare import app
+
 ui = app.nicegui.ui
 tw = app.nicegui.tw
 
 
 @app.nicegui.fastapi_app.get('/api')
 async def get_api():
-    return { 'msg': 'json api result' }
+    return {'msg': 'json api result'}
 
 
 @ui.page('/hello-world')
