@@ -1,7 +1,7 @@
 from tokeo.ext.appshare import app
 
 ui = app.nicegui.ui
-tw = app.nicegui.tw
+ux = app.nicegui.ux
 
 
 @app.nicegui.fastapi_app.get('/api')
@@ -11,8 +11,8 @@ async def get_api():
 
 @ui.page('/hello-world')
 def hello_function():
-    ui.label('Hello world!').tailwind('text-2xl', 'm-2')
+    ui.label('Hello world!').classes('text-2xl', 'm-2')
 
 
 def default():
-    tw.h1('text-2xl m-2', text='This is the homepage!')
+    ux.h1('This is the homepage!').classes('text-2xl m-2')

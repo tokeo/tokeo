@@ -9,18 +9,14 @@ from nicegui.elements.mixins.text_element import TextElement
 import importlib
 
 
-class NiceguiTailwindHelper:
+class NiceguiElementHelper:
 
-    def _tailwind_element(self, tag, *args, **kwargs):
-        if 'text' in kwargs:
-            text = kwargs.pop('text')
-            return TextElement(tag=tag, text=text).tailwind(*args, **kwargs).element
-        else:
-            return Element(tag=tag).tailwind(*args, **kwargs).element
-
-    def __getattr__(self, tag):
-        def wrapper(*args, **kwargs):
-            return self._tailwind_element(tag, *args, **kwargs)
+    def __getattr__(self, tag, *args, **kwargs):
+        def wrapper(text=None, *args, **kwargs):
+            if text is None:
+                return Element(tag=tag)
+            else:
+                return TextElement(tag=tag, text=text)
 
         return wrapper
 
@@ -59,11 +55,12 @@ class TokeoNicegui(MetaMixin):
         self.app = app
         # prepare the config
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
-        # allow easy access to ui and fastapi app
+        # allow easy access to ui
         self.ui = ui
+        # allow easy access to fastapi app
         self.fastapi_app = fastapi_app
-        # add the tailwind ui helper
-        self.tw = NiceguiTailwindHelper()
+        # add the ux helper
+        self.ux = NiceguiElementHelper()
         # lazy import pages modul
         module = importlib.import_module(self._config('pages'))
         # check default web handler
