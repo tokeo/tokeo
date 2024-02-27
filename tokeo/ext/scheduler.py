@@ -8,6 +8,7 @@ from cement.core.exc import CaughtSignal
 from apscheduler.schedulers.base import STATE_RUNNING
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.triggers.cron import CronTrigger
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import shlex
@@ -16,6 +17,55 @@ from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import NestedCompleter
+from datetime import timedelta
+
+
+class TokeoCronTrigger(CronTrigger):
+
+    def __init__(
+        self,
+        year=None,
+        month=None,
+        day=None,
+        week=None,
+        day_of_week=None,
+        hour=None,
+        minute=None,
+        second=None,
+        start_date=None,
+        end_date=None,
+        timezone=None,
+        jitter=None,
+        delay=None,
+    ):
+        super().__init__(
+            year, month, day, week, day_of_week, hour, minute, second, start_date, end_date, timezone, jitter
+        )
+        self.delay = delay
+
+    @classmethod
+    def from_crontab(cls, expr, timezone=None, jitter=None, delay=None):
+        values = expr.split()
+        if len(values) != 5:
+            raise ValueError('Wrong number of fields; got {}, expected 5'.format(len(values)))
+
+        return cls(
+            minute=values[0],
+            hour=values[1],
+            day=values[2],
+            month=values[3],
+            day_of_week=values[4],
+            timezone=timezone,
+            jitter=jitter,
+            delay=delay,
+        )
+
+    def get_next_fire_time(self, previous_fire_time, now):
+        next_fire_time = super().get_next_fire_time(previous_fire_time, now)
+        if self.delay is None:
+            return next_fire_time
+        else:
+            return next_fire_time + timedelta(seconds=self.delay)
 
 
 class TokeoScheduler(MetaMixin):
@@ -32,6 +82,8 @@ class TokeoScheduler(MetaMixin):
 
         #: Dict with initial settings
         config_defaults = dict(
+            max_concurrent_jobs=10,
+            timezone=None,
             tasks={},
         )
 
@@ -56,13 +108,28 @@ class TokeoScheduler(MetaMixin):
     def scheduler(self):
         if self._scheduler is None:
             self._scheduler = BackgroundScheduler() if self._interactive else BlockingScheduler()
+            self._scheduler.add_executor(
+                ThreadPoolExecutor(max_workers=self._config('max_concurrent_jobs', 10)), 'default'
+            )
         return self._scheduler
 
     @property
     def tasks(self):
         return self._config('tasks')
 
-    def add_crontab_task(self, module, func, crontab, kwargs={}, title=''):
+    def add_crontab_task(
+        self,
+        module,
+        func,
+        crontab,
+        coalesce=True,
+        misfire_grace_time=None,
+        delay=None,
+        max_jitter=None,
+        max_running_jobs=None,
+        kwargs={},
+        title='',
+    ):
         if title == '':
             title = func
         self._taskid += 1
@@ -70,10 +137,14 @@ class TokeoScheduler(MetaMixin):
         self.scheduler.add_job(
             f'{module}:{func}',
             kwargs=kwargs,
-            trigger=CronTrigger.from_crontab(crontab),
+            trigger=TokeoCronTrigger.from_crontab(
+                crontab, jitter=max_jitter, delay=delay, timezone=self._config('timezone', None)
+            ),
             name=f'{self._taskid}:{title}',
             id=f'{self._taskid}',
-            coalesce=True,
+            coalesce=coalesce,
+            misfire_grace_time=misfire_grace_time,
+            max_instances=1 if max_running_jobs is None else max_running_jobs,
         )
 
     def init_tasks(self):
@@ -81,6 +152,16 @@ class TokeoScheduler(MetaMixin):
         for task in self.tasks:
             # make crontab lways as list
             crontab = task['crontab'] if isinstance(task['crontab'], list) else [task['crontab']]
+            # get coalesce from string
+            coalesce = task['coalesce'] if 'coalesce' in task else 'latest'
+            if coalesce == 'latest':
+                coalesce = True
+            elif coalesce == 'earliest':
+                coalesce = True
+            elif coalesce == 'all':
+                coalesce = False
+            else:
+                raise ValueError(f'Unsupported value "{coalesce}" for coalesce setting')
             # iterate crontab
             for entry in crontab:
                 self.add_crontab_task(
@@ -89,6 +170,11 @@ class TokeoScheduler(MetaMixin):
                     entry,
                     kwargs=task['kwargs'] if 'kwargs' in task else {},
                     title=task['name'] if 'name' in task else '',
+                    coalesce=coalesce,
+                    misfire_grace_time=task['misfire_grace_time'] if 'misfire_grace_time' in task else None,
+                    delay=task['delay'] if 'delay' in task else None,
+                    max_jitter=task['max_jitter'] if 'max_jitter' in task else None,
+                    max_running_jobs=task['max_running_jobs'] if 'max_running_jobs' in task else None,
                 )
 
     def startup(self, interactive=True):
