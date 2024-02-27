@@ -10,7 +10,8 @@ from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
 from cement.core import mail
-from cement.utils.misc import minimal_logger, is_true
+from cement.utils import fs
+from cement.utils.misc import is_true
 
 
 class TokeoSMTPMailHandler(mail.MailHandler):
@@ -35,7 +36,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         #: Id for config
         config_section = 'smtp'
 
-        #: Dict with initial settings
+        #: Configuration default values
         config_defaults = {
             'to': [],
             'from_addr': 'noreply@localhost',
@@ -62,14 +63,17 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         params = dict()
 
         # some keyword args override configuration defaults
-        for item in ['to', 'from_addr', 'cc', 'bcc', 'subject', 'subject_prefix', 'files']:
+        for item in ['to', 'from_addr', 'cc', 'bcc', 'subject',
+                     'subject_prefix', 'files']:
             config_item = self.app.config.get(self._meta.config_section, item)
             params[item] = kw.get(item, config_item)
 
         # others don't
-        other_params = ['ssl', 'tls', 'host', 'port', 'auth', 'username', 'password', 'timeout']
+        other_params = ['ssl', 'tls', 'host', 'port', 'auth', 'username',
+                        'password', 'timeout']
         for item in other_params:
-            params[item] = self.app.config.get(self._meta.config_section, item)
+            params[item] = self.app.config.get(self._meta.config_section,
+                                               item)
 
         return params
 
@@ -79,7 +83,10 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         configuration defaults (cc, bcc, etc).
 
         Args:
-            body: The message body to send
+            body (list): The message body to send. List is treated as:
+                ``[<text>, <html>]``. If a single string is passed it will be
+                converted to ``[<text>]``. At minimum, a text version is
+                required.
 
         Keyword Args:
             to (list): List of recipients (generally email addresses)
@@ -87,6 +94,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             cc (list): List of CC Recipients
             bcc (list): List of BCC Recipients
             subject (str): Message subject line
+            subject_prefix (str): Prefix for message subject line (useful to
+                override if you want to remove/change the default prefix).
+            files (list): List of file paths to attach to the message.
 
         Returns:
             bool:``True`` if message is sent successfully, ``False`` otherwise
@@ -110,11 +120,13 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         params = self._get_params(**kw)
 
         if is_true(params['ssl']):
-            server = smtplib.SMTP_SSL(params['host'], params['port'], params['timeout'])
-            self.app.log.debug('%s : initiating ssl' % self._meta.label)
+            server = smtplib.SMTP_SSL(params['host'], params['port'],
+                                      params['timeout'])
+            self.app.log.debug('%s : initiating smtp over ssl' % self._meta.label)
 
         else:
-            server = smtplib.SMTP(params['host'], params['port'], params['timeout'])
+            server = smtplib.SMTP(params['host'], params['port'],
+                                  params['timeout'])
             self.app.log.debug('%s : initiating smtp' % self._meta.label)
 
         if self.app.debug is True:
@@ -141,51 +153,57 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         if params['bcc']:
             msg['Bcc'] = ', '.join(params['bcc'])
         if params['subject_prefix'] not in [None, '']:
-            subject = '%s %s' % (params['subject_prefix'], params['subject'])
+            subject = '%s %s' % (params['subject_prefix'],
+                                 params['subject'])
         else:
             subject = params['subject']
         msg['Subject'] = Header(subject)
+
         # add body as text and or or as html
         partText = None
         partHtml = None
         if isinstance(body, str):
             partText = MIMEText(body)
         elif isinstance(body, list):
+            # handle plain text
             if len(body) >= 1:
                 partText = MIMEText(body[0], 'plain')
+
+            # handle html
             if len(body) >= 2:
                 partHtml = MIMEText(body[1], 'html')
-        elif isinstance(body, dict):
-            if 'text' in body:
-                partText = MIMEText(body['text'], 'plain')
-            if 'html' in body:
-                partHtml = MIMEText(body['html'], 'html')
+
         if partText:
             msg.attach(partText)
         if partHtml:
             msg.attach(partHtml)
-        # loop files
+
+        # attach files
         if params['files']:
-            for path in params['files']:
+            for in_path in params['files']:
                 part = MIMEBase('application', 'octet-stream')
-                # test filename for a seperate attachement disposition name (filename.ext=attname.ext)
-                filename = os.path.basename(path)
-                # test for divider in filename
-                i = filename.find('=')
-                # split attname from filename
-                if i < 0:
-                    attname = filename
+
+                # support for alternative file name if its tuple
+                # like ['filename.ext', 'attname.ext']
+                if isinstance(in_path, tuple):
+                    attname = in_path[0]
+                    path = in_path[1]
                 else:
-                    attname = filename[i + 1 :]
-                    filename = filename[0:i]
-                    # update the filename to read from
-                    path = os.path.dirname(path) + '/' + filename
+                    attname = os.path.basename(in_path)
+                    path = in_path
+
+                path = fs.abspath(path)
+
                 # add attachment
                 with open(path, 'rb') as file:
                     part.set_payload(file.read())
+
                 # encode and name
                 encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename={attname}')
+                part.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename={attname}',
+                )
                 msg.attach(part)
 
         server.send_message(msg)
@@ -216,11 +234,14 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             if _template_exists(f'{template}.title.jinja2'):
                 params['subject'] = self.app.render(data, f'{template}.title.jinja2', out=None)
         # build body
-        body = dict()
+        body = list()
         if _template_exists(f'{template}.plain.jinja2'):
-            body['text'] = self.app.render(dict(**data, mail_params=params), f'{template}.plain.jinja2', out=None)
+            body.append(self.app.render(dict(**data, mail_params=params), f'{template}.plain.jinja2', out=None))
         if _template_exists(f'{template}.html.jinja2'):
-            body['html'] = self.app.render(dict(**data, mail_params=params), f'{template}.html.jinja2', out=None)
+            # before adding a html part make sure that plain part exists
+            if len(body) == 0:
+                body.append('Content is delivered as HTML only.')
+            body.append(self.app.render(dict(**data, mail_params=params), f'{template}.html.jinja2', out=None))
         # send the message
         self.send(body=body, **params)
 
