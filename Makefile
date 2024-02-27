@@ -9,6 +9,7 @@ clean:
 
 virtualenv:
 	virtualenv -q --prompt '> tokeo <' .venv
+	.venv/bin/pip install --upgrade pip
 	.venv/bin/pip install -r requirements.txt
 	@echo
 	@echo "VirtualENV Setup Complete. Now run: source .venv/bin/activate"
