@@ -15,6 +15,9 @@ class Tokeo(App):
         # this app name
         label = 'tokeo'
 
+        # this app main path
+        main_dir = os.path.dirname(fs.abspath(__file__))
+
         # configuration defaults
         config_defaults = dict(
             debug=False,
@@ -28,6 +31,7 @@ class Tokeo(App):
             'yaml',
             'colorlog',
             'jinja2',
+            'tokeo.ext.appenv',
             'tokeo.ext.appshare',
             'tokeo.ext.smtp',
             'tokeo.ext.scheduler',
@@ -50,11 +54,6 @@ class Tokeo(App):
 
         # configuration file suffix
         config_file_suffix = '.yaml'
-
-        # add local config to app
-        config_dirs = [
-            fs.abspath(os.path.dirname(fs.abspath(__file__)) + '/../config'),
-        ]
 
         # set the log handler
         log_handler = 'colorlog'
