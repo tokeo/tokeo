@@ -1,4 +1,5 @@
 recursive-include config *.yaml
+recursive-exclude config *.local.yaml
 recursive-include tokeo *.py
 recursive-include tokeo/templates *
 recursive-include proto *.proto *.py
