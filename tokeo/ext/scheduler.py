@@ -149,7 +149,9 @@ class TokeoScheduler(MetaMixin):
 
     def init_tasks(self):
         # get the entries from config
-        for task in self.tasks:
+        for key in self.tasks:
+            # get params for task
+            task = self.tasks[key]
             # make crontab lways as list
             crontab = task['crontab'] if isinstance(task['crontab'], list) else [task['crontab']]
             # get coalesce from string
@@ -166,7 +168,7 @@ class TokeoScheduler(MetaMixin):
             for entry in crontab:
                 self.add_crontab_task(
                     task['module'],
-                    task['task'],
+                    key,
                     entry,
                     kwargs=task['kwargs'] if 'kwargs' in task else {},
                     title=task['name'] if 'name' in task else '',
