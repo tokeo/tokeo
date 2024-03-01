@@ -14,6 +14,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     Additional arguments and keyword arguments are passed directly to
     RawConfigParser on initialization.
     """
+
     class Meta:
 
         """Handler meta-data."""
@@ -65,7 +66,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
                 config.
 
         """
-        assert isinstance(dict_obj, dict), "Dictionary object required."
+        assert isinstance(dict_obj, dict), 'Dictionary object required.'
 
         for section in list(dict_obj.keys()):
             if type(dict_obj[section]) is dict:
