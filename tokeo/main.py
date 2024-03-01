@@ -28,9 +28,9 @@ class Tokeo(App):
 
         # load additional framework extensions
         extensions = [
-            'yaml',
             'colorlog',
             'jinja2',
+            'tokeo.ext.yaml',
             'tokeo.ext.appenv',
             'tokeo.ext.appshare',
             'tokeo.ext.smtp',
@@ -48,9 +48,6 @@ class Tokeo(App):
             EmitController,
             GrpcCallController,
         ]
-
-        # configuration handler
-        config_handler = 'yaml'
 
         # configuration file suffix
         config_file_suffix = '.yaml'
