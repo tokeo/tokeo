@@ -1,5 +1,7 @@
-### The Tokeo Configuration Settings
+### The Tokeo Application Configuration Settings
 ---
+
+#####################################
 
 tokeo:
 
@@ -67,7 +69,7 @@ diskcache:
 pocketbase:
 
   ### connection string to database
-  # url: http://localhost:10110
+  url: http://127.0.0.1:8090
 
 #####################################
 
@@ -86,15 +88,15 @@ smtp:
   ### define a defeault prefix on subjects
   # subject_prefix: null
   ### SMTP server address to connect for service
-  # host: localhost
+  host: localhost
   ### SMTP port to connect for service
-  # port: 25
+  port: 25
   ### default timeout when connection will cause an error
-  # timeout: 30
+  timeout: 30
   ### enable SSL connection
   # ssl: false
   ### enable TLS on connection, available for SSL and non SSL connections
-  # tls: false
+  tls: true
   ### enable authentication for service
   # auth: false
   ### auth username
@@ -112,10 +114,10 @@ scheduler:
   max_concurrent_jobs: 5
   ### the default time zone
   timezone: UTC
-  ### list of tasks to plan in a crontab style
+  ### list of tasks to plan in a crontab style defined by it's key
   tasks:
-      ### each entry is defined by its method to call
-    - task: count_word_timer
+    ### each entry is defined by its method to call
+    count_word_timer:
       ### module where the method is located
       module: tokeo.core.tasks.agents
       ### a name for the entry in schedule list
@@ -142,7 +144,7 @@ nicegui:
   ### serve the web service
   host: '127.0.0.1'
   ### port for serving the web service
-  port: 8090
+  port: 8080
   ### main module with pages to serve
   pages: tokeo.core.pages.index
   ### name of default route (/) function
@@ -171,13 +173,13 @@ nicegui:
 log.colorlog:
 
   ### Where the log file lives (no log file by default)
-  # file: null
+  file: null
 
   ### The level for which to log.  One of: info, warning, error, fatal, debug
-  # level: info
+  level: info
 
   ### Whether or not to log to console
-  # to_console: true
+  to_console: true
 
   ### Whether or not to rotate the log file when it reaches `max_bytes`
   # rotate: false
