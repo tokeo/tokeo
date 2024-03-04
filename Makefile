@@ -24,24 +24,33 @@ doc:
 	open http://localhost:9999
 	pdoc3 --html --http localhost:9999 tokeo tests
 
-# check that a log-level is set
-# for testing purposes at least use info
+# check for log-level and enable print statement outputs on debug
 ifdef debug
-log-level = "$(debug)0"
+allow_print=-s
+log_level=--log-cli-level=$(debug)0
 else
-log-level = "9999"
+allow_print=
+log_level=
 endif
 
+# check for test with coverage reports
+ifdef cov
+cov_report=--cov=singer --cov-report=term --cov-report=html:coverage-report
+else
+cov_report=
+endif
+
+# limit the tests to run by files and tests filters
+# make test files=test_logging.py tests=logging debug=1
 test:
 	rm -rf tmp/tests
 	mkdir -p tmp/tests
 	python -m pytest \
 		-v \
-		--cov=tokeo \
-		--cov-report=term \
-		--cov-report=html:coverage-report \
+		$(allow_print) \
+		$(cov_report) \
 		--basetemp=tmp/tests \
-		--log-cli-level="$(log-level)" \
+		$(log_level) \
 		-k "$(tests)" \
 		tests/$(files)
 
@@ -62,4 +71,3 @@ wheel: clean
 
 dist-upload:
 	twine upload dist/*
-
