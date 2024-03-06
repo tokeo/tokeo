@@ -11,7 +11,7 @@ async def get_api():
 
 @ui.page('/hello-world')
 def hello_function():
-    ui.label('Hello world!').classes('text-2xl', 'm-2')
+    ui.label('Hello world!').classes('text-2xl m-2')
 
 
 def default():
