@@ -8,9 +8,10 @@ ux = app.nicegui.ux
 
 
 @contextmanager
-def page():
+def page(title=None):
     with layout.page(app_info='Made with tokeo!', nav=nav, footer=footer):
-        ux.h1('This is the tokeo dashboard!').classes('text-2xl text-bold my-4')
+        if title:
+            ux.h1(title).classes('text-2xl text-bold my-4')
         yield
 
 
