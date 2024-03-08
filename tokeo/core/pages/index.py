@@ -8,7 +8,7 @@ ux = app.nicegui.ux
 
 
 def default():
-    with page():
+    with page(title='This is the tokeo dashboard'):
         ux.p(
         """
             This single-page "app" style layout features a sidebar, main content area, and footer.
@@ -22,5 +22,5 @@ def default():
 
 @ui.page('/hello-world')
 def hello_function():
-    with page():
+    with page(title='Customers administration'):
         ui.label('Hello world!').classes('text-2xl text-orange-500')
