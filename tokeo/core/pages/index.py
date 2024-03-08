@@ -1,4 +1,7 @@
 from tokeo.ext.appshare import app
+from tokeo.core.pages import layout
+from .components import page
+
 
 ui = app.nicegui.ui
 ux = app.nicegui.ux
@@ -11,8 +14,18 @@ async def get_api():
 
 @ui.page('/hello-world')
 def hello_function():
-    ui.label('Hello world!').classes('text-2xl m-2')
+    with page():
+        ui.label('Hello world!').classes('text-2xl text-orange-500')
 
 
 def default():
-    ux.h1('This is the homepage!').classes('text-2xl m-2')
+    with page():
+        ux.p(
+        """
+            This single-page "app" style layout features a sidebar, main content area, and footer.
+            This full-height layout is never more than viewport height. The content area scrolls
+            independently as needed. For this example, we're using the Tailwind CSS utility framework.
+            As part of it's default classes, Tailwind includes Flexbox classes which make this layout
+            implementation simple!
+        """
+        ).classes('text-lg')
