@@ -27,8 +27,8 @@ def nav():
     define the app navigation
     """
     with layout.nav():
-        layout.nav_item(label='Dashboard', href='/', icon={'home': { 'classes': 'text-2xl' }})
-        layout.nav_item(label='Customers', href='/hello-world', icon={'supervisor_account': { 'classes': 'text-2xl' }})
+        layout.nav_item(label='Dashboard', href='/', icon='home', icon_classes='text-2xl')
+        layout.nav_item(label='Customers', href='/hello-world', icon='supervisor_account')
         layout.nav_item(label='Invoices', on_click=lambda: ui.notify('Notify Message', type='positive'), icon='receipt_long')
         layout.nav_item(label='Assets', icon='assessment')
 

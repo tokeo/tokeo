@@ -94,27 +94,19 @@ def page(
             footer()
 
 
-def nav_item(label='Label', href=None, on_click=None, icon={'link': { 'classes': 'text-2xl' }}):
-    with ux.li().classes(f'py-2 hover:!{COLORS["nav_hover"]} hover:{COLORS["nav_hover_bg"]} rounded').style():
+def nav_item(label='Label', height='h-auto', classes='', href=None, new_tab=False, on_click=None, icon='link', icon_classes='text-2xl'):
+    with ux.li().classes(f'hover:!{COLORS["nav_hover"]} hover:{COLORS["nav_hover_bg"]} rounded flex items-center {height}').style():
         if href:
-            action = ux.a().classes('truncate').props(f'href="{href}"')
+            action = ux.div().classes(f'py-2 truncate w-full {classes}').on('click', lambda href=href: ui.navigate.to(href, new_tab=new_tab))
         elif on_click:
-            action = ux.a().classes('truncate').on('click', on_click)
+            action = ux.div().classes(f'py-2 truncate w-full {classes}').on('click', on_click)
         else:
-            action = ux.a().classes('truncate')
+            action = ux.div().classes(f'py-2 truncate w-full {classes}')
         with action:
             # check for icon in nav element
-            if icon:
-                # if str only build an empty dict
-                if isinstance(icon, str):
-                    icon = { icon: {} }
-                # only first item in dict is used for the icon
-                icon_name = next(iter(icon))
-                # test if addition classes specified, otherwise add empty
-                if not 'classes' in icon[icon_name]:
-                    icon[icon_name]['classes'] = 'text-2xl'
+            if icon and icon != '':
                 # add the icon by material icons
-                ui.icon(icon_name).classes(f'w-7 sm:mx-2 mx-4 text-2xl {icon[icon_name]["classes"]}')
+                ui.icon(icon).classes(f'w-7 sm:mx-2 mx-4 text-2xl {icon_classes}')
             # define the nav label
             ux.span(label).classes('inline max-sm:hidden')
 
