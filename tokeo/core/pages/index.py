@@ -1,6 +1,5 @@
 from tokeo.ext.appshare import app
-from tokeo.core.pages import layout
-from .components import page
+from .page import page
 
 
 ui = app.nicegui.ui
