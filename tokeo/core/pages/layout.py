@@ -8,8 +8,8 @@ ux = app.nicegui.ux
 
 # defalut coloring, can be overwritten
 COLORS = dict(
-    bg='bg-white',
-    sidebar_bg='bg-white',
+    bg='bg-neutral-50',
+    sidebar_bg='bg-neutral-50',
     app_info='text-emerald-600',
     app_info_bg='bg-slate-200',
     nav='text-slate-800',
