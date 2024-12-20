@@ -38,8 +38,8 @@ def footer():
     all elements for app footer
     """
     with layout.footer(
-      footer_info='tokeo',
-      footer_copyright='©2024 tokeo',
+        footer_info='tokeo',
+        footer_copyright='©2025 tokeo',
     ):
         with ux.div().classes('flex-grow flex flex-col'):
             ux.a('Products').classes('py-1 text-xs tracking-wider').props('href="#"')

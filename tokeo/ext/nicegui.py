@@ -24,7 +24,6 @@ class NiceguiElementHelper:
 class TokeoNicegui(MetaMixin):
 
     class Meta:
-
         """Extension meta-data."""
 
         #: Unique identifier for this handler

@@ -5,7 +5,6 @@ import pocketbase
 class TokeoPocketBaseHandler(MetaMixin):
 
     class Meta:
-
         """Handler meta-data."""
 
         #: Unique identifier for this handler

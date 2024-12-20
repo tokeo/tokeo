@@ -44,7 +44,6 @@ class ExtendedRabbitmqBrocker(RabbitmqBroker):
 class TokeoDramatiq(MetaMixin):
 
     class Meta:
-
         """Extension meta-data."""
 
         #: Unique identifier for this handler
