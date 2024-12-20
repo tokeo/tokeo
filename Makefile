@@ -1,19 +1,24 @@
-.PHONY: clean virtualenv proto test fmt docker dist dist-upload
+.PHONY: clean venv devenv proto test fmt docker sdist wheel dist-upload
 
 clean:
 	find . -name '*.py[co]' -delete
 	find . -type d -name '__pycache__' -delete
-	rm -rf coverage-report
-	rm -rf html
+	rm -rf .pytest_cache .coverage coverage-report
 	rm -rf tmp
+	mkdir -p tmp/tests
+	touch tmp/tests/.gitkeep
 
-virtualenv:
-	virtualenv -q --prompt '> tokeo <' .venv
+venv:
+	python -m venv --prompt '> tokeo <' .venv
 	.venv/bin/pip install --upgrade pip
 	.venv/bin/pip install -r requirements.txt
 	@echo
-	@echo "VirtualENV Setup Complete. Now run: source .venv/bin/activate"
+	@echo "VENV Setup Complete. Now run: source .venv/bin/activate"
 	@echo
+
+devenv:
+	.venv/bin/pip install --upgrade pip
+	.venv/bin/pip install -r requirements-dev.txt
 
 proto:
 	python -m grpc_tools.protoc -I. --python_out=. --pyi_out=. --grpc_python_out=. ./proto/tokeo.proto
@@ -35,7 +40,7 @@ endif
 
 # check for test with coverage reports
 ifdef cov
-cov_report=--cov=singer --cov-report=term --cov-report=html:coverage-report
+cov_report=--cov=tokeo --cov-report=term --cov-report=html:coverage-report
 else
 cov_report=
 endif
