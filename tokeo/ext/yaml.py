@@ -2,7 +2,6 @@ from cement.ext.ext_yaml import YamlConfigHandler
 
 
 class TokeoYamlConfigHandler(YamlConfigHandler):
-
     """
     This class is an implementation of the :ref:`Config <cement.core.config>`
     interface.  It handles configuration file parsing and the like by
@@ -16,7 +15,6 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     """
 
     class Meta:
-
         """Handler meta-data."""
 
         label = 'tokeo.yaml'

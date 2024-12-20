@@ -58,10 +58,10 @@ def css_inject():
 
 @contextmanager
 def page(
-        app_info=None,
-        nav=None,
-        footer=None,
-    ):
+    app_info=None,
+    nav=None,
+    footer=None,
+):
     # update some nicegui / quasar basics
     css_inject()
 
@@ -94,7 +94,16 @@ def page(
             footer()
 
 
-def nav_item(label='Label', height='h-auto', classes='', href=None, new_tab=False, on_click=None, icon='link', icon_classes='text-2xl'):
+def nav_item(
+    label='Label',
+    height='h-auto',
+    classes='',
+    href=None,
+    new_tab=False,
+    on_click=None,
+    icon='link',
+    icon_classes='text-2xl',
+):
     with ux.li().classes(f'hover:!{COLORS["nav_hover"]} hover:{COLORS["nav_hover_bg"]} rounded flex items-center {height}').style():
         if href:
             action = ux.div().classes(f'py-2 truncate w-full {classes}').on('click', lambda href=href: ui.navigate.to(href, new_tab=new_tab))
@@ -137,5 +146,3 @@ def footer(
             # bottom copyright
             with ux.div().classes('text-center text-xs py-2'):
                 ux.a(footer_copyright).classes('').props('href="#')
-
-

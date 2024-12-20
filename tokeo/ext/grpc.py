@@ -11,7 +11,6 @@ import importlib
 class TokeoGrpc(MetaMixin):
 
     class Meta:
-
         """Extension meta-data."""
 
         #: Unique identifier for this handler

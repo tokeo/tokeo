@@ -259,7 +259,6 @@ class TokeoDiskCacheLocksHandler:
 
 
 class TokeoDiskCacheCacheHandler(cache.CacheHandler):
-
     """
     This class implements the :ref:`Cache <cement.core.cache>` Handler
     interface.  It provides a caching interface using the
@@ -267,7 +266,6 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
     """
 
     class Meta:
-
         """Handler meta-data."""
 
         #: Unique identifier for this handler

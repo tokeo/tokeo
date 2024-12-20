@@ -15,7 +15,6 @@ from cement.utils.misc import is_true
 
 
 class TokeoSMTPMailHandler(mail.MailHandler):
-
     """
     This class implements the :ref:`IMail <cement.core.mail>`
     interface, and is based on the `smtplib
@@ -27,7 +26,6 @@ class TokeoSMTPMailHandler(mail.MailHandler):
     """
 
     class Meta:
-
         """Handler meta-data."""
 
         #: Unique identifier for this handler
@@ -63,17 +61,14 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         params = dict()
 
         # some keyword args override configuration defaults
-        for item in ['to', 'from_addr', 'cc', 'bcc', 'subject',
-                     'subject_prefix', 'files']:
+        for item in ['to', 'from_addr', 'cc', 'bcc', 'subject', 'subject_prefix', 'files']:
             config_item = self.app.config.get(self._meta.config_section, item)
             params[item] = kw.get(item, config_item)
 
         # others don't
-        other_params = ['ssl', 'tls', 'host', 'port', 'auth', 'username',
-                        'password', 'timeout']
+        other_params = ['ssl', 'tls', 'host', 'port', 'auth', 'username', 'password', 'timeout']
         for item in other_params:
-            params[item] = self.app.config.get(self._meta.config_section,
-                                               item)
+            params[item] = self.app.config.get(self._meta.config_section, item)
 
         return params
 
@@ -120,13 +115,11 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         params = self._get_params(**kw)
 
         if is_true(params['ssl']):
-            server = smtplib.SMTP_SSL(params['host'], params['port'],
-                                      params['timeout'])
+            server = smtplib.SMTP_SSL(params['host'], params['port'], params['timeout'])
             self.app.log.debug('%s : initiating smtp over ssl' % self._meta.label)
 
         else:
-            server = smtplib.SMTP(params['host'], params['port'],
-                                  params['timeout'])
+            server = smtplib.SMTP(params['host'], params['port'], params['timeout'])
             self.app.log.debug('%s : initiating smtp' % self._meta.label)
 
         if self.app.debug is True:
@@ -153,8 +146,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         if params['bcc']:
             msg['Bcc'] = ', '.join(params['bcc'])
         if params['subject_prefix'] not in [None, '']:
-            subject = '%s %s' % (params['subject_prefix'],
-                                 params['subject'])
+            subject = '%s %s' % (params['subject_prefix'], params['subject'])
         else:
             subject = params['subject']
         msg['Subject'] = Header(subject)
