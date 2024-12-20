@@ -11,7 +11,7 @@ dramatiq[rabbitmq]
 dramatiq[watch]
 grpcio
 grpcio-tools
-apscheduler < 4.*
+apscheduler == 3.*
 nicegui
 pocketbase
 requests
