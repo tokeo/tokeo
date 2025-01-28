@@ -17,10 +17,10 @@ from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import NestedCompleter
-from datetime import timedelta
+from datetime import datetime, timezone, timedelta
 
 
-class TokeoCronTrigger(CronTrigger):
+class TokeoCronAndFireTrigger(CronTrigger):
 
     def __init__(
         self,
@@ -42,6 +42,8 @@ class TokeoCronTrigger(CronTrigger):
             year, month, day, week, day_of_week, hour, minute, second, start_date, end_date, timezone, jitter
         )
         self.delay = delay
+        # flag to signal an immediate trigger
+        self._fire = False
 
     @classmethod
     def from_crontab(cls, expr, timezone=None, jitter=None, delay=None):
@@ -61,11 +63,22 @@ class TokeoCronTrigger(CronTrigger):
         )
 
     def get_next_fire_time(self, previous_fire_time, now):
+        # check immediate trigger flag
+        if self._fire:
+            self._fire = False
+            return now
+        # check cron based trigger
         next_fire_time = super().get_next_fire_time(previous_fire_time, now)
+        # if there is an additional delay, put it on top
         if self.delay is None:
             return next_fire_time
         else:
             return next_fire_time + timedelta(seconds=self.delay)
+
+    def fire(self):
+        # set the fire flag
+        self._fire = True
+        return self
 
 
 class TokeoScheduler(MetaMixin):
@@ -136,7 +149,7 @@ class TokeoScheduler(MetaMixin):
         self.scheduler.add_job(
             f'{module}:{func}',
             kwargs=kwargs,
-            trigger=TokeoCronTrigger.from_crontab(
+            trigger=TokeoCronAndFireTrigger.from_crontab(
                 crontab, jitter=max_jitter, delay=delay, timezone=self._config('timezone', None)
             ),
             name=f'{self._taskid}:{title}',
@@ -212,6 +225,7 @@ class TokeoScheduler(MetaMixin):
                     'pause': None,
                     'resume': None,
                     'remove': None,
+                    'fire': None,
                 },
                 'exit': None,
                 'quit': None,
@@ -226,6 +240,7 @@ class TokeoScheduler(MetaMixin):
         )
 
     def handle_command_list(self, args):
+        self.app.log.debug(datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %z (%Z)'))
         self._scheduler.print_jobs()
 
     def handle_command_pause(self, args):
@@ -259,14 +274,20 @@ class TokeoScheduler(MetaMixin):
     def handle_command_task_commands(self, args):
         for task in args.task:
             try:
-                if args.cmd == 'remove':
-                    self._scheduler.remove_job(task)
-                elif args.cmd == 'pause':
-                    self._scheduler.pause_job(task)
-                elif args.cmd == 'resume':
-                    self._scheduler.resume_job(task)
-                # a short note
-                self.app.log.info(f'{args.cmd}d job {task}')
+                job = self._scheduler.get_job(task)
+                if job:
+                    if args.cmd == 'remove':
+                        self._scheduler.remove_job(task)
+                    elif args.cmd == 'pause':
+                        self._scheduler.pause_job(task)
+                    elif args.cmd == 'resume':
+                        self._scheduler.resume_job(task)
+                    elif args.cmd == 'fire':
+                        job.reschedule(job.trigger.fire())
+                    # a short note
+                    self.app.log.info(f'{args.cmd}d job {job.id} [{job.name}]')
+                else:
+                    raise ValueError(f'job {task} not found!')
             except Exception as err:
                 self.app.log.error(err)
 
@@ -321,6 +342,10 @@ class TokeoScheduler(MetaMixin):
             cmd = nested.add_parser('resume', help='resume the task')
             cmd.add_argument('task', nargs='+', help='id of tasks to resume')
             cmd.set_defaults(func=self.handle_command_task_commands, cmd='resume')
+            # tasks fire command
+            cmd = nested.add_parser('fire', help='fire the task')
+            cmd.add_argument('task', nargs='+', help='id of tasks to fire')
+            cmd.set_defaults(func=self.handle_command_task_commands, cmd='fire')
 
         # return initialized parser
         return self._command_parser
@@ -349,7 +374,7 @@ class TokeoScheduler(MetaMixin):
                 return False
 
         # unusual empty but valid command, can be added to history
-        return true
+        return True
 
     def shell(self):
         self.app.log.info('Welcome to scheduler interactive shell.')
@@ -358,7 +383,7 @@ class TokeoScheduler(MetaMixin):
         # initilize the user_input
         user_input_default = False
         # get std.output and prevent ruining interface
-        with patch_stdout():
+        with patch_stdout(raw=True):
             # loop interactove shell
             while True:
                 # catch exceptions
@@ -414,6 +439,18 @@ class TokeoSchedulerController(Controller):
     def _default(self):
         self._parser.print_help()
 
+    def log_info(self, *args):
+        print('\033[32mINFO:', *args, '\033[39m')
+
+    def log_warning(self, *args):
+        print('\033[33mWARN:', *args, '\033[39m')
+
+    def log_error(self, *args):
+        print('\033[31mERR:', *args, '\033[39m')
+
+    def log_debug(self, *args):
+        print('\033[35mDEBUG:', *args, '\033[39m')
+
     @ex(
         help='launch the scheduler service',
         description='Spin up the scheduler.',
@@ -428,6 +465,14 @@ class TokeoSchedulerController(Controller):
         ],
     )
     def launch(self):
+        # rewrite the output log handler for interactive
+        # to run well with prompt toolkit
+        if not self.app.pargs.background:
+            self.app.log.info = self.log_info
+            self.app.log.warning = self.log_warning
+            self.app.log.error = self.log_error
+            self.app.log.debug = self.log_debug
+        # launch the scheduler
         self.app.scheduler.launch(interactive=not self.app.pargs.background)
 
 
