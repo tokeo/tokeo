@@ -1,17 +1,28 @@
 cement @ git+https://github.com/datafolklabs/cement.git@main
 cement[jinja2]
+jinja2
 cement[yaml]
+PyYAML
 cement[colorlog]
+colorlog
 lazy_loader
 prompt_toolkit
 diskcache
 gevent
 dramatiq
 dramatiq[rabbitmq]
+pika
 dramatiq[watch]
+watchdog_gevent
+watchdog
 grpcio
 grpcio-tools
+protobuf
 apscheduler == 3.*
 nicegui
+fastapi
+starlette
+pscript
+vbuild
 pocketbase
 requests
