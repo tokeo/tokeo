@@ -38,9 +38,7 @@ class TokeoCronAndFireTrigger(CronTrigger):
         jitter=None,
         delay=None,
     ):
-        super().__init__(
-            year, month, day, week, day_of_week, hour, minute, second, start_date, end_date, timezone, jitter
-        )
+        super().__init__(year, month, day, week, day_of_week, hour, minute, second, start_date, end_date, timezone, jitter)
         self.delay = delay
         # flag to signal an immediate trigger
         self._fire = False
@@ -120,9 +118,7 @@ class TokeoScheduler(MetaMixin):
     def scheduler(self):
         if self._scheduler is None:
             self._scheduler = BackgroundScheduler() if self._interactive else BlockingScheduler()
-            self._scheduler.add_executor(
-                ThreadPoolExecutor(max_workers=self._config('max_concurrent_jobs', 10)), 'default'
-            )
+            self._scheduler.add_executor(ThreadPoolExecutor(max_workers=self._config('max_concurrent_jobs', 10)), 'default')
         return self._scheduler
 
     @property
@@ -149,9 +145,7 @@ class TokeoScheduler(MetaMixin):
         self.scheduler.add_job(
             f'{module}:{func}',
             kwargs=kwargs,
-            trigger=TokeoCronAndFireTrigger.from_crontab(
-                crontab, jitter=max_jitter, delay=delay, timezone=self._config('timezone', None)
-            ),
+            trigger=TokeoCronAndFireTrigger.from_crontab(crontab, jitter=max_jitter, delay=delay, timezone=self._config('timezone', None)),
             name=f'{self._taskid}:{title}',
             id=f'{self._taskid}',
             coalesce=coalesce,

@@ -34,7 +34,8 @@ app.nicegui.fastapi_app.config.quasar_config['screen'] = {
 
 
 def css_inject():
-    ui.add_head_html('''
+    ui.add_head_html(
+        """
         <style>
             .nicegui-content {
                 display: block;
@@ -53,7 +54,8 @@ def css_inject():
             }
 
         </style>
-    ''')
+        """
+    )
 
 
 @contextmanager
@@ -128,10 +130,7 @@ def nav():
 
 
 @contextmanager
-def footer(
-        footer_info=None,
-        footer_copyright='©2024 tokeo'
-    ):
+def footer(footer_info=None, footer_copyright='©2025 tokeo'):
     # sticky footer
     with ux.footer().classes(f'{COLORS["footer_bg"]} mt-auto'):
         with ux.div().classes(f'px-4 py-3 {COLORS["footer"]} mx-auto'):
