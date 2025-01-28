@@ -538,9 +538,7 @@ class TokeoDiskCacheController(Controller):
                     out += ' [{tag}]'
                 if out != '{key}':
                     # read the full content from key
-                    value, expire_time, tag = self.app.cache._cache.get(
-                        key, default=None, expire_time=True, tag=True, retry=False
-                    )
+                    value, expire_time, tag = self.app.cache._cache.get(key, default=None, expire_time=True, tag=True, retry=False)
                     if value is None:
                         value = ''
                     if expire_time is None:

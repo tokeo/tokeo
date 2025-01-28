@@ -52,9 +52,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         cache_opt = dict() if cache else dict(cache='no-cache')
         sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
         # run database query for multiple elements
-        return self.collection(collection_id_or_name).get_list(
-            page, perPage, dict(filter=filter, **cache_opt, **sort_opt, **q)
-        )
+        return self.collection(collection_id_or_name).get_list(page, perPage, dict(filter=filter, **cache_opt, **sort_opt, **q))
 
     def create(self, collection_id_or_name, create_fields=dict(), q=dict()):
         # run database create

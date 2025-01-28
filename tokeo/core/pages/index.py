@@ -9,13 +9,13 @@ ux = app.nicegui.ux
 def default():
     with page(title='This is the tokeo dashboard'):
         ux.p(
-        """
+            """
             This single-page "app" style layout features a sidebar, main content area, and footer.
             This full-height layout is never more than viewport height. The content area scrolls
             independently as needed. For this example, we're using the Tailwind CSS utility framework.
             As part of it's default classes, Tailwind includes Flexbox classes which make this layout
             implementation simple!
-        """
+            """
         ).classes('text-lg')
 
 
