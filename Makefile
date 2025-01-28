@@ -1,9 +1,10 @@
-.PHONY: clean venv devenv proto test fmt docker sdist wheel dist-upload
+.PHONY: clean venv outdated devenv proto test fmt docker sdist wheel dist-upload
 
 clean:
 	find . -name '*.py[co]' -delete
 	find . -type d -name '__pycache__' -delete
 	rm -rf .pytest_cache .coverage coverage-report
+	rm -rf html
 	rm -rf tmp
 	mkdir -p tmp/tests
 	touch tmp/tests/.gitkeep
@@ -15,6 +16,9 @@ venv:
 	@echo
 	@echo "VENV Setup Complete. Now run: source .venv/bin/activate"
 	@echo
+
+outdated:
+	.venv/bin/pip --disable-pip-version-check list --outdated
 
 devenv:
 	.venv/bin/pip install --upgrade pip
@@ -61,7 +65,7 @@ test:
 
 fmt:
 	# align with https://google.github.io/styleguide/pyguide.html
-	pyink --pyink-use-majority-quotes --line-length 115 --include "\.py$"" --exclude "\/__pycache__\/" tokeo proto tests docs setup.py
+	pyink --pyink-use-majority-quotes --line-length 150 --include "\.py$"" --exclude "\/__pycache__\/" tokeo proto tests docs setup.py
 
 docker: clean
 	docker build -t tokeo:latest .
