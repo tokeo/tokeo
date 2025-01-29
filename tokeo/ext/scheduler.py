@@ -40,8 +40,6 @@ class TokeoCronAndFireTrigger(CronTrigger):
     ):
         super().__init__(year, month, day, week, day_of_week, hour, minute, second, start_date, end_date, timezone, jitter)
         self.delay = delay
-        # flag to signal an immediate trigger
-        self._fire = False
 
     @classmethod
     def from_crontab(cls, expr, timezone=None, jitter=None, delay=None):
@@ -61,10 +59,6 @@ class TokeoCronAndFireTrigger(CronTrigger):
         )
 
     def get_next_fire_time(self, previous_fire_time, now):
-        # check immediate trigger flag
-        if self._fire:
-            self._fire = False
-            return now
         # check cron based trigger
         next_fire_time = super().get_next_fire_time(previous_fire_time, now)
         # if there is an additional delay, put it on top
@@ -72,11 +66,6 @@ class TokeoCronAndFireTrigger(CronTrigger):
             return next_fire_time
         else:
             return next_fire_time + timedelta(seconds=self.delay)
-
-    def fire(self):
-        # set the fire flag
-        self._fire = True
-        return self
 
 
 class TokeoScheduler(MetaMixin):
@@ -120,6 +109,26 @@ class TokeoScheduler(MetaMixin):
             self._scheduler = BackgroundScheduler() if self._interactive else BlockingScheduler()
             self._scheduler.add_executor(ThreadPoolExecutor(max_workers=self._config('max_concurrent_jobs', 10)), 'default')
         return self._scheduler
+
+    # from BaseScheduler _process_jobs
+    def process_job(self, job):
+        try:
+            executor = self.scheduler._lookup_executor(job.executor)
+        except BaseException:
+            self.app.log.error(
+                'Executor lookup ("%s") failed for job "%s" -- removing it from the '
+                'job store', job.executor, job)
+            job.remove()
+
+        try:
+            executor.submit_job(job, [datetime.now(timezone.utc)])
+        except MaxInstancesReachedError:
+            self.app.log.warning(
+                'Execution of job "%s" skipped: maximum number of running '
+                'instances reached (%d)', job, job.max_instances)
+        except BaseException:
+            self.app.log.error('Error submitting job "%s" to executor "%s"',
+                                    job, job.executor)
 
     @property
     def tasks(self):
@@ -185,12 +194,15 @@ class TokeoScheduler(MetaMixin):
                     max_running_jobs=task['max_running_jobs'] if 'max_running_jobs' in task else None,
                 )
 
-    def startup(self, interactive=True):
+    def startup(self, interactive=True, paused=False):
         self._interactive = interactive
         self.app.log.info('Adding all scheduler tasks from config')
         self.init_tasks()
-        self.app.log.info('Spinning up scheduler')
-        self.scheduler.start()
+        if paused:
+            self.app.log.warning('Initialize scheduler in paused mode')
+        else:
+            self.app.log.info('Spinning up scheduler')
+        self.scheduler.start(paused=paused)
 
     def shutdown(self, signum=None, frame=None):
         # only shutdown if initialized
@@ -199,8 +211,8 @@ class TokeoScheduler(MetaMixin):
             self._scheduler.shutdown()
             self._scheduler.remove_all_jobs()
 
-    def launch(self, interactive=True):
-        self.app.scheduler.startup(interactive=interactive)
+    def launch(self, interactive=True, paused=False):
+        self.app.scheduler.startup(interactive=interactive, paused=paused)
         if interactive:
             self.shell()
 
@@ -277,7 +289,7 @@ class TokeoScheduler(MetaMixin):
                     elif args.cmd == 'resume':
                         self._scheduler.resume_job(task)
                     elif args.cmd == 'fire':
-                        job.reschedule(job.trigger.fire())
+                        self.process_job(job)
                     # a short note
                     self.app.log.info(f'{args.cmd}d job {job.id} [{job.name}]')
                 else:
@@ -433,6 +445,18 @@ class TokeoSchedulerController(Controller):
     def _default(self):
         self._parser.print_help()
 
+    def log_info_bw(self, *args):
+        print('INFO:', *args)
+
+    def log_warning_bw(self, *args):
+        print('WARN:', *args)
+
+    def log_error_bw(self, *args):
+        print('ERR:', *args)
+
+    def log_debug_bw(self, *args):
+        print('DEBUG:', *args)
+
     def log_info(self, *args):
         print('\033[32mINFO:', *args, '\033[39m')
 
@@ -456,18 +480,39 @@ class TokeoSchedulerController(Controller):
                     help='do not startup in interactive shell',
                 ),
             ),
+            (
+                ['--paused'],
+                dict(
+                    action='store_true',
+                    help='start the scheduler in paused mode',
+                ),
+            ),
+            (
+                ['--no-colors'],
+                dict(
+                    action='store_true',
+                    help='do not use colored output',
+                ),
+            ),
         ],
     )
     def launch(self):
         # rewrite the output log handler for interactive
         # to run well with prompt toolkit
         if not self.app.pargs.background:
-            self.app.log.info = self.log_info
-            self.app.log.warning = self.log_warning
-            self.app.log.error = self.log_error
-            self.app.log.debug = self.log_debug
+            # use colored output?
+            if self.app.pargs.no_colors:
+                self.app.log.info = self.log_info_bw
+                self.app.log.warning = self.log_warning_bw
+                self.app.log.error = self.log_error_bw
+                self.app.log.debug = self.log_debug_bw
+            else:
+                self.app.log.info = self.log_info
+                self.app.log.warning = self.log_warning
+                self.app.log.error = self.log_error
+                self.app.log.debug = self.log_debug
         # launch the scheduler
-        self.app.scheduler.launch(interactive=not self.app.pargs.background)
+        self.app.scheduler.launch(interactive=not self.app.pargs.background, paused=self.app.pargs.paused)
 
 
 def tokeo_scheduler_extend_app(app):
