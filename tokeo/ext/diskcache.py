@@ -114,20 +114,24 @@ class TokeoDiskCacheLocksHandler:
                 if verbose:
                     self.app.log.info(f'@throttle {func.__name__} using key {key}')
 
-                # run in a transaction
-                with self._cache.transact(retry=True):
-                    # check if already initialized
-                    if self._cache.get(key) is None:
-                        # initialize the timer
-                        now = time_func()
-                        # set the cache
-                        self._cache.set(key, (now, count), expire=expire, tag=self._tag)
-
                 # loop
                 while True:
-                    # run in a transaction
+                    # run in a transaction<
                     with self._cache.transact(retry=True):
-                        last, tally = self._cache.get(key)
+                        # get values from cache
+                        values = self._cache.get(key)
+                        # check if not already initialized
+                        if values is None:
+                            # initialize the variables
+                            last = time_func()
+                            tally = count
+                            # initialize the cache immediately
+                            self._cache.set(key, (last, tally), expire=expire, tag=self._tag)
+                        else:
+                            # expand the cached values
+                            last, tally = values
+
+                        # calc the next values
                         now = time_func()
                         tally += (now - last) * rate
                         delay = 0
@@ -209,18 +213,23 @@ class TokeoDiskCacheLocksHandler:
                 if verbose:
                     self.app.log.info(f'@temper {func.__name__} using key {key}')
 
-                # run in a transaction
-                with self._cache.transact(retry=True):
-                    # check if already initialized
-                    if self._cache.get(key) is None:
-                        # set the cache
-                        self._cache.set(key, count, expire=expire, tag=self._tag)
-
                 # loop
                 while True:
                     # run in a transaction
                     with self._cache.transact(retry=True):
-                        available = self._cache.get(key)
+                        # get value from cache
+                        value = self._cache.get(key)
+                        # check if not already initialized
+                        if value is None:
+                            # initialize the variables
+                            available = count
+                            # initialize the cache immediately
+                            self._cache.set(key, available, expire=expire, tag=self._tag)
+                        else:
+                            # expand the cached value
+                            available = value
+
+                        # calc the next values
                         delay = 0
 
                         if available >= 1:
@@ -246,7 +255,7 @@ class TokeoDiskCacheLocksHandler:
                 # run in a transaction
                 with self._cache.transact(retry=True):
                     # add to counter
-                    self._cache.set(key, self._cache.get(key) + 1, expire=expire, tag=self._tag)
+                    self._cache.set(key, self._cache.get(key, default=count) + 1, expire=expire, tag=self._tag)
 
                 # return the @decorated result
                 return result
