@@ -96,9 +96,6 @@ class TokeoGrpcController(Controller):
     def _setup(self, app):
         super(TokeoGrpcController, self)._setup(app)
 
-    def _default(self):
-        self._parser.print_help()
-
     @ex(
         help='start grpc service',
         description='Spin up the grpc service.',
