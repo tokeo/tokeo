@@ -30,6 +30,7 @@ class Tokeo(App):
         extensions = [
             'colorlog',
             'jinja2',
+            'tokeo.ext.print',
             'tokeo.ext.yaml',
             'tokeo.ext.appenv',
             'tokeo.ext.appshare',
