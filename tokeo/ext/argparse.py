@@ -46,3 +46,6 @@ class Controller(ArgparseController):
 
     class Meta:
         argument_formatter = TokeoHelpFormatter
+
+    def _default(self):
+        self._parser.print_help()
