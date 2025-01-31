@@ -5,5 +5,8 @@ __getattr__, __dir__, __all__ = lazy.attach(
     submodules=[
         'actors',
         'agents',
+        'operators',
+        'performers',
+        'steps',
     ],
 )
