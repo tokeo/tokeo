@@ -135,10 +135,6 @@ class TokeoDramatiq(MetaMixin):
         else:
             raise AttributeError('Enable tokeo diskcache extension to allow locks')
 
-    def purge_locks(self):
-        if self._locks:
-            self._locks.purge()
-
 
 class TokeoDramatiqController(Controller):
     """
@@ -180,8 +176,32 @@ class TokeoDramatiqController(Controller):
     def _setup(self, app):
         super(TokeoDramatiqController, self)._setup(app)
 
-    def _default(self):
-        self._parser.print_help()
+    ### --------------------------------------------------------------------------------------
+
+    @ex(
+        help='access the dramatiq locks from cache',
+        description='Handle dramatiq locks stored in diskcache.',
+        epilog=f'Use "{basename(sys.argv[0])} dramatiq locks" to handle the dramatiq locks in diskcache.',
+        arguments=[
+            (
+                ['--purge'],
+                dict(
+                    action='store_true',
+                    help='purge the dramatiq locks from cache',
+                ),
+            ),
+        ],
+    )
+    def locks(self):
+        # check if parameter for locks cache
+        if self.app.pargs.purge:
+            num = self.app.dramatiq.locks.purge()
+            self.app.print(f'Purged {num} dramatiq locks from cache.')
+        else:
+            # show the locks info
+            self.app.print(f'Dramatiq locks using the cache tag: {self.app.dramatiq.locks._tag}')
+
+    ### --------------------------------------------------------------------------------------
 
     @ex(
         help='spin up the dramatiq service workers',
@@ -246,8 +266,11 @@ class TokeoDramatiqController(Controller):
         args = cli.make_argument_parser().parse_args()
         # restore the sys.argv content for later restart etc. from inside dramatiq
         sys.argv = [sys.argv[0]] + self.app.argv
-        # initialize locks on service start
-        self.app.dramatiq.purge_locks()
+        # initialize locks on service start but ignore if missing
+        try:
+            self.app.dramatiq.locks.purge()
+        except:
+            pass
         # signal hook
         for res in self.app.hook.run('tokeo_dramatiq_pre_start', self.app):
             pass
@@ -257,7 +280,8 @@ class TokeoDramatiqController(Controller):
         for res in self.app.hook.run('tokeo_dramatiq_post_end', self.app):
             pass
         # signal result as exit code
-        sys.exit(result)
+        self.app.exit_code = result
+        return
 
 
 def tokeo_dramatiq_extend_app(app):
