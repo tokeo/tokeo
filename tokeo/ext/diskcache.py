@@ -120,16 +120,24 @@ class TokeoDiskCacheLocksHandler:
                     with self._cache.transact(retry=True):
                         # get values from cache
                         values = self._cache.get(key)
-                        # check if not already initialized
+                        # check if already a valid initialized tuple(int, int) exist where ints must have values > 0
+                        if type(values) is tuple and len(values) == 2 and type(values[0]) is int and type(values[1]) is int:
+                            # expand the cached tuple values
+                            last, tally = values
+                            # validate the values
+                            if last < 1 or tally < 1:
+                                # invalidate the tuple
+                                values = None
+                        else:
+                            # invalidate any other values read or not read from cache
+                            values = None
+                        # on read failure or values failure, reset the values
                         if values is None:
                             # initialize the variables
                             last = time_func()
                             tally = count
                             # initialize the cache immediately
                             self._cache.set(key, (last, tally), expire=expire, tag=self._tag)
-                        else:
-                            # expand the cached values
-                            last, tally = values
 
                         # calc the next values
                         now = time_func()
@@ -219,15 +227,15 @@ class TokeoDiskCacheLocksHandler:
                     with self._cache.transact(retry=True):
                         # get value from cache
                         value = self._cache.get(key)
-                        # check if not already initialized
-                        if value is None:
-                            # initialize the variables
+                        # check if already correctly initialized
+                        if type(value) is int and value > 0:
+                            # expand the cached value
+                            available = value
+                        else:
+                            # re-initialize the variables
                             available = count
                             # initialize the cache immediately
                             self._cache.set(key, available, expire=expire, tag=self._tag)
-                        else:
-                            # expand the cached value
-                            available = value
 
                         # calc the next values
                         delay = 0
@@ -466,15 +474,15 @@ class TokeoDiskCacheController(Controller):
     )
     def check(self):
         directory = self.app.cache._cache.directory
-        print(f'Check cache at "{directory}".')
+        self.app.print(f'Check cache at "{directory}".')
         vol = self.app.cache.volume()
-        print(f'Used {vol} bytes on volume.')
+        self.app.print(f'Used {vol} bytes on volume.')
         result = self.app.cache.check(fix=True, retry=True)
-        print(f'Results from cache fix:\n    {result}')
+        self.app.print(f'Results from cache fix:\n    {result}')
         num = self.app.cache.expire(retry=True)
-        print(f'Removed {num} expired items from cache.')
+        self.app.print(f'Removed {num} expired items from cache.')
         cnt = self.app.cache._cache.__len__()
-        print(f'Currently {cnt} keys in cache.')
+        self.app.print(f'Currently {cnt} keys in cache.')
 
     ### --------------------------------------------------------------------------------------
 
@@ -503,6 +511,13 @@ class TokeoDiskCacheController(Controller):
                 dict(
                     action='store_true',
                     help='show current values for keys',
+                ),
+            ),
+            (
+                ['--with-types'],
+                dict(
+                    action='store_true',
+                    help='show types for key values',
                 ),
             ),
             (
@@ -541,17 +556,19 @@ class TokeoDiskCacheController(Controller):
                 out = '{key}'
                 if self.app.pargs.with_values:
                     out += ' = {value}'
+                if self.app.pargs.with_types:
+                    out += ' |:{value_type}|'
                 if self.app.pargs.with_expires:
                     out += ' ({expire_time})s'
                 if self.app.pargs.with_tags:
                     out += ' [{tag}]'
-                if out != '{key}':
+                if out != '{key}' or self.app.pargs.tag is not None:
                     # read the full content from key
                     value, expire_time, tag = self.app.cache._cache.get(key, default=None, expire_time=True, tag=True, retry=False)
                     if value is None:
                         value = ''
                     if expire_time is None:
-                        expire_time = ''
+                        expire_time = 'no expire'
                     else:
                         expire_time = expire_time - time.time()
                     if tag is None:
@@ -568,7 +585,39 @@ class TokeoDiskCacheController(Controller):
 
             # show the line
             if _show:
-                print(out.format(key=key, value=value, expire_time=expire_time, tag=tag))
+                self.app.print(out.format(key=key, value=value, value_type=type(value).__name__, expire_time=expire_time, tag=tag))
+
+    ### --------------------------------------------------------------------------------------
+
+    @ex(
+        help='access the locks from cache',
+        description='Handle locks stored in diskcache.',
+        epilog=f'Use "{basename(sys.argv[0])} cache locks" to handle the locks in diskcache.',
+        arguments=[
+            (
+                ['--purge'],
+                dict(
+                    action='store_true',
+                    help='purge the locks from cache',
+                ),
+            ),
+        ],
+    )
+    def locks(self):
+        # check if parameter for locks cache
+        if self.app.pargs.purge:
+            num = self.app.cache.locks.purge()
+            self.app.print(f'Purged {num} locks from cache.')
+        else:
+            # use the list command to show the locks
+            self.app.print(f'Locks using the tag: {self.app.cache.locks._tag}')
+            self.app.pargs.keys = ''
+            self.app.pargs.with_values = True
+            self.app.pargs.with_tags = True
+            self.app.pargs.with_types = True
+            self.app.pargs.with_expires = True
+            self.app.pargs.tag = self.app.cache.locks._tag
+            self.list()
 
     ### --------------------------------------------------------------------------------------
 
@@ -581,33 +630,49 @@ class TokeoDiskCacheController(Controller):
                 ['--tag'],
                 dict(
                     action='store',
-                    help='show keys for tag only',
+                    help='purge keys for tag only',
                 ),
             ),
             (
-                ['--locks'],
+                ['--all'],
                 dict(
                     action='store_true',
-                    help='purge locks cache',
+                    help='purge all values',
                 ),
             ),
         ],
     )
     def purge(self):
-        # check if parameter for locks cache
-        if self.app.pargs.locks:
-            num = self.app.cache.locks.purge()
-        # check if parameter for tag
-        elif self.app.pargs.tag is not None:
+        # check if valid parameters
+        if self.app.pargs.tag is not None and self.app.pargs.all:
+            self.app.log.error('Can not use both options --tag and --all together')
+            self.app.exit_code = 1
+            return
+
+        # check if valid parameters
+        if self.app.pargs.tag is None and not self.app.pargs.all:
+            self.app.log.error('Missing mandatory option --tag or --all')
+            self.app.exit_code = 1
+            return
+
+        # check for valid tag value
+        if self.app.pargs.tag is not None:
             if self.app.pargs.tag == '':
-                print('Can not purge from cache with empty tag. Need to be purged completely.')
+                self.app.log.error('Can not purge from cache with empty tag. Use delete or purge completely in that case.')
+                self.app.exit_code = 1
                 return
             else:
                 num = self.app.cache.evict(self.app.pargs.tag, retry=True)
-        else:
+
+        # check for all flag
+        elif self.app.pargs.all:
             num = self.app.cache.purge(retry=True)
 
-        print(f'Purged {num} items from cache.')
+        # identify for feedback
+        else:
+            num = 0
+
+        self.app.print(f'Purged {num} items from cache.')
 
     ### --------------------------------------------------------------------------------------
 
@@ -639,11 +704,11 @@ class TokeoDiskCacheController(Controller):
             if _delete:
                 if self.app.cache.delete(key, retry=True):
                     num += 1
-                    print(f'Deleted: {key}')
+                    self.app.print(f'Deleted: {key}')
                 else:
-                    print(f'Error: {key}')
+                    self.app.log.error(f'Error: {key}')
 
-        print(f'In total {num} keys deleted.')
+        self.app.print(f'In total {num} keys deleted.')
 
     ### --------------------------------------------------------------------------------------
 
@@ -669,6 +734,16 @@ class TokeoDiskCacheController(Controller):
                 ),
             ),
             (
+                ['--value-type'],
+                dict(
+                    action='store',
+                    help='define type for value',
+                    default='str',
+                    required=False,
+                    choices=['str', 'int', 'float', 'bool', 'eval'],
+                ),
+            ),
+            (
                 ['--tag'],
                 dict(
                     action='store',
@@ -690,12 +765,32 @@ class TokeoDiskCacheController(Controller):
     def set(self):
         key = self.app.pargs.key[0]
         value = self.app.pargs.value
+        value_type = self.app.pargs.value_type
         tag = self.app.pargs.tag
         expire = self.app.pargs.expire
-        if self.app.cache.set(key, value, expire=expire, tag=tag, retry=True):
-            print(f'Set: {key}')
+        # check the condition for value type
+        typed_value = None
+        try:
+            if value_type == 'eval':
+                typed_value = eval(value)
+            elif value_type == 'int':
+                typed_value = int(value)
+            elif value_type == 'float':
+                typed_value = float(value)
+            elif value_type == 'bool':
+                typed_value = bool(value)
+            else:
+                typed_value = value
+        except Exception as err:
+            self.app.log.error(f'Value could not be set as type "{value_type}"! ({err})')
+            self.app.exit_code = 1
+            return
+
+        # set value in cache
+        if self.app.cache.set(key, typed_value, expire=expire, tag=tag, retry=True):
+            self.app.print(f'Set: {key}')
         else:
-            print(f'Error: {key}')
+            self.app.log.error(f'Error: {key}')
 
     ### --------------------------------------------------------------------------------------
 
@@ -727,7 +822,7 @@ class TokeoDiskCacheController(Controller):
         default = self.app.pargs.default
         value = self.app.cache.get(key, default=default, retry=True)
         if value is not None:
-            print(f'{key} = {value}')
+            self.app.print(f'{key} = {value}')
 
 
 def load(app):
