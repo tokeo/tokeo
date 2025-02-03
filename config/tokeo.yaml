@@ -105,6 +105,20 @@ smtp:
   # password: null
   ### attach one or more files by default to the messages
   # files: null
+  ### define the characterset for message
+  # charset: utf-8
+  ### define the encoding of headers qp|base64
+  # header_encoding: null
+  ### define the encoding of bodies qp|base64
+  # body_encoding: null
+  ### check for Date field and append if not exist
+  # date_enforce: True
+  ### check for Message-Id and append if not exist
+  # msgid_enforce: True
+  ### some prepend string for Message-Id
+  # msgid_str: null
+  ### define the domain for Message-Id (null use current server.domain)
+  # msgid_domain: localhost
 
 #####################################
 
