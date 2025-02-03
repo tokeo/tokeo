@@ -62,7 +62,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             'date_enforce': True,
             'msgid_enforce': True,
             'msgid_str': None,
-            'msgid_domain': None,
+            'msgid_domain': 'localhost',
         }
 
     def __init__(self, **kw):
