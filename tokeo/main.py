@@ -4,8 +4,6 @@ from cement.core.exc import CaughtSignal
 from cement.utils import fs
 from .core.exc import TokeoError
 from .controllers.base import BaseController
-from .controllers.emit import EmitController
-from .controllers.grpccall import GrpcCallController
 
 
 class Tokeo(App):
@@ -32,22 +30,12 @@ class Tokeo(App):
             'jinja2',
             'tokeo.ext.print',
             'tokeo.ext.yaml',
-            'tokeo.ext.appenv',
             'tokeo.ext.appshare',
-            'tokeo.ext.smtp',
-            'tokeo.ext.scheduler',
-            'tokeo.ext.diskcache',
-            'tokeo.ext.pocketbase',
-            'tokeo.ext.dramatiq',
-            'tokeo.ext.grpc',
-            'tokeo.ext.nicegui',
         ]
 
         # register handlers
         handlers = [
             BaseController,
-            EmitController,
-            GrpcCallController,
         ]
 
         # configuration file suffix
