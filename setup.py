@@ -1,12 +1,21 @@
 from setuptools import setup, find_packages
-from tokeo.core.version import get_version
+# define VERSION
+try:
+    # when running build
+    # use from tokeo package
+    from tokeo.core.version import get_version
+    VERSION = get_version()
+except:
+    # when installed --editable
+    # just use this
+    VERSION = '0.0.0-dev.0'
 
-VERSION = get_version()
-
+# read description from file
 f = open('README.md', 'r')
 LONG_DESCRIPTION = f.read()
 f.close()
 
+# run setup
 setup(
     name='tokeo',
     version=VERSION,
