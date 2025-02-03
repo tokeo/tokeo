@@ -393,14 +393,11 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             if _template_exists(f'{template}.title.jinja2'):
                 params['subject'] = self.app.render(data, f'{template}.title.jinja2', out=None)
         # build body
-        body = list()
+        body = dict()
         if _template_exists(f'{template}.plain.jinja2'):
-            body.append(self.app.render(dict(**data, mail_params=params), f'{template}.plain.jinja2', out=None))
+            body['text'] = self.app.render(dict(**data, mail_params=params), f'{template}.plain.jinja2', out=None)
         if _template_exists(f'{template}.html.jinja2'):
-            # before adding a html part make sure that plain part exists
-            if len(body) == 0:
-                body.append('Content is delivered as HTML only.')
-            body.append(self.app.render(dict(**data, mail_params=params), f'{template}.html.jinja2', out=None))
+            body['html'] = self.app.render(dict(**data, mail_params=params), f'{template}.html.jinja2', out=None)
         # send the message
         self.send(body=body, **params)
 
