@@ -114,15 +114,15 @@ class TokeoNiceguiController(Controller):
         stacked_type = 'nested'
         stacked_on = 'base'
         subparser_options = dict(metavar='')
-        help = 'launch web frontend server'
-        description = 'Launch the tokeo nicegui webservice.'
-        epilog = f'Example: {basename(argv[0])} nicegui launch --background'
+        help = 'start web frontend server'
+        description = 'Start the tokeo nicegui webservice.'
+        epilog = f'Example: {basename(argv[0])} nicegui serve --background'
 
     def _setup(self, app):
         super()._setup(app)
 
     @ex(
-        help='launch the wbeserver service',
+        help='serve the wbeserver service',
         description='Spin up the webserver.',
         arguments=[
             (
@@ -134,7 +134,7 @@ class TokeoNiceguiController(Controller):
             ),
         ],
     )
-    def launch(self):
+    def serve(self):
         self.app.nicegui.startup()
 
 
