@@ -1,6 +1,7 @@
 from tokeo.ext.appshare import app
 from tokeo.core import tasks
-from proto import tokeo_pb2_grpc
+from .proto import tokeo_pb2
+from .proto import tokeo_pb2_grpc
 from google.protobuf import empty_pb2
 
 

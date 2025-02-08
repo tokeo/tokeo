@@ -47,7 +47,7 @@ grpc:
   ### Thread Pool max-workers for grpc service
   max_worker: 2
   ### module and method to launch grpc server
-  proto_add_servicer_to_server: proto.tokeo_pb2_grpc:add_TokeoServicer_to_server
+  proto_add_servicer_to_server: tokeo.core.grpc.proto.tokeo_pb2_grpc:add_TokeoServicer_to_server
   ### module and servicer for grpc implementations
   grpc_servicer: tokeo.core.grpc.tokeo_servicer:TokeoServicer
 
