@@ -25,13 +25,20 @@ devenv:
 	.venv/bin/pip install -r requirements-dev.txt
 
 proto:
-	python -m grpc_tools.protoc -I. --python_out=. --pyi_out=. --grpc_python_out=. ./proto/tokeo.proto
+	python -m grpc_tools.protoc -I./ --python_out=. --pyi_out=. --grpc_python_out=. ./tokeo/core/grpc/proto/tokeo.proto
 
 doc:
 	rm -rf html
 	pdoc3 --html tokeo tests
 	open http://localhost:9999
 	pdoc3 --html --http localhost:9999 tokeo tests
+
+# check for verbosity
+ifdef verbose
+verbosity=${verbose}
+else
+verbosity=v
+endif
 
 # check for log-level and enable print statement outputs on debug
 ifdef debug
@@ -54,8 +61,9 @@ endif
 test:
 	rm -rf tmp/tests
 	mkdir -p tmp/tests
+	CEMENT_LOG=0 \
 	python -m pytest \
-		-v \
+		-${verbosity} \
 		$(allow_print) \
 		$(cov_report) \
 		--basetemp=tmp/tests \
@@ -65,7 +73,7 @@ test:
 
 fmt:
 	# align with https://google.github.io/styleguide/pyguide.html
-	pyink --pyink-use-majority-quotes --line-length 150 --include "\.py$"" --exclude "\/__pycache__\/" tokeo proto tests docs setup.py
+	pyink --pyink-use-majority-quotes --line-length 150 --include "\.py$"" --exclude "\/__pycache__\/" tokeo tests docs setup.py
 
 docker: clean
 	docker build -t tokeo:latest .
