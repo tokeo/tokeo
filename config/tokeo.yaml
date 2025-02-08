@@ -19,6 +19,16 @@ tokeo:
 
 #####################################
 
+jinja2:
+
+  # preserve the trailing newline when rendering templates.
+  keep_trailing_newline: true
+  # If this is set to True the first newline after a block is removed
+  # (block, not variable tag!)
+  trim_blocks: true
+
+#####################################
+
 dramatiq:
 
   ### module and method to launch dramatiq serve service
