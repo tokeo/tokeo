@@ -430,8 +430,8 @@ class TokeoSchedulerController(Controller):
         stacked_type = 'nested'
         stacked_on = 'base'
         subparser_options = dict(metavar='')
-        help = 'launch and manage timed tasks with tokeo scheduler'
-        description = 'Launch the tokeo scheduler to control and manage running repeating tasks. Utilize a range of scheduler commands and a shell for an interactive task handling.'
+        help = 'Start and manage timed tasks with tokeo scheduler'
+        description = 'Start the tokeo scheduler to control and manage running repeating tasks. Utilize a range of scheduler commands and a shell for an interactive task handling.'
         epilog = f'Example: {basename(argv[0])} scheduler launch --background'
 
     def _setup(self, app):
@@ -462,7 +462,7 @@ class TokeoSchedulerController(Controller):
         print('\033[35mDEBUG:', *args, '\033[39m')
 
     @ex(
-        help='launch the scheduler service',
+        help='start the scheduler service',
         description='Spin up the scheduler.',
         arguments=[
             (
@@ -503,7 +503,7 @@ class TokeoSchedulerController(Controller):
                 self.app.log.warning = self.log_warning
                 self.app.log.error = self.log_error
                 self.app.log.debug = self.log_debug
-        # launch the scheduler
+        # start the scheduler
         self.app.scheduler.launch(interactive=not self.app.pargs.background, paused=self.app.pargs.paused)
 
 
