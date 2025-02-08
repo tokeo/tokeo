@@ -4,6 +4,7 @@ try:
     # when running build
     # use from tokeo package
     from tokeo.core.version import get_version
+
     VERSION = get_version()
 except:
     # when installed --editable
