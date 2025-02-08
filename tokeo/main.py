@@ -27,8 +27,8 @@ class Tokeo(App):
         # load additional framework extensions
         extensions = [
             'colorlog',
-            'jinja2',
             'tokeo.ext.print',
+            'tokeo.ext.jinja2',
             'tokeo.ext.yaml',
             'tokeo.ext.appshare',
         ]
@@ -43,9 +43,6 @@ class Tokeo(App):
 
         # set the log handler
         log_handler = 'colorlog'
-
-        # set the output handler
-        output_handler = 'jinja2'
 
 
 class TokeoTest(TestApp, Tokeo):
