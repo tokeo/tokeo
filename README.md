@@ -25,6 +25,8 @@ An integrated [Grpc](https://grpc.io) service gives access to the available task
 
 For timed jobs excution there is an integrated interactive [Apscheduler](https://apscheduler.readthedocs.io/en/master/) cron service.
 
+Last but not least expose your values and functions via [Nicegui](https://nicegui.io/) web based api and pages.
+
 Kickstart your EDA projects with **tokeo** and experience a seamless development cycle.
 
 Cheers<br/>
