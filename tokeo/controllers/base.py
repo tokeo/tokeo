@@ -4,13 +4,11 @@ from cement.utils.version import get_version_banner
 from ..core.version import get_version
 
 
-VERSION_BANNER = """
-The Tokeo CLI contains all tasks, jobs and management for your Event-Driven Backend. %s
-%s
-""" % (
-    get_version(),
-    get_version_banner(),
-)
+VERSION_BANNER = f"""
+The Tokeo CLI contains all tasks, jobs and management for your Event-Driven Backend.
+Tokeo {get_version()}
+{get_version_banner()}
+"""
 
 
 class BaseController(Controller):
