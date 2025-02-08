@@ -5,7 +5,6 @@ from jinja2 import Environment
 
 
 class TokeoJinja2OutputHandler(Jinja2OutputHandler):
-
     """
     This class implements the :ref:`OutputHandler <cement.core.output>`
     interface.  It provides text output from template and uses the
@@ -17,7 +16,6 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
     """
 
     class Meta(OutputHandler.Meta):
-
         """Handler meta-data."""
 
         label = 'tokeo.jinja2'
@@ -28,7 +26,6 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
 
 
 class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
-
     """
     This class implements the :ref:`Template <cement.core.template>` Handler
     interface.  It renders content as template, and supports copying entire
@@ -39,7 +36,6 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
     """
 
     class Meta(TemplateHandler.Meta):
-
         """Handler meta-data."""
 
         label = 'tokeo.jinja2'
