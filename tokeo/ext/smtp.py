@@ -317,7 +317,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
                 #       'path/simple.ext',
                 #       ('alt_name.ext', 'path/filename.ext'),
                 #       ('alt_name.ext', 'path/filename.ext', 'cidname'),
-                #       {'alt_name': 'alt_name', 'path': 'path/filename.ext', cid: 'cidname'},
+                #       {'name': 'alt_name', 'path': 'path/filename.ext', cid: 'cidname'},
                 #      ]
                 if isinstance(in_path, tuple):
                     alt_name = in_path[0]
