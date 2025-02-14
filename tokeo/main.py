@@ -68,7 +68,7 @@ def main():
             app.run()
 
         except AssertionError as e:
-            print('AssertionError > %s' % e.args[0])
+            print(f'AssertionError > {e.args[0]}')
             app.exit_code = 1
 
             if app.debug is True:
@@ -77,7 +77,7 @@ def main():
                 traceback.print_exc()
 
         except TokeoError as e:
-            print('TokeoError > %s' % e.args[0])
+            print(f'TokeoError > {e.args[0]}')
             app.exit_code = 1
 
             if app.debug is True:
@@ -87,7 +87,7 @@ def main():
 
         except CaughtSignal as e:
             # Default Cement signals are SIGINT and SIGTERM, exit 0 (non-error)
-            print('\n%s' % e)
+            print(f'\n{e}')
             app.exit_code = 0
 
 
