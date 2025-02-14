@@ -176,7 +176,7 @@ nicegui:
   ### web page title
   title: Tokeo NiceGUI
   ### relative filepath or absolute URL to a favicon
-  favicon: null
+  favicon: public/favicon.ico
   ### page meta viewport content
   viewport: width=device-width, initial-scale=1
   ### whether to use Quasar's dark mode (True, False, null = Auto)
