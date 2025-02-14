@@ -1,7 +1,76 @@
-# files
+
+#
+# All files ignored by default
+# include only specify directories and files
+#
+/**
+
+#
+# ! HELP:
+# to include a subdirectory only
+# un-ignore the affected subdirectory
+# and ignore the inner again
+# and un-ignore the relevant path
+#
+# -> !/path/
+# -> /path/**
+# -> !/path/subdirectory/
+#
+
+!/config/
+!/config/**
+/config/**/*.local.*
+
+!/docs/
+!/docs/**
+
+!/tokeo/
+!/tokeo/**
+
+!/public/
+!/public/**
+
+!/tests/
+!/tests/**
+
+!/tmp/
+!/tmp/tests/
+!/tmp/tests/.gitkeep
+
+!/.python-version
+!/.gitignore
+!/.npmrc
+!/Dockerfile
+!/Makefile
+
+!/package.json
+!/requirements.txt
+!/requirements-dev.txt
+!/MANIFEST.in
+!/setup.cfg
+!/setup.py
+
+!/CHANGELOG.md
+!/LICENSE.md
+!/README.md
+!/TODO.md
+
+#
+# ATTENTION:
+# always ignore the following files and directories
+#
+
 .DS_Store
-.history
-.history.d/
+*.pem
+.vercel
+*.tsbuildinfo
+.venv
+
+# logfiles
+*.log
+*.log.tar
+*.log.tar.gz
+*.log.tgz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -79,16 +148,13 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# pyenv
-.python-version
-
 # celery beat schedule file
 celerybeat-schedule
 
 # SageMath parsed files
 *.sage.py
 
-# Environments and config
+# Environments
 .env
 .venv
 env/
@@ -96,16 +162,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-config/*.local.yaml
-
-# Diskcache
-tokeo_diskcache/
-
-# Temp
-tmp/*
-!tmp/tests/
-tmp/tests/*
-!tmp/tests/.gitkeep
 
 # Spyder project settings
 .spyderproject
