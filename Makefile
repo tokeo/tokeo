@@ -56,11 +56,17 @@ else
 cov_report=
 endif
 
+# check for files
+ifndef files
+files=tests/
+endif
+
 # limit the tests to run by files and tests filters
 # make test files=test_logging.py tests=logging debug=1
 test:
 	rm -rf tmp/tests
 	mkdir -p tmp/tests
+	touch tmp/tests/.gitkeep
 	CEMENT_LOG=0 \
 	python -m pytest \
 		-${verbosity} \
@@ -69,7 +75,7 @@ test:
 		--basetemp=tmp/tests \
 		$(log_level) \
 		-k "$(tests)" \
-		tests/$(files)
+		$(files)
 
 fmt:
 	# align with https://google.github.io/styleguide/pyguide.html
