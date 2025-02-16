@@ -89,5 +89,5 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
 
 def load(app):
-    app._meta.config_handler = TokeoYamlConfigHandler.Meta.label
     app.handler.register(TokeoYamlConfigHandler)
+    app._meta.config_handler = TokeoYamlConfigHandler.Meta.label
