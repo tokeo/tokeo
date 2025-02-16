@@ -403,5 +403,5 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
 
 def load(app):
-    app._meta.mail_handler = TokeoSMTPMailHandler.Meta.label
     app.handler.register(TokeoSMTPMailHandler)
+    app._meta.mail_handler = TokeoSMTPMailHandler.Meta.label
