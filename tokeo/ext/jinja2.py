@@ -45,6 +45,7 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
 
         #: Configuration default values
         config_defaults = {
+            'template_dirs': None,
             'keep_trailing_newline': True,
             'trim_blocks': True,
         }
@@ -62,13 +63,23 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
         self.env.trim_blocks = self.app.config.get(self._meta.config_section, 'trim_blocks')
 
 
-def tokeo_jinja2_extend_app(app):
+    def _config(self, app):
+        # extend the template dirs if exist
+        d = app.config.get(self._meta.config_section, 'template_dirs')
+        if d is not None:
+            if d is str:
+                d = [d]
+            for p in d:
+                app.add_template_dir(p)
+
+
+def tokeo_jinja2_config(app):
     template_handler = app.handler.resolve('template', TokeoJinja2TemplateHandler.Meta.label)
-    template_handler._setup(app)
+    template_handler._config(app)
 
 
 def load(app):
-    app.hook.register('post_setup', tokeo_jinja2_extend_app)
+    app.hook.register('post_setup', tokeo_jinja2_config)
     app.handler.register(TokeoJinja2OutputHandler)
     app.handler.register(TokeoJinja2TemplateHandler)
     app._meta.output_handler = TokeoJinja2OutputHandler.Meta.label

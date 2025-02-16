@@ -26,6 +26,9 @@ jinja2:
   # If this is set to True the first newline after a block is removed
   # (block, not variable tag!)
   trim_blocks: true
+  # extra where to find templates
+  # template_dirs:
+  #   - extra/templates
 
 #####################################
 
