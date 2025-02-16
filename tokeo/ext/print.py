@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 import inspect
 
 
-def tokeo_print(app: App) -> None:
+def register_tokeo_print(app: App) -> None:
 
     def _print(*args: any, name=None, sep=' ', end='\n') -> None:
         app.render(dict(args=args, name=name, sep=sep, end=end), handler='print')
@@ -230,4 +230,4 @@ def load(app: App) -> None:
     app.handler.register(TokeoInspectOutputHandler)
     app.handler.register(TokeoPrintDictOutputHandler)
     app.handler.register(TokeoPrintOutputHandler)
-    app.hook.register('pre_argument_parsing', tokeo_print)
+    register_tokeo_print(app)
