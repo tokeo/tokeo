@@ -42,6 +42,23 @@ dramatiq:
   worker_processes: 2
   ### number of threads to run the dramatiq workers
   worker_threads: 2
+  ### number of milliseconds to timeout for worker shutdown
+  worker_shutdown_timeout: 600_000
+  ### number of milliseconds before restarting consumers
+  ### after a connection error
+  restart_delay: 3000
+  ### The number of messages to prefetch from the queue for each worker.
+  ### In-progress messages are included in the count. When set to "1",
+  ### a new message is only fetched once a previous one is done. If not
+  ### or "0" provided, two times the number of configured worker threads
+  ### are prefetched.
+  queue_prefetch: 0
+  ### The number of messages to prefetch from the delay queue for each worker.
+  ### When set to "1", a new message is only fetched once a previous one is done.
+  ### If not provided or "0", a thousand times the number of configured worker
+  ### threads are prefetched.
+  delay_queue_prefetch: 0
+
   ### broker to use for backend
   broker: rabbitmq
   ### connection url to rabbitmq server
