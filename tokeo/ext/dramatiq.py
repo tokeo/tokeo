@@ -58,6 +58,10 @@ class TokeoDramatiq(MetaMixin):
             actors='actors.module',
             worker_threads=1,
             worker_processes=2,
+            worker_shutdown_timeout=600_000,
+            restart_delay=3_000,
+            queue_prefetch=0,
+            delay_queue_prefetch=0,
             broker='rabbitmq',
             rabbitmq_url='amqp://guest:guest@localhost:5672/',
             locks_tag='dramatiq_locks',
@@ -243,6 +247,13 @@ class TokeoDramatiqController(Controller):
         sys.argv.extend(
             ['--threads', str(self.app.dramatiq.config('worker_threads'))],
         )
+        sys.argv.extend(
+            ['--worker-shutdown-timeout', str(self.app.dramatiq.config('worker_shutdown_timeout'))],
+        )
+        # some features ar set by environ
+        os.environ['dramatiq_restart_delay'] = str(self.app.dramatiq.config('restart_delay'))
+        os.environ['dramatiq_queue_prefetch'] = str(self.app.dramatiq.config('queue_prefetch'))
+        os.environ['dramatiq_delay_queue_prefetch'] = str(self.app.dramatiq.config('delay_queue_prefetch'))
         # check for logging parameter
         if self.app.pargs.skip_logging:
             # add logging parameter
