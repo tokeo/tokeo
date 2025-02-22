@@ -5,7 +5,6 @@ Cement print extension module.
 from __future__ import annotations
 from typing import Any, Dict, Union, TYPE_CHECKING
 from cement.core import output
-from cement.utils.misc import minimal_logger
 
 if TYPE_CHECKING:
     from cement.core.foundation import App  # pragma: nocover
@@ -144,8 +143,8 @@ class TokeoInspectOutputHandler(output.OutputHandler):
     """
     This class implements the :ref:`Output <cement.core.output>` Handler
     interface.  It takes a dict and only prints out the ``out`` key. It is
-    primarily used by the ``app.inspect()`` extended function in order to replace
-    ``inspect()`` so that framework features like ``pre_render`` and
+    primarily used by the ``app.inspect()`` extended function in order to
+    replace ``inspect()`` so that framework features like ``pre_render`` and
     ``post_render`` hooks are honored. Please see the developer documentation
     on :cement:`Output Handling <dev/output>`.
 
@@ -227,7 +226,16 @@ class TokeoInspectOutputHandler(output.OutputHandler):
         if 'args' in data.keys():
             name = f" named {data['name']}" if 'name' in data.keys() and data['name'] is not None and data['name'] != '' else ''
             self.app.log.debug(f'rendering inspect via {self.__module__}{name}')
-            out = self._inspect(data['args'], name=data['name'], system=data['system'], methods=data['methods'], attributes=data['attributes'], values=data['values'], types=data['types'], divider=data['divider'])  # type: ignore
+            out = self._inspect(
+                data['args'],
+                name=data['name'],
+                system=data['system'],
+                methods=data['methods'],
+                attributes=data['attributes'],
+                values=data['values'],
+                types=data['types'],
+                divider=data['divider'],
+            )
             if 'debug' in data.keys() and data['debug'] is not None and data['debug']:
                 self.app.log.debug(f'>>>\n{out}')
                 return ''

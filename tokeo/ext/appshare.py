@@ -2,12 +2,15 @@
 appshare Module
 ===============
 
-This module provides a global access point to the running Cement app object. It allows external modules to interact with the Cement app without explicitly passing the app object around.
+This module provides a global access point to the running Cement app object.
+It allows external modules to interact with the Cement app without explicitly
+passing the app object around.
 
 Classes
 -------
 App
-    A proxy class that provides access to the attributes and methods of the shared app object.
+    A proxy class that provides access to the attributes and methods of the
+    shared app object.
 
 Functions
 ---------
@@ -20,7 +23,9 @@ class App:
     """
     A proxy class to access the shared app object.
 
-    This class acts as a stand-in for the actual Cement app object. It allows external modules to access the app's attributes and methods as if they were directly accessing the app object itself.
+    This class acts as a stand-in for the actual Cement app object. It allows
+    external modules to access the app's attributes and methods as if they were
+    directly accessing the app object itself.
 
     Attributes
     ----------
@@ -73,7 +78,8 @@ def load(app_to_share):
     """
     Sets the shared app object.
 
-    This function is used to set the actual Cement app object that will be accessed through the App proxy class.
+    This function is used to set the actual Cement app object that will be
+    accessed through the App proxy class.
 
     Parameters
     ----------

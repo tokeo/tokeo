@@ -23,13 +23,13 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
         return ''.join(indent + line for line in text.splitlines(keepends=True)) + ' \n '
 
     def _format_action(self, action):
-        if type(action) == argparse._SubParsersAction:
+        if isinstance(action, argparse._SubParsersAction):
             # inject new class variable for subcommand formatting
             subactions = action._get_subactions()
             invocations = [self._format_action_invocation(a) for a in subactions]
             self._subcommand_max_length = max(len(i) for i in invocations)
 
-        if type(action) == argparse._SubParsersAction._ChoicesPseudoAction:
+        if isinstance(action, argparse._SubParsersAction._ChoicesPseudoAction):
             # format subcommand help line
             subcommand = self._format_action_invocation(action)  # type: str
             width = self._subcommand_max_length

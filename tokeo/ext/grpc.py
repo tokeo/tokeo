@@ -47,7 +47,8 @@ class TokeoGrpc(MetaMixin):
 
     def _config(self, key, **kwargs):
         """
-        This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
+        This is a simple wrapper, and is equivalent to:
+            ``self.app.config.get(<section>, <key>)``.
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 

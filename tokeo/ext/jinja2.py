@@ -64,18 +64,20 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
 
     def _config(self, key, **kwargs):
         """
-        This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
+        This is a simple wrapper, and is equivalent to:
+            ``self.app.config.get(<section>, <key>)``.
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
 
 def tokeo_jinja2_config(app):
     template_handler = app.handler.resolve('template', TokeoJinja2TemplateHandler.Meta.label)
-    # as long as patch is missing from cement we need to make sure that the object has app
+    # as long as patch is missing from cement
+    # we need to make sure that the object has app
     template_handler._setup(app)
     # add template dirs
     t_dirs = template_handler._config('template_dirs', fallback=[])
-    for t_dir in [t_dirs] if isinstance(t_dirs, str) else tdirs:
+    for t_dir in [t_dirs] if isinstance(t_dirs, str) else t_dirs:
         app.add_template_dir(t_dir)
 
 
