@@ -45,11 +45,11 @@ class TokeoGrpc(MetaMixin):
         self._grpc_servicer_module = a[0]
         self._grpc_servicer_method = a[1]
 
-    def _config(self, key, default=None):
+    def _config(self, key, **kwargs):
         """
         This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
         """
-        return self.app.config.get(self._meta.config_section, key)
+        return self.app.config.get(self._meta.config_section, key, **kwargs)
 
     @property
     def server(self):

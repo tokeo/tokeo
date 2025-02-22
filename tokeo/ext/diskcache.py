@@ -316,20 +316,11 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
             self._config('locks_key_prefix'),
         )
 
-    def _config(self, key, default=None):
+    def _config(self, key, **kwargs):
         """
-        This is a simple wrapper, and is equivalent to:
-        ``self.app.config.get('cache.redis', <key>)``.
-
-        Args:
-            key (str): The key to get a config value from the ``cache.redis``
-                config section.
-
-        Returns:
-            unknown: The value of the given key.
-
+        This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
         """
-        return self.app.config.get(self._meta.config_section, key)
+        return self.app.config.get(self._meta.config_section, key, **kwargs)
 
     def locks_handler(self, tag, locks_key_prefix):
         return TokeoDiskCacheLocksHandler(self.app, self._cache, tag, locks_key_prefix)

@@ -92,22 +92,23 @@ class TokeoScheduler(MetaMixin):
         self._command_parser = None
         self._scheduler = None
         self._interactive = True
+        self._tasks = None
         self._taskid = 0
 
     def _setup(self, app):
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
 
-    def _config(self, key, default=None):
+    def _config(self, key, **kwargs):
         """
         This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
         """
-        return self.app.config.get(self._meta.config_section, key)
+        return self.app.config.get(self._meta.config_section, key, **kwargs)
 
     @property
     def scheduler(self):
         if self._scheduler is None:
             self._scheduler = BackgroundScheduler() if self._interactive else BlockingScheduler()
-            self._scheduler.add_executor(ThreadPoolExecutor(max_workers=self._config('max_concurrent_jobs', 10)), 'default')
+            self._scheduler.add_executor(ThreadPoolExecutor(max_workers=self._config('max_concurrent_jobs', fallback=10)), 'default')
         return self._scheduler
 
     # from BaseScheduler _process_jobs
@@ -127,7 +128,9 @@ class TokeoScheduler(MetaMixin):
 
     @property
     def tasks(self):
-        return self._config('tasks')
+        if self._tasks is None:
+            self._tasks = self._config('tasks', fallback={})
+        return self._tasks
 
     def add_crontab_task(
         self,
@@ -149,7 +152,7 @@ class TokeoScheduler(MetaMixin):
         self.scheduler.add_job(
             f'{module}:{func}',
             kwargs=kwargs,
-            trigger=TokeoCronAndFireTrigger.from_crontab(crontab, jitter=max_jitter, delay=delay, timezone=self._config('timezone', None)),
+            trigger=TokeoCronAndFireTrigger.from_crontab(crontab, jitter=max_jitter, delay=delay, timezone=self._config('timezone', fallback=None)),
             name=f'{self._taskid}:{title}',
             id=f'{self._taskid}',
             coalesce=coalesce,
@@ -181,7 +184,7 @@ class TokeoScheduler(MetaMixin):
                     key,
                     entry,
                     kwargs=task['kwargs'] if 'kwargs' in task else {},
-                    title=task['name'] if 'name' in task else '',
+                    title=task['name'] if 'name' in task and task['name'] != '' else key,
                     coalesce=coalesce,
                     misfire_grace_time=task['misfire_grace_time'] if 'misfire_grace_time' in task else None,
                     delay=task['delay'] if 'delay' in task else None,
