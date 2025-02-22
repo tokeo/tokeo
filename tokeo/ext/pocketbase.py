@@ -24,21 +24,21 @@ class TokeoPocketBaseHandler(MetaMixin):
 
     def _setup(self, app):
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
-        self.p = pocketbase.PocketBase(self._config('url'))
+        self.pb = pocketbase.PocketBase(self._config('url'))
         # [ ] TODO: Authentication is missing
 
-    def _config(self, key, default=None):
+    def _config(self, key, **kwargs):
         """
         This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
         """
-        return self.app.config.get(self._meta.config_section, key)
+        return self.app.config.get(self._meta.config_section, key, **kwargs)
 
     def close(self):
         pass
 
     def collection(self, collection_id_or_name):
         # return a general collection
-        return self.p.collection(collection_id_or_name)
+        return self.pb.collection(collection_id_or_name)
 
     def get_one(self, collection_id_or_name, id, sort=None, cache=True, q=dict()):
         # check query options

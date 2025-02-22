@@ -63,16 +63,16 @@ class TokeoNicegui(MetaMixin):
         # lazy import pages modul
         module = importlib.import_module(self._config('pages'))
         # check default web handler
-        if self._config('default') != '':
+        if self._config('default', fallback='') != '':
             default_page = getattr(module, self._config('default'))
             # initialize page
             default_page()
 
-    def _config(self, key, default=None):
+    def _config(self, key, **kwargs):
         """
         This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
         """
-        return self.app.config.get(self._meta.config_section, key)
+        return self.app.config.get(self._meta.config_section, key, **kwargs)
 
     def startup(self):
         # spin up service

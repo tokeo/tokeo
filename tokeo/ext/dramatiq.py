@@ -87,11 +87,11 @@ class TokeoDramatiq(MetaMixin):
         # dramatiq register
         self.register()
 
-    def _config(self, key, default=None):
+    def _config(self, key, **kwargs):
         """
         This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
         """
-        return self.app.config.get(self._meta.config_section, key)
+        return self.app.config.get(self._meta.config_section, key, **kwargs)
 
     # create an alias for _config to access in controller
     config = _config
