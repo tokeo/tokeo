@@ -59,23 +59,24 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
         # prepare the config
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
         # use exposed Jinja2 Environment instance to manipulate it
-        self.env.keep_trailing_newline = self.app.config.get(self._meta.config_section, 'keep_trailing_newline')
-        self.env.trim_blocks = self.app.config.get(self._meta.config_section, 'trim_blocks')
+        self.env.keep_trailing_newline = self._config('keep_trailing_newline')
+        self.env.trim_blocks = self._config('trim_blocks')
 
-
-    def _config(self, app):
-        # extend the template dirs if exist
-        d = app.config.get(self._meta.config_section, 'template_dirs')
-        if d is not None:
-            if d is str:
-                d = [d]
-            for p in d:
-                app.add_template_dir(p)
+    def _config(self, key, **kwargs):
+        """
+        This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
+        """
+        return self.app.config.get(self._meta.config_section, key, **kwargs)
 
 
 def tokeo_jinja2_config(app):
     template_handler = app.handler.resolve('template', TokeoJinja2TemplateHandler.Meta.label)
-    template_handler._config(app)
+    # as long as patch is missing from cement we need to make sure that the object has app
+    template_handler._setup(app)
+    # add template dirs
+    t_dirs = template_handler._config('template_dirs', fallback=[])
+    for t_dir in [t_dirs] if isinstance(t_dirs, str) else tdirs:
+        app.add_template_dir(t_dir)
 
 
 def load(app):
