@@ -122,7 +122,9 @@ class TokeoScheduler(MetaMixin):
         try:
             executor.submit_job(job, [datetime.now(timezone.utc)])
         except MaxInstancesReachedError:
-            self.app.log.warning('Execution of job "%s" skipped: maximum number of running ' 'instances reached (%d)', job, job.max_instances)
+            self.app.log.warning(
+                'Execution of job "%s" skipped: maximum number of running ' 'instances reached (%d)', job, job.max_instances
+            )
         except BaseException:
             self.app.log.error('Error submitting job "%s" to executor "%s"', job, job.executor)
 
@@ -152,7 +154,9 @@ class TokeoScheduler(MetaMixin):
         self.scheduler.add_job(
             f'{module}:{func}',
             kwargs=kwargs,
-            trigger=TokeoCronAndFireTrigger.from_crontab(crontab, jitter=max_jitter, delay=delay, timezone=self._config('timezone', fallback=None)),
+            trigger=TokeoCronAndFireTrigger.from_crontab(
+                crontab, jitter=max_jitter, delay=delay, timezone=self._config('timezone', fallback=None)
+            ),
             name=f'{self._taskid}:{title}',
             id=f'{self._taskid}',
             coalesce=coalesce,
