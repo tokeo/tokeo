@@ -1,5 +1,5 @@
 from sys import argv
-from os.path import basename, dirname, abspath
+from os.path import basename
 from tokeo.ext.argparse import Controller
 from cement.core.meta import MetaMixin
 from cement import ex
@@ -70,7 +70,8 @@ class TokeoNicegui(MetaMixin):
 
     def _config(self, key, **kwargs):
         """
-        This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
+        This is a simple wrapper, and is equivalent to:
+            ``self.app.config.get(<section>, <key>)``.
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 

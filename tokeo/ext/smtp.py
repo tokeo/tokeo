@@ -194,9 +194,11 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         # check the body argument
         if type(body) not in [str, tuple, dict]:
-            error_msg = "Message body must be string, tuple " \
-                        "('<text>', '<html>') or dict " \
-                        "{'text': '<text>', 'html': '<html>'}"
+            error_msg = (
+                "Message body must be string, tuple "
+                "('<text>', '<html>') or dict "
+                "{'text': '<text>', 'html': '<html>'}"
+            )
             raise TypeError(error_msg)
 
         # get the body parts
@@ -314,11 +316,15 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             for in_path in params['files']:
                 # support for alternative file name if its tuple or dict
                 # like [
-                #       'path/simple.ext',
-                #       ('alt_name.ext', 'path/filename.ext'),
-                #       ('alt_name.ext', 'path/filename.ext', 'cidname'),
-                #       {'name': 'alt_name', 'path': 'path/filename.ext', cid: 'cidname'},
-                #      ]
+                #     'path/simple.ext',
+                #     ('alt_name.ext', 'path/filename.ext'),
+                #     ('alt_name.ext', 'path/filename.ext', 'cidname'),
+                #     {
+                #         'name': 'alt_name',
+                #         'path': 'path/filename.ext',
+                #         cid: 'cidname'
+                #     },
+                # ]
                 if isinstance(in_path, tuple):
                     alt_name = in_path[0]
                     path = in_path[1]
@@ -379,7 +385,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
                 # successfully load when available
                 self.app.template.load(template)
                 result = True
-            except:
+            except Exception:
                 pass
             # store flag in cache list to prevent often load access
             self._template_exists_cache[template] = result

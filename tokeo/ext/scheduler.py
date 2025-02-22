@@ -8,9 +8,10 @@ from cement.core.exc import CaughtSignal
 from apscheduler.schedulers.base import STATE_RUNNING
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.executors.base import MaxInstancesReachedError
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.triggers.cron import CronTrigger
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
 import shlex
 from prompt_toolkit import prompt
 from prompt_toolkit.patch_stdout import patch_stdout
@@ -100,7 +101,8 @@ class TokeoScheduler(MetaMixin):
 
     def _config(self, key, **kwargs):
         """
-        This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
+        This is a simple wrapper, and is equivalent to:
+            ``self.app.config.get(<section>, <key>)``.
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
@@ -389,7 +391,7 @@ class TokeoScheduler(MetaMixin):
         # build in-memory history for interactive shell
         history = self.shell_history()
         # initilize the user_input
-        user_input_default = False
+        user_input = ''
         # get std.output and prevent ruining interface
         with patch_stdout(raw=True):
             # loop interactove shell
@@ -401,20 +403,21 @@ class TokeoScheduler(MetaMixin):
                         completer=self.shell_completion(),
                         history=history,
                         auto_suggest=AutoSuggestFromHistory(),
-                        default=user_input if user_input_default else '',
+                        default=user_input,
                     )
                     if self.command(user_input):
-                        # add input to history while a successful command but do not repeat as input
+                        # add input to history while a successful command
+                        # but do not repeat as input
                         history.store_string(user_input)
-                        user_input_default = False
+                        user_input = ''
                     else:
                         # repeat the error input to edit and correct
-                        user_input_default = True
+                        pass
 
-                except KeyboardInterrupt as err:
+                except KeyboardInterrupt:
                     # we don't support Ctrl-C
                     continue
-                except EOFError as err:
+                except EOFError:
                     # we do support Ctrl-D
                     self.app.log.info('bye bye using scheduler...')
                     break
@@ -438,7 +441,11 @@ class TokeoSchedulerController(Controller):
         stacked_on = 'base'
         subparser_options = dict(metavar='')
         help = 'Start and manage timed tasks with tokeo scheduler'
-        description = 'Start the tokeo scheduler to control and manage running repeating tasks. Utilize a range of scheduler commands and a shell for an interactive task handling.'
+        description = (
+            'Start the tokeo scheduler to control and manage running '
+            'repeating tasks. Utilize a range of scheduler commands '
+            'and a shell for an interactive task handling.'
+        )
         epilog = f'Example: {basename(argv[0])} scheduler launch --background'
 
     def _setup(self, app):

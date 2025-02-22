@@ -2,9 +2,9 @@
 Dramatiq Controller Module
 ==========================
 
-This module integrates the Dramatiq message processing library with a Cement CLI application,
-providing command-line interfaces to manage Dramatiq workers for asynchronous task processing
-in a distributed system.
+This module integrates the Dramatiq message processing library with
+a Cement CLI application, providing command-line interfaces to manage
+Dramatiq workers for asynchronous task processing in a distributed system.
 
 Features
 --------
@@ -18,6 +18,7 @@ Dramatiq
     A Cement controller for managing Dramatiq service workers.
 """
 
+import os
 import sys
 from os.path import basename, dirname, abspath
 from tokeo.ext.argparse import Controller
@@ -82,14 +83,15 @@ class TokeoDramatiq(MetaMixin):
                     self._config('locks_tag'),
                     self._config('locks_key_prefix'),
                 )
-            except:
+            except Exception:
                 pass
         # dramatiq register
         self.register()
 
     def _config(self, key, **kwargs):
         """
-        This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
+        This is a simple wrapper, and is equivalent to:
+            ``self.app.config.get(<section>, <key>)``.
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
@@ -144,9 +146,10 @@ class TokeoDramatiqController(Controller):
     """
     A Cement controller for managing Dramatiq service workers.
 
-    This controller extends Cement's ``Controller`` class, offering functionalities specific
-    to handling Dramatiq workers, including starting workers with configurable settings and
-    reloading actors on file changes.
+    This controller extends Cement's ``Controller`` class, offering
+    functionalities specific to handling Dramatiq workers, including
+    starting workers with configurable settings and reloading actors
+    on file changes.
 
     Attributes
     ----------
@@ -156,7 +159,8 @@ class TokeoDramatiqController(Controller):
     Methods
     -------
     serve()
-        Starts the Dramatiq workers with optional settings for logging and file watching.
+        Starts the Dramatiq workers with optional settings for
+        logging and file watching.
 
     """
 
@@ -164,8 +168,8 @@ class TokeoDramatiqController(Controller):
         """
         Meta configuration for the Dramatiq controller.
 
-        Defines the label, type, parent, parser options, help text, description, and
-        epilog for the controller.
+        Defines the label, type, parent, parser options, help text,
+        description, and epilog for the controller.
 
         """
 
@@ -180,7 +184,7 @@ class TokeoDramatiqController(Controller):
     def _setup(self, app):
         super(TokeoDramatiqController, self)._setup(app)
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     @ex(
         help='access the dramatiq locks from cache',
@@ -205,12 +209,20 @@ class TokeoDramatiqController(Controller):
             # show the locks info
             self.app.print(f'Dramatiq locks using the cache tag: {self.app.dramatiq.locks._tag}')
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     @ex(
         help='spin up the dramatiq service workers',
-        description='Starts Dramatiq workers, allowing for configuration of worker processes and threads. Optional flags for logging and file watching.',
-        epilog=f'Use "{basename(sys.argv[0])} dramatiq serve" with options like "--skip-logging" for custom logging or "--watch" for automatic actor reloading.',
+        description=(
+            'Starts Dramatiq workers, allowing for configuration of '
+            'worker processes and threads. Optional flags for logging '
+            'and file watching.'
+        ),
+        epilog=(
+            f'Use "{basename(sys.argv[0])} dramatiq serve" with options '
+            'like "--skip-logging" for custom logging or "--watch" for '
+            'automatic actor reloading.'
+        ),
         arguments=[
             (
                 ['--skip-logging'],
@@ -232,7 +244,7 @@ class TokeoDramatiqController(Controller):
         """
         Starts the Dramatiq workers with customizable settings.
 
-        Parses command-line arguments to configure the behavior of Dramatiq workers,
+        Parses command-line arguments to configure directly Dramatiq workers,
         including process and thread counts, logging, and file watching.
 
         """
@@ -275,12 +287,12 @@ class TokeoDramatiqController(Controller):
         )
         # parse sys.argv as dramatiq command line options
         args = cli.make_argument_parser().parse_args()
-        # restore the sys.argv content for later restart etc. from inside dramatiq
+        # restore sys.argv for later restart etc. from inside dramatiq
         sys.argv = [sys.argv[0]] + self.app.argv
         # initialize locks on service start but ignore if missing
         try:
             self.app.dramatiq.locks.purge()
-        except:
+        except Exception:
             pass
         # signal hook
         for res in self.app.hook.run('tokeo_dramatiq_pre_start', self.app):

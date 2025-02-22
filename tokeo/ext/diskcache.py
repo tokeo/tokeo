@@ -1,5 +1,5 @@
 import sys
-from os.path import basename, dirname, abspath
+from os.path import basename
 from tokeo.ext.argparse import Controller
 from cement import ex
 from cement.core import cache
@@ -25,7 +25,7 @@ class TokeoDiskCacheLocksHandler:
         self._tag = tag
         self._key_prefix = key_prefix
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     def purge(self):
         total = 0
@@ -62,7 +62,7 @@ class TokeoDiskCacheLocksHandler:
         finally:
             lock.release()
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     def throttle(
         self,
@@ -120,7 +120,8 @@ class TokeoDiskCacheLocksHandler:
                     with self._cache.transact(retry=True):
                         # get values from cache
                         values = self._cache.get(key)
-                        # check if already a valid initialized tuple(int, int) exist where ints must have values > 0
+                        # check if already a valid initialized tuple(int, int)
+                        # exist where ints must have values > 0
                         if type(values) is tuple and len(values) == 2 and type(values[0]) is int and type(values[1]) is int:
                             # expand the cached tuple values
                             last, tally = values
@@ -129,7 +130,7 @@ class TokeoDiskCacheLocksHandler:
                                 # invalidate the tuple
                                 values = None
                         else:
-                            # invalidate any other values read or not read from cache
+                            # invalidate any other values read or not from cache
                             values = None
                         # on read failure or values failure, reset the values
                         if values is None:
@@ -152,7 +153,7 @@ class TokeoDiskCacheLocksHandler:
                             delay = (1 - tally) / rate
 
                     if delay:
-                        # with callback break and call callback outside the transaction
+                        # break and call callback outside the transaction
                         if cb_on_locked:
                             use_cb = True
                             break
@@ -173,7 +174,7 @@ class TokeoDiskCacheLocksHandler:
 
         return decorator
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     def temper(
         self,
@@ -246,7 +247,7 @@ class TokeoDiskCacheLocksHandler:
                             delay = 0.05
 
                     if delay:
-                        # with callback break and call callback outside the transaction
+                        # break and call callback outside the transaction
                         if cb_on_locked:
                             use_cb = True
                             break
@@ -272,7 +273,7 @@ class TokeoDiskCacheLocksHandler:
 
         return decorator
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
 
 class TokeoDiskCacheCacheHandler(cache.CacheHandler):
@@ -318,7 +319,8 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
     def _config(self, key, **kwargs):
         """
-        This is a simple wrapper, and is equivalent to: ``self.app.config.get(<section>, <key>)``.
+        This is a simple wrapper, and is equivalent to:
+            ``self.app.config.get(<section>, <key>)``.
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
@@ -385,7 +387,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         retry = kw.get('retry', False)
         return self._cache.clear(retry=retry)
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     def check(self, fix=False, retry=False):
         return self._cache.check(fix=fix, retry=retry)
@@ -443,8 +445,8 @@ class TokeoDiskCacheController(Controller):
         """
         Meta configuration for the DiskCache controller.
 
-        Defines the label, type, parent, parser options, help text, description, and
-        epilog for the controller.
+        Defines the label, type, parent, parser options, help text, description,
+        and epilog for the controller.
 
         """
 
@@ -456,7 +458,7 @@ class TokeoDiskCacheController(Controller):
         description = 'Provides command-line interfaces to manage diskcache content.'
         epilog = f'Example: {basename(sys.argv[0])} cache command --options'
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     @ex(
         help='verify the cache',
@@ -475,7 +477,7 @@ class TokeoDiskCacheController(Controller):
         cnt = self.app.cache._cache.__len__()
         self.app.print(f'Currently {cnt} keys in cache.')
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     @ex(
         help='list the current cache content',
@@ -528,8 +530,8 @@ class TokeoDiskCacheController(Controller):
         ],
     )
     def list(self):
-        # drop all expired keys
-        num = self.app.cache.expire(retry=True)
+        # refresh the cache and drop all expired keys
+        _ = self.app.cache.expire(retry=True)
         # iter over all keys stored in cache
         for key in self.app.cache._cache.iterkeys():
             # check for keys parameter and try to match regex
@@ -578,7 +580,7 @@ class TokeoDiskCacheController(Controller):
             if _show:
                 self.app.print(out.format(key=key, value=value, value_type=type(value).__name__, expire_time=expire_time, tag=tag))
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     @ex(
         help='access the locks from cache',
@@ -610,7 +612,7 @@ class TokeoDiskCacheController(Controller):
             self.app.pargs.tag = self.app.cache.locks._tag
             self.list()
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     @ex(
         help='purge the cache',
@@ -665,7 +667,7 @@ class TokeoDiskCacheController(Controller):
 
         self.app.print(f'Purged {num} items from cache.')
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     @ex(
         help='delete keys from cache content',
@@ -701,7 +703,7 @@ class TokeoDiskCacheController(Controller):
 
         self.app.print(f'In total {num} keys deleted.')
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     @ex(
         help='set key with value',
@@ -783,7 +785,7 @@ class TokeoDiskCacheController(Controller):
         else:
             self.app.log.error(f'Error: {key}')
 
-    ### --------------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     @ex(
         help='get value by key',
@@ -832,7 +834,7 @@ def unpack_func_args(func, *args):
         try:
             d[p] = args[n]
             n += 1
-        except:
+        except Exception:
             # if some of positional args given as kwargs then those
             # values will come in kwargs dict, so all positional args
             # processed by now
