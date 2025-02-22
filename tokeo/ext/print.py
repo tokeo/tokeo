@@ -20,10 +20,20 @@ def register_tokeo_print(app: App) -> None:
 
     app.extend('print', _print)
 
-    def _inspect(*args: any, name=None, system=False, methods=False, attributes=False, values=True, types=True, debug=False, divider=None) -> None:
+    def _inspect(
+        *args: any, name=None, system=False, methods=False, attributes=False, values=True, types=True, debug=False, divider=None
+    ) -> None:
         app.render(
             dict(
-                args=args, name=name, system=system, methods=methods, attributes=attributes, values=values, types=types, debug=debug, divider=divider
+                args=args,
+                name=name,
+                system=system,
+                methods=methods,
+                attributes=attributes,
+                values=values,
+                types=types,
+                debug=debug,
+                divider=divider,
             ),
             handler='inspect',
         )
