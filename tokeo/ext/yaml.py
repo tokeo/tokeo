@@ -1,4 +1,5 @@
 from cement.ext.ext_yaml import YamlConfigHandler
+from tokeo.core.utils.dict import deep_merge
 
 
 class TokeoYamlConfigHandler(YamlConfigHandler):
@@ -19,36 +20,6 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
         label = 'tokeo.yaml'
         """The string identifier of this handler."""
-
-    def _dict_merge(self, a, b):
-        """
-        NOTE: tuples and arbitrary objects are not handled as it is totally ambiguous what should happen
-        """
-        try:
-            if a is None or isinstance(a, (str, float, int)):
-                # border case for first run or if a is a primitive
-                a = b
-            elif isinstance(a, list):
-                # lists will be only appended
-                if isinstance(b, list):
-                    a.extend(b)
-                else:
-                    a.append(b)
-            elif isinstance(a, dict):
-                # dicts will be merged
-                if isinstance(b, dict):
-                    for key in b:
-                        if key in a:
-                            a[key] = self._dict_merge(a[key], b[key])
-                        else:
-                            a[key] = b[key]
-                else:
-                    raise ValueError('Cannot merge non-dict "%s" into dict "%s"' % (b, a))
-            else:
-                raise ValueError('NOT IMPLEMENTED "%s" into "%s"' % (b, a))
-        except TypeError as e:
-            raise ValueError('TypeError "%s" in key "%s" when merging "%s" into "%s"' % (e, key, b, a))
-        return a
 
     def merge(self, dict_obj, override=True):
         """
@@ -77,7 +48,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
                         if key in self.keys(section) and isinstance(b, dict):
                             a = self.get(section, key)
                             if isinstance(a, dict):
-                                b = self._dict_merge(a, b)
+                                b = deep_merge(a, b)
                         self.set(section, key, b)
                     else:
                         # only set it if the key doesn't exist
