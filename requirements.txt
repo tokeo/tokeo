@@ -26,3 +26,6 @@ pscript
 vbuild
 pocketbase
 requests
+invoke
+fabric
+paramiko
