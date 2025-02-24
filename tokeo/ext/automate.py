@@ -1,6 +1,7 @@
 from sys import argv
 from os.path import basename
 from datetime import datetime, timezone
+from tokeo.core.utils.base import hasprops, getprop, default_when_blank
 from tokeo.core.utils.json import jsonDump, jsonTokeoEncoder
 from tokeo.ext.argparse import Controller
 from cement.core.meta import MetaMixin
@@ -26,7 +27,7 @@ from paramiko.hostkeys import HostKeys, HostKeyEntry
 def jsonTokeoAutomateEncoder(obj):
     # test for automate result
     if isinstance(obj, TokeoAutomateResult):
-        return obj.__dict__
+        return vars(obj)
     # continue with tokeo encoder
     return jsonTokeoEncoder(obj)
 
@@ -43,62 +44,20 @@ class TokeoAutomateResult:
         self.task_id = task_id
         self.connection_id = connection_id
         self.host_id = host_id
-        # get content from give result (by function return or set on create)
-        # already type of inkoke.runners.Result
-        if isinstance(result, invoke.runners.Result):
-            # setup the values
-            self.stdout = result.stdout
-            self.stderr = result.stderr
-            self.command = result.command
-            self.exited = result.exited
-            # return the dict as values if the dict does not is a runners result
-            # otherwise any computing results have to be added as values
-            try:
-                self.values = result.values
-            except Exception:
-                self.values = None
+        self.stdout = getprop(result, 'stdout', fallback=None)
+        self.stderr = getprop(result, 'stderr', fallback=None)
+        self.command = getprop(result, 'command', fallback=None)
+        self.exited = getprop(result, 'exited', fallback=0)
+        # in case that result looks like an invoke.runners.Result
+        # try to get values from an additional values attribute
+        # otherwise save the result as values for latter processing
+        if hasprops(result, ('stdout', 'stderr', 'command', 'exited')):
+            self.values = getprop(result, 'values', fallback=None)
         else:
-            # test result type
-            try:
-                has_invoke_result = 'stdout' in result or 'stderr' in result or 'command' in result or 'exited' in result
-                like_invoke_result = 'stdout' in result and 'stderr' in result and 'command' in result and 'exited' in result
-            except Exception:
-                # not iterable or other
-                has_invoke_result = False
-                like_invoke_result = False
-            # check for iterable result
-            if has_invoke_result:
-                # setup the values
-                self.stdout = result['stdout'] if 'stdout' in result else None
-                self.stderr = result['stderr'] if 'stderr' in result else None
-                self.command = result['command'] if 'command' in result else None
-                self.exited = result['exited'] if 'exited' in result else 0
-                # return the dict as values if the dict is not a runners result
-                # otherwise any computing results have to be added as values
-                self.values = result if not like_invoke_result else result['values'] if 'values' in result else None
-            else:
-                # this is func specific return or none
-                self.stdout = None
-                self.stderr = None
-                self.command = None
-                self.exited = 0
-                self.values = result
-
-    @property
-    def __dict__(self):
-        return dict(
-            task_id=self.task_id,
-            connection_id=self.connection_id,
-            host_id=self.host_id,
-            stdout=self.stdout,
-            stderr=self.stderr,
-            command=self.command,
-            exited=self.exited,
-            values=self.values,
-        )
+            self.values = result
 
     def __repr__(self):
-        return self.__dict__.__repr__()
+        return vars(self).__repr__()
 
 
 class TokeoAutomate(MetaMixin):
@@ -169,12 +128,12 @@ class TokeoAutomate(MetaMixin):
         if not isinstance(entry, dict) or 'host' not in entry:
             raise TokeoAutomateError('To define a host entry there must be at least a dict with a "host" field')
         # setup the dict
-        d = dict(id=key, name=entry['name'] if 'name' in entry else key, host=entry['host'])
+        _host = dict(id=key, name=entry['name'] if 'name' in entry else key, host=entry['host'])
         for field in ('port', 'user', 'password', 'sudo', 'identity', 'host_key'):
             if field in entry:
-                d[field] = entry[field]
+                _host[field] = entry[field]
         # return the record
-        return d
+        return _host
 
     # make a defined dict from a config entry
     def _get_connection_dict(self, key, entry):
@@ -183,7 +142,7 @@ class TokeoAutomate(MetaMixin):
         # by any merge. If some want to set the password
         # by connection e.g., the password field should
         # not exist here.
-        d = dict(
+        _connection = dict(
             id=key,
             name=entry['name'] if 'name' in entry and key != '_default' else key,
         )
@@ -203,9 +162,9 @@ class TokeoAutomate(MetaMixin):
             'known_hosts',
         ):
             if field in entry:
-                d[field] = entry[field]
+                _connection[field] = entry[field]
         # return the record
-        return d
+        return _connection
 
     @property
     def hosts(self):
@@ -298,10 +257,7 @@ class TokeoAutomate(MetaMixin):
         # add a dictionary for additional connections
         self._connections['connections'] = {}
         # take additional connections configuration or leave empty if none
-        if 'connections' in _config_connections:
-            _config_connections = _config_connections['connections']
-        else:
-            _config_connections = {}
+        _config_connections = _config_connections.get('connections', {})
         # loop and add
         for key in _config_connections:
             # get params for host
@@ -318,13 +274,20 @@ class TokeoAutomate(MetaMixin):
         self._tasks = {}
         # save list reference
         _config_tasks = self._config('tasks', fallback={})
+        # test for a default module
+        _default_module = _config_tasks.pop('module', None)
+        if _default_module is not None and (not isinstance(_default_module, str) or str.strip(_default_module) == ''):
+            raise TokeoAutomateError('A default module for tasks must be defined by a string')
         # loop and fullfill
         for key in _config_tasks:
             # get params for task
             _config_task = _config_tasks[key]
             # check for minimal configs
             if 'module' not in _config_task or _config_task['module'] is None or str.strip(_config_task['module']) == '':
-                raise TokeoAutomateError(f'The task "{key}" for automate must have a module to exist')
+                if _default_module is None:
+                    raise TokeoAutomateError(f'The task "{key}" for automate must have a module defined to exist')
+                else:
+                    _config_task['module'] = _default_module
             # cache import module
             if _config_task['module'] not in self._modules:
                 try:
@@ -338,7 +301,7 @@ class TokeoAutomate(MetaMixin):
             try:
                 func = getattr(module, key)
             except AttributeError:
-                raise TokeoAutomateError(f'A function "{key}" does not exist in module "{_config_task['module']}"')
+                raise TokeoAutomateError(f'A function named "{key}" does not exist in module "{_config_task['module']}"')
             except Exception:
                 raise
             # fullfill task
@@ -346,9 +309,9 @@ class TokeoAutomate(MetaMixin):
                 func=func,
                 module=module,
                 id=key,
-                name=_config_task['name'] if 'name' in _config_task and _config_task['name'] != '' else key,
-                timeout=_config_task['timeout'] if 'timeout' in _config_task else None,
-                kwargs=_config_task['kwargs'] if 'kwargs' in _config_task else {},
+                name=default_when_blank(_config_task.get('name'), key),
+                timeout=_config_task.get('timeout'),
+                kwargs=_config_task.get('kwargs', {}),
             )
             # Check for connection settings. The rule follows
             # first if 'connections' exist, second a `use`
@@ -377,12 +340,12 @@ class TokeoAutomate(MetaMixin):
             connection = task['connection']
             # merge with use if defined
             connection = (self.connections['connections'][connection['use']] if 'use' in connection else {}) | connection
-            # drop use if defined
+            # drop 'use' attribute if was defined
             connection.pop('use', None)
-            # merge with default but drop sub structs
+            # merge with default but drop sub 'connections' structs
             connection = self.Meta.config_defaults['connections'] | self.connections['_default'] | connection
             connection.pop('connections', None)
-            # expand hosts to host_dicts
+            # expand list of hosts to list of host_dicts
             hosts_list = []
             # check for list of hosts
             connection_hosts = connection['hosts']
@@ -416,32 +379,38 @@ class TokeoAutomate(MetaMixin):
 
     def _run_connections(self, task):
         run_connections = []
-        connection = task['connection']
-        for h in connection['hosts']:
+        connection = task.get('connection', {})
+        for _host in connection['hosts']:
             # setup dynamic arguments for connection and connect_kwargs
             connect_args = {}
             connect_kwargs = {}
             connect_config = {}
-            # add sudo only if password is given
-            if 'sudo' in h and h['sudo'] or 'sudo' in connection and connection['sudo']:
-                connect_config['sudo'] = dict(password=h['sudo'] if 'sudo' in h and h['sudo'] else connection['sudo'])
+            # add sudo only if sudo password is given
+            if 'sudo' in _host and _host['sudo'] or 'sudo' in connection and connection['sudo']:
+                connect_config['sudo'] = dict(password=_host['sudo'] if 'sudo' in _host and _host['sudo'] else connection['sudo'])
             # create local invoke or ssh client
-            if h['host'] == 'local':
-                run_connections.append([connection['id'], h['id'], invoke.Context(config=invoke.Config(overrides={**connect_config}))])
+            if _host['host'] == 'local':
+                run_connections.append(
+                    dict(
+                        connection_id=connection['id'],
+                        host_id=_host['id'],
+                        context=invoke.Context(config=invoke.Config(overrides={**connect_config})),
+                    )
+                )
             else:
                 # define some settings per default
                 connect_kwargs['look_for_keys'] = False
                 connect_kwargs['allow_agent'] = False
                 connect_args['forward_agent'] = False
                 # host and port are mandatory
-                connect_args['host'] = h['host']
-                connect_args['port'] = h['port'] if 'port' in h and h['port'] else connection['port']
+                connect_args['host'] = _host['host']
+                connect_args['port'] = _host['port'] if 'port' in _host and _host['port'] else connection['port']
                 # add user only if user is given
-                if 'user' in h and h['user'] or 'user' in connection:
-                    connect_args['user'] = h['user'] if 'user' in h and h['user'] else connection['user']
+                if 'user' in _host and _host['user'] or 'user' in connection:
+                    connect_args['user'] = _host['user'] if 'user' in _host and _host['user'] else connection['user']
                 # add password only if password is given
-                if 'password' in h and h['password'] or 'password' in connection:
-                    connect_kwargs['password'] = h['password'] if 'password' in h and h['password'] else connection['password']
+                if 'password' in _host and _host['password'] or 'password' in connection:
+                    connect_kwargs['password'] = _host['password'] if 'password' in _host and _host['password'] else connection['password']
                 # setup and attach the connection
                 if 'lookup_keys' in connection and isinstance(connection['lookup_keys'], bool) and connection['lookup_keys']:
                     connect_kwargs['look_for_keys'] = True
@@ -460,9 +429,12 @@ class TokeoAutomate(MetaMixin):
                     **connect_args, config=fabric.Config(overrides={**connect_config}), connect_kwargs={**connect_kwargs}
                 )
                 # modify connection
-                if 'host_key' in h and h['host_key'] or 'known_hosts' in connection and connection['known_hosts']:
+                if 'host_key' in _host and _host['host_key'] or 'known_hosts' in connection and connection['known_hosts']:
                     # get the list of host keys from known_hosts like strings
-                    known_hosts = f'{h["host"]} {h["host_key"]}' if 'host_key' in h and h['host_key'] else connection['known_hosts']
+                    if 'host_key' in _host and _host['host_key']:
+                        known_hosts = f'{_host["host"]} {_host["host_key"]}'
+                    else:
+                        known_hosts = connection['known_hosts']
                     # if just string rebuild to list
                     if isinstance(known_hosts, str):
                         known_hosts = tuple((known_hosts,))
@@ -479,18 +451,28 @@ class TokeoAutomate(MetaMixin):
                 else:
                     fabric_conn.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 # append to stack
-                run_connections.append([connection['id'], h['id'], fabric_conn])
+                run_connections.append(
+                    dict(
+                        connection_id=connection['id'],
+                        host_id=_host['id'],
+                        context=fabric_conn,
+                    )
+                )
 
         return tuple((run_connections))
 
-    def run(self, task, host_ids=(), verbose=False):
+    def run(self, task, filter_host_ids=(), verbose=False):
         # list results for all connections
         results = []
         run_connections = self._run_connections(task)
-        for rc in run_connections:
-            if len(host_ids) == 0 or rc[1] in host_ids:
+        for run_connection in run_connections:
+            if len(filter_host_ids) == 0 or run_connection['host_id'] in filter_host_ids:
                 results.append(
-                    TokeoAutomateResult(task['id'], rc[0], rc[1], task['func'](self.app, rc[2], verbose=verbose, **task['kwargs']))
+                    TokeoAutomateResult(
+                        task['id'],
+                        run_connection['connection_id'],
+                        run_connection['host_id'],
+                        task['func'](self.app, run_connection['context'], verbose=verbose, **task['kwargs']))
                 )
         # return that content
         return tuple(results)
@@ -503,66 +485,75 @@ class TokeoAutomate(MetaMixin):
     def run_sequential(self, task_ids, continue_on_error=False, verbose=False, return_results=False, return_outputs=True):
         # test tasks_ids
         if isinstance(task_ids, str):
-            _ = tuple((task_ids,))
-        if not isinstance(task_ids, list) and not isinstance(task_ids, tuple):
-            raise TokeoAutomateError('runMany must be called with one or many task ids')
+            task_ids = tuple((task_ids,))
+        if not isinstance(task_ids, (list, tuple)):
+            raise TokeoAutomateError('run_sequential must be called with one or many task ids')
         # flag for getting all exit codes from run commands
-        sum_exit_codes = 0
+        sum_exited_code = 0
         # list for all result details
         results = []
         # run all given tasks from command line
-        for t in task_ids:
-            if sum_exit_codes == 0 or continue_on_error:
+        for task_host_id in task_ids:
+            if sum_exited_code == 0 or continue_on_error:
                 try:
                     # split into separated task and host filter
-                    a = t.split(':') + [None]
-                    t = a[0]
-                    h = tuple((a[1],)) if a[1] else ()
+                    split_task_host_id = task_host_id.split(':') + [None]
+                    task_id = split_task_host_id[0]
+                    host_id = tuple((split_task_host_id[1],)) if split_task_host_id[1] else ()
                     # check before start
-                    if t not in self.tasks:
-                        raise TokeoAutomateError(f'Task "{t}" is not configured yet')
+                    if task_id not in self.tasks:
+                        raise TokeoAutomateError(f'Task "{task_id}" is not defined yet')
                     # get the task object
-                    task = self.tasks[t]
+                    task = self.tasks[task_id]
                     # use and run one by one
-                    res = self.app.automate.run(task, host_ids=h, verbose=verbose)
+                    run_results = self.app.automate.run(task, filter_host_ids=host_id, verbose=verbose)
                     # prepare empty list for this run results
-                    r_list = []
+                    run_results_return = []
                     # loop results
-                    for r in res:
+                    for run_result in run_results:
                         # check for any error and set flag
-                        if r.exited != 0:
-                            sum_exit_codes = 1
+                        if run_result.exited != 0:
+                            sum_exited_code = 1
                         # check if results need to be stored for output
                         if return_results:
+                            # drop outputs
+                            if not return_outputs:
+                                run_result.stdout = None
+                                run_result.stderr = None
                             # append the results details to list
-                            r_list.append(r)
+                            run_results_return.append(run_result)
                     # append to overall list
-                    if len(r_list) > 0:
-                        results.append(tuple(r_list))
+                    if len(run_results_return) > 0:
+                        results.append(tuple(run_results_return))
 
                 except Exception as e:
                     # handle all other errors
                     self.app.log.error(e)
                     # save flag only if no other error was encountered
-                    if sum_exit_codes == 0:
-                        sum_exit_codes = -1
+                    if sum_exited_code == 0:
+                        sum_exited_code = -1
                     # prepare output
                     if return_results:
                         results.append(
-                            TokeoAutomateResult(t, None, None, dict(stdout='', stderr=f'{e}', command=f'automate run {t}', exited=-1))
+                            TokeoAutomateResult(
+                                task_id,
+                                None,
+                                None,
+                                dict(stdout='', stderr=f'{e}', command=f'automate run {task_id}', exited=-1)
+                            )
                         )
 
         # return the results as dict
-        return dict(sum_exit_codes=sum_exit_codes, results=results)
+        return dict(sum_exited_code=sum_exited_code, results=results)
 
     def run_threaded(self, max_workers, task_ids, verbose=False, return_results=False, return_outputs=True):
         # test tasks_ids
         if isinstance(task_ids, str):
-            _ = tuple((task_ids,))
-        if not isinstance(task_ids, list) and not isinstance(task_ids, tuple):
-            raise TokeoAutomateError('runMany must be called with one or many task ids')
+            task_ids = tuple((task_ids,))
+        if not isinstance(task_ids, (list, tuple)):
+            raise TokeoAutomateError('run_threaded must be called with one or many task ids')
         # flag for getting all exit codes from run commands
-        sum_exit_codes = 0
+        sum_exited_code = 0
         # list for all result details
         results = []
         # create the thread pool
@@ -570,68 +561,82 @@ class TokeoAutomate(MetaMixin):
             # list of initiated threads
             futures = []
             # run all given tasks from command line
-            for t in task_ids:
+            for task_host_id in task_ids:
                 try:
                     # split into separated task and host filter
-                    a = t.split(':') + [None]
-                    t = a[0]
-                    h = tuple((a[1],)) if a[1] else ()
+                    split_task_host_id = task_host_id.split(':') + [None]
+                    task_id = split_task_host_id[0]
+                    host_id = tuple((split_task_host_id[1],)) if split_task_host_id[1] else ()
                     # check before start
-                    if t not in self.tasks:
-                        raise TokeoAutomateError(f'Task "{t}" is not configured yet')
+                    if task_id not in self.tasks:
+                        raise TokeoAutomateError(f'Task "{task_id}" is not defined yet')
                     # get the task object
-                    task = self.tasks[t]
+                    task = self.tasks[task_id]
                     # put task on pool
-                    futures.append(executor.submit(self.run, task, h, verbose))
+                    futures.append(executor.submit(self.run, task, host_id, verbose))
 
                 # exception while create
                 except Exception as e:
                     # handle all other errors
                     self.app.log.error(e)
                     # save flag only if no other error was encountered
-                    if sum_exit_codes == 0:
-                        sum_exit_codes = -1
+                    if sum_exited_code == 0:
+                        sum_exited_code = -1
                     # prepare output
                     if return_results:
                         results.append(
-                            TokeoAutomateResult(t, None, None, dict(stdout='', stderr=f'{e}', command=f'automate run {t}', exited=-1))
+                            TokeoAutomateResult(
+                                task_id,
+                                None,
+                                None,
+                                dict(stdout='', stderr=f'{e}', command=f'automate run {task_id}', exited=-1)
+                            )
                         )
 
             # check processing of all threads and result
             for future in concurrent_futures.as_completed(futures):
                 try:
                     # use and run one by one
-                    res = future.result()
+                    run_results = future.result()
                     # prepare empty list for this run results
-                    r_list = []
+                    run_results_return = []
                     # loop results
-                    for r in res:
+                    for run_result in run_results:
                         # check for any error and set flag
-                        if r.exited != 0:
-                            sum_exit_codes = 1
+                        if run_result.exited != 0:
+                            sum_exited_code = 1
                         # check if results need to be stored for output
                         if return_results:
+                            # drop outputs
+                            if not return_outputs:
+                                run_result.stdout = None
+                                run_result.stderr = None
                             # append the results details to list
-                            r_list.append(r)
+                            run_results_return.append(run_result)
                     # append to overall list
-                    if len(r_list) > 0:
-                        results.append(tuple(r_list))
+                    if len(run_results_return) > 0:
+                        results.append(tuple(run_results_return))
 
                 # handle running exceptions
                 except Exception as e:
                     # handle all other errors
                     self.app.log.error(e)
                     # save flag only if no other error was encountered
-                    if sum_exit_codes == 0:
-                        sum_exit_codes = -1
+                    if sum_exited_code == 0:
+                        sum_exited_code = -1
                     # prepare output
                     if return_results:
                         results.append(
-                            TokeoAutomateResult(t, None, None, dict(stdout='', stderr=f'{e}', command=f'automate run {t}', exited=-1))
+                            TokeoAutomateResult(
+                                task_id,
+                                None,
+                                None,
+                                dict(stdout='', stderr=f'{e}', command=f'automate run {task_id}', exited=-1)
+                            )
                         )
 
         # return the results as dict
-        return dict(sum_exit_codes=sum_exit_codes, results=results)
+        return dict(sum_exited_code=sum_exited_code, results=results)
 
 
 class TokeoAutomateShell:
@@ -653,20 +658,21 @@ class TokeoAutomateShell:
 
     def shell_completion(self):
         # create a completion set for tasks and tasks by hosts
-        t_completion = []
-        t_host_completion = []
-        for tid in self.app.automate.tasks:
-            t_completion.append(f'{tid}')
-            for hid in self.app.automate.tasks[tid]['connection']['hosts']:
-                t_host_completion.append(f'{tid}:{hid["id"]}')
-        wt = WordCompleter(t_completion)
-        wh = WordCompleter(t_completion + t_host_completion)
+        tasks_completion = []
+        tasks_host_completion = []
+        for task_id in self.app.automate.tasks:
+            tasks_completion.append(f'{task_id}')
+            for host_id in self.app.automate.tasks[task_id]['connection']['hosts']:
+                tasks_host_completion.append(f'{task_id}:{host_id["id"]}')
+        # create completer
+        wordlist_show = WordCompleter(tasks_completion)
+        wordlist_run = WordCompleter(tasks_completion + tasks_host_completion + ['--verbose', '--as-json', '--without-output', '--threads'])
         # return the completion set
         return NestedCompleter.from_nested_dict(
             {
                 'list': None,
-                'show': wt,
-                'run': wh,
+                'show': wordlist_show,
+                'run': wordlist_run,
                 'hosts': {
                     'list': None,
                 },
@@ -691,37 +697,54 @@ class TokeoAutomateShell:
 
     def handle_command_list(self, args):
         self.app.log.debug(datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %z (%Z)'))
-        for tid in self.app.automate.tasks:
-            t = self.app.automate.tasks[tid]
-            print(f'{t["id"]}' + f' - {t['name']}' if t['id'] != t['name'] else '')
+        for task_id in self.app.automate.tasks:
+            task = self.app.automate.tasks[task_id]
+            if task['id'] == task['name']:
+                print(f'{task["id"]}')
+            else:
+                print(f'{task["id"]} - {task["name"]}')
 
     def handle_command_show(self, args):
-        for tid in args.task:
+        for task_id in args.task:
             try:
-                t = self.app.automate.tasks[tid]
-                print(f'{t}')
+                task = self.app.automate.tasks[task_id]
+                print(f'{task}')
             except Exception as err:
                 self.app.log.error(err)
 
     def handle_command_run(self, args):
+        # setup run kwargs from args
+        run_args = {}
+        run_args['verbose'] = args.verbose
+        run_args['return_results'] = args.as_json
+        run_args['return_outputs'] = not args.without_output
+        # run command line wit args
         if args.threads >= 1:
-            self.app.automate.run_threaded(args.threads, args.task, verbose=args.verbose)
+            res = self.app.automate.run_threaded(args.threads, args.task, **run_args)
         else:
-            self.app.automate.run_sequential(args.task, verbose=args.verbose)
+            res = self.app.automate.run_sequential(args.task, **run_args)
+        if args.as_json:
+            self.app.print(
+                jsonDump(
+                    res['results'],
+                    default=jsonTokeoAutomateEncoder,
+                    encoding=None,
+                )
+            )
 
     def handle_subcommand_commands(self, args):
         try:
             if args.cmd == 'hosts.list':
-                for h in self.app.automate.hosts:
-                    print(f'{h}: {self.app.automate.hosts[h]}')
+                for host in self.app.automate.hosts:
+                    print(f'{host}: {self.app.automate.hosts[host]}')
             elif args.cmd == 'groups.list':
-                for g in self.app.automate.hostgroups:
-                    print(f'{g}: {self.app.automate.hostgroups[g]}')
+                for hostgroup in self.app.automate.hostgroups:
+                    print(f'{hostgroup}: {self.app.automate.hostgroups[hostgroup]}')
             elif args.cmd == 'conns.list':
-                c = '_default'
-                print(f'{c}: {self.app.automate.connections[c]}')
-                for c in self.app.automate.connections['connections']:
-                    print(f'{c}: {self.app.automate.connections['connections'][c]}')
+                conn = '_default'
+                print(f'{conn}: {self.app.automate.connections[conn]}')
+                for conn in self.app.automate.connections['connections']:
+                    print(f'{conn}: {self.app.automate.connections['connections'][conn]}')
         except Exception as err:
             self.app.log.error(err)
 
@@ -751,6 +774,8 @@ class TokeoAutomateShell:
             cmd = sub.add_parser('run', help='start the scheduler')
             cmd.add_argument('task', nargs='+', help='task_id(s)[:host] to run')
             cmd.add_argument('--verbose', action='store_true', help='show output from command execution')
+            cmd.add_argument('--as-json', action='store_true', help='show results as json')
+            cmd.add_argument('--without-output', action='store_true', help='hide outputs from stdout and stderr')
             cmd.add_argument('--threads', type=int, default=0, help='run by number of threads')
             cmd.set_defaults(func=self.handle_command_run)
 
@@ -785,9 +810,9 @@ class TokeoAutomateShell:
             raise EOFError('Command exit entered.')
 
         # check command
-        n = shlex.split(cmd)
+        splitted_cmd = shlex.split(cmd)
         try:
-            args = self.command_parser.parse_args(args=n)
+            args = self.command_parser.parse_args(args=splitted_cmd)
         except SystemExit as err:
             # if parse was ok but only help, err == 0, else err != 0
             return err.code == 0
@@ -834,7 +859,8 @@ class TokeoAutomateShell:
                         pass
 
                 except KeyboardInterrupt:
-                    # we don't support Ctrl-C
+                    # we don't support Ctrl-C but reset input
+                    user_input = ''
                     continue
                 except EOFError:
                     # we do support Ctrl-D
@@ -966,7 +992,7 @@ class TokeoAutomateController(Controller):
             )
 
         # return the loggeg exit codes
-        self.app.exit_code = res['sum_exit_codes']
+        self.app.exit_code = res['sum_exited_code']
 
     @ex(
         help='start the automate command shell',
