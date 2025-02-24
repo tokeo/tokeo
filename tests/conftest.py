@@ -23,3 +23,11 @@ def key(request):
 @pytest.fixture(scope="function")
 def rando(request):
     yield _rando()[:12]
+
+
+@pytest.fixture
+def disable_stdin_capture(monkeypatch):
+    # -- NEEDED-FOR: fabric.connection.Connection.run() in a test-function.
+    monkeypatch.setattr("sys.stdin", StringIO(''))
+    return monkeypatch
+
