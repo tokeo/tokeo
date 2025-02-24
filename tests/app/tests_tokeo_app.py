@@ -1,4 +1,3 @@
-from pytest import raises
 from tokeo.main import TokeoTest
 
 

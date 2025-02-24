@@ -481,11 +481,8 @@ def test_automate_result(rando):
         app.run()
 
         res = TokeoAutomateResult(
-                  'task1',
-                  'con1',
-                  'host1',
-                  result=dict(stdout='Out', stderr='Err', command='Cmd', exited=1, values=dict(a=1, b='2nd'))
-              )
+            'task1', 'con1', 'host1', result=dict(stdout='Out', stderr='Err', command='Cmd', exited=1, values=dict(a=1, b='2nd'))
+        )
         assert 'Fallback' == getprop(res, 'unknown', fallback='Fallback')
         assert 'Out' == getprop(res, 'stdout', fallback='Fallback')
         assert 'Err' == getattr(res, 'stderr')
