@@ -30,7 +30,7 @@ class BaseController(Controller):
 
         # controller level arguments. ex: 'tokeo --version'
         arguments = [
-            ### add a version banner
+            # add a version banner
             (
                 ['-v', '--version'],
                 dict(
