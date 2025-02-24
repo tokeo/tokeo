@@ -366,9 +366,9 @@ class TokeoScheduler(MetaMixin):
             raise EOFError('Command exit entered.')
 
         # check command
-        n = shlex.split(cmd)
+        splitted_cmd = shlex.split(cmd)
         try:
-            args = self.command_parser.parse_args(args=n)
+            args = self.command_parser.parse_args(args=splitted_cmd)
         except SystemExit as err:
             # if parse was ok but only help, err == 0, else err != 0
             return err.code == 0
@@ -415,7 +415,8 @@ class TokeoScheduler(MetaMixin):
                         pass
 
                 except KeyboardInterrupt:
-                    # we don't support Ctrl-C
+                    # we don't support Ctrl-C but reset input
+                    user_input = ''
                     continue
                 except EOFError:
                     # we do support Ctrl-D
