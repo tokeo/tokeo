@@ -84,11 +84,11 @@ endif
 
 fmt:
 	# align with https://google.github.io/styleguide/pyguide.html
-	pyink --pyink-use-majority-quotes --line-length 139 --include "\.py" --exclude ".git,\/__pycache__\/" $(sources)
+	pyink --pyink-use-majority-quotes --line-length 139 --include "\.py" --exclude="/(\.git|__pycache__)/" $(sources)
 
 lint:
 	# align with https://google.github.io/styleguide/pyguide.html
-	flake8 --max-line-length 140 --max-doc-length 80 --extend-ignore "" --exclude ".git,\/__pycache__\/" $(sources)
+	flake8 --max-line-length 140 --max-doc-length 80 --extend-ignore "" --exclude ".git, __pycache__" $(sources)
 
 docker: clean
 	docker build -t tokeo:latest .
