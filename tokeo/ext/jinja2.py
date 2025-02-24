@@ -76,9 +76,10 @@ def tokeo_jinja2_config(app):
     # we need to make sure that the object has app
     template_handler._setup(app)
     # add template dirs
-    t_dirs = template_handler._config('template_dirs', fallback=[])
-    for t_dir in [t_dirs] if isinstance(t_dirs, str) else t_dirs:
-        app.add_template_dir(t_dir)
+    t_dirs = template_handler._config('template_dirs', fallback=None)
+    if t_dirs is not None:
+        for t_dir in [t_dirs] if isinstance(t_dirs, str) else t_dirs:
+            app.add_template_dir(t_dir)
 
 
 def load(app):
