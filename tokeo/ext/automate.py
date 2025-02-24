@@ -472,7 +472,8 @@ class TokeoAutomate(MetaMixin):
                         task['id'],
                         run_connection['connection_id'],
                         run_connection['host_id'],
-                        task['func'](self.app, run_connection['context'], verbose=verbose, **task['kwargs']))
+                        task['func'](self.app, run_connection['context'], verbose=verbose, **task['kwargs']),
+                    )
                 )
         # return that content
         return tuple(results)
@@ -665,8 +666,12 @@ class TokeoAutomateShell:
             for host_id in self.app.automate.tasks[task_id]['connection']['hosts']:
                 tasks_host_completion.append(f'{task_id}:{host_id["id"]}')
         # create completer
-        wordlist_show = WordCompleter(tasks_completion)
-        wordlist_run = WordCompleter(tasks_completion + tasks_host_completion + ['--verbose', '--as-json', '--without-output', '--threads'])
+        wordlist_show = WordCompleter(
+            tasks_completion
+        )
+        wordlist_run = WordCompleter(
+            tasks_completion + tasks_host_completion + ['--verbose', '--as-json', '--without-output', '--threads']
+        )
         # return the completion set
         return NestedCompleter.from_nested_dict(
             {

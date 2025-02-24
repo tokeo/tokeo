@@ -1,6 +1,6 @@
 def isbasetype(obj):
     basetypes = (int, str, float, bool, bytes, list, dict, set, tuple)
-    return isinstance(obj, base_types)
+    return isinstance(obj, basetypes)
 
 
 def hasprop(obj, name):
@@ -29,7 +29,7 @@ def hasprops(obj, names):
         # when iterateable object
         try:
             for name in names:
-                if not name in obj:
+                if name not in obj:
                     return False
             # all props exist
             return True
@@ -107,7 +107,7 @@ def getprop(obj, name, **kwargs):
 
 
 def getitem_first_not_blank(values, default=None):
-    if not isinstance(values, (list, tuples)):
+    if not isinstance(values, (list, tuple)):
         raise TypeError('getitem_first_not_blank expects a list or tuple as input arg')
 
     for value in values:
@@ -123,7 +123,7 @@ def getitem_first_not_blank(values, default=None):
 
 
 def getitem_first_not_empty(values, default=None):
-    if not isinstance(values, (list, tuples)):
+    if not isinstance(values, (list, tuple)):
         raise TypeError('getitem_first_not_empty expects a list or tuple as input arg')
 
     for value in values:
@@ -168,4 +168,3 @@ def default_when_empty(value, default=None):
 
     # seems to be filled
     return value
-

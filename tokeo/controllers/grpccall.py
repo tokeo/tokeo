@@ -40,9 +40,10 @@ class GrpcCallController(Controller):
         ],
     )
     def count_words(self):
-        # NOTE(gRPC Python Team): .close() is possible on a channel and should be
-        # used in circumstances in which the with statement does not fit the needs
-        # of the code.
+        # NOTE (from gRPC Python Team):
+        # .close() is possible on a channel and should be used
+        # in circumstances in which the with statement does
+        # not fit the needs of the code.
         self.app.log.info('Try to call CountWords by grpc ...')
         with grpc.insecure_channel(self.app.config.get('grpc', 'url')) as channel:
             stub = tokeo_pb2_grpc.TokeoStub(channel)

@@ -1,6 +1,9 @@
 def deep_merge(a, b):
     """
-    NOTE: tuples and arbitrary objects are not handled as it is totally ambiguous what should happen
+    IMPORTANT NOTE:
+
+    tuples and arbitrary objects are not handled
+    as it is totally ambiguous what should happen
     """
     try:
         if a is None or isinstance(a, (str, float, int)):
