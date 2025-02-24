@@ -184,6 +184,17 @@ scheduler:
 
 #####################################
 
+automate:
+  tasks:
+    module: tokeo.core.tasks.automate
+    uname:
+      name: uname automation
+      kwargs:
+        flags:
+          - '-a'
+
+#####################################
+
 nicegui:
   ### serve the web service
   host: '127.0.0.1'
