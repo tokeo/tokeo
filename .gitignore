@@ -49,6 +49,7 @@
 !/MANIFEST.in
 !/setup.cfg
 !/setup.py
+!/pyproject.toml
 
 !/CHANGELOG.md
 !/LICENSE.md

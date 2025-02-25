@@ -6,13 +6,14 @@ clean:
 	rm -rf .pytest_cache .coverage coverage-report
 	rm -rf html
 	rm -rf tmp
+	rm -rf dist/*
 	mkdir -p tmp/tests
 	touch tmp/tests/.gitkeep
 
 venv:
 	python -m venv --prompt '> tokeo <' .venv
 	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install -r requirements.txt
+	.venv/bin/pip install .
 	@echo
 	@echo "VENV Setup Complete. Now run: source .venv/bin/activate"
 	@echo
@@ -22,7 +23,7 @@ outdated:
 
 devenv:
 	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install -r requirements-dev.txt
+	.venv/bin/pip install .[dev]
 
 proto:
 	python -m grpc_tools.protoc -I./ --python_out=. --pyi_out=. --grpc_python_out=. ./tokeo/core/grpc/proto/tokeo.proto
@@ -95,11 +96,11 @@ docker: clean
 
 sdist: clean
 	rm -rf dist/*
-	python setup.py sdist
+	python -m build --sdist
 
 wheel: clean
 	rm -rf dist/*
-	python setup.py bdist_wheel
+	python -m build --wheel
 
 dist-upload:
 	twine upload dist/*

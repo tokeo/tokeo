@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=64.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tokeo"
+dynamic = ["version"]  # Declare version as dynamic
+description = "The Tokeo CLI contains all the dramatiq workers and publishers."
+readme = "README.md"
+authors = [
+    {name = "Tom Freudenberg", email = "th.freudenberg@gmail.com"}
+]
+license = {text = "MIT"}
+urls = {"Homepage" = "https://github.com/tokeo/tokeo"}
+requires-python = ">=3.10"  # Adjust based on your needs
+dependencies = [
+    "cement @ git+https://github.com/datafolklabs/cement.git@3.0.12",
+    "cement[jinja2]",
+    "jinja2",
+    "cement[yaml]",
+    "PyYAML",
+    "cement[colorlog]",
+    "colorlog",
+    "lazy_loader",
+    "prompt_toolkit",
+    "diskcache",
+    "gevent",
+    "dramatiq",
+    "dramatiq[rabbitmq]",
+    "pika",
+    "dramatiq[watch]",
+    "watchdog_gevent",
+    "watchdog",
+    "grpcio",
+    "grpcio-tools",
+    "protobuf",
+    "apscheduler>=3.0,<4.0",
+    "nicegui",
+    "fastapi",
+    "starlette",
+    "pscript",
+    "vbuild",
+    "pocketbase",
+    "requests",
+    "invoke",
+    "fabric",
+    "paramiko"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pip-tools",
+    "pytest",
+    "pytest-cov",
+    "coverage",
+    "twine>=1.11.0",
+    "setuptools>=38.6.0",
+    "wheel>=0.31.0",
+    "pyink",
+    "flake8",
+    "pdoc3"
+]
+
+[project.scripts]
+tokeo = "tokeo.main:main"
+
+[tool.setuptools]
+packages = {find = {exclude = ["ez_setup", "tests*"]}}
+include-package-data = true
+
+[tool.setuptools.package-data]
+"tokeo" = ["templates/*", "*.proto"]
+
+[tool.setuptools.dynamic]
+version = {attr = "tokeo.core.version.get_version"}
