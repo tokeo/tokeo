@@ -1,8 +1,4 @@
 recursive-include config *.yaml
 recursive-exclude config *.local.yaml
-recursive-include tokeo *.py *.proto
-recursive-include tokeo/templates *
-include setup.py setup.cfg
-include README.md CHANGELOG.md LICENSE.md
-include requirements*.txt
+include CHANGELOG.md LICENSE.md
 include Makefile
