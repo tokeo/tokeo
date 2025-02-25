@@ -6,7 +6,7 @@ try:
     from tokeo.core.version import get_version
 
     VERSION = get_version()
-except:
+except Exception:
     # when installed --editable
     # just use this
     VERSION = '0.0.0-dev.0'

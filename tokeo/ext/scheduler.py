@@ -118,17 +118,15 @@ class TokeoScheduler(MetaMixin):
         try:
             executor = self.scheduler._lookup_executor(job.executor)
         except BaseException:
-            self.app.log.error('Executor lookup ("%s") failed for job "%s" -- removing it from the ' 'job store', job.executor, job)
+            self.app.log.error(f'Executor lookup "{job.executor}" failed for job "{job}" -- removing it from the job store')
             job.remove()
 
         try:
             executor.submit_job(job, [datetime.now(timezone.utc)])
         except MaxInstancesReachedError:
-            self.app.log.warning(
-                'Execution of job "%s" skipped: maximum number of running ' 'instances reached (%d)', job, job.max_instances
-            )
+            self.app.log.warning(f'Execution of job "{job}" skipped: maximum number of running instances reached ({job.max_instances})')
         except BaseException:
-            self.app.log.error('Error submitting job "%s" to executor "%s"', job, job.executor)
+            self.app.log.error(f'Error submitting job "{job}" to executor "{job.executor}"')
 
     @property
     def tasks(self):
