@@ -93,7 +93,7 @@ class TokeoPrintOutputHandler(output.OutputHandler):
             self.app.log.debug(f'rendering content via {self.__module__}{name}')
             return self._print(data['args'], sep=data['sep'], end=data['end'], divider=data['divider'])  # type: ignore
         else:
-            self.app.log.debug("no 'args' key found in data to render. " 'not rendering content via %s' % self.__module__)
+            self.app.log.debug(f'No "args" key found in data to render. Not rendering content via "{self.__module__}"')
             return None
 
 
@@ -242,7 +242,7 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             else:
                 return out + '\n'
         else:
-            self.app.log.debug("no 'args' key found in data to inspect. " 'not rendering inspect via %s' % self.__module__)
+            self.app.log.debug(f'No "args" key found in data to render. Not rendering content via "{self.__module__}"')
             return None
 
 
