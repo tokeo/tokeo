@@ -135,6 +135,47 @@ class TokeoAutomate(MetaMixin):
         # return the record
         return _host
 
+    def _get_host_dict_from_str(self, key, host_str):
+        """
+        This will get a string from schema
+        user:password@host.domain:port
+        and split into parts and create a host_dict
+        """
+        if not isinstance(host_str, str) or str.strip(host_str) == '':
+            raise TokeoAutomateError('At least a host must be specified to get host_dict from string')
+        # get parts from string
+        user_host_parts = str.strip(host_str).split('@') if '@' in host_str else ['', str.strip(host_str)]
+        user_password_parts = user_host_parts[0].split(':') if ':' in user_host_parts[0] else [user_host_parts[0], '']
+        host_port_parts = user_host_parts[1].split(':') if ':' in user_host_parts[1] else [user_host_parts[1], '']
+        # build and return as dict
+        if key is None or str(key) == '':
+            key = host_port_parts[0]
+        _host = dict(id=key, name=key, host=host_port_parts[0])
+        if host_port_parts[1] and host_port_parts[1] != '':
+            _host['port'] = host_port_parts[1]
+        if user_password_parts[0] and user_password_parts[0] != '':
+            _host['user'] = user_password_parts[0]
+        if user_password_parts[1] and user_password_parts[1] != '':
+            _host['password'] = user_password_parts[1]
+        # return the record
+        return _host
+
+    def _overrule_host_dict(self, base, overrule):
+        """
+        This will get two dicts and overrule allowed
+        keys from 2nd dict into 1st dict
+        """
+        _host = base.copy()
+        # test for overrule content
+        if overrule is None or not isinstance(overrule, dict):
+            return _host
+        # overrulable fields from host dict
+        for field in ('name', 'host', 'port', 'user', 'password', 'sudo', 'identity', 'host_key'):
+            if field in overrule:
+                _host[field] = overrule[field]
+        # return the record
+        return _host
+
     # make a defined dict from a config entry
     def _get_connection_dict(self, key, entry):
         # Create a dict with all given and allowed fields
@@ -226,14 +267,14 @@ class TokeoAutomate(MetaMixin):
                 raise TokeoAutomateError('To create the hostgroup "{key}" there must be a list of hosts')
             # expand hosts to host_dicts
             hosts_list = []
-            for h in _config_hostgroup:
+            for host in _config_hostgroup:
                 # check if found as host
-                if h in self.hosts:
-                    hosts_list.append(self.hosts[h])
-                elif h in self._hostgroups:
-                    hosts_list.extend(self._hostgroups[h])
+                if host in self.hosts:
+                    hosts_list.append(self.hosts[host].copy())
+                elif host in self._hostgroups:
+                    hosts_list.extend(self._hostgroups[host])
                 else:
-                    hosts_list.append(self._get_host_dict(h, dict(host=h)))
+                    hosts_list.append(self._get_host_dict_from_str(None, host))
             # add the filled entry
             self._hostgroups[key] = tuple(hosts_list)
         # return property
@@ -270,6 +311,12 @@ class TokeoAutomate(MetaMixin):
         return self._connections
 
     def _get_tasks(self):
+        # a simple wrapper to raise not exist function error on runtime
+        def __unknown_function(module, key):
+            def wrapper(app, connection, **kwargs):
+                raise TokeoAutomateError(f'A function named "{key}" does not exist in module "{_config_task['module']}"')
+            return wrapper
+
         # initialize tasks
         self._tasks = {}
         # save list reference
@@ -301,7 +348,7 @@ class TokeoAutomate(MetaMixin):
             try:
                 func = getattr(module, key)
             except AttributeError:
-                raise TokeoAutomateError(f'A function named "{key}" does not exist in module "{_config_task['module']}"')
+                func = __unknown_function(module, key)
             except Exception:
                 raise
             # fullfill task
@@ -352,18 +399,34 @@ class TokeoAutomate(MetaMixin):
             if isinstance(connection_hosts, str):
                 connection_hosts = tuple((connection_hosts,))
             # loop the hosts
-            for h in connection_hosts:
-                if h in self.hosts:
-                    hosts_list.append(self.hosts[h])
-                elif h in self.hostgroups:
-                    hosts_list.extend(self.hostgroups[h])
+            for host in connection_hosts:
+                # check types of entries to identify the config
+                if isinstance(connection_hosts, dict):
+                    # host is key, maybe more fields
+                    entry = connection_hosts[host]
+                elif isinstance(host, dict):
+                    # list of dicts
+                    if len(host) > 1:
+                        raise TokeoAutomateError('A host dict must contains just 1 host dict structure')
+                    _host = next(iter(host))
+                    entry = host[_host]
+                    host = _host
+                    if isinstance(entry, str):
+                        entry = self._get_host_dict_from_str(None, entry)
                 else:
-                    hosts_list.append(self._get_host_dict(h, dict(host=h)))
+                    entry = None
+
+                if host in self.hosts:
+                    hosts_list.append(self._overrule_host_dict(self.hosts[host], entry))
+                elif host in self.hostgroups:
+                    hosts_list.extend(self.hostgroups[host])
+                else:
+                    hosts_list.append(self._overrule_host_dict(self._get_host_dict_from_str(None, host), entry))
             # make dict list of hosts unique
             unique_hosts_list = {}
-            for h in hosts_list:
-                if not h['id'] in unique_hosts_list:
-                    unique_hosts_list[h['id']] = h
+            for host in hosts_list:
+                if not f'{host["id"]}%{host["name"]}' in unique_hosts_list:
+                    unique_hosts_list[f'{host["id"]}%{host["name"]}'] = host
             # replace the fullfilled hosts
             connection['hosts'] = tuple(unique_hosts_list.values())
             # replace with fullfilled connection
@@ -645,6 +708,7 @@ class TokeoAutomateShell:
     def __init__(self, app):
         self.app = app
         self._command_parser = None
+        self._shell_completion = None
 
     def startup(self):
         self.app.automate.tasks
@@ -658,39 +722,41 @@ class TokeoAutomateShell:
         self.shell()
 
     def shell_completion(self):
-        # create a completion set for tasks and tasks by hosts
-        tasks_completion = []
-        tasks_host_completion = []
-        for task_id in self.app.automate.tasks:
-            tasks_completion.append(f'{task_id}')
-            for host_id in self.app.automate.tasks[task_id]['connection']['hosts']:
-                tasks_host_completion.append(f'{task_id}:{host_id["id"]}')
-        # create completer
-        wordlist_show = WordCompleter(
-            tasks_completion
-        )
-        wordlist_run = WordCompleter(
-            tasks_completion + tasks_host_completion + ['--verbose', '--as-json', '--without-output', '--threads']
-        )
+        if self._shell_completion is None:
+            # create a completion set for tasks and tasks by hosts
+            tasks_completion = []
+            tasks_host_completion = []
+            for task_id in self.app.automate.tasks:
+                tasks_completion.append(f'{task_id}')
+                for host_id in self.app.automate.tasks[task_id]['connection']['hosts']:
+                    tasks_host_completion.append(f'{task_id}:{host_id["id"]}')
+            # create completer
+            wordlist_show = WordCompleter(
+                sorted(set(tasks_completion))
+            )
+            wordlist_run = WordCompleter(
+                sorted(set(tasks_completion + tasks_host_completion)) + ['--verbose', '--as-json', '--without-output', '--threads']
+            )
+            self._shell_completion = NestedCompleter.from_nested_dict(
+                {
+                    'list': None,
+                    'show': wordlist_show,
+                    'run': wordlist_run,
+                    'hosts': {
+                        'list': None,
+                    },
+                    'hostgroups': {
+                        'list': None,
+                    },
+                    'connections': {
+                        'list': None,
+                    },
+                    'exit': None,
+                    'quit': None,
+                },
+            )
         # return the completion set
-        return NestedCompleter.from_nested_dict(
-            {
-                'list': None,
-                'show': wordlist_show,
-                'run': wordlist_run,
-                'hosts': {
-                    'list': None,
-                },
-                'hostgroups': {
-                    'list': None,
-                },
-                'connections': {
-                    'list': None,
-                },
-                'exit': None,
-                'quit': None,
-            },
-        )
+        return self._shell_completion
 
     def shell_history(self):
         return InMemoryHistory(
