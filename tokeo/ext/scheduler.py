@@ -91,6 +91,7 @@ class TokeoScheduler(MetaMixin):
         super(TokeoScheduler, self).__init__(*args, **kw)
         self.app = app
         self._command_parser = None
+        self._shell_completion = None
         self._scheduler = None
         self._interactive = True
         self._tasks = None
@@ -219,26 +220,29 @@ class TokeoScheduler(MetaMixin):
             self.shell()
 
     def shell_completion(self):
-        return NestedCompleter.from_nested_dict(
-            {
-                'list': None,
-                'pause': None,
-                'resume': None,
-                'reload': {
-                    '--restart': None,
-                },
-                'restart': None,
-                'wakeup': None,
-                'tasks': {
+        if self._shell_completion is None:
+            self._shell_completion = NestedCompleter.from_nested_dict(
+                {
+                    'list': None,
                     'pause': None,
                     'resume': None,
-                    'remove': None,
-                    'fire': None,
+                    'reload': {
+                        '--restart': None,
+                    },
+                    'restart': None,
+                    'wakeup': None,
+                    'tasks': {
+                        'pause': None,
+                        'resume': None,
+                        'remove': None,
+                        'fire': None,
+                    },
+                    'exit': None,
+                    'quit': None,
                 },
-                'exit': None,
-                'quit': None,
-            },
-        )
+            )
+        # return the completion set
+        return self._shell_completion
 
     def shell_history(self):
         return InMemoryHistory(
