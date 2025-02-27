@@ -1,20 +1,7 @@
 from sys import argv
 from os.path import basename
 from datetime import datetime, timezone
-from tokeo.core.utils.base import hasprops, getprop, default_when_blank
-from tokeo.core.utils.json import jsonDump, jsonTokeoEncoder
-from tokeo.ext.argparse import Controller
-from cement.core.meta import MetaMixin
-from cement import ex
-from cement.core.foundation import SIGNALS
-from cement.core.exc import CaughtSignal
-from argparse import ArgumentParser
-import shlex
-from prompt_toolkit import prompt
-from prompt_toolkit.patch_stdout import patch_stdout
-from prompt_toolkit.history import InMemoryHistory
-from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-from prompt_toolkit.completion import NestedCompleter, WordCompleter
+import yaml
 from threading import Thread
 from concurrent import futures as concurrent_futures
 import importlib
@@ -22,6 +9,20 @@ import invoke
 import fabric
 import paramiko
 from paramiko.hostkeys import HostKeys, HostKeyEntry
+from argparse import ArgumentParser
+import shlex
+from prompt_toolkit import prompt
+from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+from prompt_toolkit.completion import NestedCompleter, WordCompleter
+from cement.core.meta import MetaMixin
+from cement import ex
+from cement.core.foundation import SIGNALS
+from cement.core.exc import CaughtSignal
+from tokeo.core.utils.base import hasprops, getprop, default_when_blank
+from tokeo.core.utils.json import jsonDump, jsonTokeoEncoder
+from tokeo.ext.argparse import Controller
 
 
 def jsonTokeoAutomateEncoder(obj):
@@ -99,11 +100,20 @@ class TokeoAutomate(MetaMixin):
     def __init__(self, app, *args, **kw):
         super(TokeoAutomate, self).__init__(*args, **kw)
         self.app = app
+        # copy from list of tasks with expanded entries
         self._tasks = None
+        # refernces for imported modules
         self._modules = {}
+        # configured hosts list with settings per host
         self._hosts = None
+        # counter of created host entries, also used as unique id
+        self._hosts_cnt = 0
+        # configured groups with hosts references
         self._hostgroups = None
+        # configured named connections and access settings
         self._connections = None
+        # counter of created connections, also used as unique id
+        self._connections_cnt = 0
 
     def _setup(self, app):
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
@@ -120,13 +130,23 @@ class TokeoAutomate(MetaMixin):
         This will create a host dict for different defined hosts like:
         host, host:port, user@host, user:passwort@host:port
         """
+        if not isinstance(entry, dict):
+            raise TokeoAutomateError('To define a host entry there must be at least a dict')
+        # use the counter also as running id
+        self._hosts_cnt += 1
+        # test key and make sure that has a value
+        key = entry['id'] if 'id' in entry else key if key is not None else f'_host{self._hosts_cnt}'
+        # check for reference
+        entry = (self.hosts.get(entry['use'], {}) if 'use' in entry else {}) | entry
+        # drop 'use' attribute if was defined
+        entry.pop('use', None)
         # Create a dict with all given and allowed fields
         # any field set hereby will never be overwritten
         # by any merge. If some want to set the password
         # by connection e.g., the password field should
         # not exist here.
-        if not isinstance(entry, dict) or 'host' not in entry:
-            raise TokeoAutomateError('To define a host entry there must be at least a dict with a "host" field')
+        if 'host' not in entry:
+            raise TokeoAutomateError('To define a host entry there must be at least a "host" field')
         # setup the dict
         _host = dict(id=key, name=entry['name'] if 'name' in entry else key, host=entry['host'])
         for field in ('port', 'user', 'password', 'sudo', 'identity', 'host_key'):
@@ -143,6 +163,8 @@ class TokeoAutomate(MetaMixin):
         """
         if not isinstance(host_str, str) or str.strip(host_str) == '':
             raise TokeoAutomateError('At least a host must be specified to get host_dict from string')
+        # use the counter also as running id
+        self._hosts_cnt += 1
         # get parts from string
         user_host_parts = str.strip(host_str).split('@') if '@' in host_str else ['', str.strip(host_str)]
         user_password_parts = user_host_parts[0].split(':') if ':' in user_host_parts[0] else [user_host_parts[0], '']
@@ -165,12 +187,19 @@ class TokeoAutomate(MetaMixin):
         This will get two dicts and overrule allowed
         keys from 2nd dict into 1st dict
         """
+        # use the counter also as running id
+        self._hosts_cnt += 1
+        # make a copy from base dict
         _host = base.copy()
         # test for overrule content
         if overrule is None or not isinstance(overrule, dict):
             return _host
+        # check for reference
+        overrule = (self.hosts.get(overrule['use'], {}) if 'use' in overrule else {}) | overrule
+        # drop 'use' attribute if was defined
+        overrule.pop('use', None)
         # overrulable fields from host dict
-        for field in ('name', 'host', 'port', 'user', 'password', 'sudo', 'identity', 'host_key'):
+        for field in ('id', 'name', 'host', 'port', 'user', 'password', 'sudo', 'identity', 'host_key'):
             if field in overrule:
                 _host[field] = overrule[field]
         # return the record
@@ -178,11 +207,18 @@ class TokeoAutomate(MetaMixin):
 
     # make a defined dict from a config entry
     def _get_connection_dict(self, key, entry):
-        # Create a dict with all given and allowed fields
-        # any field set hereby will never be overwritten
-        # by any merge. If some want to set the password
-        # by connection e.g., the password field should
-        # not exist here.
+        """
+        Create a dict with all given and allowed fields
+        any field set hereby will never be overwritten
+        by any merge. If some want to set the password
+        by connection e.g., the password field should
+        not exist here.
+        """
+        # use the counter also as running id
+        self._connections_cnt += 1
+        # test key and make sure that has a value
+        key = key if key else entry['id'] if 'id' in entry else f'_conn{self._connections_cnt}'
+        # create the base dict
         _connection = dict(
             id=key,
             name=entry['name'] if 'name' in entry and key != '_default' else key,
@@ -206,6 +242,60 @@ class TokeoAutomate(MetaMixin):
                 _connection[field] = entry[field]
         # return the record
         return _connection
+
+    def _setup_connection(self, connection):
+        # merge with use if defined
+        connection = (self.connections['connections'][connection['use']] if 'use' in connection else {}) | connection
+        # drop 'use' attribute if was defined
+        connection.pop('use', None)
+        # merge with default but drop sub 'connections' structs
+        connection = self.Meta.config_defaults['connections'] | self.connections['_default'] | connection
+        connection.pop('connections', None)
+        # expand list of hosts to list of host_dicts
+        hosts_list = []
+        # check for list of hosts
+        connection_hosts = connection['hosts']
+        if isinstance(connection_hosts, str):
+            connection_hosts = tuple((connection_hosts,))
+        # loop the hosts
+        for host in connection_hosts:
+            # check types of entries to identify the config
+            if isinstance(connection_hosts, dict):
+                # host is key, maybe more fields
+                entry = connection_hosts[host]
+            elif isinstance(host, dict):
+                # list of dicts
+                if len(host) > 1:
+                    raise TokeoAutomateError('A host dict must contains just 1 host dict structure')
+                _host = next(iter(host))
+                entry = host[_host]
+                host = _host
+            else:
+                entry = None
+            if isinstance(entry, str):
+                entry = self._get_host_dict_from_str(None, entry)
+            # check if entry needs fullfill while ref
+            if entry and 'use' in entry:
+                entry = self._get_host_dict(host, entry)
+
+            if host in self.hosts:
+                hosts_list.append(self._overrule_host_dict(self.hosts[host], entry))
+            elif host in self.hostgroups:
+                hosts_list.extend(self.hostgroups[host])
+            else:
+                if entry:
+                    hosts_list.append(entry)
+                else:
+                    hosts_list.append(self._get_host_dict_from_str(None, host))
+        # make dict list of hosts unique
+        unique_hosts_list = {}
+        for host in hosts_list:
+            if not host['id'] in unique_hosts_list:
+                unique_hosts_list[host['id']] = host
+        # replace the fullfilled hosts
+        connection['hosts'] = tuple(unique_hosts_list.values())
+        # return with fullfilled connection
+        return connection
 
     @property
     def hosts(self):
@@ -383,54 +473,8 @@ class TokeoAutomate(MetaMixin):
                     task['connection'] = dict(
                         hosts=tuple(('local',)),
                     )
-            # fullfill the connection
-            connection = task['connection']
-            # merge with use if defined
-            connection = (self.connections['connections'][connection['use']] if 'use' in connection else {}) | connection
-            # drop 'use' attribute if was defined
-            connection.pop('use', None)
-            # merge with default but drop sub 'connections' structs
-            connection = self.Meta.config_defaults['connections'] | self.connections['_default'] | connection
-            connection.pop('connections', None)
-            # expand list of hosts to list of host_dicts
-            hosts_list = []
-            # check for list of hosts
-            connection_hosts = connection['hosts']
-            if isinstance(connection_hosts, str):
-                connection_hosts = tuple((connection_hosts,))
-            # loop the hosts
-            for host in connection_hosts:
-                # check types of entries to identify the config
-                if isinstance(connection_hosts, dict):
-                    # host is key, maybe more fields
-                    entry = connection_hosts[host]
-                elif isinstance(host, dict):
-                    # list of dicts
-                    if len(host) > 1:
-                        raise TokeoAutomateError('A host dict must contains just 1 host dict structure')
-                    _host = next(iter(host))
-                    entry = host[_host]
-                    host = _host
-                    if isinstance(entry, str):
-                        entry = self._get_host_dict_from_str(None, entry)
-                else:
-                    entry = None
-
-                if host in self.hosts:
-                    hosts_list.append(self._overrule_host_dict(self.hosts[host], entry))
-                elif host in self.hostgroups:
-                    hosts_list.extend(self.hostgroups[host])
-                else:
-                    hosts_list.append(self._overrule_host_dict(self._get_host_dict_from_str(None, host), entry))
-            # make dict list of hosts unique
-            unique_hosts_list = {}
-            for host in hosts_list:
-                if not f'{host["id"]}%{host["name"]}' in unique_hosts_list:
-                    unique_hosts_list[f'{host["id"]}%{host["name"]}'] = host
-            # replace the fullfilled hosts
-            connection['hosts'] = tuple(unique_hosts_list.values())
             # replace with fullfilled connection
-            task['connection'] = connection
+            task['connection'] = self._setup_connection(task['connection'].copy())
             # add the task to the list
             self._tasks[key] = task
 
@@ -546,12 +590,43 @@ class TokeoAutomate(MetaMixin):
         t.start()
         return t
 
-    def run_sequential(self, task_ids, continue_on_error=False, verbose=False, return_results=False, return_outputs=True):
+    def run_sequential(
+        self,
+        task_ids,
+        with_hosts=None,
+        with_connection=None,
+        continue_on_error=False,
+        verbose=False,
+        return_results=False,
+        return_outputs=True
+    ):
         # test tasks_ids
         if isinstance(task_ids, str):
             task_ids = tuple((task_ids,))
         if not isinstance(task_ids, (list, tuple)):
             raise TokeoAutomateError('run_sequential must be called with one or many task ids')
+
+        # check overrulers for hosts
+        if isinstance(with_hosts, str):
+            if with_hosts in self.hosts:
+                _with_hosts = tuple((self.hosts[with_hosts],))
+            else:
+                _with_hosts = tuple((self._get_host_dict_from_str(with_hosts),))
+        elif isinstance(with_hosts, (list, tuple, dict)):
+            _with_hosts = with_hosts
+        else:
+            _with_hosts = None
+
+        # check overrulers for connection
+        if isinstance(with_connection, str):
+            _with_connection = self.connections['connections'][with_connection]
+        elif isinstance(with_connection, dict):
+            _with_connection = self._get_connection_dict(None, with_connection)
+            if 'use' in with_connection:
+                _with_connection['use'] = with_connection['use']
+        else:
+            _with_connection = None
+
         # flag for getting all exit codes from run commands
         sum_exited_code = 0
         # list for all result details
@@ -568,7 +643,13 @@ class TokeoAutomate(MetaMixin):
                     if task_id not in self.tasks:
                         raise TokeoAutomateError(f'Task "{task_id}" is not defined yet')
                     # get the task object
-                    task = self.tasks[task_id]
+                    task = self.tasks[task_id].copy()
+                    # test overules
+                    if _with_connection:
+                        task['connection'] = self._setup_connection(_with_connection)
+                    if _with_hosts:
+                        task['connection']['hosts'] = _with_hosts
+                        task['connection'] = self._setup_connection(task['connection'])
                     # use and run one by one
                     run_results = self.app.automate.run(task, filter_host_ids=host_id, verbose=verbose)
                     # prepare empty list for this run results
@@ -610,12 +691,43 @@ class TokeoAutomate(MetaMixin):
         # return the results as dict
         return dict(sum_exited_code=sum_exited_code, results=results)
 
-    def run_threaded(self, max_workers, task_ids, verbose=False, return_results=False, return_outputs=True):
+    def run_threaded(
+        self,
+        max_workers,
+        task_ids,
+        with_hosts=None,
+        with_connection=None,
+        verbose=False,
+        return_results=False,
+        return_outputs=True
+    ):
         # test tasks_ids
         if isinstance(task_ids, str):
             task_ids = tuple((task_ids,))
         if not isinstance(task_ids, (list, tuple)):
             raise TokeoAutomateError('run_threaded must be called with one or many task ids')
+
+        # check overrulers for hosts
+        if isinstance(with_hosts, str):
+            if with_hosts in self.hosts:
+                _with_hosts = tuple((self.hosts[with_hosts],))
+            else:
+                _with_hosts = tuple((self._get_host_dict_from_str(with_hosts),))
+        elif isinstance(with_hosts, (list, tuple, dict)):
+            _with_hosts = with_hosts
+        else:
+            _with_hosts = None
+
+        # check overrulers for connection
+        if isinstance(with_connection, str):
+            _with_connection = self.connections['connections'][with_connection]
+        elif isinstance(with_connection, dict):
+            _with_connection = self._get_connection_dict(None, with_connection)
+            if 'use' in with_connection:
+                _with_connection['use'] = with_connection['use']
+        else:
+            _with_connection = None
+
         # flag for getting all exit codes from run commands
         sum_exited_code = 0
         # list for all result details
@@ -635,7 +747,13 @@ class TokeoAutomate(MetaMixin):
                     if task_id not in self.tasks:
                         raise TokeoAutomateError(f'Task "{task_id}" is not defined yet')
                     # get the task object
-                    task = self.tasks[task_id]
+                    task = self.tasks[task_id].copy()
+                    # test overules
+                    if _with_connection:
+                        task['connection'] = self._setup_connection(_with_connection)
+                    if _with_hosts:
+                        task['connection']['hosts'] = _with_hosts
+                        task['connection'] = self._setup_connection(task['connection'])
                     # put task on pool
                     futures.append(executor.submit(self.run, task, host_id, verbose))
 
@@ -994,7 +1112,29 @@ class TokeoAutomateController(Controller):
         help='run task(s)',
         description='Run one or many configured tasks.',
         arguments=[
-            (['task'], dict(nargs='+', help='task(s)[:host] to run')),
+            (
+                ['task'],
+                dict(
+                    nargs='+',
+                    help='task(s)[:host] to run',
+                )
+            ),
+            (
+                ['--with-hosts'],
+                dict(
+                    type=str,
+                    default=None,
+                    help='run tasks but set the hosts by parameter from string or by yaml',
+                )
+            ),
+            (
+                ['--with-connection'],
+                dict(
+                    type=str,
+                    default=None,
+                    help='run tasks but set the connection by parameter as id or by yaml',
+                )
+            ),
             (
                 ['--threads'],
                 dict(
@@ -1046,6 +1186,19 @@ class TokeoAutomateController(Controller):
         kwargs = dict(
             verbose=self.app.pargs.verbose, return_results=self.app.pargs.as_json, return_outputs=not self.app.pargs.without_output
         )
+        # get hosts by --with-hosts
+        if self.app.pargs.with_hosts:
+            try:
+                kwargs['with_hosts'] = yaml.safe_load(self.app.pargs.with_hosts)
+            except (yaml.error.MarkedYAMLError, yaml.error.YAMLError):
+                kwargs['with_hosts'] = self.app.pargs.with_hosts
+        # get connection by --with-connection
+        if self.app.pargs.with_connection:
+            try:
+                kwargs['with_connection'] = yaml.safe_load(self.app.pargs.with_connection)
+            except (yaml.error.MarkedYAMLError, yaml.error.YAMLError):
+                kwargs['with_connection'] = self.app.pargs.with_connection
+
         # use the internal processings
         if self.app.pargs.threads > 0:
             res = self.app.automate.run_threaded(self.app.pargs.threads, self.app.pargs.task, **kwargs)
