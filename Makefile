@@ -7,6 +7,7 @@ clean:
 	rm -rf html
 	rm -rf tmp
 	rm -rf dist/*
+	rm -rf build/
 	mkdir -p tmp/tests
 	touch tmp/tests/.gitkeep
 
