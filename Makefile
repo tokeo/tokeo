@@ -14,17 +14,29 @@ clean:
 venv:
 	python -m venv --prompt '> tokeo <' .venv
 	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install .
 	@echo
-	@echo "VENV Setup Complete. Now run: source .venv/bin/activate"
+	@echo
+	@echo "___________________________________________________"
+	@echo
+	@echo
+	@echo "VENV Setup Complete!"
+	@echo "  activate now using: \`source .venv/bin/activate\`"
+	@echo
+	@echo "With active venv install the app:"
+	@echo "  \`make dev\` or \`make prod\`"
 	@echo
 
 outdated:
 	.venv/bin/pip --disable-pip-version-check list --outdated
 
-devenv:
+dev:
 	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install .[dev]
+	.venv/bin/pip install -e .
+	.venv/bin/pip install -e .[dev]
+
+prod:
+	.venv/bin/pip install --upgrade pip
+	.venv/bin/pip install -e .
 
 proto:
 	python -m grpc_tools.protoc -I./ --python_out=. --pyi_out=. --grpc_python_out=. ./tokeo/core/grpc/proto/tokeo.proto
@@ -81,7 +93,7 @@ test:
 
 # check for files
 ifndef sources
-sources=tokeo tests docs setup.py
+sources=tokeo docs tests
 endif
 
 fmt:
@@ -96,11 +108,9 @@ docker: clean
 	docker build -t tokeo:latest .
 
 sdist: clean
-	rm -rf dist/*
 	python -m build --sdist
 
 wheel: clean
-	rm -rf dist/*
 	python -m build --wheel
 
 dist-upload:
