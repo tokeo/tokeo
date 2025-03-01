@@ -22,29 +22,6 @@ dependencies = [
     "cement[colorlog]",
     "colorlog",
     "lazy_loader",
-    "prompt_toolkit",
-    "diskcache",
-    "gevent",
-    "dramatiq",
-    "dramatiq[rabbitmq]",
-    "pika",
-    "dramatiq[watch]",
-    "watchdog_gevent",
-    "watchdog",
-    "grpcio",
-    "grpcio-tools",
-    "protobuf",
-    "apscheduler>=3.0,<4.0",
-    "nicegui",
-    "fastapi",
-    "starlette",
-    "pscript",
-    "vbuild",
-    "pocketbase",
-    "requests",
-    "invoke",
-    "fabric",
-    "paramiko"
 ]
 
 [project.optional-dependencies]
@@ -58,7 +35,7 @@ dev = [
     "wheel>=0.31.0",
     "pyink",
     "flake8",
-    "pdoc3"
+    "pdoc3",
 ]
 
 [project.scripts]
