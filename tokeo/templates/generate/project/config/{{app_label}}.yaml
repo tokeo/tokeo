@@ -185,6 +185,9 @@ scheduler:
 #####################################
 
 automate:
+  hosts:
+    local:
+      shell: /bin/sh
   tasks:
     module: {{ app_label }}.core.tasks.automate
     uname:

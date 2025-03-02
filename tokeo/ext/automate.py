@@ -149,7 +149,7 @@ class TokeoAutomate(MetaMixin):
             raise TokeoAutomateError('To define a host entry there must be at least a "host" field')
         # setup the dict
         _host = dict(id=key, name=entry['name'] if 'name' in entry else key, host=entry['host'])
-        for field in ('port', 'user', 'password', 'sudo', 'identity', 'host_key'):
+        for field in ('port', 'user', 'password', 'sudo', 'identity', 'host_key', 'shell'):
             if field in entry:
                 _host[field] = entry[field]
         # return the record
@@ -199,7 +199,7 @@ class TokeoAutomate(MetaMixin):
         # drop 'use' attribute if was defined
         overrule.pop('use', None)
         # overrulable fields from host dict
-        for field in ('id', 'name', 'host', 'port', 'user', 'password', 'sudo', 'identity', 'host_key'):
+        for field in ('id', 'name', 'host', 'port', 'user', 'password', 'sudo', 'identity', 'host_key', 'shell'):
             if field in overrule:
                 _host[field] = overrule[field]
         # return the record
@@ -237,6 +237,7 @@ class TokeoAutomate(MetaMixin):
             'forward_local',
             'forward_remote',
             'known_hosts',
+            'shell',
         ):
             if field in entry:
                 _connection[field] = entry[field]
@@ -318,12 +319,16 @@ class TokeoAutomate(MetaMixin):
                 # local is only allowed when used to set sudo property
                 if 'host' in _config_host:
                     raise TokeoAutomateError('The id "local" is reserved and not allowed as host')
-                # only sudo property may be set by config
+                # create a host dict for local
+                _config_local = dict(host=key)
+                # only sudo and shell properties may set by config
                 # all other props will be dropped
                 if 'sudo' in _config_host:
-                    _config_host = dict(host=key, sudo=_config_host['sudo'])
-                else:
-                    _config_host = dict(host=key)
+                    _config_local['sudo'] = _config_host['sudo']
+                if 'shell' in _config_host:
+                    _config_local['shell'] = _config_host['shell']
+                # set local for host dict
+                _config_host = _config_local
             # build entry
             host = self._get_host_dict(key, _config_host)
             # add the filled entry
@@ -456,23 +461,30 @@ class TokeoAutomate(MetaMixin):
             # is local command
             if 'connection' in _config_task:
                 task['connection'] = _config_task['connection']
+                if 'hosts' not in task['connection'] and 'use' not in task['connection']:
+                    task['connection']['hosts'] = tuple(('local',))
             else:
                 if 'use' in _config_task:
                     task['connection'] = dict(use=_config_task['use'])
-                elif 'hosts' in _config_task:
-                    # move hosts into inside struct
-                    hosts = _config_task['hosts']
-                    if isinstance(hosts, str):
-                        hosts = tuple((hosts,))
-                    if isinstance(hosts, list):
-                        hosts = tuple(hosts)
-                    # append hosts to dict
-                    task['connection'] = dict(hosts=hosts)
                 else:
-                    # without any hosts it's a local command
-                    task['connection'] = dict(
-                        hosts=tuple(('local',)),
-                    )
+                    if 'hosts' in _config_task:
+                        # move hosts into inside struct
+                        hosts = _config_task['hosts']
+                        if isinstance(hosts, str):
+                            hosts = tuple((hosts,))
+                        if isinstance(hosts, list):
+                            hosts = tuple(hosts)
+                        # append hosts to dict
+                        task['connection'] = dict(hosts=hosts)
+                    else:
+                        # without any hosts it's a local command
+                        task['connection'] = dict(
+                            hosts=tuple(('local',)),
+                        )
+                    # check if shell is defined by task
+                    if 'shell' in _config_task:
+                        task['connection']['shell'] = _config_task['shell']
+
             # replace with fullfilled connection
             task['connection'] = self._setup_connection(task['connection'].copy())
             # add the task to the list
@@ -495,6 +507,8 @@ class TokeoAutomate(MetaMixin):
             # add sudo only if sudo password is given
             if 'sudo' in _host and _host['sudo'] or 'sudo' in connection and connection['sudo']:
                 connect_config['sudo'] = dict(password=_host['sudo'] if 'sudo' in _host and _host['sudo'] else connection['sudo'])
+            if 'shell' in _host and _host['shell'] or 'shell' in connection and connection['shell']:
+                connect_config['run'] = dict(shell=_host['shell'] if 'shell' in _host and _host['shell'] else connection['shell'])
             # create local invoke or ssh client
             if _host['host'] == 'local':
                 run_connections.append(
