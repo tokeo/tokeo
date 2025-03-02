@@ -8,4 +8,4 @@
 dramatiq:
 
   ### connection url to rabbitmq server
-  rabbitmq_url: amqp://test_user:test@10.0.16.115:5672/dev
+  rabbitmq_url: amqp://test:test@localhost:5672/test
