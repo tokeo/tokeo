@@ -20,6 +20,7 @@ from cement.core.meta import MetaMixin
 from cement import ex
 from cement.core.foundation import SIGNALS
 from cement.core.exc import CaughtSignal
+from tokeo.core.exc import TokeoError
 from tokeo.core.utils.base import hasprops, getprop, default_when_blank
 from tokeo.core.utils.json import jsonDump, jsonTokeoEncoder
 from tokeo.ext.argparse import Controller
@@ -33,7 +34,7 @@ def jsonTokeoAutomateEncoder(obj):
     return jsonTokeoEncoder(obj)
 
 
-class TokeoAutomateError(Exception):
+class TokeoAutomateError(TokeoError):
     """Tokeo automate errors."""
 
     pass
@@ -410,6 +411,7 @@ class TokeoAutomate(MetaMixin):
         def __unknown_function(module, key):
             def wrapper(app, connection, **kwargs):
                 raise TokeoAutomateError(f'A function named "{key}" does not exist in module "{_config_task['module']}"')
+
             return wrapper
 
         # initialize tasks
@@ -612,7 +614,7 @@ class TokeoAutomate(MetaMixin):
         continue_on_error=False,
         verbose=False,
         return_results=False,
-        return_outputs=True
+        return_outputs=True,
     ):
         # test tasks_ids
         if isinstance(task_ids, str):
@@ -713,7 +715,7 @@ class TokeoAutomate(MetaMixin):
         with_connection=None,
         verbose=False,
         return_results=False,
-        return_outputs=True
+        return_outputs=True,
     ):
         # test tasks_ids
         if isinstance(task_ids, str):
@@ -1131,7 +1133,7 @@ class TokeoAutomateController(Controller):
                 dict(
                     nargs='+',
                     help='task(s)[:host] to run',
-                )
+                ),
             ),
             (
                 ['--with-hosts'],
@@ -1139,7 +1141,7 @@ class TokeoAutomateController(Controller):
                     type=str,
                     default=None,
                     help='run tasks but set the hosts by parameter from string or by yaml',
-                )
+                ),
             ),
             (
                 ['--with-connection'],
@@ -1147,7 +1149,7 @@ class TokeoAutomateController(Controller):
                     type=str,
                     default=None,
                     help='run tasks but set the connection by parameter as id or by yaml',
-                )
+                ),
             ),
             (
                 ['--threads'],
