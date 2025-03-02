@@ -26,6 +26,13 @@ class TokeoAppEnv:
             self.APP_ENV = STAGING
         elif self.APP_ENV_VAR_VALUE in ['test', 'testing']:
             self.APP_ENV = TESTING
+        elif self.APP_LABEL.endswith('_test'):
+            # check if _test app was called
+            app._meta.label = self.APP_LABEL[:-5]
+            self.APP_LABEL = app._meta.label
+            self.APP_ENV_VAR_NAME = self.APP_LABEL.upper() + '_ENV'
+            self.APP_ENV_VAR_VALUE = 'test'
+            self.APP_ENV = TESTING
         else:
             self.APP_ENV = None
         # identify MODES
