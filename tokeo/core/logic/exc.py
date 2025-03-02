@@ -1,4 +1,4 @@
-class LogicError(Exception):
-    """Generic business logic errors."""
+class TokeoLogicError(Exception):
+    """The Tokeo logic errors."""
 
     pass

@@ -7,7 +7,7 @@ from .controllers.base import BaseController
 
 
 class Tokeo(App):
-    """The Tokeo primary application."""
+    """The Tokeo generator application."""
 
     class Meta:
         # this app name
@@ -27,10 +27,10 @@ class Tokeo(App):
         # load additional framework extensions
         extensions = [
             'colorlog',
+            'generate',
             'tokeo.ext.print',
             'tokeo.ext.jinja2',
             'tokeo.ext.yaml',
-            'tokeo.ext.appshare',
         ]
 
         # register handlers
@@ -50,7 +50,7 @@ class TokeoTest(TestApp, Tokeo):
 
     class Meta:
         # this app test name
-        label = f'{Tokeo.Meta.label}:test'
+        label = f'{Tokeo.Meta.label}_test'
 
 
 def dramatiq():
