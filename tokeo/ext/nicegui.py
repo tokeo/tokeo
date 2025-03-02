@@ -1,12 +1,19 @@
 from sys import argv
 from os.path import basename
 from tokeo.ext.argparse import Controller
+from tokeo.core.exc import TokeoError
 from cement.core.meta import MetaMixin
 from cement import ex
 from nicegui import ui, app as fastapi_app
 from nicegui.element import Element
 from nicegui.elements.mixins.text_element import TextElement
 import importlib
+
+
+class TokeoNiceguiError(TokeoError):
+    """Tokeo automate errors."""
+
+    pass
 
 
 class NiceguiElementHelper:
@@ -36,8 +43,8 @@ class TokeoNicegui(MetaMixin):
         config_defaults = dict(
             host='127.0.0.1',
             port='4123',
-            pages='tokeo.core.pages.index',
-            default='default',
+            pages=None,
+            default=None,
             title='Tokeo NiceGUI',
             favicon=None,
             viewport='width=device-width, initial-scale=1',
@@ -61,12 +68,8 @@ class TokeoNicegui(MetaMixin):
         # add the ux helper
         self.ux = NiceguiElementHelper()
         # lazy import pages modul
-        module = importlib.import_module(self._config('pages'))
-        # check default web handler
-        if self._config('default', fallback='') != '':
-            default_page = getattr(module, self._config('default'))
-            # initialize page
-            default_page()
+        self._pages = self._config('pages')
+        self._default = self._config('default')
 
     def _config(self, key, **kwargs):
         """
@@ -76,6 +79,16 @@ class TokeoNicegui(MetaMixin):
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
     def startup(self):
+        # load the api and weppages module
+        module = importlib.import_module(self._pages)
+        # check default web handler
+        if self._default and isinstance(self._default, str) and self._default != '':
+            default_page = getattr(module, self._default, None)
+            # verify
+            if default_page is None:
+                raise TokeoNiceguiError(f'Default page handler "{self._default}" could not be found in module "{self._pages}"')
+            # initialize registered default page
+            default_page()
         # spin up service
         ui.run(
             # config
