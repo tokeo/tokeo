@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=64.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "{{ app_label }}"
+dynamic = ["version"]  # Declare version as dynamic
+description = "{{ app_description }}"
+readme = "README.md"
+authors = [
+    {name = "{{ creator_name }}", email = "{{ creator_email }}"}
+]
+license = {text = "{{ project_license }}"}
+urls = {"Homepage" = "{{ project_url }}"}
+requires-python = ">=3.10"  # Adjust based on your needs
+dependencies = [
+    "tokeo @ git+https://github.com/tokeo/tokeo.git@master",
+    "cement @ git+https://github.com/datafolklabs/cement.git@3.0.12",
+    "cement[jinja2]",
+    "jinja2",
+    "cement[yaml]",
+    "PyYAML",
+    "cement[colorlog]",
+    "colorlog",
+    "lazy_loader",
+{% if feature_apscheduler == "Y" or feature_automate == "Y" %}
+    "prompt_toolkit",
+{% endif -%}
+{% if feature_diskcache == "Y" or feature_dramatiq == "Y" or feature_apscheduler == "Y" %}
+    "diskcache",
+{% endif -%}
+{% if feature_dramatiq == "Y" %}
+    "dramatiq",
+    "dramatiq[rabbitmq]",
+    "pika",
+    "dramatiq[watch]",
+    "watchdog_gevent",
+    "watchdog",
+    "gevent",
+{% endif -%}
+{% if feature_grpc == "Y" %}
+    "grpcio",
+    "grpcio-tools",
+    "protobuf",
+{% endif -%}
+{% if feature_apscheduler == "Y" %}
+    "apscheduler>=3.0,<4.0",
+{% endif -%}
+{% if feature_dramatiq == "Y" or feature_grpc == "Y" or feature_apscheduler == "Y" %}
+    "requests",
+{% endif -%}
+{% if feature_nicegui == "Y" %}
+    "nicegui",
+    "fastapi",
+    "starlette",
+    "pscript",
+    "vbuild",
+{% endif -%}
+{% if feature_pocketbase == "Y" %}
+    "pocketbase",
+{% endif -%}
+{% if feature_automate == "Y" %}
+    "invoke",
+    "fabric",
+    "paramiko",
+{% endif -%}
+]
+
+[project.optional-dependencies]
+dev = [
+    "pip-tools",
+    "pytest",
+    "pytest-cov",
+    "coverage",
+    "twine>=1.11.0",
+    "setuptools>=38.6.0",
+    "wheel>=0.31.0",
+    "pyink",
+    "flake8",
+    "pdoc3",
+]
+
+[project.scripts]
+{{ app_label }} = "{{ app_label }}.main:main"
+
+[tool.setuptools]
+packages = {find = {exclude = ["ez_setup", "tests*"]}}
+include-package-data = true
+
+[tool.setuptools.package-data]
+"{{ app_label }}" = ["templates/*", "*.proto"]
+
+[tool.setuptools.dynamic]
+version = {attr = "{{ app_label }}.core.version.get_version"}

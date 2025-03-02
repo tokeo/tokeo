@@ -1,0 +1,245 @@
+### The {{ app_name }} Application Configuration Settings
+---
+
+#####################################
+
+{{ app_label }}:
+
+  ### Toggle application level debug (does not toggle framework debugging)
+  # debug: false
+
+  ### Where external (third-party) plugins are loaded from
+  # plugin_dir: /var/lib/{{ app_label }}/plugins/
+
+  ### Where all plugin configurations are loaded from
+  # plugin_config_dir: /etc/{{ app_label }}/plugins.d/
+
+  ### Where external templates are loaded from
+  # template_dir: /var/lib/{{ app_label }}/templates/
+
+#####################################
+
+jinja2:
+
+  # preserve the trailing newline when rendering templates.
+  keep_trailing_newline: true
+  # If this is set to True the first newline after a block is removed
+  # (block, not variable tag!)
+  trim_blocks: true
+  # extra where to find templates
+  # template_dirs:
+  #   - extra/templates
+
+#####################################
+
+dramatiq:
+
+  ### module and method to launch dramatiq serve service
+  serve: {{ app_label }}.main:dramatiq
+  ### actors module to launch with services
+  actors: {{ app_label }}.core.tasks.actors
+  ### number of processes to run the dramatiq workers
+  worker_processes: 2
+  ### number of threads to run the dramatiq workers
+  worker_threads: 2
+  ### number of milliseconds to timeout for worker shutdown
+  worker_shutdown_timeout: 600_000
+  ### number of milliseconds before restarting consumers
+  ### after a connection error
+  restart_delay: 3000
+  ### The number of messages to prefetch from the queue for each worker.
+  ### In-progress messages are included in the count. When set to "1",
+  ### a new message is only fetched once a previous one is done. If not
+  ### or "0" provided, two times the number of configured worker threads
+  ### are prefetched.
+  queue_prefetch: 0
+  ### The number of messages to prefetch from the delay queue for each worker.
+  ### When set to "1", a new message is only fetched once a previous one is done.
+  ### If not provided or "0", a thousand times the number of configured worker
+  ### threads are prefetched.
+  delay_queue_prefetch: 0
+
+  ### broker to use for backend
+  broker: rabbitmq
+  ### connection url to rabbitmq server
+  rabbitmq_url: amqp://guest:guest@localhost:5672/
+  ### mark lock keys by tag
+  locks_tag: dramatiq_locks
+  ### mark lock keys with prefix
+  locks_key_prefix: dq_
+
+#####################################
+
+grpc:
+
+  ### serve and connect to the grpc service
+  url: localhost:50051
+  ### Thread Pool max-workers for grpc service
+  max_worker: 2
+  ### module and method to launch grpc server
+  proto_add_servicer_to_server: {{ app_label }}.core.grpc.proto.{{ app_label }}_pb2_grpc:add_{{ app_class_name }}Servicer_to_server
+  ### module and servicer for grpc implementations
+  grpc_servicer: {{ app_label }}.core.grpc.{{ app_label }}_servicer:{{ app_class_name }}Servicer
+
+#####################################
+
+diskcache:
+
+  ### file path to store permanent data content
+  directory: ./{{ app_label }}_diskcache
+  ### default connection timeout
+  timeout: 60
+  ### mark lock keys by tag
+  locks_tag: diskcache_locks
+  ### mark lock keys with prefix
+  locks_key_prefix: dc_
+
+#####################################
+
+pocketbase:
+
+  ### connection string to database
+  url: http://127.0.0.1:8090
+
+#####################################
+
+smtp:
+
+  ### define one or more standard recipients
+  # to: null
+  ### define the senders address
+  # from_addr: no-reply@example.com
+  ### define one or more carbon copy recipients
+  # cc: null
+  ### define one or more blind copy recipients
+  # bcc: null
+  ### define a default subject
+  # subject: null
+  ### define a defeault prefix on subjects
+  # subject_prefix: null
+  ### SMTP server address to connect for service
+  host: localhost
+  ### SMTP port to connect for service
+  port: 25
+  ### default timeout when connection will cause an error
+  timeout: 30
+  ### enable SSL connection
+  # ssl: false
+  ### enable TLS on connection, available for SSL and non SSL connections
+  tls: true
+  ### enable authentication for service
+  # auth: false
+  ### auth username
+  # username: null
+  ### auth password
+  # password: null
+  ### attach one or more files by default to the messages
+  # files: null
+  ### define the characterset for message
+  # charset: utf-8
+  ### define the encoding of headers qp|base64
+  # header_encoding: null
+  ### define the encoding of bodies qp|base64
+  # body_encoding: null
+  ### check for Date field and append if not exist
+  # date_enforce: True
+  ### check for Message-Id and append if not exist
+  # msgid_enforce: True
+  ### some prepend string for Message-Id
+  # msgid_str: null
+  ### define the domain for Message-Id (null use current server.domain)
+  # msgid_domain: localhost
+
+#####################################
+
+scheduler:
+
+  ### number of concurrent running tasks overall
+  max_concurrent_jobs: 5
+  ### the default time zone
+  timezone: UTC
+  ### list of tasks to plan in a crontab style defined by it's key
+  tasks:
+    ### each entry is defined by its method to call
+    count_word_timer:
+      ### module where the method is located
+      module: {{ app_label }}.core.tasks.agents
+      ### a name for the entry in schedule list
+      name: count-word timer
+      ### what to do if multiple run times occur until task starts (earliest, latest, all)
+      coalesce: latest
+      ### maximum number of seconds the scheduled job’s actual run time is allowed to be late
+      misfire_grace_time: null
+      ### number of seconds to add to the scheduled time for each job
+      delay: null
+      ### maximum number of seconds to randomly add to the scheduled time for each job
+      max_jitter: null
+      ###  maximum number of instances of the task that are allowed to run concurrently
+      max_running_jobs: null
+      ### one or multiple entries in crontab style when to run the task
+      crontab: '*/5 * * * *'
+      ### optional arguments send by named args to the method
+      kwargs:
+        url: https://github.com
+
+#####################################
+
+automate:
+  tasks:
+    module: {{ app_label }}.core.tasks.automate
+    uname:
+      kwargs:
+        flags:
+          - '-a'
+
+#####################################
+
+nicegui:
+  ### serve the web service
+  host: '127.0.0.1'
+  ### port for serving the web service
+  port: 8080
+  ### main module with pages to serve
+  pages: {{ app_label }}.core.pages.index
+  ### name of default route (/) function
+  default: default
+  ### web page title
+  title: {{ app_name }} NiceGUI
+  ### relative filepath or absolute URL to a favicon
+  favicon: public/favicon.ico
+  ### page meta viewport content
+  viewport: width=device-width, initial-scale=1
+  ### whether to use Quasar's dark mode (True, False, null = Auto)
+  dark: null
+  ### use tailwindcss
+  tailwind: True
+  ### secret key for browser-based storage
+  storage_secret: null
+  ### time between binding updates
+  binding_refresh_interval: 0.5
+  ### maximum time the server waits for the browser to reconnect
+  reconnect_timeout: 5.0
+  ### logging level for uvicorn server
+  logging_level: warning
+
+#####################################
+
+log.colorlog:
+
+  ### Where the log file lives (no log file by default)
+  file: null
+
+  ### The level for which to log.  One of: info, warning, error, fatal, debug
+  level: info
+
+  ### Whether or not to log to console
+  to_console: true
+
+  ### Whether or not to rotate the log file when it reaches `max_bytes`
+  # rotate: false
+
+  ### Max size in bytes that a log file can grow until it is rotated.
+  # max_bytes: 512000
+
+  ### The maximum number of log files to maintain when rotating
+  # max_files: 4

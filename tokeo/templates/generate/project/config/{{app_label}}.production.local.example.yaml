@@ -1,0 +1,15 @@
+### The {{ app_name }} Production Configuration Secrets
+### Secrets will be merged into Application Configuration
+### This files should not be checked into source repos
+---
+
+#####################################
+
+smtp:
+
+  ### enable authentication for service
+  auth: true
+  ### auth username
+  username: production.user
+  ### auth password
+  password: top.secret
