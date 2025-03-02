@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package {{ app_label }};
+
+// The grpc service on Tokeo
+service {{ app_class_name }} {
+  // Sends a greeting
+  rpc CountWords (CountWordsRequest) returns (google.protobuf.Empty) {}
+}
+
+// The request message containing the url.
+message CountWordsRequest {
+  string url = 1;
+}

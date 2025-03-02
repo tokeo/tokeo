@@ -24,8 +24,8 @@
 !/docs/
 !/docs/**
 
-!/{{ app_label }}/
-!/{{ app_label }}/**
+!/{{app_label}}/
+!/{{app_label}}/**
 
 !/public/
 !/public/**
