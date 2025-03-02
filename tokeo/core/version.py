@@ -11,6 +11,7 @@ except ModuleNotFoundError:
         mapping = {'alpha': 'a', 'beta': 'b', 'rc': 'c'}
         return f'{version[0]}.{version[1]}.{version[2]}{mapping[version[3]]}{version[4]}'
 
+
 VERSION = (0, 9, 1, 'final', 0)
 
 
