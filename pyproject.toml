@@ -46,7 +46,7 @@ packages = {find = {exclude = ["ez_setup", "tests*"]}}
 include-package-data = true
 
 [tool.setuptools.package-data]
-"tokeo" = ["templates/*", "*.proto"]
+"tokeo" = ["templates/*", "templates/**/*", "templates/**/.*", "*.proto"]
 
 [tool.setuptools.dynamic]
 version = {attr = "tokeo.core.version.get_version"}
