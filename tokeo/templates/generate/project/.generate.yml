@@ -1,0 +1,92 @@
+---
+
+exclude:
+    - '^(.*)[\/\\\\]project[\/\\\\]{{ app_label }}[\/\\\\]templates[\/\\\\](.*)$'
+    - '^.*\.(jpg|png|ico)$'
+
+ignore:
+    - '^(.*)pyc(.*)$'
+    - '^(.*)pyo(.*)$'
+    - '^(.*)__pycache__(.*)$'
+
+variables:
+    -   name: app_label
+        prompt: "App Label"
+        validate: "^[a-z][a-z0-9_]+$"
+        case: "lower"
+        default: "inspire"
+
+    -   name: app_name
+        prompt: "App Name"
+        default: "Inspire"
+
+    -   name: app_class_name
+        prompt: "App Class Name"
+        validate: "^[A-Z][a-zA-Z0-9]+$"
+        default: "Inspire"
+
+    -   name: app_description
+        prompt: "App Description"
+        default: "The Inspire CLI is a cool app!"
+
+    -   name: app_copyright
+        prompt: "App copyright hint"
+        default: "©2025 ACME Inc."
+
+    -   name: creator_name
+        prompt: "Creator Name"
+        default: "John Doe"
+
+    -   name: creator_email
+        prompt: "Creator Email"
+        default: "john.doe@example.com"
+
+    -   name: project_url
+        prompt: "Project URL"
+        default: "https://github.com/johndoe/inspire/"
+
+    -   name: project_license
+        prompt: "Project license"
+        default: "unlicensed"
+
+    -   name: feature_diskcache
+        prompt: "Enable diskcache [(Y)es/(N)o]"
+        validate: "^[YN]$"
+        case: "upper"
+        default: "Y"
+
+    -   name: feature_dramatiq
+        prompt: "Enable dramatiq [(Y)es/(N)o]"
+        validate: "^[YN]$"
+        case: "upper"
+        default: "Y"
+
+    -   name: feature_grpc
+        prompt: "Enable grpc [(Y)es/(N)o]"
+        validate: "^[YN]$"
+        case: "upper"
+        default: "Y"
+
+    -   name: feature_apscheduler
+        prompt: "Enable apscheduler [(Y)es/(N)o]"
+        validate: "^[YN]$"
+        case: "upper"
+        default: "Y"
+
+    -   name: feature_nicegui
+        prompt: "Enable nicegui [(Y)es/(N)o]"
+        validate: "^[YN]$"
+        case: "upper"
+        default: "Y"
+
+    -   name: feature_pocketbase
+        prompt: "Enable pocketbase [(Y)es/(N)o]"
+        validate: "^[YN]$"
+        case: "upper"
+        default: "Y"
+
+    -   name: feature_automate
+        prompt: "Enable automate [(Y)es/(N)o]"
+        validate: "^[YN]$"
+        case: "upper"
+        default: "Y"
