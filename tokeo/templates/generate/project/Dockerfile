@@ -6,8 +6,11 @@ WORKDIR /app
 COPY . /app
 RUN apk add --update --no-cache \
 {% if feature_grpc == "Y" %}
+    linux-headers \
     build-base \
     cmake \
+    gcc \
+    g++ \
 {% endif %}
     git \
     && pip install --upgrade pip \
