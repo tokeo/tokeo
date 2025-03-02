@@ -4,7 +4,13 @@ ENV PS1="\[\e[0;33m\]\(> {{ app_label }} <\) \[\e[1;35m\]\W\[\e[0m\] \[\e[0m\]# 
 
 WORKDIR /app
 COPY . /app
-RUN pip install --upgrade pip \
+RUN apk add --update --no-cache \
+{% if feature_grpc == "Y" %}
+    build-base \
+    cmake \
+{% endif %}
+    git \
+    && pip install --upgrade pip \
     && pip install --no-cache-dir -e .
 WORKDIR /
 ENTRYPOINT ["{{ app_label }}"]
