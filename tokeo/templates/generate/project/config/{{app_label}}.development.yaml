@@ -1,0 +1,13 @@
+### The {{ app_name }} Development Configuration Settings
+### Settings will be merged into Application Configuration
+---
+
+#####################################
+
+scheduler:
+
+  tasks:
+    ### each entry is defined by its method to call
+    count_word_timer:
+      ### one or multiple entries in crontab style when to run the task
+      crontab: '* * * * *'
