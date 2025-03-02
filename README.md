@@ -34,18 +34,32 @@ Tom
 
 <br/>
 
-## tokeo CLI handles all the workers, services, tasks, jobs and functions
+## tokeo CLI and extensions come with all the workers, services, tasks, jobs and functions
 
 <br/>
 
-### Installation on production
+### Create a new project for development
 
 ```bash
-$ make virtualenv
+$ mkdir path/for/project
+
+$ cd path/for/project
+
+$ python -m venv .venv
+
+$ .venv/bin/pip install git+https://github.com/tokeo/tokeo.git@master
+
+$ .venv/bin/tokeo generate project . # use --defaults to create "inspire" with defaults
+
+$ make venv
 
 $ source .venv/bin/activate
 
-$ python setup.py develop # currently install will cause an error on lazy-load
+$ make dev
+
+$ make proto # if feature_grpc installed
+
+$ the_app --help # verify setup
 ```
 
 <br/>
@@ -53,23 +67,17 @@ $ python setup.py develop # currently install will cause an error on lazy-load
 ### Run the message broker workers
 
 ```bash
-$ source .venv/bin/activate
-
 ### run the dramatiq workers for the implemented tasks
-
-$ tokeo dramatiq serve
+$ the_app dramatiq serve
 ```
 
 <br/>
 
-### Run a task by emitter
+### Run a task by emitter example
 
 ```bash
-$ source .venv/bin/activate
-
 ### run the count_words task
-
-$ tokeo emit count-words --url https://github.com
+$ the_app emit count-words --url https://github.com
 
 ### check result output on dramatiq serve console
 ```
@@ -79,11 +87,8 @@ $ tokeo emit count-words --url https://github.com
 ### Run the grpc service
 
 ```bash
-$ source .venv/bin/activate
-
 ### run the grpc service for the exported methods
-
-$ tokeo grpc serve
+$ the_app grpc serve
 ```
 
 <br/>
@@ -91,11 +96,8 @@ $ tokeo grpc serve
 ### Run a task by grpc call
 
 ```bash
-$ source .venv/bin/activate
-
 ### run the count_words task
-
-$ tokeo grpc-client count-words --url https://github.com
+$ the_app grpc-client count-words --url https://github.com
 
 ### check result output on dramatiq serve console
 ```
@@ -105,16 +107,12 @@ $ tokeo grpc-client count-words --url https://github.com
 ### Run tasks by scheduler
 
 ```bash
-$ source .venv/bin/activate
-
 ### run the scheduler
-
-$ tokeo scheduler launch
+$ the_app scheduler launch --interactive --paused
 
 ### now you are in the interactive scheduler shell
 
 Scheduler> list
-
 ### will print the active running tasks and their next execution time
 
 ### check result output on dramatiq serve console
@@ -122,19 +120,28 @@ Scheduler> list
 
 <br/>
 
+### Run the automate service
+
+```bash
+### run the automate service for the exported tasks
+$ the_app automate run uname --verbose
+```
+
+<br/>
+
 ## Controlling log level
 
-The log level for the app can be set by config file (`config/tokeo.yaml`) or an environment variable.
+The log level for the app can be set by config file (`config/the_app.yaml`) or an environment variable.
 
 ```bash
 ### this enables the app debug level output
-$ TOKEO_LOG_COLORLOG_LEVEL=debug tokeo command
+$ THE_APP_LOG_COLORLOG_LEVEL=debug the_app command
 
 ### Instead this enables also the framework debug log
-$ tokeo --debug command
+$ the_app --debug command
 
 ### At least this enables framework debug log only
-$ CEMENT_LOG=1 tokeo command
+$ CEMENT_LOG=1 the_app command
 ```
 
 <br/>
@@ -145,67 +152,51 @@ This project includes a number of helpers in the `Makefile` to streamline common
 
 <br/>
 
-### Environment Setup
-
-The following demonstrates setting up and working with a development environment:
+### Makefile
 
 ```bash
-### create a virtualenv for development
+# show outdated packages
+$ make outdated
 
-$ make virtualenv
+# clean all temporary
+$ make clean
 
-$ source .venv/bin/activate
+# create and update the grpc codes for proto files
+$ make proto
 
-$ pip install -r requirements-dev.txt
+# use pyink for formatting
+$ make fmt # can be filtered by sources=path/files
 
-$ python setup.py develop
+# use flake8 as linter
+$ make lint # can be filtered by sources=path/files
 
-
-### check tokeo cli application
-
-$ tokeo --help
-
-
-### run pytest / coverage
-
-$ make test
-```
-
-<br/>
-
-### Releasing to PyPi
-
-Before releasing to PyPi, you must configure your login credentials:
-
-**~/.pypirc**:
-
-```
-[pypi]
-username = YOUR_USERNAME
-password = YOUR_PASSWORD
-```
-
-Then use the included helper function via the `Makefile`:
-
-```
-$ make dist
-
-$ make dist-upload
+# run your tests
+$ make test # can be filtered by files=path/files
 ```
 
 <br/>
 
 ## Deployments
 
+### create installation packages
+
+```bash
+# create a a source package (tgz)
+make sdist
+
+# create a wheel package (whl)
+make wheel
+```
+
 <br/>
 
 ### Docker
 
-Included is a basic `Dockerfile` for building and distributing `The tokeo`,
+Included is a basic `Dockerfile` for building and distributing `The app`,
 and can be built with the included `make` helper:
 
 ```
 $ make docker
 
-$ docker run -it tokeo --help
+$ docker run the_app --help
 ```
