@@ -5,27 +5,29 @@
 <h1 align="center">tokeo</h1>
 
 <p align="center">
-  <strong>Unleashing the Power of Python, Cement, Dramatiq, Apschedule and Grpc for Superior EDA Solutions!</strong>
+  <strong>Unleashing the Power of Python, Cement, Dramatiq, APScheduler, and gRPC for Superior EDA Solutions!</strong>
 </p>
 <p align="center">
--- Event-Driven Architecture, Backend-Automation, Event-Driven Automation --
+  -- Event-Driven Architecture, Backend Automation, Event-Driven Automation --
 </p>
 
 <br/>
 
 <br/>
 
-In an an Event-Driven Architecture ([EDA](https://en.wikipedia.org/wiki/Event-driven_architecture)) world you need a fast and reliable development cycle even for small projects.
+In an Event-Driven Architecture ([EDA](https://en.wikipedia.org/wiki/Event-driven_architecture)) world, you need a fast and reliable development cycle, even for small projects.
 
-[Cement](https://builtoncement.com) is a well known [python](https://www.python.org) project and allows to build fast and super documented CLI apps with easyness.
+[Cement](https://builtoncement.com) is a well-known [Python](https://www.python.org) project that enables building fast and well-documented CLI apps with ease.
 
-The [Dramatiq](https://dramatiq.io) background task processing library in combination with [RabbitMQ Message Broker](https://www.rabbitmq.com) runs a reliable and solid EDA environment.
+The [Dramatiq](https://dramatiq.io) background task processing library, paired with [RabbitMQ Message Broker](https://www.rabbitmq.com), provides a reliable and solid EDA environment.
 
-An integrated [Grpc](https://grpc.io) service gives access to the available tasks and workflows from outside.
+An integrated [gRPC](https://grpc.io) service allows external access to available tasks and workflows.
 
-For timed jobs excution there is an integrated interactive [Apscheduler](https://apscheduler.readthedocs.io/en/master/) cron service.
+For timed job execution, a background and interactive [APScheduler](https://apscheduler.readthedocs.io/en/master/) cron service is included.
 
-Last but not least expose your values and functions via [Nicegui](https://nicegui.io/) web based api and pages.
+[Fabric](https://www.fabfile.org) simplifies running task automation locally and remotely, configurable through YAML files and CLI arguments.
+
+Expose your values and functions via [NiceGUI](https://nicegui.io/) web-based API and pages.
 
 Kickstart your EDA projects with **tokeo** and experience a seamless development cycle.
 
@@ -34,169 +36,161 @@ Tom
 
 <br/>
 
-## tokeo CLI and extensions come with all the workers, services, tasks, jobs and functions
+## Why Choose Tokeo?
+
+Tokeo combines a robust CLI framework with task automation, message queues, and web interfaces, making it ideal for Python backend projects. Key features include:
+
+- **Integrated EDA Stack**: Combines Dramatiq, RabbitMQ, and gRPC for efficient task processing and external access, plus APScheduler for scheduled jobs.
+- **Flexible Task Automation**: Use Fabric-based tools (`tokeo.ext.automate`) to define and run local or remote tasks, with flexible configuration via YAML and CLI overrides.
+- **Extensible CLI**: Built on Cement, Tokeo supports custom commands and plugins, simplifying complex workflows with minimal setup.
+- **Developer-Friendly Tools**: The `Makefile` provides one-liners for formatting (`fmt`), linting (`lint`), testing (`test`), and packaging (`sdist`, `wheel`), speeding up development.
+- **DiskCache** by `tokeo.ext.diskcache` enhances performance with disk-based caching for frequently accessed data, reducing load times and improving efficiency.
+- **Manage task execution rates** using `temper` and `throttle` to prevent overloading with rate-limiting tools, ensuring stable and controlled processing.
+- **SMTP with Jinja2 Templates**: Send emails with precise, individualized content using Jinja2 templates, supporting text, HTML, inline images, and attachments for dynamic communications.
+- **Simple debugging** when using `app.inspect`. Provides basic debugging tools to inspect application state of vars and objects.
+
+Whether you’re building microservices, automating workflows, or prototyping, Tokeo provides the structure and flexibility to get started quickly.
 
 <br/>
 
-### Create a new project for development
+## Create a New Project
+
+Set up a Tokeo project for development:
 
 ```bash
 $ mkdir path/for/project
-
 $ cd path/for/project
-
 $ python -m venv .venv
-
 $ .venv/bin/pip install git+https://github.com/tokeo/tokeo.git@master
-
-$ .venv/bin/tokeo generate project . # use --defaults to create "inspire" with defaults
-
-$ make venv
-
+$ .venv/bin/tokeo generate project .  # Use --defaults to create "inspire" with defaults
+$ make venv                           # Install dependencies
 $ source .venv/bin/activate
-
-$ make dev
-
-$ make proto # if feature_grpc installed
-
-$ the_app --help # verify setup
+$ make dev                            # Start development server
+$ make proto                          # Generate gRPC code (if feature_grpc is enabled)
+$ the_app --help                      # Verify setup
 ```
 
 <br/>
 
-### Run the message broker workers
+## Run Message Broker Workers
+
+Launch Dramatiq workers to process background tasks:
 
 ```bash
-### run the dramatiq workers for the implemented tasks
 $ the_app dramatiq serve
 ```
 
 <br/>
 
-### Run a task by emitter example
+## Emit a Task
+
+Trigger a task (e.g., `count-words`) via the CLI:
 
 ```bash
-### run the count_words task
 $ the_app emit count-words --url https://github.com
-
-### check result output on dramatiq serve console
+# Check output in the dramatiq serve console
 ```
 
 <br/>
 
-### Run the grpc service
+## Run the gRPC Service
+
+Start the gRPC server for external task access:
 
 ```bash
-### run the grpc service for the exported methods
 $ the_app grpc serve
 ```
 
 <br/>
 
-### Run a task by grpc call
+## Call a Task via gRPC
+
+Execute a task using the gRPC client:
 
 ```bash
-### run the count_words task
 $ the_app grpc-client count-words --url https://github.com
-
-### check result output on dramatiq serve console
+# Check output in the dramatiq serve console
 ```
 
 <br/>
 
-### Run tasks by scheduler
+## Schedule Tasks
+
+Run the scheduler for timed jobs:
 
 ```bash
-### run the scheduler
 $ the_app scheduler launch --interactive --paused
-
-### now you are in the interactive scheduler shell
-
-Scheduler> list
-### will print the active running tasks and their next execution time
-
-### check result output on dramatiq serve console
+# Enter the interactive shell
+Scheduler> list  # Show active tasks and next run times
+# Check output in the dramatiq serve console
 ```
 
 <br/>
 
-### Run the automate service
+## Automate Tasks
+
+Run automation tasks locally or remotely with Fabric:
 
 ```bash
-### run the automate service for the exported tasks
-$ the_app automate run uname --verbose
+$ the_app automate run uname --verbose  # Display system info
+$ the_app automate run svc              # Manage services (requires config)
 ```
 
 <br/>
 
-## Controlling log level
+## Control Logging
 
-The log level for the app can be set by config file (`config/the_app.yaml`) or an environment variable.
+Set log levels via config (`config/the_app.yaml`), environment variables, or CLI flags:
 
 ```bash
-### this enables the app debug level output
-$ THE_APP_LOG_COLORLOG_LEVEL=debug the_app command
-
-### Instead this enables also the framework debug log
-$ the_app --debug command
-
-### At least this enables framework debug log only
-$ CEMENT_LOG=1 the_app command
+$ THE_APP_LOG_COLORLOG_LEVEL=debug the_app command  # App debug logs
+$ the_app --debug command                           # App + framework debug logs
+$ CEMENT_LOG=1 the_app command                      # Framework debug logs only
 ```
 
 <br/>
 
-## Development
+## Development Tools
 
-This project includes a number of helpers in the `Makefile` to streamline common development tasks.
+Tokeo includes a `Makefile` and extensions to streamline development:
 
-<br/>
-
-### Makefile
+### Makefile Commands
 
 ```bash
-# show outdated packages
-$ make outdated
-
-# clean all temporary
-$ make clean
-
-# create and update the grpc codes for proto files
-$ make proto
-
-# use pyink for formatting
-$ make fmt # can be filtered by sources=path/files
-
-# use flake8 as linter
-$ make lint # can be filtered by sources=path/files
-
-# run your tests
-$ make test # can be filtered by files=path/files
+$ make venv        # Set up virtualenv and dependencies
+$ make outdated    # List outdated packages
+$ make clean       # Remove temporary files
+$ make proto       # Generate gRPC code from .proto files
+$ make fmt         # Format code with pyink (optional: sources=path/files)
+$ make lint        # Lint with flake8 (optional: sources=path/files)
+$ make test        # Run tests with pytest (optional: files=path/files)
+$ make coverage    # Generate test coverage report
 ```
 
 <br/>
 
-## Deployments
+## Deployment
 
-### create installation packages
+### Build Packages
+
+Create distributable packages:
 
 ```bash
-# create a a source package (tgz)
-make sdist
-
-# create a wheel package (whl)
-make wheel
+$ make sdist  # Source package (.tar.gz)
+$ make wheel  # Wheel package (.whl)
 ```
-
-<br/>
 
 ### Docker
 
-Included is a basic `Dockerfile` for building and distributing `The app`,
-and can be built with the included `make` helper:
+Build and run with Docker:
 
+```bash
+$ make docker       # Build the Docker image
+$ docker run the_app --help  # Verify the image
 ```
-$ make docker
 
-$ docker run the_app --help
-```
+<br/>
+
+## Next Steps
+
+Explore the [Makefile](https://github.com/tokeo/tokeo/blob/master/Makefile) and [extensions](https://github.com/tokeo/tokeo/tree/master/tokeo/ext) for more tools and customization options. Tokeo’s modular design makes it easy to adapt for your backend needs.
