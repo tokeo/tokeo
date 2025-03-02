@@ -9,7 +9,7 @@ from .controllers.emit import EmitController
 {% endif -%}
 {% if feature_grpc == "Y" %}
 from .controllers.grpccall import GrpcCallController
-{% endif -%}
+{% endif %}
 
 
 class {{ app_class_name }}(App):
