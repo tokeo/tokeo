@@ -1,10 +1,51 @@
+"""
+Custom command-line argument handling for Tokeo applications.
+
+This module extends Cement's ArgparseController with an improved help formatter
+that provides better organization and display of commands and subcommands in
+help output.
+
+Example:
+    ```python
+    from tokeo.ext.argparse import Controller
+
+    class MyController(Controller):
+        class Meta:
+            label = 'my_controller'
+            help = 'My custom controller'
+
+        @ex(help='My command help')
+        def my_command(self):
+            # Command implementation
+            pass
+    ```
+"""
+
 from cement.ext.ext_argparse import ArgparseController
 import argparse
 
 
 class TokeoHelpFormatter(argparse.HelpFormatter):
+    """
+    Custom help formatter for Tokeo CLI applications.
+
+    Extends the standard argparse.HelpFormatter to provide improved formatting
+    for subcommands with better organization and alignment.
+
+    The formatter sorts subcommands alphabetically and improves indentation and
+    spacing for better readability in complex command hierarchies.
+    """
 
     def _iter_indented_subactions(self, action):
+        """
+        Iterate over subactions with proper indentation and sorting.
+
+        Args:
+            action: The argparse action containing subactions.
+
+        Yields:
+            Sorted subactions from the given action.
+        """
         try:
             get_subactions = action._get_subactions
         except AttributeError:
@@ -20,9 +61,29 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
             self._dedent()
 
     def _fill_text(self, text, width, indent):
+        """
+        Fill text with consistent indentation.
+
+        Args:
+            text: The text to format.
+            width: The width to fill to.
+            indent: The indentation string.
+
+        Returns:
+            Formatted text with proper indentation.
+        """
         return ''.join(indent + line for line in text.splitlines(keepends=True)) + ' \n '
 
     def _format_action(self, action):
+        """
+        Format an action's help text with improved subcommand display.
+
+        Args:
+            action: The argparse action to format.
+
+        Returns:
+            Formatted help string for the action.
+        """
         if isinstance(action, argparse._SubParsersAction):
             # inject new class variable for subcommand formatting
             subactions = action._get_subactions()
@@ -43,9 +104,25 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
 
 
 class Controller(ArgparseController):
+    """
+    Base controller class for Tokeo CLI applications.
+
+    Extends Cement's ArgparseController with an improved help formatter and
+    default behavior for commands.
+
+    Attributes:
+        Meta: Configuration class for the controller.
+    """
 
     class Meta:
+        """Controller configuration settings."""
+
         argument_formatter = TokeoHelpFormatter
 
     def _default(self):
+        """
+        Default action when no subcommand is specified.
+
+        Displays the help information for the controller.
+        """
         self._parser.print_help()
