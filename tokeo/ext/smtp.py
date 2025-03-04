@@ -74,23 +74,29 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         # some keyword args override configuration defaults
         for item in [
+            # fmt: off
             'to', 'from_addr', 'cc', 'bcc', 'subject', 'subject_prefix', 'files',
             'charset', 'header_encoding', 'body_encoding',
             'date_enforce', 'msgid_enforce', 'msgid_str',
+            # fmt: on
         ]:
             config_item = self.app.config.get(self._meta.config_section, item)
             params[item] = kw.get(item, config_item)
 
         # others don't
         for item in [
+            # fmt: off
             'ssl', 'tls', 'host', 'port', 'auth', 'username', 'password',
             'timeout', 'msgid_domain'
+            # fmt: on
         ]:
             params[item] = self.app.config.get(self._meta.config_section, item)
 
         # some are only set by message
         for item in [
+            # fmt: off
             'date', 'message_id', 'return_path', 'reply_to'
+            # fmt: on
         ]:
             value = kw.get(item, None)
             if value is not None and str.strip(f'{value}') != '':
@@ -195,9 +201,11 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # check the body argument
         if type(body) not in [str, tuple, dict]:
             error_msg = (
+                # fmt: off
                 "Message body must be string, tuple "
                 "('<text>', '<html>') or dict "
                 "{'text': '<text>', 'html': '<html>'}"
+                # fmt: on
             )
             raise TypeError(error_msg)
 

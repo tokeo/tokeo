@@ -1,7 +1,30 @@
+"""
+Environment management extension for Tokeo applications.
+
+This module provides environment detection and configuration based on
+environment variables. It supports different runtime environments like
+production, staging, development, and testing.
+
+Usage Example:
+    ```python
+    # Automatically loaded by Cement framework via hooks
+    # Access environment information through app.env
+
+    # Check current environment
+    if app.env.IS_DEV_MODE:
+        # Development-specific code
+        pass
+
+    # Get environment-specific configurations
+    app.config.get('my_section', 'my_key')  # Uses environment-specific config
+    ```
+"""
+
 import os
 from cement.utils import fs
 
 
+# Environment constants
 PRODUCTION = 'production'
 STAGING = 'staging'
 DEVELOPMENT = 'development'
@@ -9,8 +32,35 @@ TESTING = 'testing'
 
 
 class TokeoAppEnv:
+    """
+    Application environment manager for Tokeo applications.
+
+    Detects environment based on environment variables and app label.
+    Loads configuration files and provides environment flags.
+
+    Attributes:
+        APP_LABEL (str): The lowercase application label.
+        APP_ENV_VAR_NAME (str): The environment variable name for app
+            environment.
+        APP_ENV_VAR_VALUE (str): The value of the environment variable.
+        APP_ENV (str): The detected environment (production, development,
+            staging, testing).
+        IS_PROD_MODE (bool): True if running in production environment.
+        IS_STAGE_MODE (bool): True if running in staging environment.
+        IS_DEV_MODE (bool): True if running in development environment.
+        IS_TEST_MODE (bool): True if running in testing environment.
+        APP_MAIN_DIR (str): The main directory of the application.
+        APP_DIR (str): The base directory of the application.
+        APP_CONFIG_DIR (str): The configuration directory of the application.
+    """
 
     def __init__(self, app):
+        """
+        Initialize the environment manager.
+
+        Args:
+            app: The Cement application instance.
+        """
         # get the app label
         self.APP_LABEL = app._meta.label.strip().lower()
         # build the main ENV_VAR_NAME from app meta label
@@ -64,4 +114,12 @@ class TokeoAppEnv:
 
 
 def load(app):
+    """
+    Load the environment extension into the application.
+
+    This function is called by the Cement framework when loading extensions.
+
+    Args:
+        app: The Cement application instance.
+    """
     app.extend('env', TokeoAppEnv(app))

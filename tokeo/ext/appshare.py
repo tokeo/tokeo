@@ -1,21 +1,18 @@
 """
-appshare Module
-===============
+Provides a global access point to the running Cement app object.
 
-This module provides a global access point to the running Cement app object.
-It allows external modules to interact with the Cement app without explicitly
-passing the app object around.
+This module allows external modules to interact with the Cement app without
+explicitly passing the app object around. It implements a proxy pattern to
+make the app accessible through a singleton.
 
-Classes
--------
-App
-    A proxy class that provides access to the attributes and methods of the
-    shared app object.
+Example:
+    ```python
+    from tokeo.ext.appshare import app
 
-Functions
----------
-load(app_to_share)
-    Sets the Cement app object to be shared globally.
+    # Access the app objects
+    if app.dramatiq:
+        pass
+    ```
 """
 
 
@@ -23,46 +20,31 @@ class App:
     """
     A proxy class to access the shared app object.
 
-    This class acts as a stand-in for the actual Cement app object. It allows
+    This class acts as a stand-in for the actual Cement app object, allowing
     external modules to access the app's attributes and methods as if they were
     directly accessing the app object itself.
 
-    Attributes
-    ----------
-    _app : object
-        The actual Cement app object.
-
-    Methods
-    -------
-    __getattr__(key)
-        Returns the attribute of the app object corresponding to the key.
-
+    Attributes:
+        _app: The actual Cement app object.
     """
 
     def __init__(self):
-        """
-        Initializes the App class with a None value for the _app attribute.
-        """
+        """Initializes the App class with an unset app reference."""
         self._app = None
 
     def __getattr__(self, key):
         """
         Provides dynamic access to the attributes of the shared app object.
 
-        Parameters
-        ----------
-        key : str
-            The attribute name to access from the app object.
+        Args:
+            key: The attribute name to access from the app object.
 
-        Returns
-        -------
-        The attribute of the app object if it exists.
+        Returns:
+            The attribute of the app object if it exists.
 
-        Raises
-        ------
-        AttributeError
-            If the app object is not set or the attribute does not exist.
-
+        Raises:
+            AttributeError: If the app object is not set or the attribute
+                does not exist.
         """
         # test _app object
         if self._app is None:
@@ -76,15 +58,13 @@ app = App()
 
 def load(app_to_share):
     """
-    Sets the shared app object.
+    Sets the global shared app object.
 
-    This function is used to set the actual Cement app object that will be
-    accessed through the App proxy class.
+    This function is called during application initialization to store
+    the Cement app object that will be accessible through the global `app`
+    instance.
 
-    Parameters
-    ----------
-    app_to_share : object
-        The Cement app object to be shared.
-
+    Args:
+        app_to_share: The Cement app object to be shared globally.
     """
     app._app = app_to_share
