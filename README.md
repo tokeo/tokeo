@@ -58,16 +58,36 @@ Whether you’re building microservices, automating workflows, or prototyping, T
 Set up a Tokeo project for development:
 
 ```bash
+# create a space for the project
 $ mkdir path/for/project
+
+# enter new project dir
 $ cd path/for/project
+
+# create a simple venv to install the tokeo generator
 $ python -m venv .venv
+
+# install the necessary tool-chain
 $ .venv/bin/pip install git+https://github.com/tokeo/tokeo.git@master
-$ .venv/bin/tokeo generate project .  # Use --defaults to create "inspire" with defaults
-$ make venv                           # Install dependencies
+
+# run and create a new project from template
+# use --defaults to create "inspire" with defaults
+$ .venv/bin/tokeo generate project .
+
+# prepare python venv
+$ make venv
+
+# activate the venv
 $ source .venv/bin/activate
-$ make dev                            # Start development server
-$ make proto                          # Generate gRPC code (if feature_grpc is enabled)
-$ the_app --help                      # Verify setup
+
+# Start development and install packages
+$ make dev
+
+# Generate gRPC code (if feature_grpc is enabled)
+$ make proto
+
+# start the app and verify
+$ the_app --help
 ```
 
 <br/>
