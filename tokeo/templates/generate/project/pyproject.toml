@@ -33,10 +33,6 @@ dependencies = [
     "dramatiq",
     "dramatiq[rabbitmq]",
     "pika",
-    "dramatiq[watch]",
-    "watchdog_gevent",
-    "watchdog",
-    "gevent",
 {% endif -%}
 {% if feature_grpc == "Y" %}
     "grpcio",
@@ -78,6 +74,14 @@ dev = [
     "pyink",
     "flake8",
     "pdoc3",
+{% if feature_dramatiq == "Y" or  feature_nicegui == "Y" %}
+    "watchdog",
+{% endif -%}
+{% if feature_dramatiq == "Y" %}
+    "dramatiq[watch]",
+    "watchdog_gevent",
+    "gevent",
+{% endif -%}
 ]
 
 [project.scripts]
