@@ -151,8 +151,8 @@ class TokeoDramatiq(MetaMixin):
         Initialize the Dramatiq extension.
 
         This method is called during application setup to initialize the Dramatiq
-        extension, merge configuration settings, set up the locks handler if available,
-        and register the broker and middleware.
+        extension, merge configuration settings, set up the locks handler if
+        available, and register the broker and middleware.
 
         Args:
             app: The Cement application instance.
