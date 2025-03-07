@@ -127,5 +127,5 @@ If you encounter challenges or have questions:
 <br/>
 
 <p>
-  Built with ❤️ <a href="https://github.com/tokeo/tokeo">tokeo</a> - Empowering Python Applications
+  Built with ❤️ and <a href="https://github.com/tokeo/tokeo">tokeo</a> - Empowering Python Applications
 </p>
