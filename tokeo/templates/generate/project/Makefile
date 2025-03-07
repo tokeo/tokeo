@@ -29,7 +29,7 @@ venv:
 	@echo "Generate the python files from proto:"
 	@echo "  \`make proto\`"
 	@echo
-{% endif -%}
+{% endif %}
 	@echo "Run your app the first time:"
 	@echo "  \`{{app_label}} --help\`"
 	@echo
