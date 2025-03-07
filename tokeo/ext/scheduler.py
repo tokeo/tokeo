@@ -1,3 +1,41 @@
+"""
+Tokeo Scheduler Extension Module.
+
+This extension provides task scheduling capabilities for Tokeo applications.
+It integrates the APScheduler library to enable cron-style scheduled tasks
+and provides an interactive shell for managing the scheduler at runtime.
+
+The extension supports:
+- Cron-style scheduling with optional jitter and delay
+- Task coalescing (latest, earliest, or all)
+- Interactive command shell for task management
+- Background or blocking scheduler modes
+- Configuration-driven task setup
+
+Example:
+    To use this extension in your application:
+
+    .. code-block:: python
+
+        from tokeo.app import TokeoApp
+
+        with TokeoApp('myapp', extensions=['tokeo.ext.scheduler']) as app:
+            # Configure scheduler in app's configuration
+            app.config.set('scheduler', 'tasks', {
+                'mytask': {
+                    'module': 'myapp.tasks',
+                    'crontab': '*/5 * * * *',  # Run every 5 minutes
+                    'name': 'Database Cleanup',
+                    'kwargs': {'max_age': 30}
+                }
+            })
+
+            # Start the scheduler in the background
+            app.scheduler.startup(interactive=False)
+
+            # Your app code here...
+"""
+
 from sys import argv
 from os.path import basename
 from tokeo.ext.argparse import Controller
@@ -22,6 +60,13 @@ from datetime import datetime, timezone, timedelta
 
 
 class TokeoCronAndFireTrigger(CronTrigger):
+    """
+    Enhanced CronTrigger that supports an additional delay after trigger time.
+
+    This trigger extends the standard APScheduler CronTrigger with the ability
+    to add a configurable delay after the scheduled time. This can be useful
+    for staggering task execution or preventing resource contention.
+    """
 
     def __init__(
         self,
@@ -39,11 +84,45 @@ class TokeoCronAndFireTrigger(CronTrigger):
         jitter=None,
         delay=None,
     ):
+        """
+        Initialize the trigger with cron parameters and optional delay.
+
+        Args:
+            year: Year to run on
+            month: Month to run on
+            day: Day of month to run on
+            week: Week of the year to run on
+            day_of_week: Weekday to run on (0-6 or mon,tue,wed,thu,fri,sat,sun)
+            hour: Hour to run on
+            minute: Minute to run on
+            second: Second to run on
+            start_date: Earliest date/time to run on
+            end_date: Latest date/time to run on
+            timezone: Timezone to use for the date/time calculations
+            jitter: Advance or delay the job execution by jitter seconds at most
+            delay: Additional seconds to delay after the scheduled time
+        """
         super().__init__(year, month, day, week, day_of_week, hour, minute, second, start_date, end_date, timezone, jitter)
         self.delay = delay
 
     @classmethod
     def from_crontab(cls, expr, timezone=None, jitter=None, delay=None):
+        """
+        Create a trigger from a standard crontab expression.
+
+        Args:
+            expr: A crontab expression (5 fields: minute, hour, day of month,
+                 month, day of week)
+            timezone: Timezone to use for the date/time calculations
+            jitter: Advance or delay the job execution by jitter seconds at most
+            delay: Additional seconds to delay after the scheduled time
+
+        Returns:
+            A TokeoCronAndFireTrigger instance
+
+        Raises:
+            ValueError: If the expression has the wrong number of fields
+        """
         values = expr.split()
         if len(values) != 5:
             raise ValueError('Wrong number of fields; got {}, expected 5'.format(len(values)))
@@ -60,6 +139,16 @@ class TokeoCronAndFireTrigger(CronTrigger):
         )
 
     def get_next_fire_time(self, previous_fire_time, now):
+        """
+        Calculate the next time this trigger should fire.
+
+        Args:
+            previous_fire_time: Previous firing time of the job or None
+            now: Current time (UTC)
+
+        Returns:
+            The next fire time or None if no future fire times are available
+        """
         # check cron based trigger
         next_fire_time = super().get_next_fire_time(previous_fire_time, now)
         # if there is an additional delay, put it on top
@@ -70,17 +159,30 @@ class TokeoCronAndFireTrigger(CronTrigger):
 
 
 class TokeoScheduler(MetaMixin):
+    """
+    Main scheduler class for Tokeo applications.
+
+    This class provides task scheduling functionality for Tokeo applications,
+    allowing for cron-style scheduled tasks and interactive management.
+    """
 
     class Meta:
-        """Extension meta-data."""
+        """
+        Extension meta-data and configuration.
 
-        #: Unique identifier for this handler
+        Attributes:
+            label (str): Unique identifier for this extension.
+            config_section (str): Configuration section identifier.
+            config_defaults (dict): Default configuration values.
+        """
+
+        # Unique identifier for this handler
         label = 'tokeo.scheduler'
 
-        #: Id for config
+        # Id for config
         config_section = 'scheduler'
 
-        #: Dict with initial settings
+        # Dict with initial settings
         config_defaults = dict(
             max_concurrent_jobs=10,
             timezone=None,
@@ -88,6 +190,14 @@ class TokeoScheduler(MetaMixin):
         )
 
     def __init__(self, app, *args, **kw):
+        """
+        Initialize the scheduler.
+
+        Args:
+            app: The application object.
+            *args: Variable length argument list.
+            **kw: Arbitrary keyword arguments.
+        """
         super(TokeoScheduler, self).__init__(*args, **kw)
         self.app = app
         self._command_parser = None
@@ -98,24 +208,49 @@ class TokeoScheduler(MetaMixin):
         self._taskid = 0
 
     def _setup(self, app):
+        """
+        Setup the scheduler extension.
+
+        Args:
+            app: The application object.
+        """
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
 
     def _config(self, key, **kwargs):
         """
-        This is a simple wrapper, and is equivalent to:
-            ``self.app.config.get(<section>, <key>)``.
+        Get configuration value from the extension's config section.
+
+        This is a simple wrapper around the application's config.get method.
+
+        Args:
+            key (str): Configuration key to retrieve.
+            **kwargs: Additional arguments passed to config.get().
+
+        Returns:
+            The configuration value for the specified key.
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
     @property
     def scheduler(self):
+        """
+        Get the APScheduler instance.
+
+        Returns:
+            The APScheduler instance (BackgroundScheduler or BlockingScheduler).
+        """
         if self._scheduler is None:
             self._scheduler = BackgroundScheduler() if self._interactive else BlockingScheduler()
             self._scheduler.add_executor(ThreadPoolExecutor(max_workers=self._config('max_concurrent_jobs', fallback=10)), 'default')
         return self._scheduler
 
-    # from BaseScheduler _process_jobs
     def process_job(self, job):
+        """
+        Process a single job by submitting it to its executor.
+
+        Args:
+            job: The job to process.
+        """
         try:
             executor = self.scheduler._lookup_executor(job.executor)
         except BaseException:
@@ -131,6 +266,12 @@ class TokeoScheduler(MetaMixin):
 
     @property
     def tasks(self):
+        """
+        Get the configured tasks.
+
+        Returns:
+            A dictionary of task configurations.
+        """
         if self._tasks is None:
             self._tasks = self._config('tasks', fallback={})
         return self._tasks
@@ -148,6 +289,23 @@ class TokeoScheduler(MetaMixin):
         kwargs={},
         title='',
     ):
+        """
+        Add a new cron-style task to the scheduler.
+
+        Args:
+            module (str): The module containing the function to run.
+            func (str): The function name to run.
+            crontab (str): Crontab expression for scheduling.
+            coalesce (bool): Whether to coalesce missed executions.
+            misfire_grace_time (int, optional): Seconds after the designated run time
+                that the job is still allowed to be run.
+            delay (int, optional): Seconds to delay execution after scheduled time.
+            max_jitter (int, optional): Maximum jitter in seconds to add to the schedule.
+            max_running_jobs (int, optional): Maximum number of concurrently running
+                instances of this job.
+            kwargs (dict): Keyword arguments to pass to the function.
+            title (str): Human-readable title for the task.
+        """
         if title == '':
             title = func
         self._taskid += 1
@@ -166,6 +324,15 @@ class TokeoScheduler(MetaMixin):
         )
 
     def init_tasks(self):
+        """
+        Initialize tasks from configuration.
+
+        This method loads task configurations from the application config
+        and schedules them with the scheduler.
+
+        Raises:
+            ValueError: If an unsupported coalesce setting is used.
+        """
         # get the entries from config
         for key in self.tasks:
             # get params for task
@@ -198,6 +365,13 @@ class TokeoScheduler(MetaMixin):
                 )
 
     def startup(self, interactive=True, paused=False):
+        """
+        Start the scheduler.
+
+        Args:
+            interactive (bool): Whether to run in interactive mode.
+            paused (bool): Whether to start in paused state.
+        """
         self._interactive = interactive
         self.app.log.info('Adding all scheduler tasks from config')
         self.init_tasks()
@@ -208,6 +382,13 @@ class TokeoScheduler(MetaMixin):
         self.scheduler.start(paused=paused)
 
     def shutdown(self, signum=None, frame=None):
+        """
+        Shutdown the scheduler.
+
+        Args:
+            signum: Signal number (optional, used for signal handlers).
+            frame: Current stack frame (optional, used for signal handlers).
+        """
         # only shutdown if initialized
         if self._scheduler is not None:
             self.app.log.info('Shutdown scheduler')
@@ -215,11 +396,24 @@ class TokeoScheduler(MetaMixin):
             self._scheduler.remove_all_jobs()
 
     def launch(self, interactive=True, paused=False):
+        """
+        Launch the scheduler and optionally start the interactive shell.
+
+        Args:
+            interactive (bool): Whether to run in interactive mode.
+            paused (bool): Whether to start in paused state.
+        """
         self.app.scheduler.startup(interactive=interactive, paused=paused)
         if interactive:
             self.shell()
 
     def shell_completion(self):
+        """
+        Get shell command completions for the interactive shell.
+
+        Returns:
+            A NestedCompleter instance for prompt_toolkit.
+        """
         if self._shell_completion is None:
             self._shell_completion = NestedCompleter.from_nested_dict(
                 {
@@ -245,6 +439,12 @@ class TokeoScheduler(MetaMixin):
         return self._shell_completion
 
     def shell_history(self):
+        """
+        Get history for the interactive shell.
+
+        Returns:
+            An InMemoryHistory instance for prompt_toolkit.
+        """
         return InMemoryHistory(
             [
                 'exit',
@@ -252,16 +452,40 @@ class TokeoScheduler(MetaMixin):
         )
 
     def handle_command_list(self, args):
+        """
+        Handle the 'list' command to show scheduled tasks.
+
+        Args:
+            args: Command arguments.
+        """
         self.app.log.debug(datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %z (%Z)'))
         self._scheduler.print_jobs()
 
     def handle_command_pause(self, args):
+        """
+        Handle the 'pause' command to pause the scheduler.
+
+        Args:
+            args: Command arguments.
+        """
         self._scheduler.pause()
 
     def handle_command_resume(self, args):
+        """
+        Handle the 'resume' command to resume the scheduler.
+
+        Args:
+            args: Command arguments.
+        """
         self._scheduler.resume()
 
     def handle_command_reload(self, args):
+        """
+        Handle the 'reload' command to reload tasks from configuration.
+
+        Args:
+            args: Command arguments with a restart flag.
+        """
         # save running state
         is_running = self._scheduler.state == STATE_RUNNING
         # pause if running to prevent events while updating tasks
@@ -277,13 +501,31 @@ class TokeoScheduler(MetaMixin):
             self._scheduler.resume()
 
     def handle_command_restart(self, args):
+        """
+        Handle the 'restart' command to restart the scheduler.
+
+        Args:
+            args: Command arguments.
+        """
         args.restart = True
         self.handle_command_reload(args)
 
     def handle_command_wakeup(self, args):
+        """
+        Handle the 'wakeup' command to wake up the scheduler.
+
+        Args:
+            args: Command arguments.
+        """
         self._scheduler.wakeup()
 
     def handle_command_task_commands(self, args):
+        """
+        Handle task-specific commands (pause, resume, remove, fire).
+
+        Args:
+            args: Command arguments with cmd and task attributes.
+        """
         for task in args.task:
             try:
                 job = self._scheduler.get_job(task)
@@ -304,10 +546,22 @@ class TokeoScheduler(MetaMixin):
                 self.app.log.error(err)
 
     def handle_subcommand_help(self, args):
+        """
+        Handle help requests for subcommands.
+
+        Args:
+            args: Command arguments with print_help method.
+        """
         args.print_help()
 
     @property
     def command_parser(self):
+        """
+        Get the command parser for the interactive shell.
+
+        Returns:
+            An ArgumentParser instance.
+        """
         if self._command_parser is None:
             # if not created, generate the nested command parser
             self._command_parser = ArgumentParser(
@@ -363,6 +617,18 @@ class TokeoScheduler(MetaMixin):
         return self._command_parser
 
     def command(self, cmd=''):
+        """
+        Process a command string from the interactive shell.
+
+        Args:
+            cmd (str): Command string to process.
+
+        Returns:
+            bool: True if the command was successful, False otherwise.
+
+        Raises:
+            EOFError: If the exit or quit command is entered.
+        """
         # signal bye bye to interactive shell
         if cmd in ['exit', 'quit']:
             raise EOFError('Command exit entered.')
@@ -389,6 +655,12 @@ class TokeoScheduler(MetaMixin):
         return True
 
     def shell(self):
+        """
+        Start the interactive shell for scheduler management.
+
+        This method provides an interactive command prompt for managing the
+        scheduler and its tasks.
+        """
         self.app.log.info('Welcome to scheduler interactive shell.')
         # build in-memory history for interactive shell
         history = self.shell_history()
@@ -437,8 +709,27 @@ class TokeoScheduler(MetaMixin):
 
 
 class TokeoSchedulerController(Controller):
+    """
+    Command-line controller for scheduler functionality.
+
+    This controller provides CLI commands for starting and managing
+    the scheduler.
+    """
 
     class Meta:
+        """
+        Controller meta-data configuration.
+
+        Attributes:
+            label (str): The identifier for this controller.
+            stacked_type (str): How this controller is stacked.
+            stacked_on (str): Which controller this is stacked on.
+            subparser_options (dict): Options for the subparser.
+            help (str): Help text for this controller.
+            description (str): Detailed description for this controller.
+            epilog (str): Epilog text displaying usage example.
+        """
+
         label = 'scheduler'
         stacked_type = 'nested'
         stacked_on = 'base'
@@ -452,30 +743,84 @@ class TokeoSchedulerController(Controller):
         epilog = f'Example: {basename(argv[0])} scheduler launch --background'
 
     def _setup(self, app):
+        """
+        Set up the controller.
+
+        Args:
+            app: The application object.
+        """
         super(TokeoSchedulerController, self)._setup(app)
 
     def log_info_bw(self, *args):
+        """
+        Log info message in black and white.
+
+        Args:
+            *args: Message parts to log.
+        """
         print('INFO:', *args)
 
     def log_warning_bw(self, *args):
+        """
+        Log warning message in black and white.
+
+        Args:
+            *args: Message parts to log.
+        """
         print('WARN:', *args)
 
     def log_error_bw(self, *args):
+        """
+        Log error message in black and white.
+
+        Args:
+            *args: Message parts to log.
+        """
         print('ERR:', *args)
 
     def log_debug_bw(self, *args):
+        """
+        Log debug message in black and white.
+
+        Args:
+            *args: Message parts to log.
+        """
         print('DEBUG:', *args)
 
     def log_info(self, *args):
+        """
+        Log info message in color (green).
+
+        Args:
+            *args: Message parts to log.
+        """
         print('\033[32mINFO:', *args, '\033[39m')
 
     def log_warning(self, *args):
+        """
+        Log warning message in color (yellow).
+
+        Args:
+            *args: Message parts to log.
+        """
         print('\033[33mWARN:', *args, '\033[39m')
 
     def log_error(self, *args):
+        """
+        Log error message in color (red).
+
+        Args:
+            *args: Message parts to log.
+        """
         print('\033[31mERR:', *args, '\033[39m')
 
     def log_debug(self, *args):
+        """
+        Log debug message in color (magenta).
+
+        Args:
+            *args: Message parts to log.
+        """
         print('\033[35mDEBUG:', *args, '\033[39m')
 
     @ex(
@@ -506,6 +851,12 @@ class TokeoSchedulerController(Controller):
         ],
     )
     def launch(self):
+        """
+        Start the scheduler service.
+
+        This command initializes and starts the scheduler with the
+        configured options, including interactive shell if requested.
+        """
         # rewrite the output log handler for interactive
         # to run well with prompt toolkit
         if not self.app.pargs.background:
@@ -525,15 +876,40 @@ class TokeoSchedulerController(Controller):
 
 
 def tokeo_scheduler_extend_app(app):
+    """
+    Extend the application with scheduler functionality.
+
+    This function adds the scheduler extension to the application and
+    initializes it.
+
+    Args:
+        app: The application object.
+    """
     app.extend('scheduler', TokeoScheduler(app))
     app.scheduler._setup(app)
 
 
 def tokeo_scheduler_shutdown(app):
+    """
+    Handle application shutdown for scheduler.
+
+    Properly cleans up scheduler resources when the application is shutting down.
+
+    Args:
+        app: The application object.
+    """
     app.scheduler.shutdown()
 
 
 def load(app):
+    """
+    Load the scheduler extension into a Tokeo application.
+
+    Registers the controller and hooks needed for scheduler integration.
+
+    Args:
+        app: The application object.
+    """
     app.handler.register(TokeoSchedulerController)
     app.hook.register('post_setup', tokeo_scheduler_extend_app)
     app.hook.register('pre_close', tokeo_scheduler_shutdown)
