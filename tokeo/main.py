@@ -53,15 +53,6 @@ class TokeoTest(TestApp, Tokeo):
         label = f'{Tokeo.Meta.label}_test'
 
 
-def dramatiq():
-    # instantiate app to get config etc. when starting as module via dramatiq
-    app = Tokeo()
-    # disable signal catching when started as module by dramatiq
-    app._meta.catch_signals = None
-    # run setup to inintializes config, handlers and hooks
-    app.setup()
-
-
 def main():
     with Tokeo() as app:
         try:
