@@ -214,3 +214,10 @@ $ docker run the_app --help  # Verify the image
 ## Next Steps
 
 Explore the [Makefile](https://github.com/tokeo/tokeo/blob/master/Makefile) and [extensions](https://github.com/tokeo/tokeo/tree/master/tokeo/ext) for more tools and customization options. Tokeo’s modular design makes it easy to adapt for your backend needs.
+
+<br/>
+<br/>
+
+<p>
+  tokeo is built with ❤️ by Tom Freudenberg - Empowering Python Applications
+</p>
