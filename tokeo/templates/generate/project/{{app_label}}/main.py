@@ -124,7 +124,12 @@ def main():
 
         except CaughtSignal as e:
             # Default Cement signals are SIGINT and SIGTERM, exit 0 (non-error)
-            print(f'\n{e}')
+            if e.signum == 2:
+                print('\nstopped by Ctrl-C')
+            elif e.signum == 15:
+                print('\nterminated by SIGTERM')
+            else:
+                print(f'\n{e}')
             app.exit_code = 0
 
 
