@@ -1,7 +1,7 @@
 from cement.ext.ext_jinja2 import Jinja2OutputHandler, Jinja2TemplateHandler
 from cement.core.output import OutputHandler
 from cement.core.template import TemplateHandler
-from jinja2 import Environment
+from jinja2 import Environment  # noqa: F401
 
 
 class TokeoJinja2OutputHandler(Jinja2OutputHandler):
