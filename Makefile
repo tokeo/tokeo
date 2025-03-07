@@ -25,6 +25,9 @@ venv:
 	@echo "With active venv install the app:"
 	@echo "  \`make dev\` or \`make prod\`"
 	@echo
+	@echo "Run tokeo for the first time:"
+	@echo "  \`tokeo --help\`"
+	@echo
 
 outdated:
 	.venv/bin/pip --disable-pip-version-check list --outdated
