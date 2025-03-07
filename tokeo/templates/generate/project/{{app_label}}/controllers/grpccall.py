@@ -1,11 +1,11 @@
-from concurrent import futures
+from concurrent import futures  # noqa: F401
 import grpc
 from cement import ex
 from tokeo.ext.argparse import Controller
 from tokeo.core.utils.controllers import controller_log_info_help
-from ..core.grpc import {{ app_label }}_servicer
-from ..core.grpc.proto import {{ app_label }}_pb2_grpc
-from ..core.grpc.proto import {{ app_label }}_pb2
+from ..core.grpc import {{ app_label }}_servicer  # noqa: F401
+from ..core.grpc.proto import {{ app_label }}_pb2_grpc  # noqa: F401
+from ..core.grpc.proto import {{ app_label }}_pb2  # noqa: F401
 
 
 class GrpcCallController(Controller):
@@ -49,4 +49,4 @@ class GrpcCallController(Controller):
         self.app.log.info('  given url: ' + self.app.pargs.url)
         with grpc.insecure_channel(self.app.config.get('grpc', 'url')) as channel:
             stub = {{ app_label }}_pb2_grpc.{{ app_class_name }}Stub(channel)
-            response = stub.CountWords({{ app_label }}_pb2.CountWordsRequest(url=self.app.pargs.url))
+            _ = stub.CountWords({{ app_label }}_pb2.CountWordsRequest(url=self.app.pargs.url))
