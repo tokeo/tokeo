@@ -297,10 +297,11 @@ class TokeoScheduler(MetaMixin):
             func (str): The function name to run.
             crontab (str): Crontab expression for scheduling.
             coalesce (bool): Whether to coalesce missed executions.
-            misfire_grace_time (int, optional): Seconds after the designated run time
-                that the job is still allowed to be run.
+            misfire_grace_time (int, optional): Seconds after the designated
+                run time that the job is still allowed to be run.
             delay (int, optional): Seconds to delay execution after scheduled time.
-            max_jitter (int, optional): Maximum jitter in seconds to add to the schedule.
+            max_jitter (int, optional): Maximum jitter in seconds to add
+                to the schedule.
             max_running_jobs (int, optional): Maximum number of concurrently running
                 instances of this job.
             kwargs (dict): Keyword arguments to pass to the function.
