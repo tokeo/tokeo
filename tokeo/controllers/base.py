@@ -1,11 +1,11 @@
-from tokeo.ext.argparse import Controller
-from cement import ex
+from cement import ex  # noqa: F401
 from cement.utils.version import get_version_banner
+from tokeo.ext.argparse import Controller
 from ..core.version import get_version
 
-
+DESCRIPTION = """The Tokeo CLI contains all tasks, jobs and management for your Event-Driven Backend."""
 VERSION_BANNER = f"""
-The Tokeo CLI contains all tasks, jobs and management for your Event-Driven Backend.
+{DESCRIPTION}
 Tokeo {get_version()}
 {get_version_banner()}
 """
@@ -20,7 +20,7 @@ class BaseController(Controller):
         subparser_options = dict(metavar='')
 
         # text displayed at the top of --help output
-        description = 'The Tokeo CLI contains all tasks, jobs and management for your Event-Driven Backend.'
+        description = DESCRIPTION
 
         # text displayed at the bottom of --help output
         epilog = 'Example: tokeo command --option --param value'
