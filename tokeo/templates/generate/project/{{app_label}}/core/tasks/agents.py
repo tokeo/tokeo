@@ -1,4 +1,4 @@
-from tokeo.ext.appshare import app
+from tokeo.ext.appshare import app   # noqa: F401
 from {{ app_label }}.core import tasks
 
 

@@ -1,6 +1,6 @@
 import dramatiq
 import requests
-from tokeo.ext.appshare import app
+from tokeo.ext.appshare import app  # noqa: F401
 
 
 @dramatiq.actor(queue_name='count_words')

@@ -1,11 +1,11 @@
-from cement import ex
+from cement import ex  # noqa: F401
 from cement.utils.version import get_version_banner
 from tokeo.ext.argparse import Controller
 from ..core.version import get_version
 
 DESCRIPTION = """{{ app_description }}"""
 VERSION_BANNER = f"""
-{ DESCRIPTION }
+{DESCRIPTION}
 {{ app_name }} {get_version()}
 {get_version_banner()}
 """
