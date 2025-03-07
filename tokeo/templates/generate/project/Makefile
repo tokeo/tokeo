@@ -25,6 +25,14 @@ venv:
 	@echo "With active venv install the app:"
 	@echo "  \`make dev\` or \`make prod\`"
 	@echo
+{% if feature_grpc == "Y" %}
+	@echo "Generate the python files from proto:"
+	@echo "  \`make proto\`"
+	@echo
+{% endif -%}
+	@echo "Run your app the first time:"
+	@echo "  \`{{app_label}} --help\`"
+	@echo
 
 outdated:
 	.venv/bin/pip --disable-pip-version-check list --outdated
