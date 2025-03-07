@@ -342,7 +342,7 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             **kw: Arbitrary keyword arguments.
 
         Returns:
-            str: A text string with inspection results, or None if no 'args' key is found.
+            str: A string with inspection results, None if no 'args' key is found.
         """
         if 'args' in data.keys():
             name = f" named {data['name']}" if 'name' in data.keys() and data['name'] is not None and data['name'] != '' else ''
