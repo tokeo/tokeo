@@ -13,7 +13,7 @@
 
 <br/>
 
-<br/>
+## 🚀 Accelerate Your Python Development
 
 In an Event-Driven Architecture ([EDA](https://en.wikipedia.org/wiki/Event-driven_architecture)) world, you need a fast and reliable development cycle, even for small projects.
 
@@ -36,7 +36,7 @@ Tom
 
 <br/>
 
-## Why Choose Tokeo?
+## 💪 Why Choose Tokeo?
 
 Tokeo combines a robust CLI framework with task automation, message queues, and web interfaces, making it ideal for Python backend projects. Key features include:
 
@@ -48,176 +48,200 @@ Tokeo combines a robust CLI framework with task automation, message queues, and 
 - **Manage task execution rates** using `temper` and `throttle` to prevent overloading with rate-limiting tools, ensuring stable and controlled processing.
 - **SMTP with Jinja2 Templates**: Send emails with precise, individualized content using Jinja2 templates, supporting text, HTML, inline images, and attachments for dynamic communications.
 - **Simple debugging** when using `app.inspect`. Provides basic debugging tools to inspect application state of vars and objects.
+- **Web Interface**: Create beautiful UIs with the built-in NiceGUI extension to visualize data and interact with your application.
 
-Whether you’re building microservices, automating workflows, or prototyping, Tokeo provides the structure and flexibility to get started quickly.
+Whether you're building microservices, automating workflows, or prototyping, Tokeo provides the structure and flexibility to get started quickly.
 
 <br/>
 
-## Create a New Project
+## 🛠️ Getting Started
 
-Set up a Tokeo project for development:
+### Installing Tokeo
 
 ```bash
-# create a space for the project
-$ mkdir path/for/project
+# Install directly from GitHub
+pip install git+https://github.com/tokeo/tokeo.git@master
 
-# enter new project dir
-$ cd path/for/project
+# Verify installation
+tokeo --help
+```
 
-# create a simple venv to install the tokeo generator
-$ python -m venv .venv
+### Creating a New Project
 
-# install the necessary tool-chain
-$ .venv/bin/pip install git+https://github.com/tokeo/tokeo.git@master
+Set up a Tokeo project in minutes:
 
-# run and create a new project from template
-# use --defaults to create "inspire" with defaults
-$ .venv/bin/tokeo generate project .
+```bash
+# Create a dedicated space for your project
+mkdir path/for/project
+cd path/for/project
 
-# prepare python venv
-$ make venv
+# Generate a new project (interactive prompts)
+tokeo generate project .
 
-# activate the venv
-$ source .venv/bin/activate
+# Or use defaults for quick setup
+tokeo generate project . --defaults
+```
 
-# Start development and install packages
-$ make dev
+### Setting Up Your Development Environment
 
-# Generate gRPC code (if feature_grpc is enabled)
-$ make proto
+```bash
+# Prepare Python virtual environment
+make venv
 
-# start the app and verify
-$ the_app --help
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Install development dependencies
+make dev
+
+# If using gRPC, generate code from proto files
+make proto
+
+# Verify your application is working
+your_app_name --help
 ```
 
 <br/>
 
-## Run Message Broker Workers
+## 📊 Exploring Tokeo Features
 
-Launch Dramatiq workers to process background tasks:
+### Process Background Tasks with Dramatiq
 
 ```bash
-$ the_app dramatiq serve
+# Launch Dramatiq workers to process background tasks
+your_app_name dramatiq serve
+
+# Trigger a task (e.g., count-words)
+your_app_name emit count-words --url https://github.com
+```
+
+### Expose Services via gRPC
+
+```bash
+# Start the gRPC server for external task access
+your_app_name grpc serve
+
+# Execute a task using the gRPC client
+your_app_name grpc-client count-words --url https://github.com
+```
+
+### Schedule Recurring Tasks
+
+```bash
+# Run the scheduler with interactive shell
+your_app_name scheduler launch
+
+# Within the scheduler shell, list and manage tasks
+Scheduler> list
+Scheduler> pause 1  # Pause task with ID 1
+Scheduler> resume 1  # Resume task with ID 1
+```
+
+### Automate Deployment and Operations
+
+```bash
+# Run automation tasks locally or remotely
+your_app_name automate run uname --verbose
+your_app_name automate run deploy --target=production
+```
+
+### Create Web Interfaces
+
+```bash
+# Start the web interface
+your_app_name nicegui serve
+
+# Access the interface at http://localhost:4123
 ```
 
 <br/>
 
-## Emit a Task
+## 🧰 Developer Tools
 
-Trigger a task (e.g., `count-words`) via the CLI:
+Tokeo includes comprehensive tools to maintain code quality:
 
 ```bash
-$ the_app emit count-words --url https://github.com
-# Check output in the dramatiq serve console
+# Format your code
+make fmt
+
+# Run linting checks
+make lint
+
+# Run tests
+make test
+
+# Run tests with coverage report
+make test cov=1
+
+# Build documentation
+make doc
+
+# Check for outdated dependencies
+make outdated
 ```
 
 <br/>
 
-## Run the gRPC Service
+## 🚀 Deployment Options
 
-Start the gRPC server for external task access:
+### Package Your Application
 
 ```bash
-$ the_app grpc serve
+# Create source distribution
+make sdist
+
+# Create wheel package
+make wheel
+
+# Build Docker image
+make docker
+```
+
+### Control Logging
+
+Set log levels via config, environment variables, or CLI flags:
+
+```bash
+# App debug logs
+YOUR_APP_LOG_COLORLOG_LEVEL=debug your_app_name command
+
+# App + framework debug logs
+your_app_name --debug command
+
+# Framework debug logs only
+CEMENT_LOG=1 your_app_name command
 ```
 
 <br/>
 
-## Call a Task via gRPC
+## 📚 Project Structure
 
-Execute a task using the gRPC client:
+When you create a new project with Tokeo, you get a clean, modular structure:
 
-```bash
-$ the_app grpc-client count-words --url https://github.com
-# Check output in the dramatiq serve console
-```
-
-<br/>
-
-## Schedule Tasks
-
-Run the scheduler for timed jobs:
-
-```bash
-$ the_app scheduler launch --interactive --paused
-# Enter the interactive shell
-Scheduler> list  # Show active tasks and next run times
-# Check output in the dramatiq serve console
-```
+- `config/` - Configuration files for prod, stage, dev and test environments
+- `your_app/controllers/` - Command-line interface controllers
+- `your_app/core/logic` - Space for your core application logic
+- `your_app/core/grpc/` - gRPC service definitions and implementations
+- `your_app/core/pages/` - Web interface pages and apis
+- `your_app/core/tasks/` - All implementations of actors, agents, automation, operations, performers and others
+- `your_app/core/utils/` - A place to put your overall tools and helper functions
+- `tests/` - Test suite to ensure reliability
 
 <br/>
 
-## Automate Tasks
+## 🔮 Next Steps
 
-Run automation tasks locally or remotely with Fabric:
+Tokeo is designed to grow with your project. As you build, consider:
 
-```bash
-$ the_app automate run uname --verbose  # Display system info
-$ the_app automate run svc              # Manage services (requires config)
-```
+- Customizing the application structure for your specific needs
+- Creating new controllers for additional commands
+- Adding task processors for background workloads
+- Designing web interfaces to visualize data
+- Implementing automated deployment pipelines
 
-<br/>
-
-## Control Logging
-
-Set log levels via config (`config/the_app.yaml`), environment variables, or CLI flags:
-
-```bash
-$ THE_APP_LOG_COLORLOG_LEVEL=debug the_app command  # App debug logs
-$ the_app --debug command                           # App + framework debug logs
-$ CEMENT_LOG=1 the_app command                      # Framework debug logs only
-```
-
-<br/>
-
-## Development Tools
-
-Tokeo includes a `Makefile` and extensions to streamline development:
-
-### Makefile Commands
-
-```bash
-$ make venv        # Set up virtualenv and dependencies
-$ make outdated    # List outdated packages
-$ make clean       # Remove temporary files
-$ make proto       # Generate gRPC code from .proto files
-$ make fmt         # Format code with pyink (optional: sources=path/files)
-$ make lint        # Lint with flake8 (optional: sources=path/files)
-$ make test        # Run tests with pytest (optional: files=path/files)
-$ make coverage    # Generate test coverage report
-```
-
-<br/>
-
-## Deployment
-
-### Build Packages
-
-Create distributable packages:
-
-```bash
-$ make sdist  # Source package (.tar.gz)
-$ make wheel  # Wheel package (.whl)
-```
-
-### Docker
-
-Build and run with Docker:
-
-```bash
-$ make docker       # Build the Docker image
-$ docker run the_app --help  # Verify the image
-```
-
-<br/>
-
-## Next Steps
-
-Explore the [Makefile](https://github.com/tokeo/tokeo/blob/master/Makefile) and [extensions](https://github.com/tokeo/tokeo/tree/master/tokeo/ext) for more tools and customization options. Tokeo’s modular design makes it easy to adapt for your backend needs.
+Explore the [Makefile](https://github.com/tokeo/tokeo/blob/master/Makefile) and [extensions](https://github.com/tokeo/tokeo/tree/master/tokeo/ext) for more tools and customization options. Tokeo's modular design makes it easy to adapt for your backend needs.
 
 <br/>
 <br/>
 
-<p>
-  tokeo is built with ❤️ by Tom Freudenberg - Empowering Python Applications
-</p>
+tokeo is built with ❤️ by Tom Freudenberg - Empowering Python Applications
