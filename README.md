@@ -59,8 +59,8 @@ Whether you're building microservices, automating workflows, or prototyping, Tok
 ### Installing Tokeo
 
 ```bash
-# Install directly from GitHub
-pip install git+https://github.com/tokeo/tokeo.git@master
+# Install directly from Pypi.org
+pip install tokeo
 
 # Verify installation
 tokeo --help
@@ -71,20 +71,34 @@ tokeo --help
 Set up a Tokeo project in minutes:
 
 ```bash
-# Create a dedicated space for your project
-mkdir path/for/project
-cd path/for/project
+# Define a dedicated space for your project
+cd basepath/for/project
 
 # Generate a new project (interactive prompts)
-tokeo generate project .
+tokeo generate project your_app
 
 # Or use defaults for quick setup
-tokeo generate project . --defaults
+tokeo generate project your_app --defaults
+```
+
+### Use our docker container to create a New Project
+
+Set up a Tokeo project in seconds:
+
+```bash
+# Define a dedicated space for your project
+cd basepath/for/project
+
+# Use docker image to generate a new project (interactive prompts)
+docker run -it -v $(pwd)/your_app:/your_app tokeocli/tokeo generate project /your_app
 ```
 
 ### Setting Up Your Development Environment
 
 ```bash
+# Enter the dedicated space for your project
+cd your_app
+
 # Prepare Python virtual environment
 make venv
 
@@ -94,62 +108,63 @@ source .venv/bin/activate
 # Install development dependencies
 make dev
 
-# If using gRPC, generate code from proto files
+# If using feature gRPC, generate code from proto files
 make proto
 
 # Verify your application is working
-your_app_name --help
+your_app --help
 ```
 
 <br/>
 
 ## 📊 Exploring Tokeo Features
 
-### Process Background Tasks with Dramatiq
+### Process Background Tasks with Dramatiq (needs a running RabbitMQ)
 
 ```bash
 # Launch Dramatiq workers to process background tasks
-your_app_name dramatiq serve
+your_app dramatiq serve
 
 # Trigger a task (e.g., count-words)
-your_app_name emit count-words --url https://github.com
+your_app emit count-words --url https://github.com
 ```
 
 ### Expose Services via gRPC
 
 ```bash
 # Start the gRPC server for external task access
-your_app_name grpc serve
+your_app grpc serve
 
 # Execute a task using the gRPC client
-your_app_name grpc-client count-words --url https://github.com
+your_app grpc-client count-words --url https://github.com
 ```
 
 ### Schedule Recurring Tasks
 
 ```bash
 # Run the scheduler with interactive shell
-your_app_name scheduler launch
+your_app scheduler launch
 
 # Within the scheduler shell, list and manage tasks
 Scheduler> list
-Scheduler> pause 1  # Pause task with ID 1
-Scheduler> resume 1  # Resume task with ID 1
+Scheduler> tasks pause 1 2 3  # Pause task with ID 1, 2, 3
+Scheduler> tasks resume 1  # Resume task with ID 1
+Scheduler> tasks fire 1  # Resume task with ID 1
 ```
 
 ### Automate Deployment and Operations
 
 ```bash
 # Run automation tasks locally or remotely
-your_app_name automate run uname --verbose
-your_app_name automate run deploy --target=production
+your_app automate run uname --verbose
+your_app automate run deploy --target=production
 ```
 
 ### Create Web Interfaces
 
 ```bash
 # Start the web interface
-your_app_name nicegui serve
+your_app nicegui serve
 
 # Access the interface at http://localhost:4123
 ```
@@ -203,13 +218,13 @@ Set log levels via config, environment variables, or CLI flags:
 
 ```bash
 # App debug logs
-YOUR_APP_LOG_COLORLOG_LEVEL=debug your_app_name command
+YOUR_APP_LOG_COLORLOG_LEVEL=debug your_app command
 
 # App + framework debug logs
-your_app_name --debug command
+your_app --debug command
 
 # Framework debug logs only
-CEMENT_LOG=1 your_app_name command
+CEMENT_LOG=1 your_app command
 ```
 
 <br/>
@@ -239,7 +254,7 @@ Tokeo is designed to grow with your project. As you build, consider:
 - Designing web interfaces to visualize data
 - Implementing automated deployment pipelines
 
-Explore the [Makefile](https://github.com/tokeo/tokeo/blob/master/Makefile) and [extensions](https://github.com/tokeo/tokeo/tree/master/tokeo/ext) for more tools and customization options. Tokeo's modular design makes it easy to adapt for your backend needs.
+Explore the [Makefile](https://github.com/tokeo/tokeo/blob/master/Makefile) and [extensions](https://github.com/tokeo/tokeo/tree/master/tokeo/ext) for more tools and customization options. Checkout the example project at [Tokeo Spiral example](https://github.com/tokeo/spiral). Tokeo's modular design makes it easy to adapt for your backend needs.
 
 <br/>
 <br/>

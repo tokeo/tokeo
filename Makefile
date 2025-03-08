@@ -108,7 +108,7 @@ lint:
 	flake8 --max-line-length 140 --max-doc-length 84 --extend-ignore "" --exclude "*/grpc/proto/*_pb2*.py,.git,__pycache__" $(sources)
 
 docker: clean
-	docker build -t tokeo:latest .
+	docker build -t tokeocli/tokeo:latest .
 
 sdist: clean
 	python -m build --sdist

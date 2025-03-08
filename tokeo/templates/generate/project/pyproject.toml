@@ -14,8 +14,8 @@ license = {text = "{{ project_license }}"}
 urls = {"Homepage" = "{{ project_url }}"}
 requires-python = ">=3.10"  # Adjust based on your needs
 dependencies = [
-    "tokeo @ git+https://github.com/tokeo/tokeo.git@1.0.1",
-    "cement @ git+https://github.com/datafolklabs/cement.git@3.0.12",
+    "tokeo==1.0.1",
+    "cement==3.0.12",
     "cement[jinja2]",
     "jinja2",
     "cement[yaml]",
