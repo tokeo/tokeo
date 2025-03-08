@@ -22,7 +22,7 @@ class GrpcCallController(Controller):
         description = 'Call remote grpc methods.'
 
         # text displayed at the bottom of --help output
-        epilog = 'Example: {{ app_label }} grpc count-words --url value'
+        epilog = 'Example: {{ app_label }} grpccall count-words --url value'
 
         # short help information
         help = 'call remote grpc methods manually'
