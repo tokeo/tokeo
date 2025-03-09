@@ -36,6 +36,26 @@ dev = [
     "pyink",
     "flake8",
     "pdoc3",
+    # packages necessary to run all macros
+    "prompt_toolkit",
+    "diskcache",
+    "dramatiq",
+    "dramatiq[rabbitmq]",
+    "pika",
+    "grpcio",
+    "grpcio-tools",
+    "protobuf",
+    "apscheduler>=3.0,<4.0",
+    "requests",
+    "nicegui",
+    "fastapi",
+    "starlette",
+    "pscript",
+    "vbuild",
+    "pocketbase",
+    "invoke",
+    "fabric",
+    "paramiko",
 ]
 
 [project.scripts]
