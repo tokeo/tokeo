@@ -259,6 +259,4 @@ If you encounter challenges or have questions:
 <br/>
 <br/>
 
-<p>
-  Built with ❤️ and <a href="https://github.com/tokeo/tokeo">tokeo</a> - Empowering Python Applications
-</p>
+Built with ❤️ and <a href="https://github.com/tokeo/tokeo">tokeo</a> - Empowering Python Applications
