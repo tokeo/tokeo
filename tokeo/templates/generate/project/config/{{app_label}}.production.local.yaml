@@ -5,6 +5,13 @@
 
 #####################################
 
+dramatiq:
+
+  ### connection url to rabbitmq server
+  rabbitmq_url: amqp://guest:guest@localhost:5672/
+
+#####################################
+
 smtp:
 
   ### enable authentication for service
