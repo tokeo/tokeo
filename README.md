@@ -152,12 +152,11 @@ Scheduler> tasks resume 1  # Resume task with ID 1
 Scheduler> tasks fire 1  # Resume task with ID 1
 ```
 
-### Automate Deployment and Operations
+### Automate Operations
 
 ```bash
 # Run automation tasks locally or remotely
-your_app automate run uname --verbose
-your_app automate run deploy --target=production
+your_app automate run uname --verbose --as-json
 ```
 
 ### Create Web Interfaces
@@ -238,7 +237,7 @@ When you create a new project with Tokeo, you get a clean, modular structure:
 - `your_app/core/logic` - Space for your core application logic
 - `your_app/core/grpc/` - gRPC service definitions and implementations
 - `your_app/core/pages/` - Web interface pages and apis
-- `your_app/core/tasks/` - All implementations of actors, agents, automation, operations, performers and others
+- `your_app/core/tasks/` - Implementations of actors, agents, automations, operations, performers etc.
 - `your_app/core/utils/` - A place to put your overall tools and helper functions
 - `tests/` - Test suite to ensure reliability
 
