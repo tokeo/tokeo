@@ -11,3 +11,9 @@ scheduler:
     count_words_timer:
       ### one or multiple entries in crontab style when to run the task
       crontab: '* * * * *'
+
+#####################################
+
+nicegui:
+  ### serve the web service on all interfaces
+  host: '0.0.0.0'
