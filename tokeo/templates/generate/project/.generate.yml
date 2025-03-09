@@ -27,7 +27,7 @@ variables:
 
     -   name: app_description
         prompt: "App Description"
-        default: "The Inspire CLI is a cool app!"
+        default: "Inspire is easily crafted with Tokeo for scaleable services."
 
     -   name: app_copyright
         prompt: "App copyright hint"
