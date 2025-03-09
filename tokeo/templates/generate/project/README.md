@@ -27,6 +27,8 @@ Your application is ready for you to explore and expand. Here are some exciting 
 
 Remember, every great application started exactly where you are now!
 
+<br/>
+
 ## 🛠️ Getting Started
 
 ### Installation
@@ -65,6 +67,8 @@ make proto
 ```
 {% endif %}
 
+<br/>
+
 ## 📊 Development Tools
 
 This project includes several helpful commands to streamline your development:
@@ -84,19 +88,49 @@ make test cov=1
 
 # Build documentation
 make doc
+
+# Check for outdated dependencies
+make outdated
 ```
+
+<br/>
+
+## 🚀 Deployment Options
+
+### Package Your Application
+
+```bash
+# Create source distribution
+make sdist
+
+# Create wheel package
+make wheel
+
+# Build Docker image
+make docker
+```
+
+<br/>
 
 ## 📚 Project Structure
 
 Your project is organized into a clean, modular structure:
 
-- `config/` - Configuration files for different environments
+- `config/` - Configuration files for prod, stage, dev and test environments
 - `{{ app_label }}/controllers/` - Command-line interface controllers
-- `{{ app_label }}/core/` - Core application logic
-- `{{ app_label }}/core/pages/` - Web interface pages
-- `{{ app_label }}/core/tasks/` - Background and scheduled tasks
+- `{{ app_label }}/core/logic` - Space for your core application logic
+{% if feature_grpc == "Y" %}
+- `{{ app_label }}/core/grpc/` - gRPC service definitions and implementations
+{% endif %}
+{% if feature_nicegui == "Y" %}
+- `{{ app_label }}/core/pages/` - Web interface pages and apis
+{% endif %}
+- `{{ app_label }}/core/tasks/` - All implementations of actors, agents, automation, operations, performers and others
+- `{{ app_label }}/core/utils/` - A place to put your overall tools and helper functions
 - `{{ app_label }}/templates/` - Templates for rendering content
 - `tests/` - Test suite to ensure reliability
+
+<br/>
 
 ## 🌟 Making It Your Own
 
@@ -106,6 +140,8 @@ This is just the beginning of your journey. As you build and shape this project,
 - Who will use your application and how?
 - How can you make it not just functional, but delightful to use?
 
+<br/>
+
 ## 🔄 Continuous Improvement
 
 Keep your project healthy with these practices:
@@ -114,6 +150,8 @@ Keep your project healthy with these practices:
 - Write tests for new features
 - Refactor when needed for clarity
 - Stay up-to-date with your packages using `make outdated`
+
+<br/>
 
 ## 🤝 Need Help?
 
