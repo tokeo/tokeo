@@ -69,6 +69,84 @@ make proto
 
 <br/>
 
+## 📊 Exploring Tokeo Features
+
+{% if feature_dramatiq == "Y" %}
+### Process Background Tasks with Dramatiq (needs a running RabbitMQ)
+
+```bash
+# Launch Dramatiq workers to process background tasks
+{{ app_label }} dramatiq serve
+
+# Trigger a task (e.g., count-words)
+{{ app_label }} emit count-words --url https://github.com
+```
+
+{% endif %}
+{% if feature_grpc == "Y" %}
+### Expose Services via gRPC
+
+```bash
+# Start the gRPC server for external task access
+{{ app_label }} grpc serve
+
+# Execute a task using the gRPC client
+{{ app_label }} grpc-client count-words --url https://github.com
+```
+
+{% endif %}
+{% if feature_apscheduler == "Y" %}
+### Schedule Recurring Tasks
+
+```bash
+# Run the scheduler with interactive shell
+{{ app_label }} scheduler launch
+
+# Within the scheduler shell, list and manage tasks
+Scheduler> list
+Scheduler> tasks pause 1 2 3  # Pause task with ID 1, 2, 3
+Scheduler> tasks resume 1  # Resume task with ID 1
+Scheduler> tasks fire 1  # Resume task with ID 1
+```
+
+{% endif %}
+{% if feature_automate == "Y" %}
+### Automate Operations
+
+```bash
+# Run automation tasks locally or remotely
+{{ app_label }} automate run uname --verbose --as-json
+```
+
+{% endif %}
+{% if feature_nicegui == "Y" %}
+### Create Web Interfaces
+
+```bash
+# Start the web interface
+{{ app_label }} nicegui serve
+
+# Access the interface at http://localhost:4123
+```
+
+{% endif %}
+{% if feature_diskcache == "Y" %}
+### Use Diskcache
+
+```bash
+# List content
+{{ app_label }} cache list
+
+# Set value
+{{ app_label }} cache set counter --value 1 --value-type int
+
+# Get value
+{{ app_label }} cache get counter
+```
+
+{% endif %}
+<br/>
+
 ## 📊 Development Tools
 
 This project includes several helpful commands to streamline your development:
@@ -108,6 +186,23 @@ make wheel
 
 # Build Docker image
 make docker
+```
+
+<br/>
+
+## Control Logging
+
+Set log levels via config, environment variables, or CLI flags:
+
+```bash
+# App debug logs
+{{ app_label | upper }}_LOG_COLORLOG_LEVEL=debug {{ app_label }} command
+
+# App + framework debug logs
+{{ app_label }} --debug command
+
+# Framework debug logs only
+CEMENT_LOG=1 {{ app_label }} command
 ```
 
 <br/>
