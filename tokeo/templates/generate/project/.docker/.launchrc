@@ -15,11 +15,16 @@ echo -e "$APP_LABEL is warming up ...\c"
 # remove the spiral package and replace with local /app
 (
 cd /app
+sleep .5
 pip uninstall -y spiral
+sleep .5
 make dev no_venv=1
+sleep .5
 {% if feature_grpc == "Y" %}
 make proto
+sleep .5
 {% endif %}
+$APP_LABEL
 ) >/dev/null 2>&1
 
 # always start the spiral nicegui web-service
