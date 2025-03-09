@@ -31,6 +31,9 @@ Expose your values and functions via [NiceGUI](https://nicegui.io/) web-based AP
 
 Kickstart your EDA projects with **tokeo** and experience a seamless development cycle.
 
+**Checkout &nbsp; [Spiral](https://github.com/tokeo/spiral)** &nbsp; 🍒 &nbsp; It takes you on an interactive journey through Tokeo's capabilities, providing a
+fully functional environment where you can witness Event-Driven Architecture in real-time.
+
 Cheers<br/>
 Tom
 
