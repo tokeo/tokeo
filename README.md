@@ -38,7 +38,7 @@ Tom
 
 ## 💪 Why Choose Tokeo?
 
-Tokeo combines a robust CLI framework with task automation, message queues, and web interfaces, making it ideal for Python backend projects. Key features include:
+Tokeo is a robust CLI framework for task automation, message queues, and web interfaces, making it ideal for Python backend projects. Key features include:
 
 - **Integrated EDA Stack**: Combines Dramatiq, RabbitMQ, and gRPC for efficient task processing and external access, plus APScheduler for scheduled jobs.
 - **Flexible Task Automation**: Use Fabric-based tools (`tokeo.ext.automate`) to define and run local or remote tasks, with flexible configuration via YAML and CLI overrides.
@@ -117,7 +117,7 @@ your_app --help
 
 <br/>
 
-## 📊 Exploring Tokeo Features
+## 📊 Exploring Tokeo Features on New Project
 
 ### Process Background Tasks with Dramatiq (needs a running RabbitMQ)
 
@@ -168,6 +168,19 @@ your_app nicegui serve
 # Access the interface at http://localhost:4123
 ```
 
+### Use Diskcache
+
+```bash
+# List content
+your_app cache list
+
+# Set value
+your_app cache set counter --value 1 --value-type int
+
+# Get value
+your_app cache get counter
+```
+
 <br/>
 
 ## 🧰 Developer Tools
@@ -211,21 +224,6 @@ make wheel
 make docker
 ```
 
-### Control Logging
-
-Set log levels via config, environment variables, or CLI flags:
-
-```bash
-# App debug logs
-YOUR_APP_LOG_COLORLOG_LEVEL=debug your_app command
-
-# App + framework debug logs
-your_app --debug command
-
-# Framework debug logs only
-CEMENT_LOG=1 your_app command
-```
-
 <br/>
 
 ## 📚 Project Structure
@@ -253,7 +251,10 @@ Tokeo is designed to grow with your project. As you build, consider:
 - Designing web interfaces to visualize data
 - Implementing automated deployment pipelines
 
-Explore the [Makefile](https://github.com/tokeo/tokeo/blob/master/Makefile) and [extensions](https://github.com/tokeo/tokeo/tree/master/tokeo/ext) for more tools and customization options. Checkout the example project at [Tokeo Spiral example](https://github.com/tokeo/spiral). Tokeo's modular design makes it easy to adapt for your backend needs.
+<br/>
+<br/>
+
+**Checkout the example project at [Tokeo Spiral](https://github.com/tokeo/spiral)** and explore the [Makefile](https://github.com/tokeo/tokeo/blob/master/Makefile) and [extensions](https://github.com/tokeo/tokeo/tree/master/tokeo/ext) for more tools and customization options.  Tokeo's modular design makes it easy to adapt for your backend needs.
 
 <br/>
 <br/>
