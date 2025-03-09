@@ -161,7 +161,7 @@ scheduler:
   ### list of tasks to plan in a crontab style defined by it's key
   tasks:
     ### each entry is defined by its method to call
-    count_word_timer:
+    count_words_timer:
       ### module where the method is located
       module: {{ app_label }}.core.tasks.agents
       ### a name for the entry in schedule list
@@ -190,6 +190,7 @@ automate:
       shell: /bin/sh
   tasks:
     module: {{ app_label }}.core.tasks.automate
+    count_words: {}
     uname:
       kwargs:
         flags:

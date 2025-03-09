@@ -8,6 +8,6 @@ scheduler:
 
   tasks:
     ### each entry is defined by its method to call
-    count_word_timer:
+    count_words_timer:
       ### one or multiple entries in crontab style when to run the task
       crontab: '* * * * *'
