@@ -11,6 +11,7 @@ clean:
 	touch tmp/tests/.gitkeep
 
 venv:
+	@if [ "0${VIRTUAL_ENV}" != "0" ]; then echo "Please deactivate venv before continue!"; exit 1; fi
 	python -m venv --prompt '> {{ app_label }} <' .venv
 	.venv/bin/pip install --upgrade pip
 	@echo
@@ -34,16 +35,19 @@ venv:
 	@echo
 
 outdated:
-	.venv/bin/pip --disable-pip-version-check list --outdated
+	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
+	pip --disable-pip-version-check list --outdated
 
 dev:
-	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install -e .
-	.venv/bin/pip install -e .[dev]
+	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
+	pip install --upgrade pip
+	pip install -e .
+	pip install -e .[dev]
 
 prod:
-	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install -e .
+	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
+	pip install --upgrade pip
+	pip install -e .
 
 proto:
 	python -m grpc_tools.protoc -I./ --python_out=. --pyi_out=. --grpc_python_out=. ./{{ app_label }}/core/grpc/proto/{{ app_label }}.proto
