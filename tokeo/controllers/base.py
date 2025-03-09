@@ -1,13 +1,21 @@
 from cement import ex  # noqa: F401
-from cement.utils.version import get_version_banner
+from cement.utils.version import get_version_banner as cement_version_banner
 from tokeo.ext.argparse import Controller
-from ..core.version import get_version
+from tokeo.core.version import get_version as tokeo_get_version
 
-DESCRIPTION = """The Tokeo CLI contains all tasks, jobs and management for your Event-Driven Backend."""
+DESCRIPTION = """Tokeo ignites your powerful event-driven backends in seconds."""
+CEMENT_VERSION, PYTHON_VERSION, OS_VERSION = (cement_version_banner().split('\n') + ['unknown', 'unknown', 'unknown'])[:3]
 VERSION_BANNER = f"""
-{DESCRIPTION}
-Tokeo {get_version()}
-{get_version_banner()}
+ 
+┃
+┃   {DESCRIPTION}
+┃
+┃   🚀 Tokeo CLI {tokeo_get_version()}
+┃
+┃   🔧 Built on {CEMENT_VERSION}
+┃   🐍 Powered by {PYTHON_VERSION}
+┃   💻 Running on {OS_VERSION}
+┃
 """
 
 
