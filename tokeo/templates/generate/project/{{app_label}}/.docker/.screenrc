@@ -1,0 +1,48 @@
+# don't display the copyright page
+startup_message off
+
+# increase scrollback buffer size
+defscrollback 10000
+
+# use the mouse to switch focus
+mousetrack on
+defmousetrack on
+
+### create windows
+split -v
+split
+focus next
+focus next
+split
+split
+focus prev
+focus prev
+
+# start scheduler paused
+cd /app
+screen -t scheduler {{ app_label }} scheduler launch
+
+# start an interactive shell to test commands
+focus next
+cd /app
+screen -t shell sh
+
+# start automation shell
+focus next
+cd /app
+screen -t automate {{ app_label }} automate shell
+
+# start grpc backend
+focus next
+cd /app
+screen -t grpc {{ app_label }} grpc serve
+
+# start dramatiq backend
+focus next
+cd /app
+screen -t dramatiq {{ app_label }} dramatiq serve --skip-logging
+
+# set focus
+focus prev
+focus prev
+focus prev

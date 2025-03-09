@@ -1,0 +1,37 @@
+# this is a ramp up script to use tokeocli/spiral:latest as
+# ready to test docker image for your tokeo application
+export {{ app_label | upper }}_ENV="dev"
+export APP_LABEL="{{ app_label }}"
+
+# the prompt for login shell
+export PS1="\[\e[0;33m\]\(> $APP_LABEL <\) \[\e[1;35m\]\W\[\e[0m\] \[\e[0m\]# "
+
+# show small feddback
+echo -e "$APP_LABEL is warming up ...\c"
+
+# always start the rabbitmq-server
+/usr/sbin/rabbitmq-server -detached
+
+# remove the spiral package and replace with local /app
+(
+cd /app
+pip uninstall -y spiral
+make dev no_venv=1
+) >/dev/null 2>&1
+
+# always start the spiral nicegui web-service
+($APP_LABEL nicegui serve --hotload >/dev/null 2>&1 &)
+
+# cleanup
+clear
+
+# show prompt
+$APP_LABEL --version
+echo ""
+echo ""
+echo "Enter 'launch' to start the $APP_LABEL multi-window example."
+echo ""
+echo "  -- if dramatiq window shows few times an '404' error,"
+echo "     it is expected while the default queues need to setup"
+echo ""
+echo ""
