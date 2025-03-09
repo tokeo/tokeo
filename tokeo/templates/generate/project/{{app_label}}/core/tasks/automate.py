@@ -1,4 +1,4 @@
-from spiral.core import tasks
+from {{ app_label }}.core import tasks
 
 
 def count_words(app, connection, verbose=False):
