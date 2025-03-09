@@ -17,6 +17,9 @@ echo -e "$APP_LABEL is warming up ...\c"
 cd /app
 pip uninstall -y spiral
 make dev no_venv=1
+{% if feature_grpc == "Y" %}
+make proto
+{% endif %}
 ) >/dev/null 2>&1
 
 # always start the spiral nicegui web-service
