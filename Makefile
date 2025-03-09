@@ -6,7 +6,6 @@ clean:
 	rm -rf .pytest_cache .coverage coverage-report
 	rm -rf html
 	rm -rf tmp
-	rm -rf dist/*
 	rm -rf build/
 	mkdir -p tmp/tests
 	touch tmp/tests/.gitkeep
