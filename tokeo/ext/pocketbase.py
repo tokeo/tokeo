@@ -94,7 +94,7 @@ class TokeoPocketBaseHandler(MetaMixin):
 
     def _config(self, key, **kwargs):
         """
-        Get configuration value from the handler's config section.
+        Get configuration value from the extension's config section.
 
         This is a simple wrapper around the application's config.get method.
 

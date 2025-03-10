@@ -131,7 +131,7 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
 
     def _config(self, key, **kwargs):
         """
-        Get configuration value.
+        Get configuration value from the extension's config section.
 
         This is a simple wrapper around the application's config.get method.
 
