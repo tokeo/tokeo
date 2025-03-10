@@ -35,6 +35,11 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
                 config.
 
         """
+        # nothing to do, if dict_obj is just empty
+        if dict_obj is None:
+            return
+
+        # when dict_obj has content it must be from type dict
         assert isinstance(dict_obj, dict), 'Dictionary object required.'
 
         for section in list(dict_obj.keys()):
