@@ -1,11 +1,11 @@
 import pytest
-import copy
-from tests.utils import use_disabled_stdin_capture
-from tokeo.main import TestApp
-from cement.utils.misc import init_defaults
-from tokeo.ext.automate import TokeoAutomateError, TokeoAutomateResult
-from tokeo.core.utils.base import hasprops, anyprop, getprop
 import invoke
+import copy
+from cement.utils.misc import init_defaults
+from tests.utils import use_disabled_stdin_capture
+from tokeo.core.utils.base import hasprops, anyprop, getprop
+from tokeo.main import TokeoTest
+from tokeo.ext.automate import TokeoAutomateError, TokeoAutomateResult
 
 
 def task1(app, connection, url=''):
@@ -371,16 +371,18 @@ defaults['automate']['connections'] = defaults_automate_connections()
 defaults['automate']['tasks'] = defaults_automate_tasks()
 
 
-class AutomateTestApp(TestApp):
+class AutomateTest(TokeoTest):
 
     class Meta:
-        extensions = ['tokeo.ext.print', 'tokeo.ext.automate']
+        extensions = [
+            'tokeo.ext.print',
+            'tokeo.ext.automate'
+        ]
 
 
 def test_hosts_simple(rando):
     'Test for reading a list of hosts'
-    with AutomateTestApp(config_defaults=defaults) as app:
-        app.run()
+    with AutomateTest(config_defaults=defaults) as app:
 
         hosts = app.automate.hosts
         assert hosts == defaults_automate_hosts(validate=True)
@@ -390,8 +392,7 @@ def test_hostgroups_simple(rando):
     """
     Test for reading and expanding hostgroups
     """
-    with AutomateTestApp(config_defaults=defaults) as app:
-        app.run()
+    with AutomateTest(config_defaults=defaults) as app:
 
         hostgroups = app.automate.hostgroups
         assert hostgroups == defaults_automate_hostgroups(validate=True)
@@ -410,8 +411,7 @@ def test_reserved_local_key(rando):
         )
     )
 
-    with AutomateTestApp(config_defaults=test_defaults) as app:
-        app.run()
+    with AutomateTest(config_defaults=test_defaults) as app:
 
         with pytest.raises(TokeoAutomateError):
             _ = app.automate.hosts
@@ -423,8 +423,7 @@ def test_connections_simple(rando):
     """
     Test for reading connections
     """
-    with AutomateTestApp(config_defaults=defaults) as app:
-        app.run()
+    with AutomateTest(config_defaults=defaults) as app:
 
         connections = app.automate.connections
         assert connections == defaults_automate_connections(validate=True)
@@ -436,8 +435,7 @@ def test_tasks_simple(rando):
     """
     test_defaults = copy.deepcopy(defaults)
 
-    with AutomateTestApp(config_defaults=test_defaults) as app:
-        app.run()
+    with AutomateTest(config_defaults=test_defaults) as app:
 
         tasks = app.automate.tasks
         # Drop funcs and modules while they are already tested.
@@ -457,8 +455,7 @@ def test_tasks_task1(rando):
     """
     test_defaults = copy.deepcopy(defaults)
 
-    with AutomateTestApp(config_defaults=test_defaults) as app:
-        app.run()
+    with AutomateTest(config_defaults=test_defaults) as app:
 
         tasks = app.automate.tasks
         context = invoke.Context(config=invoke.Config(overrides={}))
@@ -477,8 +474,7 @@ def test_tasks_task1(rando):
 
 def test_automate_result(rando):
 
-    with AutomateTestApp(config_defaults=defaults) as app:
-        app.run()
+    with AutomateTest(config_defaults=defaults) as app:
 
         res = TokeoAutomateResult(
             'task1', 'con1', 'host1', result=dict(stdout='Out', stderr='Err', command='Cmd', exited=1, values=dict(a=1, b='2nd'))

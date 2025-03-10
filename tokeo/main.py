@@ -46,11 +46,19 @@ class Tokeo(App):
 
 
 class TokeoTest(TestApp, Tokeo):
-    """A sub-class of Tokeo that is better suited for testing."""
+    """A sub-class of Tokeo that is suited for testing."""
 
     class Meta:
         # this app test name
         label = f'{Tokeo.Meta.label}_test'
+
+        # load additional framework extensions
+        extensions = [
+            'tokeo.ext.print',
+        ]
+
+        # set the log handler
+        log_handler = 'logging'
 
 
 def main():
