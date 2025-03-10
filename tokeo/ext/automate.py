@@ -216,8 +216,16 @@ class TokeoAutomate(MetaMixin):
 
     def _config(self, key, **kwargs):
         """
-        This is a simple wrapper, and is equivalent to:
-            ``self.app.config.get(<section>, <key>)``.
+        Get configuration value from the extension's config section.
+
+        This is a simple wrapper around the application's config.get method.
+
+        Args:
+            key (str): Configuration key to retrieve.
+            **kwargs: Additional arguments passed to config.get().
+
+        Returns:
+            The configuration value for the specified key.
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 

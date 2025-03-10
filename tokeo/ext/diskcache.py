@@ -579,17 +579,16 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
     def _config(self, key, **kwargs):
         """
-        Access configuration from the handler's config section.
+        Get configuration value from the extension's config section.
 
-        This is a simple wrapper around app.config.get that automatically uses
-        the correct config section.
+        This is a simple wrapper around the application's config.get method.
 
         Args:
-            key: Configuration key to retrieve
-            **kwargs: Additional arguments passed to app.config.get
+            key (str): Configuration key to retrieve.
+            **kwargs: Additional arguments passed to config.get().
 
         Returns:
-            The configuration value for the given key.
+            The configuration value for the specified key.
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
