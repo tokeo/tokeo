@@ -1,5 +1,5 @@
 from tokeo.ext.appshare import app
-from .ui  import blocks
+from .components import blocks
 
 
 ui = app.nicegui.ui
