@@ -376,7 +376,7 @@ class AutomateTest(TokeoTest):
     class Meta:
         extensions = [
             'tokeo.ext.print',
-            'tokeo.ext.automate'
+            'tokeo.ext.automate',
         ]
 
 

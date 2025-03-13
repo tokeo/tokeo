@@ -1,4 +1,4 @@
-import os
+import os  # noqa: F401
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
 
