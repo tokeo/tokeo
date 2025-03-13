@@ -3,8 +3,6 @@
 ### This files should not be checked into source repos
 ---
 
-#####################################
-
 dramatiq:
 
   ### connection url to rabbitmq server

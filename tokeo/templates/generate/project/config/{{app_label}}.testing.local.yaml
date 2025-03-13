@@ -1,0 +1,9 @@
+### The Tokeo Testing Configuration Secrets
+### Secrets will be merged into Application Configuration
+### This files should not be checked into source repos
+---
+
+dramatiq:
+
+  ### connection url to rabbitmq server
+  rabbitmq_url: amqp://guest:guest@localhost:5672/
