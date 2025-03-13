@@ -2,8 +2,6 @@
 ### Settings will be merged into Application Configuration
 ---
 
-#####################################
-
 scheduler:
 
   tasks:

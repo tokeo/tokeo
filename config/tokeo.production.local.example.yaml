@@ -3,8 +3,6 @@
 ### This files should not be checked into source repos
 ---
 
-#####################################
-
 smtp:
 
   ### enable authentication for service
