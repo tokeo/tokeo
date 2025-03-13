@@ -203,12 +203,14 @@ nicegui:
   host: '127.0.0.1'
   ### port for serving the web service
   port: 8080
-  ### main module with pages to serve
-  pages: {{ app_label }}.core.pages
+  ### main module with apis to serve
+  apis: {{ app_label }}.site.apis
+  ### main module with routes to serve
+  routes: {{ app_label }}.site.routes
   ### name of default route (/) function
-  default: default
+  default_route: default
   ### web page title
-  title: {{ app_name }} NiceGUI
+  title: {{ app_name }} Site
   ### relative filepath or absolute URL to a favicon
   favicon: public/favicon.ico
   ### page meta viewport content
