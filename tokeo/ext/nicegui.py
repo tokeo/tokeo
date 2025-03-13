@@ -189,8 +189,9 @@ class TokeoNicegui(MetaMixin):
         config_defaults = dict(
             host='127.0.0.1',
             port='4123',
-            pages=None,
-            default=None,
+            apis=None,
+            routes=None,
+            default_route=None,
             title='Tokeo NiceGUI',
             favicon=None,
             viewport='width=device-width, initial-scale=1',
@@ -227,9 +228,10 @@ class TokeoNicegui(MetaMixin):
         self.fastapi_app = fastapi_app
         # add the ux helper
         self.ux = NiceguiElementHelper()
-        # lazy import pages modul
-        self._pages = self._config('pages')
-        self._default = self._config('default')
+        # lazy import apis and routes modul
+        self._apis = self._config('apis')
+        self._routes = self._config('routes')
+        self._default_route = self._config('default_route')
         # test welcome message
         self._welcome_message = self._config('welcome_message')
         if self._welcome_message is None:
@@ -304,7 +306,7 @@ class TokeoNicegui(MetaMixin):
         """
         Start the NiceGUI web server with Tokeo integration.
 
-        Loads configured web pages, sets up file monitoring if requested,
+        Loads configured apis and routes, sets up file monitoring if requested,
         and starts the NiceGUI server.
 
         Args:
@@ -312,30 +314,33 @@ class TokeoNicegui(MetaMixin):
             hotload (bool): Whether to enable hot reloading functionality.
 
         Raises:
-            TokeoNiceguiError: If the default page handler cannot be found.
+            TokeoNiceguiError: If the default route handler cannot be found.
         """
-        # load the api and weppages module
-        module = importlib.import_module(self._pages)
+        # load the api and routes module
+        apis_module = importlib.import_module(self._apis)
+        routes_module = importlib.import_module(self._routes)
         # check default web handler
-        if self._default and isinstance(self._default, str) and self._default != '':
-            default_page = getattr(module, self._default, None)
+        if self._default_route and isinstance(self._default_route, str) and self._default_route != '':
+            default_route = getattr(routes_module, self._default_route, None)
             # verify
-            if default_page is None:
+            if default_route is None:
                 raise TokeoNiceguiError(
                     # fmt: skip
-                    f'Default page handler "{self._default}" could not be found in module "{self._pages}"'
+                    f'Default route handler "{self._default_route}" could not be found in module "{self._routes}"'
                 )
-            # initialize registered default page
-            default_page()
+            # initialize registered default route
+            default_route()
         # check config for watchdog
         if hotload:
             self._hotload_dir = hotload_dir if hotload_dir else self._config('hotload_dir', fallback=None)
             # if no dir set use the module's path
             if self._hotload_dir is None:
-                self._hotload_dir = module.__file__
+                self._hotload_dir = getattr(routes_module, '__file__', getattr(apis_module, '__file__', None))
             # check to point for a dir
-            if isfile(self._hotload_dir):
+            if self._hotload_dir and isfile(self._hotload_dir):
                 self._hotload_dir = dirname(self._hotload_dir)
+            else:
+                self._hotload_dir = self.app._meta.main_dir
             # activate watchdog
             self._setup_watchdog()
             # Create the file monitor task to run in the FastAPI's event loop
