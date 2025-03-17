@@ -1,9 +1,8 @@
-import dramatiq
 import requests
 from tokeo.ext.appshare import app  # noqa: F401
 
 
-@dramatiq.actor(queue_name='count_words')
+@app.dramatiq.actor(queue_name='count_words')
 def count_words(url):
     try:
         response = requests.get(url)
