@@ -112,12 +112,13 @@ class TokeoPdoc(MetaMixin):
     def render(self):
         # when running pdoc do not catch signals
         self.app._meta.catch_signals = None
-        # send out hook to prepare other modules for pdoc rendering
-        for res in self.app.hook.run('tokeo_pdoc_pre_render', self.app):
-            pass
         # save original show method
         warnings_showwarning = warnings.showwarning
         try:
+            # send out hook to prepare other modules for pdoc rendering
+            for res in self.app.hook.run('tokeo_pdoc_pre_render', self.app):
+                pass
+
             # do not show the default warnings
             warnings.showwarning = self.showwarning
             # change templates if given
@@ -165,12 +166,13 @@ class TokeoPdoc(MetaMixin):
                     )
                 )
 
-        finally:
-            # restore saved show method
-            warnings.showwarning = warnings_showwarning
             # send out hook to process other modules after pdoc rendering
             for res in self.app.hook.run('tokeo_pdoc_post_render', self.app):
                 pass
+
+        finally:
+            # restore saved show method
+            warnings.showwarning = warnings_showwarning
 
     def startup(self):
         self.server.start()
