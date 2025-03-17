@@ -4,6 +4,7 @@
   import pdoc
   from pdoc.html_helpers import extract_toc, glimpse, to_html as _to_html, format_git_link
 
+  from tokeo.core.utils.pdoc import DecoratedFunction
 
   def link(dobj: pdoc.Doc, name=None):
     name = name or dobj.qualname + ('()' if isinstance(dobj, pdoc.Function) else '')
@@ -106,14 +107,24 @@
   %>
 
   <%def name="show_func(f)">
-    <dt id="${f.refname}"><code class="name flex">
+    <dt id="${f.refname}"><code class="name flex flex-col">
         <%
             params = f.params(annotate=show_type_annotations, link=link)
             sep = ',<br>' if sum(map(len, params)) > 75 else ', '
             params = sep.join(params)
             return_type = get_annotation(f.return_annotation, '\N{non-breaking hyphen}>')
+            decorated = DecoratedFunction(app, f, update_func_docstring=True, prepend_docstrings='\n\n###\n\n---\n\n###\n\n')
         %>
-        <span>${f.funcdef()} ${ident(f.name)}</span>(<span>${params})${return_type}</span>
+        % if decorated.has_decorators:
+            % for decorator in decorated.decorators:
+                <div>
+                    <span class="decorator">${decorator['decorator']}</span><span>${f'({decorator["params"]})' if decorator["params"] is not None else ''}</span>
+                </div>
+            % endfor
+        % endif
+        <div>
+            <span>${f.funcdef()} ${ident(f.name)}</span><span>(${params})${return_type}</span>
+        </div>
     </code></dt>
     <dd>${show_desc(f)}</dd>
   </%def>
@@ -424,6 +435,7 @@
     <script>window.addEventListener('DOMContentLoaded', () => {
         hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
         hljs.highlightAll();
+        /* FIXME Remove that */
         /* Collapse source docstrings */
         setTimeout(() => {
             [...document.querySelectorAll('.hljs.language-python > .hljs-string')]

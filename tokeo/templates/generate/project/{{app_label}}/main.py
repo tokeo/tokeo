@@ -33,6 +33,7 @@ class {{ app_class_name }}(App):
         # load additional framework extensions
         extensions = [
             'colorlog',
+            'tokeo.ext.pdoc',
             'tokeo.ext.yaml',
             'tokeo.ext.appenv',
             'tokeo.ext.print',

@@ -10,6 +10,11 @@
     display: flex !important;
   }
 
+  .flex-col {
+    flex-direction: column;
+    flex-wrap: wrap;
+  }
+
   body {
     line-height: 1.5em;
   }
@@ -55,7 +60,7 @@
     }
 
   h1, h2, h3, h4, h5 {
-    font-weight: 300;
+    font-weight: 400;
   }
   h1 {
     font-size: 2.5em;
@@ -66,12 +71,12 @@
     margin: 2em 0 .50em 0;
   }
   h3 {
-    font-size: 1.4em;
+    font-size: 1.6em;
     margin: 1.6em 0 .7em 0;
   }
   h4 {
+    font-size: 1.4em;
     margin: 0;
-    font-size: 105%;
   }
   h1:target,
   h2:target,
@@ -99,6 +104,11 @@
   }
   .ident {
     color: #900;
+    font-weight: bold;
+  }
+
+  .decorator {
+    color: #006799;
     font-weight: bold;
   }
 
@@ -213,10 +223,14 @@
       font-size: 1.25em;
     }
     .desc h3 {
-      font-size: 1em;
+      font-size: 1.2em;
     }
     .desc dt code {
       background: inherit;  /* Don't grey-back parameters */
+    }
+
+    div.desc:has(> p) {
+      margin-bottom: 4rem;
     }
 
     .source > summary,
