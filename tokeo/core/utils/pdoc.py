@@ -4,6 +4,24 @@ import ast
 
 
 def pdoc_replace_decorator(*args, **kwargs):
+    """
+    Create a placeholder decorator for pdoc documentation.
+
+    This function creates a no-op decorator that wraps the original function
+    without changing its behavior, allowing pdoc to properly document
+    decorated functions.
+
+    ### Args:
+
+    - ***args**: Positional arguments to pass to the decorator
+    - ****kwargs**: Keyword arguments to pass to the decorator
+
+    ### Returns:
+
+    - **callable**: A decorator function that preserves function metadata
+
+    """
+
     def decorator(func):
         @wraps(func)
         def _decorator():
@@ -15,16 +33,51 @@ def pdoc_replace_decorator(*args, **kwargs):
 
 
 class DecoratedFunction:
+    """
+    Utility class for handling function decorators in documentation.
+
+    This class parses and processes function decorators for documentation purposes,
+    allowing extraction of decorator information and updating function docstrings
+    with decorator-specific documentation.
+
+    """
 
     def __init__(self, app, func, update_func_docstring=True, prepend_docstrings=None, append_docstrings=None):
+        """
+        Initialize a DecoratedFunction instance.
+
+        ### Args:
+
+        - **app** (object): The application instance
+        - **func** (object): The function object to analyze
+        - **update_func_docstring** (bool, optional): Whether to update the
+          function's docstring with decorator docs. Defaults to True.
+        - **prepend_docstrings** (str, optional): Text to prepend to each
+          decorator's docstring
+        - **append_docstrings** (str, optional): Text to append to each
+          decorator's docstring
+
+        """
         self.app = app
         self.func = func
         self.decorators = []
         self._setup_decorators()
         if update_func_docstring:
-            self.update_func_docstring(prepend_docstrings=prepend_docstrings, append_docstrings=append_docstrings)
+            self._update_func_docstring(prepend_docstrings=prepend_docstrings, append_docstrings=append_docstrings)
 
     def __getattr__(self, attr):
+        """
+        Delegate attribute access to the wrapped function.
+
+        ### Args:
+
+        - **attr** (str): The attribute name to access
+
+        ### Returns:
+
+        - **any**: The requested attribute value
+
+        """
         if attr == 'decorators':
             return self.decorators
         else:
@@ -32,9 +85,30 @@ class DecoratedFunction:
 
     @property
     def has_decorators(self):
+        """
+        Check if the function has any decorators.
+
+        ### Returns:
+
+        - **bool**: True if the function has decorators, False otherwise
+
+        """
         return len(self.decorators) > 0
 
     def _setup_decorators(self):
+        """
+        Parse and extract decorator information from the function's source
+        code.
+
+        Uses AST parsing to identify decorators and their parameters, and
+        processes them through hooks to generate documentation.
+
+        ### Returns:
+
+        - **bool|None**: True if decorators were successfully parsed, False
+          or None otherwise
+
+        """
         block_start = re.search(rf'\s*{self.func.funcdef()}', self.func.source, re.MULTILINE)
         if block_start is None:
             return None
@@ -121,7 +195,23 @@ class DecoratedFunction:
         # signal success
         return True
 
-    def update_func_docstring(self, prepend_docstrings=None, append_docstrings=None):
+    def _update_func_docstring(self, prepend_docstrings=None, append_docstrings=None):
+        """
+        Update the function's docstring with documentation from its decorators.
+
+        ### Args:
+
+        - **prepend_docstrings** (str, optional): Text to prepend to each
+          decorator's docstring
+        - **append_docstrings** (str, optional): Text to append to each
+          decorator's docstring
+
+        ### Notes:
+
+        : This method appends unique decorator docstrings to the function's
+          existing docstring, avoiding duplicates from the same decorator type.
+
+        """
         # do insert same decorator's docstring twice
         _unique = {}
         # initialize docstring placeholder

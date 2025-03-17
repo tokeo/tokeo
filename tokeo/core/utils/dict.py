@@ -1,9 +1,32 @@
 def deep_merge(a, b):
     """
-    IMPORTANT NOTE:
+    Recursively merge two data structures with special handling for different types.
 
-    tuples and arbitrary objects are not handled
-    as it is totally ambiguous what should happen
+    This function handles merging of dictionaries, lists, and primitive types:
+
+    - Primitives: b replaces a
+    - Lists: elements from b are appended to a
+    - Dicts: recursively merge keys from b into a
+
+    ### Args:
+
+    - **a** (any): The target data structure that will be modified
+    - **b** (any): The source data structure to merge into a
+
+    ### Returns:
+
+    - **any**: The merged data structure (same object as a, modified in-place)
+
+    ### Raises:
+
+    - **ValueError**: If trying to merge incompatible types or unsupported types
+    - **ValueError**: If a TypeError occurs during merging (with context details)
+
+    ### Notes:
+
+    : **IMPORTANT**: Tuples and arbitrary objects are not handled as
+      their merge behavior would be ambiguous.
+
     """
     try:
         if a is None or isinstance(a, (str, float, int)):
