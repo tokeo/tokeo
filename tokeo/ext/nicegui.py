@@ -476,6 +476,51 @@ class TokeoNiceguiController(Controller):
         )
 
 
+def tokeo_nicegui_pdoc_render_decorator(app, decorator, args, kwargs):
+    """
+    Handle docstrings for nicegui decorators in pdoc
+    """
+    if decorator == '@app.nicegui.fastapi_app.get':
+        params = None
+        if args is not None:
+            try:
+                value = args[0].value
+                params = f'"{value}"' if isinstance(value, str) else f'{value}'
+            except Exception:
+                params = '...path...'
+        return dict(
+            decorator=decorator,
+            params=params,
+            docstring=app.pdoc.docstrings('decorator', 'fastapi.get'),
+        )
+    elif decorator == '@app.nicegui.fastapi_app.post':
+        params = None
+        if args is not None:
+            try:
+                value = args[0].value
+                params = f'"{value}"' if isinstance(value, str) else f'{value}'
+            except Exception:
+                params = '...path...'
+        return dict(
+            decorator=decorator,
+            params=params,
+            docstring=app.pdoc.docstrings('decorator', 'fastapi.post'),
+        )
+    elif decorator == '@app.nicegui.ui.page' or decorator == '@ui.page':
+        params = None
+        if args is not None:
+            try:
+                value = args[0].value
+                params = f'"{value}"' if isinstance(value, str) else f'{value}'
+            except Exception:
+                params = '...path...'
+        return dict(
+            decorator=decorator,
+            params=params,
+            docstring=app.pdoc.docstrings('decorator', 'nicegui.page'),
+        )
+
+
 def tokeo_nicegui_extend_app(app):
     """
     Extend the application with NiceGUI functionality.
@@ -527,3 +572,4 @@ def load(app):
     app.hook.register('post_setup', tokeo_nicegui_extend_app)
     app.hook.register('pre_close', tokeo_nicegui_shutdown)
     app.hook.register('post_close', tokeo_nicegui_hotload)
+    app.hook.register('tokeo_pdoc_render_decorator', tokeo_nicegui_pdoc_render_decorator)

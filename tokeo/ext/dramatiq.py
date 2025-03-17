@@ -43,12 +43,12 @@ Command-line interface:
 import os
 import sys
 from os.path import basename, dirname, abspath
-from tokeo.ext.argparse import Controller
 from cement.core.meta import MetaMixin
 from cement import ex
 import dramatiq
-from dramatiq import middleware, cli
+from dramatiq import middleware, cli, actor as dramatiq_actor
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
+from tokeo.ext.argparse import Controller
 
 
 class ExtendedRabbitmqBrocker(RabbitmqBroker):
@@ -172,6 +172,8 @@ class TokeoDramatiq(MetaMixin):
                 )
             except Exception:
                 pass
+        # safe references to dramtiq lib
+        self.actor = dramatiq_actor
         # dramatiq register
         self.register()
 
@@ -437,6 +439,45 @@ class TokeoDramatiqController(Controller):
         return
 
 
+def tokeo_dramatiq_pdoc_pre_render(app):
+    """
+    Rewrite the dramatiq decorator into a simple one for pdoc rendering
+    """
+    from tokeo.core.utils.pdoc import pdoc_replace_decorator
+
+    dramatiq.actor = pdoc_replace_decorator
+    if hasattr(app.dramatiq, 'actor'):
+        app.dramatiq.actor = pdoc_replace_decorator
+
+
+def tokeo_dramatiq_pdoc_post_render(app):
+    """
+    Rewrite the dramatiq decorator to origin
+    """
+    dramatiq.actor = dramatiq_actor
+    if hasattr(app.dramatiq, 'actor'):
+        app.dramatiq.actor = dramatiq_actor
+
+
+def tokeo_dramatiq_pdoc_render_decorator(app, decorator, args, kwargs):
+    """
+    Handle docstrings for dramatiq decorators in pdoc
+    """
+    if decorator == '@dramatiq.actor' or decorator == '@app.dramatiq.actor':
+        params = None
+        if kwargs is not None and 'queue_name' in kwargs:
+            try:
+                value = kwargs['queue_name'].value
+                params = f'queue_name="{value}"' if isinstance(value, str) else f'queue_name={value}'
+            except Exception:
+                params = 'queue_name=...'
+        return dict(
+            decorator=decorator,
+            params=params,
+            docstring=app.pdoc.docstrings('decorator', 'dramatiq.actor'),
+        )
+
+
 def tokeo_dramatiq_extend_app(app):
     """
     Initialize and register the Dramatiq extension with the application.
@@ -481,3 +522,7 @@ def load(app):
     # Register initialization and shutdown hooks
     app.hook.register('post_setup', tokeo_dramatiq_extend_app)
     app.hook.register('pre_close', tokeo_dramatiq_shutdown)
+    # register for pdoc
+    app.hook.register('tokeo_pdoc_pre_render', tokeo_dramatiq_pdoc_pre_render)
+    app.hook.register('tokeo_pdoc_post_render', tokeo_dramatiq_pdoc_post_render)
+    app.hook.register('tokeo_pdoc_render_decorator', tokeo_dramatiq_pdoc_render_decorator)
