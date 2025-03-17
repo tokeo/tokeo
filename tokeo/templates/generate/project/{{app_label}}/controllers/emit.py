@@ -23,11 +23,6 @@ class EmitController(Controller):
         # short help information
         help = 'emit tasks manually'
 
-    def _default(self):
-        """Default command action if no sub-command is passed."""
-
-        self.app.args.print_help()
-
     @ex(
         help='emit the count-words task for an url',
         arguments=[
