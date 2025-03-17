@@ -242,6 +242,22 @@ nicegui:
 
 #####################################
 
+pdoc:
+  ### modules to render (str | list), app and test as default
+  modules: null
+  ### render content into output directory
+  output_dir: html
+  ### serve the pdoc service
+  host: '127.0.0.1'
+  ### port for serving the pdoc service
+  port: 9999
+  ### relative filepath or absolute URL to a favicon
+  favicon: public/favicon.ico
+  ### module or absolute path to the mako templates
+  templates: tokeo.templates.pdoc.html
+
+#####################################
+
 log.colorlog:
 
   ### Where the log file lives (no log file by default)

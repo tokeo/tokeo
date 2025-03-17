@@ -28,6 +28,7 @@ class Tokeo(App):
         extensions = [
             'colorlog',
             'generate',
+            'tokeo.ext.pdoc',
             'tokeo.ext.print',
             'tokeo.ext.jinja2',
             'tokeo.ext.yaml',
