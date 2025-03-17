@@ -3,6 +3,7 @@
 clean:
 	find . -name '*.py[co]' -delete
 	find . -type d -name '__pycache__' -delete
+	find . -type d -name '__pycache__' | sort --reverse | xargs rm -rfv
 	rm -rf .pytest_cache .coverage coverage-report
 	rm -rf html
 	rm -rf tmp
