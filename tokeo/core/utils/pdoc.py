@@ -109,13 +109,13 @@ class DecoratedFunction:
           or None otherwise
 
         """
-        block_start = re.search(rf'\s*{self.func.funcdef()}', self.func.source, re.MULTILINE)
+        block_start = re.search(rf'\s*{self.func.funcdef()}\s+{self.func.name}', self.func.source, re.MULTILINE)
         if block_start is None:
             return None
 
         # get the source block from zero to function definition and
         # replace by simplest method just for ast parsing
-        block = f'{self.func.source[:block_start.end()]} decorator(): pass'
+        block = f'{self.func.source[:block_start.end()]}_decorator(): pass'
         try:
             # safe parse the block
             tree = ast.parse(block)
