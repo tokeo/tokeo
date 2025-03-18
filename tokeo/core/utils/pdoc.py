@@ -169,7 +169,7 @@ class DecoratedFunction:
             _docstring = None
 
             # send out hook to process other modules for decorators docstring
-            for res in self.app.hook.run('tokeo_pdoc_render_decorator', self.app, _decorator, _args, _kwargs):
+            for res in self.app.hook.run('tokeo_pdoc_render_decorator', self.app, self.func, _decorator, _args, _kwargs):
                 if res is not None:
                     if isinstance(res, dict):
                         _decorator = res['decorator'] if 'decorator' in res else None
