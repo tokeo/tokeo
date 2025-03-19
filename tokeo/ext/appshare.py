@@ -6,13 +6,14 @@ explicitly passing the app object around. It implements a proxy pattern to
 make the app accessible through a singleton.
 
 Example:
-    ```python
-    from tokeo.ext.appshare import app
+```python
+# Use the imported app object
+from tokeo.ext.appshare import app
 
-    # Access the app objects
-    if app.dramatiq:
-        pass
-    ```
+if app.dramatiq:
+    pass
+```
+
 """
 
 
@@ -24,27 +25,37 @@ class App:
     external modules to access the app's attributes and methods as if they were
     directly accessing the app object itself.
 
-    Attributes:
-        _app: The actual Cement app object.
+    ### Attributes:
+
+    - **_app** (Application): The actual Cement app object
+
     """
 
     def __init__(self):
-        """Initializes the App class with an unset app reference."""
+        """
+        Initialize the App class with an unset app reference.
+        """
         self._app = None
 
     def __getattr__(self, key):
         """
-        Provides dynamic access to the attributes of the shared app object.
+        Provide dynamic access to the attributes of the shared app object.
 
-        Args:
-            key: The attribute name to access from the app object.
+        This magic method enables transparent access to all properties and methods
+        of the underlying Cement application instance.
 
-        Returns:
-            The attribute of the app object if it exists.
+        ### Args:
 
-        Raises:
-            AttributeError: If the app object is not set or the attribute
-                does not exist.
+        - **key** (str): The attribute name to access from the app object
+
+        ### Returns:
+
+        - **any**: The attribute of the app object if it exists
+
+        ### Raises:
+
+        - **AttributeError**: If the app object is not set or the attribute does not exist
+
         """
         # test _app object
         if self._app is None:
@@ -58,13 +69,20 @@ app = App()
 
 def load(app_to_share):
     """
-    Sets the global shared app object.
+    Set the global shared app object.
 
     This function is called during application initialization to store
     the Cement app object that will be accessible through the global `app`
     instance.
 
-    Args:
-        app_to_share: The Cement app object to be shared globally.
+    ### Args:
+
+    - **app_to_share** (Application): The Cement app object to be shared globally
+
+    ### Notes:
+
+    : This function is called automatically by the Cement framework when
+      the appshare extension is loaded, making the app globally accessible.
+
     """
     app._app = app_to_share

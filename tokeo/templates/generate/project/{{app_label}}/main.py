@@ -13,7 +13,7 @@ from .controllers.grpccall import GrpcCallController
 
 
 class {{ app_class_name }}(App):
-    """The {{ app_name }} primary application."""
+    """The {{ app_name }} CLI application."""
 
     class Meta:
         # this app name

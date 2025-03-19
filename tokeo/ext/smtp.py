@@ -1,5 +1,16 @@
 """
-Tokeo smtp extension module.
+Tokeo SMTP extension module.
+
+This extension provides a robust email sending capability via SMTP protocol
+for Tokeo applications. It supports plain text and HTML email messages,
+file attachments, inline images, template-based emails, and various
+encoding options.
+
+The module implements a mail handler that is fully compliant with the
+Cement framework mail interface, while extending it with additional
+features like template-based email generation and comprehensive
+configuration options.
+
 """
 
 import os
@@ -20,52 +31,94 @@ from cement.utils.misc import is_true
 
 class TokeoSMTPMailHandler(mail.MailHandler):
     """
-    This class implements the :ref:`IMail <cement.core.mail>`
-    interface, and is based on the `smtplib
-    <http://docs.python.org/dev/library/smtplib.html>`_ standard library.
+    SMTP mail handler for sending emails in Tokeo applications.
 
-    A complete documentation about python and mail could be find at:
-    https://mailtrap.io/blog/python-send-html-email/
+    This class implements the Cement framework's mail interface and extends it with
+    additional features for comprehensive email communication. The implementation
+    is based on the Python standard library's `smtplib` module.
+
+    The handler supports various email types including plain text, HTML,
+    multipart messages with attachments, and inline images. It also provides
+    template-based email generation using Tokeo's and Jinja's templating system.
+
+    ### Notes:
+
+    : This handler requires proper SMTP server configuration in the application
+      configuration. The configuration can be overridden per message via keyword
+      arguments when sending emails.
+
+    ### See Also:
+
+    1. Python smtplib documentation: https://docs.python.org/library/smtplib.html
+    1. Email composition guide: https://mailtrap.io/blog/python-send-html-email/
 
     """
 
     class Meta:
-        """Handler meta-data."""
+        """
+        Handler meta-data defining configuration and behavior.
+
+        ### Notes:
+
+        : This class defines the configuration section, default values,
+          and other metadata required by the Cement framework for
+          proper handler registration and operation.
+
+        """
 
         #: Unique identifier for this handler
         label = 'tokeo.smtp'
 
-        #: Id for config
+        #: Configuration section name in the application config
         config_section = 'smtp'
 
         #: Configuration default values
         config_defaults = {
-            'to': [],
-            'from_addr': 'noreply@localhost',
-            'cc': [],
-            'bcc': [],
-            'subject': None,
-            'subject_prefix': None,
-            'host': 'localhost',
-            'port': '25',
-            'timeout': 30,
-            'ssl': False,
-            'tls': False,
-            'auth': False,
-            'username': None,
-            'password': None,
-            'files': None,
-            # define controlling of mail encoding
-            'charset': 'utf-8',
-            'header_encoding': None,
-            'body_encoding': None,
-            'date_enforce': True,
-            'msgid_enforce': True,
-            'msgid_str': None,
-            'msgid_domain': 'localhost',
+            # Email recipients and sender
+            'to': [],  # List of primary recipients
+            'from_addr': 'noreply@localhost',  # Sender email address
+            'cc': [],  # Carbon copy recipients
+            'bcc': [],  # Blind carbon copy recipients
+            # Email content configuration
+            'subject': None,  # Email subject line
+            'subject_prefix': None,  # Optional prefix for all subjects
+            'files': None,  # Attachments or inline images
+            # SMTP server configuration
+            'host': 'localhost',  # SMTP server hostname
+            'port': '25',  # SMTP server port
+            'timeout': 30,  # Connection timeout in seconds
+            'ssl': False,  # Use SSL/TLS connection
+            'tls': False,  # Use STARTTLS command
+            'auth': False,  # Use SMTP authentication
+            'username': None,  # SMTP username
+            'password': None,  # SMTP password
+            # Email encoding options
+            'charset': 'utf-8',  # Character set for email
+            'header_encoding': None,  # Encoding for headers (None, 'base64', 'qp')
+            'body_encoding': None,  # Encoding for body (None, 'base64', 'qp')
+            # Message identification
+            'date_enforce': True,  # Auto-add Date header if missing
+            'msgid_enforce': True,  # Auto-add Message-ID if missing
+            'msgid_str': None,  # Custom string for Message-ID generation
+            'msgid_domain': 'localhost',  # Domain for Message-ID generation
         }
 
     def __init__(self, **kw):
+        """
+        Initialize the SMTP mail handler.
+
+        Sets up the handler and initializes the template cache.
+
+        ### Args:
+
+        - **kw**: Keyword arguments passed to the parent handler
+
+        ### Notes:
+
+        : Initializes an internal cache to optimize template existence checks
+          during template-based email generation.
+
+        """
         super().__init__(**kw)
         self._template_exists_cache = dict()
 
@@ -73,21 +126,69 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         """
         Get configuration value from the extension's config section.
 
-        This is a simple wrapper around the application's config.get method.
+        This is a simple wrapper around the application's config.get method
+        that automatically uses the correct configuration section.
 
-        Args:
-            key (str): Configuration key to retrieve.
-            **kwargs: Additional arguments passed to config.get().
+        ### Args:
 
-        Returns:
-            The configuration value for the specified key.
+        - **key** (str): Configuration key to retrieve
+        - **kwargs**: Additional arguments passed to config.get()
+
+        ### Returns:
+
+        - Configuration value for the specified key
+
+        ### Example:
+
+        ```python
+        # Get the SMTP host from config
+        host = handler._config('host')
+
+        # Get a value with a fallback default
+        port = handler._config('port', fallback='587')
+        ```
+
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
     def _get_params(self, **kw):
+        """
+        Merge configuration and keyword parameters for email sending.
+
+        This method handles the merging of configuration defaults with
+        per-message overrides specified in keyword arguments. It also
+        processes special parameters like X-headers.
+
+        ### Args:
+
+        - **kw**: Keyword arguments for message-specific parameter overrides
+
+        ### Returns:
+
+        - **dict**: Merged parameters for email creation
+
+        ### Notes:
+
+        : Parameter merging follows specific rules: message parameters like 'to'
+          and 'subject' can be overridden by keyword arguments, while connection
+          parameters like 'host' and 'port' are always taken from configuration.
+          Special headers like Date and X-headers receive special handling.
+
+        ### Example:
+
+        ```python
+        # Get parameters with some overrides
+        params = handler._get_params(
+            to=['user@example.com'],
+            subject='Important message',
+            x_priority='High'
+        )
+        ```
+
+        """
         params = dict()
 
-        # some keyword args override configuration defaults
+        # Parameters that can be overridden by keyword arguments
         for item in [
             # fmt: off
             'to', 'from_addr', 'cc', 'bcc', 'subject', 'subject_prefix', 'files',
@@ -98,7 +199,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             config_item = self.app.config.get(self._meta.config_section, item)
             params[item] = kw.get(item, config_item)
 
-        # others don't
+        # Connection parameters always come from configuration
         for item in [
             # fmt: off
             'ssl', 'tls', 'host', 'port', 'auth', 'username', 'password',
@@ -107,7 +208,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         ]:
             params[item] = self.app.config.get(self._meta.config_section, item)
 
-        # some are only set by message
+        # Message headers that are only set explicitly, not from config
         for item in [
             # fmt: off
             'date', 'message_id', 'return_path', 'reply_to'
@@ -117,7 +218,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             if value is not None and str.strip(f'{value}') != '':
                 params[item] = kw.get(item, config_item)
 
-        # take all X-headers as is
+        # Process all X-headers from keyword arguments
         for item in kw.keys():
             if len(item) > 2 and item.startswith(('x-', 'X-', 'x_', 'X_')):
                 value = kw.get(item, None)
@@ -128,42 +229,70 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
     def send(self, body, **kw):
         """
-        Send an email message via SMTP.  Keyword arguments override
-        configuration defaults (cc, bcc, etc).
+        Send an email message via SMTP.
 
-        Args:
-            body (list): The message body to send. List is treated as:
-                ``[<text>, <html>]``. If a single string is passed it will be
-                converted to ``[<text>]``. At minimum, a text version is
-                required.
+        Sends email messages with support for plain text, HTML, attachments,
+        and other email features. The method handles various email body formats
+        and establishes the appropriate SMTP connection based on configuration.
 
-        Keyword Args:
-            to (list): List of recipients (generally email addresses)
-            from_addr (str): Address (generally email) of the sender
-            cc (list): List of CC Recipients
-            bcc (list): List of BCC Recipients
-            subject (str): Message subject line
-            subject_prefix (str): Prefix for message subject line (useful to
-                override if you want to remove/change the default prefix).
-            files (list): List of file paths to attach to the message.
+        ### Args:
 
-        Returns:
-            bool:``True`` if message is sent successfully, ``False`` otherwise
+        - **body** (str|tuple|dict): The message body content to send. Can be:
 
-        Example:
+            - A string for plain text email
+            - A tuple of (text, html) for multipart emails
+            - A dict with 'text' and/or 'html' keys
 
-            .. code-block:: python
+        ### Keyword Args:
 
-                # Using all configuration defaults
-                app.mail.send('This is my message body')
+        - **to** (list): List of primary recipient email addresses
+        - **from_addr** (str): Email address of the sender
+        - **cc** (list): List of carbon copy recipient email addresses
+        - **bcc** (list): List of blind carbon copy recipient email addresses
+        - **subject** (str): Email subject line
+        - **subject_prefix** (str): Prefix for the subject line
+        - **files** (list): List of file paths to attach to the message
+        - **header_encoding** (str): Encoding for email headers ('base64' or 'qp')
+        - **body_encoding** (str): Encoding for email body ('base64' or 'qp')
+        - **date** (str): Custom date for the Date header
+        - **message_id** (str): Custom Message-ID header value
+        - **return_path** (str): Return-Path header value
+        - **reply_to** (str): Reply-To header value
+        - **x_***: Any parameter starting with 'x_' will be added as an X-header
 
-                # Overriding configuration defaults
-                app.mail.send('My message body'
-                    from_addr='me@example.com',
-                    to=['john@example.com'],
-                    cc=['jane@example.com', 'rita@example.com'],
-                    subject='This is my subject',
-                    )
+        ### Returns:
+
+        - **bool**: `True` if message is sent successfully, `False` otherwise
+
+        ### Raises:
+
+        - **TypeError**: If the body parameter is not a string, tuple, or dict
+        - **smtplib.SMTPException**: If SMTP server connection or sending fails
+
+        ### Example:
+
+        ```python
+        # Basic text email with configuration defaults
+        app.mail.send('This is my message body')
+
+        # Text and HTML multipart email with custom settings
+        app.mail.send(
+            ('Plain text version', '<html><body><h1>HTML version</h1></body></html>'),
+            from_addr='sender@example.com',
+            to=['recipient@example.com'],
+            cc=['cc@example.com'],
+            subject='Important notification',
+            files=['/path/to/attachment.pdf']
+        )
+
+        # Using a dictionary for message body with custom headers
+        app.mail.send(
+            {'text': 'Text version', 'html': '<p>HTML version</p>'},
+            subject='System alert',
+            x_priority='1',
+            return_path='bounces@example.com'
+        )
+        ```
 
         """
         params = self._get_params(**kw)
@@ -192,28 +321,80 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         server.quit()
 
     def _header(self, value, _charset=None, **params):
+        """
+        Create an email header value with proper encoding if needed.
+
+        ### Args:
+
+        - **value** (str): The header value to encode
+        - **_charset** (Charset): Character set for encoding
+        - **params**: Parameter dictionary containing encoding settings
+
+        ### Returns:
+
+        - **str|Header**: Encoded Header object or plain string
+
+        ### Notes:
+
+        : Returns a Header object with proper encoding if header_encoding is
+          specified in the params, otherwise returns the value as-is.
+
+        """
         return Header(value, charset=_charset) if params['header_encoding'] else value
 
     def _make_message(self, body, **params):
-        # use encoding for header parts
+        """
+        Create an email message object with all necessary parts.
+
+        Constructs a complete email message with appropriate content types,
+        encodings, body parts, attachments, and headers based on the provided
+        parameters.
+
+        ### Args:
+
+        - **body** (str|tuple|dict): The message body content in one of supported formats
+        - **params**: Dictionary of email parameters from _get_params()
+
+        ### Returns:
+
+        - **MIMEBase**: Complete email message ready for sending
+
+        ### Raises:
+
+        - **TypeError**: If body has an unsupported type
+
+        ### Notes:
+
+        : This method handles all the complexity of creating multipart messages,
+          setting proper encodings, and handling attachments. The message structure
+          will vary depending on the content:
+
+            1. text/plain: For text-only emails
+            1. text/html: For HTML-only emails
+            1. multipart/alternative: For emails with both text and HTML versions
+            1. multipart/mixed: For emails with attachments
+            1. multipart/related: For HTML emails with inline images
+
+        """
+        # Set up encoding for header parts
         cs_header = Charset(params['charset'])
         if params['header_encoding'] == 'base64':
             cs_header.header_encoding = BASE64
         elif params['header_encoding'] == 'qp' or params['body_encoding'] == 'quoted-printable':
             cs_header.header_encoding = QP
 
-        # use encoding for body parts
+        # Set up encoding for body parts
         cs_body = Charset(params['charset'])
         if params['body_encoding'] == 'base64':
             cs_body.body_encoding = BASE64
         elif params['body_encoding'] == 'qp' or params['body_encoding'] == 'quoted-printable':
             cs_body.body_encoding = QP
 
-        # setup body parts
+        # Initialize body part containers
         partText = None
         partHtml = None
 
-        # check the body argument
+        # Validate and process the body argument
         if type(body) not in [str, tuple, dict]:
             error_msg = (
                 # fmt: off
@@ -224,21 +405,24 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             )
             raise TypeError(error_msg)
 
-        # get the body parts
+        # Extract text and HTML parts from the body argument
         if isinstance(body, str):
+            # String body = plain text only
             partText = MIMEText(body, 'plain', _charset=cs_body)
         elif isinstance(body, tuple):
-            # handle plain text
+            # Tuple body = (text, html)
+            # Process plain text part if provided
             if len(body) >= 1 and body[0] and str.strip(body[0]) != '':
                 partText = MIMEText(str.strip(body[0]), 'plain', _charset=cs_body)
-            # handle html
+            # Process HTML part if provided
             if len(body) >= 2 and body[1] and str.strip(body[1]) != '':
                 partHtml = MIMEText(str.strip(body[1]), 'html', _charset=cs_body)
         elif isinstance(body, dict):
-            # handle plain text
+            # Dict body = {'text': '...', 'html': '...'}
+            # Process plain text part if provided
             if 'text' in body and str.strip(body['text']) != '':
                 partText = MIMEText(str.strip(body['text']), 'plain', _charset=cs_body)
-            # handle html
+            # Process HTML part if provided
             if 'html' in body and str.strip(body['html']) != '':
                 partHtml = MIMEText(str.strip(body['html']), 'html', _charset=cs_body)
 
@@ -397,32 +581,99 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         return msg
 
     def send_by_template(self, template, data={}, **kw):
-        # test if template exists by loading it
+        """
+        Send an email using a template for content generation.
+
+        This method provides template-based email sending by rendering email
+        content from Jinja2 templates. It looks for template files with specific
+        naming conventions to generate the subject, plain text, and HTML parts
+        of the email.
+
+        ### Args:
+
+        - **template** (str): Base template path/name without extension
+        - **data** (dict): Data context for template rendering
+        - **kw**: Additional email parameters passed to send()
+
+        ### Returns:
+
+        - **bool**: Result from the send() method
+
+        ### Notes:
+
+        : The method looks for the following template files:
+
+            1. `{template}.title.jinja2`: For subject line (optional)
+            1. `{template}.plain.jinja2`: For plain text body (optional)
+            1. `{template}.html.jinja2`: For HTML body (optional)
+
+        : At least one of plain text or HTML templates should exist.
+          The mail_params context variable is provided to templates
+          containing the email parameters.
+
+        ### Example:
+
+        ```python
+        # Assuming templates/emails/welcome.plain.jinja2,
+        # templates/emails/welcome.html.jinja2, and
+        # templates/emails/welcome.title.jinja2 exist:
+
+        app.mail.send_by_template(
+            'emails/welcome',
+            {'username': 'john', 'account_info': account_data},
+            to=['john@example.com'],
+            files=['/path/to/terms.pdf']
+        )
+        ```
+
+        """
+
+        # Helper function to check if a template exists and cache the result
         def _template_exists(template):
-            # check if stored in cache already
+            """
+            Check if a template exists and cache the result.
+
+            Attempts to load the template and caches the result to avoid
+            repeated file system or module lookups for the same template.
+
+            ### Args:
+
+            - **template** (str): Template path to check
+
+            ### Returns:
+
+            - **bool**: True if template exists and can be loaded
+
+            """
+            # Check if stored in cache already
             if template in self._template_exists_cache:
                 return self._template_exists_cache[template]
-            # do first time check from file or module
+
+            # Do first time check from file or module
             result = False
             try:
-                # successfully load when available
+                # Successfully load when available
                 self.app.template.load(template)
                 result = True
             except Exception:
                 pass
-            # store flag in cache list to prevent often load access
+
+            # Store flag in cache to prevent repeated lookups
             self._template_exists_cache[template] = result
-            # return state
             return result
 
-        # prepare email params
+        # Prepare email params
         params = dict(**kw)
-        # check render subject
+
+        # Check if we need to render the subject from template
         if 'subject' not in params:
             if _template_exists(f'{template}.title.jinja2'):
                 params['subject'] = self.app.render(data, f'{template}.title.jinja2', out=None)
-        # build body
+
+        # Build the email body from templates
         body = dict()
+
+        # Plain text template
         if _template_exists(f'{template}.plain.jinja2'):
             body['text'] = self.app.render(dict(**data, mail_params=params), f'{template}.plain.jinja2', out=None)
         if _template_exists(f'{template}.html.jinja2'):
@@ -432,5 +683,31 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
 
 def load(app):
+    """
+    Load the TokeoSMTPMailHandler and register it with the application.
+
+    This function is called by the Cement framework when the extension
+    is loaded. It registers the mail handler and sets it as the default
+    mail handler for the application.
+
+    ### Args:
+
+    - **app**: The application instance
+
+    ### Example:
+
+    ```python
+    # In your application configuration:
+    class MyApp(App):
+        class Meta:
+            extensions = [
+                'tokeo.ext.smtp',
+            ]
+
+            # Set as the default mail handler
+            mail_handler = 'tokeo.smtp'
+    ```
+
+    """
     app.handler.register(TokeoSMTPMailHandler)
     app._meta.mail_handler = TokeoSMTPMailHandler.Meta.label

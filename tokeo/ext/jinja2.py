@@ -5,16 +5,15 @@ This extension provides enhanced Jinja2 templating capabilities to Tokeo
 applications. It extends the base Cement Jinja2 functionality with additional
 configuration options and improved template handling.
 
-Example:
-    To use this extension in your application:
+### Features:
 
-    .. code-block:: python
+- **Enhanced environment configuration** with custom options like trim_blocks
+- **Improved template directory** handling and discovery
+- **Configurable through application settings** with sensible defaults
+- **Automatic registration** as the default output and template handlers
+- **Proper inheritance** from Cement's handlers with Tokeo-specific enhancements
+- **Consistent rendering** across all output channels
 
-        from tokeo.app import TokeoApp
-
-        with TokeoApp('myapp', extensions=['tokeo.ext.jinja2']) as app:
-            # App now has access to enhanced Jinja2 template handling
-            app.render('my_template.j2', {'key': 'value'})
 """
 
 from cement.ext.ext_jinja2 import Jinja2OutputHandler, Jinja2TemplateHandler
@@ -27,20 +26,23 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
     """
     Enhanced Jinja2 output handler for Tokeo applications.
 
-    This class implements the OutputHandler interface from Cement. It provides
-    text output from templates using the Jinja2 templating language with
-    Tokeo-specific enhancements.
+    This class implements the OutputHandler interface from Cement with
+    Tokeo-specific enhancements for template rendering across all output channels.
+    It ensures that the application uses the Tokeo Jinja2 template handler for
+    all rendering operations.
 
-    The handler integrates with Tokeo's template handling system to provide a
-    consistent template rendering experience across all output channels.
+    ### Notes:
+
+    - Inherits from Cement's Jinja2OutputHandler but uses Tokeo's template handler
+    - Provides consistent template rendering experience across all output channels
+    - Automatically configured when the extension is loaded
+    - Used for rendering output in various formats (json, yaml, etc.)
+
     """
 
     class Meta(OutputHandler.Meta):
         """
         Handler meta-data configuration.
-
-        Attributes:
-            label (str): The identifier for this handler.
         """
 
         label = 'tokeo.jinja2'
@@ -49,8 +51,14 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
         """
         Configure the output handler.
 
-        Args:
-            app: The application object.
+        Initializes the handler and ensures it uses Tokeo's template handler
+        for rendering templates. This override ensures proper integration
+        with the Tokeo Jinja2 template handler.
+
+        ### Args:
+
+        - **app** (Application): The Cement application instance
+
         """
         super(Jinja2OutputHandler, self)._setup(app)
         self.templater = self.app.handler.resolve(
@@ -65,22 +73,23 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
     """
     Enhanced Jinja2 template handler for Tokeo applications.
 
-    This class implements the Template Handler interface from Cement. It
-    renders content as templates and supports copying entire source template
-    directories using the Jinja2 templating language.
+    This class implements the Template Handler interface from Cement with
+    additional configuration options and enhanced directory handling for
+    Tokeo applications. It provides a configurable Jinja2 environment
+    with settings controlled through the application's configuration.
 
-    The handler provides additional configuration options for template
-    processing and enhanced directory handling for Tokeo applications.
+    ### Notes:
+
+    - Provides additional configuration options for template processing
+    - Supports proper template directory resolution and management
+    - Can be configured through the application's 'jinja2' config section
+    - Exposes the Jinja2 environment for further customization
+
     """
 
     class Meta(TemplateHandler.Meta):
         """
         Handler meta-data configuration.
-
-        Attributes:
-            label (str): The identifier for this handler.
-            config_section (str): Id for configuration section.
-            config_defaults (dict): Default configuration values.
         """
 
         label = 'tokeo.jinja2'
@@ -98,10 +107,6 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
     def __init__(self, *args, **kw):
         """
         Initialize the template handler.
-
-        Args:
-            *args: Variable length argument list.
-            **kw: Arbitrary keyword arguments.
         """
         super(TokeoJinja2TemplateHandler, self).__init__(*args, **kw)
 
@@ -110,10 +115,13 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
         Configure the template handler.
 
         Sets up the Jinja2 environment with application-specific settings
-        from configuration.
+        from configuration, applying options like keep_trailing_newline and
+        trim_blocks to the environment.
 
-        Args:
-            app: The application object.
+        ### Args:
+
+        - **app** (Application): The Cement application instance
+
         """
         # save pointer to app
         self.app = app
@@ -133,14 +141,18 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
         """
         Get configuration value from the extension's config section.
 
-        This is a simple wrapper around the application's config.get method.
+        This is a convenient wrapper around the application's config.get method,
+        accessing values from the extension's config section.
 
-        Args:
-            key (str): Configuration key to retrieve.
-            **kwargs: Additional arguments passed to config.get().
+        ### Args:
 
-        Returns:
-            The configuration value for the specified key.
+        - **key** (str): Configuration key to retrieve
+        - **kwargs**: Additional arguments passed to config.get()
+
+        ### Returns:
+
+        - **Any**: The configuration value for the specified key
+
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
@@ -150,10 +162,21 @@ def tokeo_jinja2_config(app):
     Configure Jinja2 for the Tokeo application.
 
     Sets up template directories from configuration and ensures proper
-    initialization of the template handler.
+    initialization of the template handler. This function runs during
+    the post_setup application hook.
 
-    Args:
-        app: The application object.
+    ### Args:
+
+    - **app** (Application): The Cement application instance
+
+    ### Notes:
+
+    : This function addresses a limitation in Cement by ensuring the template
+      handler is properly initialized and has access to the application
+
+    : Adds template directories from the configuration if specified
+
+    : Template directories can be specified as a string or a list of strings
     """
     template_handler = app.handler.resolve(
         # fmt: skip
@@ -180,8 +203,16 @@ def load(app):
     Sets this extension's handlers as the application's default output
     and template handlers.
 
-    Args:
-        app: The application object.
+    ### Args:
+
+    - **app** (Application): The Cement application instance
+
+    ### Notes:
+
+    1. Registers the post_setup hook to configure Jinja2
+    1. Registers both the output and template handlers
+    1. Sets the Tokeo Jinja2 handlers as the application defaults
+
     """
     app.hook.register('post_setup', tokeo_jinja2_config)
     app.handler.register(TokeoJinja2OutputHandler)

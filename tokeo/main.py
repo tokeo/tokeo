@@ -7,7 +7,7 @@ from .controllers.base import BaseController
 
 
 class Tokeo(App):
-    """The Tokeo generator application."""
+    """The Tokeo CLI application."""
 
     class Meta:
         # this app name
@@ -47,7 +47,7 @@ class Tokeo(App):
 
 
 class TokeoTest(TestApp, Tokeo):
-    """A sub-class of Tokeo that is suited for testing."""
+    """A sub-class of Tokeo that is better suited for testing."""
 
     class Meta:
         # this app test name
