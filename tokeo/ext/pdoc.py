@@ -147,7 +147,10 @@ class TokeoPdoc(MetaMixin):
         self._templates = self._config('templates')
         # identify modules to document
         if self._config('modules', fallback=None) is None:
-            self._modules = set([self.app._meta.label, 'tests', 'tokeo'])
+            self._modules = []
+            for mod in [self.app._meta.label, 'tests', 'tokeo']:
+                if mod not in self._modules:
+                    self._modules.append(mod)
         elif isinstance(self._config('modules'), str):
             self._modules = self._config('modules').split(',')
         elif isinstance(self._config('modules'), (list, tuple)):
