@@ -152,8 +152,15 @@ smtp:
 
 #####################################
 
+### Crontab schema
+###   Min, Hour, Day (Month), Month, Day (Week)
+### Examples:
+###   '*'    means 'every'
+###   '*/10' means 'every tens, e.g. every 10 minutes'
+###   '1'    means at fix value '1'
+###   '5,25,40' means at '5 and 25 and 40'
+###   'SUN-SAT' means day of week, alternative '0-6'
 scheduler:
-
   ### number of concurrent running tasks overall
   max_concurrent_jobs: 5
   ### the default time zone
