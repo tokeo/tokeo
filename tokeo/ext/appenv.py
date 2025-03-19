@@ -39,7 +39,7 @@ class TokeoAppEnv:
     - **APP_ENV_VAR_NAME** (str): The environment variable name for app environment
     - **APP_ENV_VAR_VALUE** (str): The value of the environment variable
     - **APP_ENV** (str): The detected environment (production, development, staging,
-      testing)
+        testing)
     - **IS_PROD_MODE** (bool): True if running in production environment
     - **IS_STAGE_MODE** (bool): True if running in staging environment
     - **IS_DEV_MODE** (bool): True if running in development environment
@@ -131,7 +131,7 @@ def load(app):
     ### Notes:
 
     : Creates a new TokeoAppEnv instance and attaches it to the application
-      as `app.env`, making environment information available throughout the app.
+        as `app.env`, making environment information available throughout the app.
 
     """
     app.extend('env', TokeoAppEnv(app))

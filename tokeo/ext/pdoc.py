@@ -64,7 +64,7 @@ class TokeoPdoc(MetaMixin):
     ### Notes:
 
     - Automatically generates documentation for the application module,
-      tests, and tokeo
+        tests, and tokeo
     - Supports custom docstring templates for extensions and decorators
     - Handles filtering of common warning messages
     - Provides a web server for browsing generated documentation
@@ -79,7 +79,7 @@ class TokeoPdoc(MetaMixin):
 
         - The config section is 'pdoc' in the application configuration
         - Default configuration provides reasonable starting values
-          for most applications
+            for most applications
         - All settings can be overridden in the application's configuration
 
         """
@@ -147,7 +147,7 @@ class TokeoPdoc(MetaMixin):
         self._templates = self._config('templates')
         # identify modules to document
         if self._config('modules', fallback=None) is None:
-            self._modules = [self.app._meta.label, 'tests', 'tokeo']
+            self._modules = set([self.app._meta.label, 'tests', 'tokeo'])
         elif isinstance(self._config('modules'), str):
             self._modules = self._config('modules').split(',')
         elif isinstance(self._config('modules'), (list, tuple)):
@@ -196,7 +196,7 @@ class TokeoPdoc(MetaMixin):
         ### Notes:
 
         - Searches in all registered docstrings directories for a matching file
-          with the path pattern `{dir}/{group}/{identifier}.md`
+            with the path pattern `{dir}/{group}/{identifier}.md`
         - Caches results to avoid repeated file system access
         - Returns None if no matching docstring file is found
 
@@ -323,7 +323,7 @@ class TokeoPdoc(MetaMixin):
             with open(fs.join(self._output_dir, 'index.html'), 'w', encoding='utf-8') as f:
                 f.write(
                     pdoc._render_template(
-                        '/html.mako', app=self.app, modules=sorted((module.name, module.docstring) for module in modules)
+                        '/html.mako', app=self.app, modules=((module.name, module.docstring) for module in modules)
                     )
                 )
 
@@ -385,9 +385,9 @@ class TokeoPdoc(MetaMixin):
 
         This method:
         1. Starts the server
-        2. Logs a message with the server URL
-        3. Blocks until a keyboard interrupt (Ctrl+C) is received
-        4. Shuts down the server cleanly
+        1. Logs a message with the server URL
+        1. Blocks until a keyboard interrupt (Ctrl+C) is received
+        1. Shuts down the server cleanly
 
         ### Notes:
 
@@ -417,7 +417,7 @@ class TokeoPdocController(Controller):
     ### Notes:
 
     : Provides commands for both static documentation generation and
-      serving documentation via a web server
+        serving documentation via a web server
 
     """
 
@@ -445,6 +445,7 @@ class TokeoPdocController(Controller):
         ### Args:
 
         - **app** (Application): The Cement application instance
+
         """
         super(TokeoPdocController, self)._setup(app)
 

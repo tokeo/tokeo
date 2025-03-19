@@ -62,10 +62,11 @@ class ExtendedRabbitmqBrocker(RabbitmqBroker):
     ### Notes:
 
     : To use this feature, simply include '_unparalleled' in your queue name.
-      For example: 'my_ordered_tasks_unparalleled'
+        For example: 'my_ordered_tasks_unparalleled'
 
     : Implementation based on solution from the Dramatiq users group:
-      https://groups.io/g/dramatiq-users/topic/77913723
+        https://groups.io/g/dramatiq-users/topic/77913723
+
     """
 
     def _build_queue_arguments(self, queue_name):
@@ -202,11 +203,11 @@ class TokeoDramatiq(MetaMixin):
         ### Notes:
 
         : Configures a standard set of middleware components including AgeLimit,
-          TimeLimit, ShutdownNotifications, Callbacks, Pipelines, Retries, and
-          CurrentMessage
+            TimeLimit, ShutdownNotifications, Callbacks, Pipelines, Retries, and
+            CurrentMessage
 
         : Creates an ExtendedRabbitmqBrocker instance with the configured URL
-          and registers it as the global Dramatiq broker
+            and registers it as the global Dramatiq broker
 
         """
         self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBrocker ...')
@@ -346,7 +347,7 @@ class TokeoDramatiqController(Controller):
         ### Notes:
 
         - The `--purge` flag removes all locks from the cache, which can be useful
-          when locks need to be reset after system failures
+            when locks need to be reset after system failures
 
         - Without arguments, displays information about the lock configuration
 
@@ -410,13 +411,13 @@ class TokeoDramatiqController(Controller):
         ### Notes:
 
         - Worker configuration includes process count, thread count, shutdown
-          timeout, restart delay, and queue prefetch settings
+            timeout, restart delay, and queue prefetch settings
 
         - When using --watch, the command will monitor the specified directory for
-          changes and automatically reload actors when files change
+            changes and automatically reload actors when files change
 
         - The command configures Dramatiq CLI arguments and environment variables
-          before delegating to Dramatiq's main function
+            before delegating to Dramatiq's main function
 
         ### Output:
 
@@ -494,7 +495,7 @@ def tokeo_dramatiq_pdoc_pre_render(app):
     ### Notes:
 
     : This function replaces the complex Dramatiq actor decorator
-      with a simpler version that pdoc can handle
+        with a simpler version that pdoc can handle
 
     """
     from tokeo.core.utils.pdoc import pdoc_replace_decorator
@@ -515,6 +516,7 @@ def tokeo_dramatiq_pdoc_post_render(app):
     ### Notes:
 
     : This function restores the original Dramatiq actor decorator functionality
+
     """
     dramatiq.actor = dramatiq_actor
     if hasattr(app.dramatiq, 'actor'):
@@ -543,7 +545,7 @@ def tokeo_dramatiq_pdoc_render_decorator(app, func, decorator, args, kwargs):
     ### Notes:
 
     - This function extracts queue_name parameters from decorators to
-      provide meaningful documentation
+        provide meaningful documentation
 
     - It works with both the global dramatiq.actor and app.dramatiq.actor forms
 
@@ -576,7 +578,7 @@ def tokeo_dramatiq_extend_app(app):
     - This function is called during application setup
 
     - It creates the TokeoDramatiq instance and attaches it to the app
-      as app.dramatiq
+        as app.dramatiq
 
     """
     app.extend('dramatiq', TokeoDramatiq(app))

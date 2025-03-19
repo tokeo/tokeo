@@ -9,7 +9,7 @@ def subcmdmeta(controller):
     ### Returns:
 
     - **\\_\\_cement_meta\\_\\_** (Meta): object ref to Meta information of the
-      subcommand
+        subcommand
 
     """
     return getattr(controller, controller.app.pargs.__dispatch__.split('.')[1]).__cement_meta__

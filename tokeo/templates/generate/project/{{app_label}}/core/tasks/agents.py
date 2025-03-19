@@ -70,7 +70,7 @@ def count_words_timer(url=''):
     ### Args:
 
     - **url** (str, optional): URL of the webpage to analyze.
-      Argument is defined in config files.
+        Argument is defined in config files.
 
     """
     app.log.info(f'Timer start with url: {url}')

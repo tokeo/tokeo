@@ -55,7 +55,7 @@ class App:
         ### Raises:
 
         - **AttributeError**: If the app object is not set or the attribute
-          does not exist
+            does not exist
 
         """
         # test _app object
@@ -83,7 +83,7 @@ def load(app_to_share):
     ### Notes:
 
     : This function is called automatically by the Cement framework when
-      the appshare extension is loaded, making the app globally accessible.
+        the appshare extension is loaded, making the app globally accessible.
 
     """
     app._app = app_to_share

@@ -42,10 +42,10 @@ def resource_intensive_operation(data):
 ### Notes:
 
 - The temper state persists in the cache based on the function
-  name or custom name/name_f parameter
+    name or custom name/name_f parameter
 - If a process crashes while holding a slot, the slot will be released
-  when the cache key expires, preventing permanent deadlock
+    when the cache key expires, preventing permanent deadlock
 - Unlike throttle, temper has a fixed delay when blocked
-  (0.05 seconds by default)
+    (0.05 seconds by default)
 - The function will automatically restore slots when complete, ensuring
-  resources become available again
+    resources become available again

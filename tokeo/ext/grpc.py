@@ -11,7 +11,7 @@ and configuration management.
 ### Features:
 
 - **Dynamic loading** of servicers and protocol buffer implementations
-  based on configuration
+    based on configuration
 - **Server lifecycle management** with clean startup and shutdown
 - **CLI commands** for managing the gRPC server
 - **Integration** with the application's logging system
@@ -42,7 +42,7 @@ class TokeoGrpc(MetaMixin):
     ### Notes:
 
     - The server is lazily initialized when first accessed through
-      the `server` property
+        the `server` property
     - Server configuration is drawn from the application's 'grpc' config section
     - Provides methods for startup, shutdown, and serving (blocking mode)
     - Supports dynamic loading of servicer implementations
@@ -120,12 +120,12 @@ class TokeoGrpc(MetaMixin):
         : The initialization process follows these steps:
 
             1. Creates a server with ThreadPoolExecutor using configured
-              max_worker count
+                max_worker count
             1. Dynamically imports the protocol buffer module containing the
-              add_servicer_to_server function
+                add_servicer_to_server function
             1. Dynamically imports the servicer class module
             1. Registers the servicer with the server using the
-              add_servicer_to_server function
+                add_servicer_to_server function
             1. Configures the server to listen on the specified URL
 
         """
@@ -165,7 +165,8 @@ class TokeoGrpc(MetaMixin):
         : Uses a grace period of 0 seconds for immediate shutdown
 
         : Called automatically when handling Ctrl+C in serve() method or
-          can be called directly to stop the server programmatically
+            can be called directly to stop the server programmatically
+
         """
         self.server.stop(0)
 
@@ -310,8 +311,8 @@ The controller:
 To add a new gRPC service method:
 
 1. Define the method in your .proto file
-2. Generate the Python code using the protoc compiler
-3. Implement the method in your ServicerClass
-4. Create a controller command for client-side access if needed
+1. Generate the Python code using the protoc compiler
+1. Implement the method in your ServicerClass
+1. Create a controller command for client-side access if needed
 
 """

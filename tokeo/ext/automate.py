@@ -170,9 +170,9 @@ class TokeoAutomate(MetaMixin):
     - **_hostgroups** (dict): Cached dictionary of configured host groups
     - **_connections** (dict): Cached dictionary of configured connections
     - **_hosts_cnt** (int): Counter for created host entries
-      (used as unique ID)
+        (used as unique ID)
     - **_connections_cnt** (int): Counter for created connections
-      (used as unique ID)
+        (used as unique ID)
 
     """
 
@@ -367,7 +367,7 @@ class TokeoAutomate(MetaMixin):
         ### Notes:
 
         : Only specific fields can be overruled: id, name, host, port, user,
-          password, sudo, identity, host_key, and shell.
+            password, sudo, identity, host_key, and shell.
 
         """
         # use the counter also as running id
@@ -407,8 +407,8 @@ class TokeoAutomate(MetaMixin):
         ### Notes:
 
         : Fields set in this dictionary will never be overwritten by later merges.
-          For example, if password should be set by connection, the password field
-          should not exist here.
+            For example, if password should be set by connection, the password field
+            should not exist here.
 
         """
         # use the counter also as running id
@@ -450,32 +450,32 @@ class TokeoAutomate(MetaMixin):
         connection configuration by:
 
         1. Connection Reference Resolution:
-           - If 'use' parameter is specified, merges with the referenced connection
-           - Applies connection-specific settings on top of the reference
+            - If 'use' parameter is specified, merges with the referenced connection
+            - Applies connection-specific settings on top of the reference
 
         2. Default Settings Application:
-           - Applies default connection settings from Meta.config_defaults
-           - Put user-defined default connection settings into a ['_default'] dict
-           - Ensures connection-specific settings override defaults
+            - Applies default connection settings from Meta.config_defaults
+            - Put user-defined default connection settings into a ['_default'] dict
+            - Ensures connection-specific settings override defaults
 
         3. Host Resolution Process:
-           - Supports various host specification formats (string, dict, reference)
-           - Resolves host references in multiple formats:
-             * Direct host IDs from the hosts dictionary
-             * Host group IDs from the hostgroups dictionary
-             * Inline host definitions as dictionaries
-             * Connection strings in "user:password@host:port" format
-           - Properly merges host-specific overrides with referenced hosts
+            - Supports various host specification formats (string, dict, reference)
+            - Resolves host references in multiple formats:
+                + Direct host IDs from the hosts dictionary
+                + Host group IDs from the hostgroups dictionary
+                + Inline host definitions as dictionaries
+                + Connection strings in "user:password@host:port" format
+            - Properly merges host-specific overrides with referenced hosts
 
         4. Parameter Precedence Handling:
-           - Host-specific parameters take highest precedence
-           - Connection parameters (if 'use' is defined) come next
-           - Task-specific parameters have lowest precedence
+            - Host-specific parameters take highest precedence
+            - Connection parameters (if 'use' is defined) come next
+            - Task-specific parameters have lowest precedence
 
         5. Host List Normalization:
-           - Ensures each host appears only once in the final list
-           - Converts host configurations to a standardized format
-           - Creates a tuple of fully-resolved host configurations
+            - Ensures each host appears only once in the final list
+            - Converts host configurations to a standardized format
+            - Creates a tuple of fully-resolved host configurations
 
         Args:
             connection: A connection configuration dictionary which may be partial
@@ -606,7 +606,7 @@ class TokeoAutomate(MetaMixin):
         Returns:
 
         - **dict**: Dictionary mapping group names to lists of
-          host configuration dictionaries.
+            host configuration dictionaries.
 
         """
         # if set return
@@ -654,7 +654,7 @@ class TokeoAutomate(MetaMixin):
         Returns:
 
         - **dict**: Dictionary containing the default connection and a
-          nested dictionary of named connections.
+            nested dictionary of named connections.
 
         """
         # if set return
@@ -691,30 +691,30 @@ class TokeoAutomate(MetaMixin):
         It handles:
 
         1. Dynamic task module loading:
-           - Imports Python modules containing task implementation functions
-           - Supports a default module for all tasks via the 'module' setting
-           - Caches imported modules for performance
+            - Imports Python modules containing task implementation functions
+            - Supports a default module for all tasks via the 'module' setting
+            - Caches imported modules for performance
 
         2. Task function resolution:
-           - Looks up the function in the module matching the task name
-           - Creates fallback error-raising functions for missing implementations
-           - Proper exception handling for import and lookup errors
+            - Looks up the function in the module matching the task name
+            - Creates fallback error-raising functions for missing implementations
+            - Proper exception handling for import and lookup errors
 
         3. Connection configuration with priority rules:
-           - Explicit 'connection' setting takes precedence
-           - Reference via 'use' parameter is second priority
-           - Direct 'hosts' configuration is third priority
-           - Default to 'local' host if no connection is specified
-           - Parameters stored in a single host dict proceeds connection paramters
-           - Rule for parameter taken: Host, Connection (if used), task specific
+            - Explicit 'connection' setting takes precedence
+            - Reference via 'use' parameter is second priority
+            - Direct 'hosts' configuration is third priority
+            - Default to 'local' host if no connection is specified
+            - Parameters stored in a single host dict proceeds connection paramters
+            - Rule for parameter taken: Host, Connection (if used), task specific
 
         4. Standardizes task objects with:
-           - Function reference
-           - Module reference
-           - ID and name
-           - Timeout settings
-           - Additional keyword arguments
-           - Fully-resolved connection information
+            - Function reference
+            - Module reference
+            - ID and name
+            - Timeout settings
+            - Additional keyword arguments
+            - Fully-resolved connection information
 
         The connection configuration follows a cascading resolution process
         to determine where tasks should be executed, with proper fallback to
@@ -723,7 +723,7 @@ class TokeoAutomate(MetaMixin):
         Raises:
 
         - **TokeoAutomateError**: If task module is missing, invalid, or cannot
-          be imported, or for other configuration errors.
+            be imported, or for other configuration errors.
 
         """
 
@@ -929,14 +929,14 @@ class TokeoAutomate(MetaMixin):
 
         - **task** (dict): Task configuration dictionary
         - **filter_host_ids** (tuple, optional): Optional tuple of host IDs
-          to restrict execution
+            to restrict execution
         - **verbose** (bool, optional): Whether to enable verbose execution output.
-          Defaults to False.
+            Defaults to False.
 
         ### Returns:
 
         - **tuple**: Tuple of TokeoAutomateResult objects, one
-          for each host execution
+            for each host execution
 
         """
         # list results for all connections
@@ -966,7 +966,7 @@ class TokeoAutomate(MetaMixin):
 
         - **task** (dict): Task configuration dictionary
         - **verbose** (bool, optional): Whether to enable verbose execution output.
-          Defaults to False.
+            Defaults to False.
 
         ### Returns:
 
@@ -997,19 +997,19 @@ class TokeoAutomate(MetaMixin):
         ### Args:
 
         - **task_ids** (str|list|tuple): String or sequence of task IDs to
-          execute
+            execute
         - **with_hosts** (str|list|tuple|dict, optional): Host or hosts to
-          override task configuration
+            override task configuration
         - **with_connection** (str|dict, optional): Connection to override
-          task configuration
+            task configuration
         - **continue_on_error** (bool, optional): Whether to continue executing
-          tasks after errors. Defaults to False.
+            tasks after errors. Defaults to False.
         - **verbose** (bool, optional): Whether to enable verbose execution
-          output. Defaults to False.
+            output. Defaults to False.
         - **return_results** (bool, optional): Whether to include full result
-          details in results. Defaults to False.
+            details in results. Defaults to False.
         - **return_outputs** (bool, optional): Whether to include stdout/stderr
-          in results. Defaults to True.
+            in results. Defaults to True.
 
         ### Returns:
 
@@ -1024,7 +1024,7 @@ class TokeoAutomate(MetaMixin):
         ### Notes:
 
         : Tasks can be specified in the format "task_id:host_id" to run a specific
-          task on a specific host.
+            task on a specific host.
 
         """
         # test tasks_ids
@@ -1140,17 +1140,17 @@ class TokeoAutomate(MetaMixin):
 
         - **max_workers** (int): Maximum number of concurrent worker threads
         - **task_ids** (str|list|tuple): String or sequence of task IDs to
-          execute
+            execute
         - **with_hosts** (str|list|tuple|dict, optional): Host or hosts to
-          override task configuration
+            override task configuration
         - **with_connection** (str|dict, optional): Connection to override
-          task configuration
+            task configuration
         - **verbose** (bool, optional): Whether to enable verbose execution
-          output. Defaults to False.
+            output. Defaults to False.
         - **return_results** (bool, optional): Whether to include full result
-          details in results. Defaults to False.
+            details in results. Defaults to False.
         - **return_outputs** (bool, optional): Whether to include stdout/stderr in
-          results. Defaults to True.
+            results. Defaults to True.
 
         ### Returns:
 
@@ -1165,8 +1165,8 @@ class TokeoAutomate(MetaMixin):
         ### Notes:
 
         : Tasks can be specified in the format "task_id:host_id" to run a specific
-          task on a specific host. All tasks are submitted to the thread pool at
-          once, and results are collected as they complete.
+            task on a specific host. All tasks are submitted to the thread pool at
+            once, and results are collected as they complete.
 
         """
         # test tasks_ids
@@ -1824,7 +1824,7 @@ class TokeoAutomateController(Controller):
         ### Notes:
 
         - Tasks can be specified in the format "task_id:host_id" to target
-          specific hosts
+            specific hosts
         - Results can be output as JSON with optional UTF-8 encoding
         - Task execution details can be displayed verbosely
         - Can continue execution even when tasks fail
