@@ -317,8 +317,14 @@
 
     ${extract_toc(module.docstring) if extract_module_toc_into_sidebar else ''}
     <ul id="index">
+    <li><h3>Home</h3>
+      <ul>
+        <li><code><a title="Home" href="/">Home</a></code></li>
+      </ul>
+    </li>
+
     % if supermodule:
-    <li><h3>Super-module</h3>
+    <li><h3>Super-Module</h3>
       <ul>
         <li><code>${link(supermodule)}</code></li>
       </ul>
