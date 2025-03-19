@@ -7,28 +7,29 @@ both sequential and parallel execution, SSH-based remote operations, and an
 interactive command-line interface.
 
 Example:
-    ```python
-    # Define a task in your configuration
-    # tokeo.yml
-    automate:
-      tasks:
-        check_uptime:
-          module: "myapp.tasks"
-          hosts: "webserver1"
+```python
+# Define a task in your configuration
+# tokeo.yml
+automate:
+  tasks:
+    check_uptime:
+      module: "myapp.tasks"
+      hosts: "webserver1"
 
-      hosts:
-        webserver1:
-          host: "192.168.1.10"
-          user: "admin"
-          identity: "/path/to/ssh_key"
+  hosts:
+    webserver1:
+      host: "192.168.1.10"
+      user: "admin"
+      identity: "/path/to/ssh_key"
 
-    # Execute via CLI
-    # tokeo automate run check_uptime
+# Execute via CLI
+# tokeo automate run check_uptime
 
-    # define your method
-    def check_uptime(app, connection, verbose=False):
-        return connection.run('uptime', hide=not verbose, warn=False)
-    ```
+# define your method
+def check_uptime(app, connection, verbose=False):
+    return connection.run('uptime', hide=not verbose, warn=False)
+```
+
 """
 
 from sys import argv
@@ -65,11 +66,14 @@ def jsonTokeoAutomateEncoder(obj):
 
     Converts TokeoAutomateResult objects to dictionaries for JSON serialization.
 
-    Args:
-        obj: The object to encode.
+    ### Args:
 
-    Returns:
-        A serializable representation of the object.
+    - **obj** (any): The object to encode
+
+    ### Returns:
+
+    - **any**: A serializable representation of the object
+
     """
     # test for automate result
     if isinstance(obj, TokeoAutomateResult):
@@ -84,6 +88,7 @@ class TokeoAutomateError(TokeoError):
 
     Used for errors specific to the automation system, such as
     configuration problems, connection issues, or task execution failures.
+
     """
 
     pass
@@ -96,26 +101,30 @@ class TokeoAutomateResult:
     Stores the output and status of a task execution, including stdout,
     stderr, exit code, and any additional values returned by the task.
 
-    Attributes:
-        task_id: Identifier of the executed task.
-        connection_id: Identifier of the connection used.
-        host_id: Identifier of the host where the task was executed.
-        stdout: Standard output from the task execution.
-        stderr: Standard error output from the task execution.
-        command: The command that was executed.
-        exited: Exit code of the command (0 for success).
-        values: Additional values returned by the task.
+    ### Attributes:
+
+    - **task_id** (str): Identifier of the executed task
+    - **connection_id** (str): Identifier of the connection used
+    - **host_id** (str): Identifier of the host where the task was executed
+    - **stdout** (str): Standard output from the task execution
+    - **stderr** (str): Standard error output from the task execution
+    - **command** (str): The command that was executed
+    - **exited** (int): Exit code of the command (0 for success)
+    - **values** (any): Additional values returned by the task
+
     """
 
     def __init__(self, task_id, connection_id, host_id, result):
         """
         Initialize a task execution result.
 
-        Args:
-            task_id: Identifier of the executed task.
-            connection_id: Identifier of the connection used.
-            host_id: Identifier of the host where the task was executed.
-            result: Raw result object from the execution.
+        ### Args:
+
+        - **task_id** (str): Identifier of the executed task
+        - **connection_id** (str): Identifier of the connection used
+        - **host_id** (str): Identifier of the host where the task was executed
+        - **result** (any): Raw result object from the execution
+
         """
         self.task_id = task_id
         self.connection_id = connection_id
@@ -134,10 +143,12 @@ class TokeoAutomateResult:
 
     def __repr__(self):
         """
-        String representation of the result.
+        Generate string representation of the result.
 
-        Returns:
-            A string representation of all result properties.
+        ### Returns:
+
+        - **str**: A string representation of all result properties
+
         """
         return vars(self).__repr__()
 
@@ -150,13 +161,17 @@ class TokeoAutomate(MetaMixin):
     multiple hosts using SSH or local execution. Supports host definitions,
     host groups, connections, and task configuration.
 
-    Attributes:
-        app: The Cement application instance.
-        _tasks: Cached dictionary of configured tasks.
-        _modules: Cache of imported task modules.
-        _hosts: Cached dictionary of configured hosts.
-        _hostgroups: Cached dictionary of configured host groups.
-        _connections: Cached dictionary of configured connections.
+    ### Attributes:
+
+    - **app** (Application): The Cement application instance
+    - **_tasks** (dict): Cached dictionary of configured tasks
+    - **_modules** (dict): Cache of imported task modules
+    - **_hosts** (dict): Cached dictionary of configured hosts
+    - **_hostgroups** (dict): Cached dictionary of configured host groups
+    - **_connections** (dict): Cached dictionary of configured connections
+    - **_hosts_cnt** (int): Counter for created host entries (used as unique ID)
+    - **_connections_cnt** (int): Counter for created connections (used as unique ID)
+
     """
 
     class Meta:
@@ -220,19 +235,38 @@ class TokeoAutomate(MetaMixin):
 
         This is a simple wrapper around the application's config.get method.
 
-        Args:
-            key (str): Configuration key to retrieve.
-            **kwargs: Additional arguments passed to config.get().
+        ### Args:
 
-        Returns:
-            The configuration value for the specified key.
+        - **key** (str): Configuration key to retrieve
+        - ****kwargs**: Additional arguments passed to config.get()
+
+        ### Returns:
+
+        - **any**: The configuration value for the specified key
+
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
     def _get_host_dict(self, key, entry):
         """
-        This will create a host dict for different defined hosts like:
-        host, host:port, user@host, user:passwort@host:port
+        Create a host configuration dictionary from a definition.
+
+        Processes host definitions to create standardized host dictionaries.
+        Handles various formats including host:port, user@host, etc.
+
+        ### Args:
+
+        - **key** (str): Host identifier/key (may be None)
+        - **entry** (dict): Host configuration entry
+
+        ### Returns:
+
+        - **dict**: Standardized host configuration dictionary
+
+        ### Raises:
+
+        - **TokeoAutomateError**: If the host entry doesn't have required fields
+
         """
         if not isinstance(entry, dict):
             raise TokeoAutomateError('To define a host entry there must be at least a dict')
@@ -261,9 +295,35 @@ class TokeoAutomate(MetaMixin):
 
     def _get_host_dict_from_str(self, key, host_str):
         """
-        This will get a string from schema
-        user:password@host.domain:port
-        and split into parts and create a host_dict
+        Parse a host connection string into a host configuration dictionary.
+
+        Processes a connection string in format "user:password@host.domain:port"
+        into a standardized host dictionary.
+
+        ### Args:
+
+        - **key** (str): Host identifier/key (may be None)
+        - **host_str** (str): Host connection string to parse
+
+        ### Returns:
+
+        - **dict**: Standardized host configuration dictionary
+
+        ### Raises:
+
+        - **TokeoAutomateError**: If the host string is invalid
+
+        ### Notes:
+
+        - Supported formats:
+
+            - host
+            - host:port
+            - user@host
+            - user:password@host
+            - user@host:port
+            - user:password@host:port
+
         """
         if not isinstance(host_str, str) or str.strip(host_str) == '':
             raise TokeoAutomateError('At least a host must be specified to get host_dict from string')
@@ -288,8 +348,25 @@ class TokeoAutomate(MetaMixin):
 
     def _overrule_host_dict(self, base, overrule):
         """
-        This will get two dicts and overrule allowed
-        keys from 2nd dict into 1st dict
+        Merge two host dictionaries with the second taking precedence.
+
+        Takes a base host dictionary and applies specific overrides from a second
+        dictionary, following rules for which fields can be overridden.
+
+        ### Args:
+
+        - **base** (dict): Base host configuration dictionary
+        - **overrule** (dict): Dictionary with values to override base settings
+
+        ### Returns:
+
+        - **dict**: New host dictionary with applied overrides
+
+        ### Notes:
+
+        : Only specific fields can be overruled: id, name, host, port, user,
+          password, sudo, identity, host_key, and shell.
+
         """
         # use the counter also as running id
         self._hosts_cnt += 1
@@ -309,14 +386,28 @@ class TokeoAutomate(MetaMixin):
         # return the record
         return _host
 
-    # make a defined dict from a config entry
     def _get_connection_dict(self, key, entry):
         """
-        Create a dict with all given and allowed fields
-        any field set hereby will never be overwritten
-        by any merge. If some want to set the password
-        by connection e.g., the password field should
-        not exist here.
+        Create a connection configuration dictionary from a definition.
+
+        Processes connection entry definitions into standardized connection
+        dictionaries with proper defaults and valid fields.
+
+        ### Args:
+
+        - **key** (str): Connection identifier/key
+        - **entry** (dict): Connection configuration entry
+
+        ### Returns:
+
+        - **dict**: Standardized connection configuration dictionary
+
+        ### Notes:
+
+        : Fields set in this dictionary will never be overwritten by later merges.
+          For example, if password should be set by connection, the password field
+          should not exist here.
+
         """
         # use the counter also as running id
         self._connections_cnt += 1
@@ -394,6 +485,7 @@ class TokeoAutomate(MetaMixin):
 
         Raises:
             TokeoAutomateError: If host configurations are invalid.
+
         """
         # merge with use if defined
         connection = (self.connections['connections'][connection['use']] if 'use' in connection else {}) | connection
@@ -458,7 +550,9 @@ class TokeoAutomate(MetaMixin):
         like hostname, port, username, and authentication information.
 
         Returns:
-            Dictionary mapping host IDs to host configuration dictionaries.
+
+        - **dict**: Dictionary mapping host IDs to host configuration dictionaries.
+
         """
         # if set return
         if self._hosts is not None:
@@ -500,14 +594,18 @@ class TokeoAutomate(MetaMixin):
 
         Retrieves and caches the configured host group definitions.
         Host groups allow executing tasks on multiple hosts at once.
+
         The resolution rules are:
+
         1. First lookup the ID in the hosts dictionary
-        2. Second lookup the ID in already defined hostgroups
-        3. As a fallback, create a new host entry from the string
+        1. Second lookup the ID in already defined hostgroups
+        1. As a fallback, create a new host entry from the string
 
         Returns:
-            Dictionary mapping group names to lists of
-            host configuration dictionaries.
+
+        - **dict**: Dictionary mapping group names to lists of
+          host configuration dictionaries.
+
         """
         # if set return
         if self._hostgroups is not None:
@@ -552,8 +650,10 @@ class TokeoAutomate(MetaMixin):
         with additional named connections.
 
         Returns:
-            Dictionary containing the default connection and a nested dictionary
-            of named connections.
+
+        - **dict**: Dictionary containing the default connection and a nested dictionary
+          of named connections.
+
         """
         # if set return
         if self._connections is not None:
@@ -619,8 +719,10 @@ class TokeoAutomate(MetaMixin):
         local execution if no remote hosts are specified.
 
         Raises:
-            TokeoAutomateError: If task module is missing, invalid, or cannot
-                be imported, or for other configuration errors.
+
+        - **TokeoAutomateError**: If task module is missing, invalid, or cannot
+          be imported, or for other configuration errors.
+
         """
 
         # a simple wrapper to raise not exist function error on runtime
@@ -719,7 +821,9 @@ class TokeoAutomate(MetaMixin):
         parameters.
 
         Returns:
-            Dictionary mapping task IDs to task configuration dictionaries.
+
+        - **dict**: Dictionary mapping task IDs to task configuration dictionaries.
+
         """
         if self._tasks is None:
             self._get_tasks()
@@ -819,13 +923,16 @@ class TokeoAutomate(MetaMixin):
         optionally filtering to specific hosts. Collects the results from each
         execution.
 
-        Args:
-            task: Task configuration dictionary.
-            filter_host_ids: Optional tuple of host IDs to restrict execution.
-            verbose: Whether to enable verbose execution output.
+        ### Args:
 
-        Returns:
-            Tuple of TokeoAutomateResult objects, one for each host execution.
+        - **task** (dict): Task configuration dictionary
+        - **filter_host_ids** (tuple, optional): Optional tuple of host IDs to restrict execution
+        - **verbose** (bool, optional): Whether to enable verbose execution output. Defaults to False.
+
+        ### Returns:
+
+        - **tuple**: Tuple of TokeoAutomateResult objects, one for each host execution
+
         """
         # list results for all connections
         results = []
@@ -844,7 +951,23 @@ class TokeoAutomate(MetaMixin):
         return tuple(results)
 
     def run_thread(self, task, verbose=False):
-        t = Thread(target=self.run, arg=(task, verbose))
+        """
+        Execute a task in a separate thread.
+
+        Creates a new thread to run the specified task, allowing asynchronous
+        execution.
+
+        ### Args:
+
+        - **task** (dict): Task configuration dictionary
+        - **verbose** (bool, optional): Whether to enable verbose execution output. Defaults to False.
+
+        ### Returns:
+
+        - **Thread**: The started thread object
+
+        """
+        t = Thread(target=self.run, args=(task, (), verbose))
         t.start()
         return t
 
@@ -863,24 +986,33 @@ class TokeoAutomate(MetaMixin):
 
         Runs a sequence of tasks one after another, optionally continuing
         even if some tasks fail. Tasks can be overridden to use specific
-         hosts or connections.
+        hosts or connections.
 
-        Args:
-            task_ids: String or sequence of task IDs to execute.
-            with_hosts: Optional host or hosts to override task configuration.
-            with_connection: Optional connection to override task configuration.
-            continue_on_error: Whether to continue executing tasks after errors.
-            verbose: Whether to enable verbose execution output.
-            return_results: Whether to include full result details in results.
-            return_outputs: Whether to include stdout/stderr in results.
+        ### Args:
 
-        Returns:
-            Dictionary with keys:
-                sum_exited_code: 0 for success, non-zero for errors
-                results: List of task results if return_results is True
+        - **task_ids** (str|list|tuple): String or sequence of task IDs to execute
+        - **with_hosts** (str|list|tuple|dict, optional): Host or hosts to override task configuration
+        - **with_connection** (str|dict, optional): Connection to override task configuration
+        - **continue_on_error** (bool, optional): Whether to continue executing tasks after errors. Defaults to False.
+        - **verbose** (bool, optional): Whether to enable verbose execution output. Defaults to False.
+        - **return_results** (bool, optional): Whether to include full result details in results. Defaults to False.
+        - **return_outputs** (bool, optional): Whether to include stdout/stderr in results. Defaults to True.
 
-        Raises:
-            TokeoAutomateError: If a task ID does not exist.
+        ### Returns:
+
+        - **dict**: Dictionary with execution results containing:
+            - **sum_exited_code** (int): 0 for success, non-zero for errors
+            - **results** (list): List of task results if return_results is True
+
+        ### Raises:
+
+        - **TokeoAutomateError**: If a task ID does not exist
+
+        ### Notes:
+
+        : Tasks can be specified in the format "task_id:host_id" to run a specific
+          task on a specific host.
+
         """
         # test tasks_ids
         if isinstance(task_ids, str):
@@ -984,6 +1116,40 @@ class TokeoAutomate(MetaMixin):
         return_results=False,
         return_outputs=True,
     ):
+        """
+        Execute multiple tasks in parallel using a thread pool.
+
+        Runs multiple tasks concurrently using a thread pool, with the specified
+        maximum number of worker threads. Tasks can be overridden to use specific
+        hosts or connections.
+
+        ### Args:
+
+        - **max_workers** (int): Maximum number of concurrent worker threads
+        - **task_ids** (str|list|tuple): String or sequence of task IDs to execute
+        - **with_hosts** (str|list|tuple|dict, optional): Host or hosts to override task configuration
+        - **with_connection** (str|dict, optional): Connection to override task configuration
+        - **verbose** (bool, optional): Whether to enable verbose execution output. Defaults to False.
+        - **return_results** (bool, optional): Whether to include full result details in results. Defaults to False.
+        - **return_outputs** (bool, optional): Whether to include stdout/stderr in results. Defaults to True.
+
+        ### Returns:
+
+        - **dict**: Dictionary with execution results containing:
+            - **sum_exited_code** (int): 0 for success, non-zero for errors
+            - **results** (list): List of task results if return_results is True
+
+        ### Raises:
+
+        - **TokeoAutomateError**: If a task ID does not exist
+
+        ### Notes:
+
+        : Tasks can be specified in the format "task_id:host_id" to run a specific
+          task on a specific host. All tasks are submitted to the thread pool at
+          once, and results are collected as they complete.
+
+        """
         # test tasks_ids
         if isinstance(task_ids, str):
             task_ids = tuple((task_ids,))
@@ -1107,6 +1273,20 @@ class TokeoAutomate(MetaMixin):
 
 
 class TokeoAutomateShell:
+    """
+    Interactive shell for automating task execution.
+
+    Provides a command-line interface for listing, viewing, and running tasks
+    with interactive features like command history, tab completion, and
+    suggestions.
+
+    ### Attributes:
+
+    - **app** (Application): The Cement application instance
+    - **_command_parser** (ArgumentParser): Command parser for shell commands
+    - **_shell_completion** (NestedCompleter): Command completion handler
+
+    """
 
     def __init__(self, app):
         self.app = app
@@ -1117,14 +1297,40 @@ class TokeoAutomateShell:
         self.app.automate.tasks
 
     def shutdown(self, signum=None, frame=None):
+        """
+        Perform cleanup when shutting down the shell.
+
+        ### Args:
+
+        - **signum** (int, optional): Signal number that triggered shutdown
+        - **frame** (frame, optional): Current stack frame
+
+        """
         # only shutdown if initialized
         pass
 
     def launch(self):
+        """
+        Launch the interactive shell.
+
+        Initializes the environment and starts the shell interface.
+
+        """
         self.startup()
         self.shell()
 
     def shell_completion(self):
+        """
+        Build tab completion handlers for shell commands.
+
+        Creates and caches a nested completer for task names, host names,
+        and command options to provide autocompletion in the interactive shell.
+
+        ### Returns:
+
+        - **NestedCompleter**: Completion handler for shell commands
+
+        """
         if self._shell_completion is None:
             # create a completion set for tasks and tasks by hosts
             tasks_completion = []
@@ -1163,6 +1369,17 @@ class TokeoAutomateShell:
         return self._shell_completion
 
     def shell_history(self):
+        """
+        Create command history for the interactive shell.
+
+        Initializes the shell history with default commands to help
+        users get started.
+
+        ### Returns:
+
+        - **InMemoryHistory**: History handler with initial commands
+
+        """
         return InMemoryHistory(
             [
                 'exit',
@@ -1171,6 +1388,16 @@ class TokeoAutomateShell:
         )
 
     def handle_command_list(self, args):
+        """
+        Handle the 'list' command to display available tasks.
+
+        Lists all configured tasks with their identifiers and names.
+
+        ### Args:
+
+        - **args** (Namespace): Command arguments from ArgumentParser
+
+        """
         self.app.log.debug(datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %z (%Z)'))
         for task_id in self.app.automate.tasks:
             task = self.app.automate.tasks[task_id]
@@ -1180,6 +1407,16 @@ class TokeoAutomateShell:
                 print(f'{task["id"]} - {task["name"]}')
 
     def handle_command_show(self, args):
+        """
+        Handle the 'show' command to display task details.
+
+        Shows the configuration details of specified tasks.
+
+        ### Args:
+
+        - **args** (Namespace): Command arguments from ArgumentParser
+
+        """
         for task_id in args.task:
             try:
                 task = self.app.automate.tasks[task_id]
@@ -1188,6 +1425,17 @@ class TokeoAutomateShell:
                 self.app.log.error(err)
 
     def handle_command_run(self, args):
+        """
+        Handle the 'run' command to execute tasks.
+
+        Executes the specified tasks either sequentially or in parallel
+        based on command options.
+
+        ### Args:
+
+        - **args** (Namespace): Command arguments from ArgumentParser
+
+        """
         # setup run kwargs from args
         run_args = {}
         run_args['verbose'] = args.verbose
@@ -1208,6 +1456,17 @@ class TokeoAutomateShell:
             )
 
     def handle_subcommand_commands(self, args):
+        """
+        Handle the hosts, hostgroups, and connections list subcommands.
+
+        Processes subcommands to list hosts, host groups, and connection
+        configurations.
+
+        ### Args:
+
+        - **args** (Namespace): Command arguments from ArgumentParser
+
+        """
         try:
             if args.cmd == 'hosts.list':
                 for host in self.app.automate.hosts:
@@ -1224,10 +1483,31 @@ class TokeoAutomateShell:
             self.app.log.error(err)
 
     def handle_subcommand_help(self, args):
+        """
+        Handle the help request for a subcommand.
+
+        Displays help information for a specific subcommand.
+
+        ### Args:
+
+        - **args** (Namespace): Command arguments from ArgumentParser
+
+        """
         args.print_help()
 
     @property
     def command_parser(self):
+        """
+        Command parser for the interactive shell.
+
+        Lazily builds and caches a command parser with all available
+        commands and subcommands for the interactive shell.
+
+        ### Returns:
+
+        - **ArgumentParser**: Parser for shell commands
+
+        """
         if self._command_parser is None:
             # if not created, generate the nested command parser
             self._command_parser = ArgumentParser(
@@ -1280,6 +1560,24 @@ class TokeoAutomateShell:
         return self._command_parser
 
     def command(self, cmd=''):
+        """
+        Process a command in the interactive shell.
+
+        Parses and executes a command entered in the interactive shell.
+
+        ### Args:
+
+        - **cmd** (str, optional): Command string to execute. Defaults to ''.
+
+        ### Returns:
+
+        - **bool**: True if the command was valid and can be added to history
+
+        ### Raises:
+
+        - **EOFError**: If the command is 'exit' or 'quit'
+
+        """
         # signal bye bye to interactive shell
         if cmd in ['exit', 'quit']:
             raise EOFError('Command exit entered.')
@@ -1306,6 +1604,19 @@ class TokeoAutomateShell:
         return True
 
     def shell(self):
+        """
+        Run the interactive shell.
+
+        Starts an interactive loop that processes user commands until
+        the user exits or a signal is caught.
+
+        ### Notes:
+
+        - Uses prompt_toolkit for interactive command input
+        - Handles keyboard interrupts, EOF signals, and exceptions
+        - Maintains command history and provides auto-suggestions
+
+        """
         self.app.log.info('Welcome to automate interactive shell.')
         # build in-memory history for interactive shell
         history = self.shell_history()
@@ -1359,6 +1670,7 @@ class TokeoAutomateController(Controller):
 
     Provides command-line interface commands for running tasks and launching
     the interactive automation shell.
+
     """
 
     class Meta:
@@ -1378,28 +1690,36 @@ class TokeoAutomateController(Controller):
     def _setup(self, app):
         super(TokeoAutomateController, self)._setup(app)
 
-    def log_info_bw(self, *args):
+    def _log_info_bw(self, *args):
+        """Log an info message in black and white (no colors)."""
         print('INFO:', *args)
 
-    def log_warning_bw(self, *args):
+    def _log_warning_bw(self, *args):
+        """Log a warning message in black and white (no colors)."""
         print('WARN:', *args)
 
-    def log_error_bw(self, *args):
+    def _log_error_bw(self, *args):
+        """Log an error message in black and white (no colors)."""
         print('ERR:', *args)
 
-    def log_debug_bw(self, *args):
+    def _log_debug_bw(self, *args):
+        """Log a debug message in black and white (no colors)."""
         print('DEBUG:', *args)
 
-    def log_info(self, *args):
+    def _log_info(self, *args):
+        """Log an info message with green color."""
         print('\033[32mINFO:', *args, '\033[39m')
 
-    def log_warning(self, *args):
+    def _log_warning(self, *args):
+        """Log a warning message with yellow color."""
         print('\033[33mWARN:', *args, '\033[39m')
 
-    def log_error(self, *args):
+    def _log_error(self, *args):
+        """Log an error message with red color."""
         print('\033[31mERR:', *args, '\033[39m')
 
-    def log_debug(self, *args):
+    def _log_debug(self, *args):
+        """Log a debug message with purple color."""
         print('\033[35mDEBUG:', *args, '\033[39m')
 
     @ex(
@@ -1476,6 +1796,20 @@ class TokeoAutomateController(Controller):
         ],
     )
     def run(self):
+        """
+        Run one or more automation tasks.
+
+        Execute configured tasks sequentially or in parallel threads.
+        Tasks can be run with custom host or connection configurations.
+
+        ### Notes:
+
+        - Tasks can be specified in the format "task_id:host_id" to target specific hosts
+        - Results can be output as JSON with optional UTF-8 encoding
+        - Task execution details can be displayed verbosely
+        - Can continue execution even when tasks fail
+
+        """
         # setup kwargs
         kwargs = dict(
             verbose=self.app.pargs.verbose, return_results=self.app.pargs.as_json, return_outputs=not self.app.pargs.without_output
@@ -1526,6 +1860,19 @@ class TokeoAutomateController(Controller):
         ],
     )
     def shell(self):
+        """
+        Start the interactive automation shell.
+
+        Launches an interactive shell for running automation tasks,
+        listing configurations, and managing automation.
+
+        ### Notes:
+
+        - Configures console output colors based on command options
+        - Provides command history and tab completion
+        - Supports both color and monochrome output modes
+
+        """
         # use colored output?
         if self.app.pargs.no_colors:
             self.app.log.info = self.log_info_bw
@@ -1547,8 +1894,10 @@ def tokeo_automate_extend_app(app):
     """
     Initialize and register the automate extension with the application.
 
-    Args:
-        app: The Cement application instance.
+    ### Args:
+
+    - **app** (Application): The Cement application instance
+
     """
     app.extend('automate', TokeoAutomate(app))
     app.automate._setup(app)
@@ -1558,8 +1907,10 @@ def tokeo_automate_shutdown(app):
     """
     Perform any cleanup needed when shutting down the automate extension.
 
-    Args:
-        app: The Cement application instance.
+    ### Args:
+
+    - **app** (Application): The Cement application instance
+
     """
     pass
 
@@ -1568,10 +1919,13 @@ def load(app):
     """
     Load the automate extension into the application.
 
-    This function is called by Cement when loading extensions.
+    This function is called by Cement when loading extensions. It registers
+    the controller, and hooks for initialization and cleanup.
 
-    Args:
-        app: The Cement application instance.
+    ### Args:
+
+    - **app** (Application): The Cement application instance
+
     """
     app.handler.register(TokeoAutomateController)
     app.hook.register('post_setup', tokeo_automate_extend_app)

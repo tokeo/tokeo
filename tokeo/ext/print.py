@@ -5,25 +5,39 @@ This extension provides enhanced printing capabilities for Tokeo applications.
 It integrates with the Cement framework to provide structured output handling
 for print operations, ensuring that pre_render and post_render hooks are honored.
 
-The extension provides three main pieces of functionality:
-1. app.print() - A replacement for Python's built-in print() function
-2. app.inspect() - A detailed inspection utility for objects
-3. Output handlers for different rendering styles
+The extension provides framework-aware printing functionality that respects the
+application's output handling pipeline, including hooks, formatters, and
+rendering templates.
 
-Example:
-    To use this extension in your application:
+### Features:
 
-    .. code-block:: python
+1. **app.print()** - A framework-aware replacement for Python's built-in print() function
+1. **app.inspect()** - A detailed inspection utility for examining objects
+1. **Output handlers** - Specialized handlers for different rendering styles:
+    - Print - Basic text output with hooks
+    - Print Dict - Key-value pair rendering for dictionaries
+    - Inspect - Detailed object introspection with type information
 
-        from tokeo.app import TokeoApp
+### Example:
 
-        with TokeoApp('myapp', extensions=['tokeo.ext.print']) as app:
-            # Use the print extension
-            app.print("Hello, world!")
+```python
+# Basic printing
+app.print("Hello, world!")
 
-            # Use the inspect extension
-            user = {'name': 'John', 'age': 30}
-            app.inspect(user, methods=True, attributes=True)
+# Print with a divider and custom name
+app.print("Section start", divider="-", name="section-header")
+
+# Detailed object inspection
+user = {'name': 'John', 'age': 30}
+app.inspect(user, methods=True, attributes=True)
+
+# Inspect multiple objects with type information
+app.inspect(user, "string value", 42, types=True)
+
+# Debug output
+app.inspect(complex_object, debug=True)
+```
+
 """
 
 from __future__ import annotations
@@ -41,22 +55,36 @@ def register_tokeo_print(app: App) -> None:
     Register print and inspect functionality with the application.
 
     This function extends the application with print and inspect methods
-    that use the appropriate output handlers.
+    that use the appropriate output handlers, integrating with the
+    Cement framework's rendering pipeline.
 
-    Args:
-        app: The application object to extend.
+    ### Args:
+
+    - **app**: The application object to extend
+
+    ### Notes:
+
+    : The registered methods become available as app.print() and app.inspect()
+      throughout the application lifetime. These methods provide framework-aware
+      alternatives to Python's built-in printing and inspection capabilities.
+
     """
 
     def _print(*args: any, name=None, sep=' ', end='\n', divider=None) -> None:
         """
         Print output using the application's print handler.
 
-        Args:
-            *args: Variable arguments to print.
-            name: Optional name to identify this print operation in logs.
-            sep: Separator between printed items (default: space).
-            end: String to append at the end (default: newline).
-            divider: Character to use for divider line (prints 40 of these).
+        Framework-aware alternative to Python's built-in print() function
+        that respects the application's rendering pipeline and hooks.
+
+        ### Args:
+
+        - ***args**: Variable arguments to print
+        - **name** (str, optional): Name to identify this print operation in logs
+        - **sep** (str): Separator between printed items (default: space)
+        - **end** (str): String to append at the end (default: newline)
+        - **divider** (str, optional): Character to use for divider line (prints 40 of these)
+
         """
         app.render(dict(args=args, name=name, sep=sep, end=end, divider=divider), handler='print')
 
@@ -76,16 +104,21 @@ def register_tokeo_print(app: App) -> None:
         """
         Inspect objects and print their details.
 
-        Args:
-            *args: Objects to inspect.
-            name: Optional name to identify this inspect operation in logs.
-            system: Whether to include system methods/attributes.
-            methods: Whether to display object methods.
-            attributes: Whether to display object attributes.
-            values: Whether to display object values.
-            types: Whether to display object types.
-            debug: Whether to output to debug log instead of stdout.
-            divider: Character to use for divider line (prints 40 of these).
+        Provides detailed introspection of objects including values, types,
+        methods, and attributes. Useful for debugging and exploring objects.
+
+        ### Args:
+
+        - ***args**: Objects to inspect
+        - **name** (str, optional): Name to identify this inspection in output
+        - **system** (bool): Whether to include system methods/attributes (those with __name__)
+        - **methods** (bool): Whether to display object methods
+        - **attributes** (bool): Whether to display object attributes
+        - **values** (bool): Whether to display object values
+        - **types** (bool): Whether to display object types
+        - **debug** (bool): Whether to output to debug log instead of stdout
+        - **divider** (str, optional): Character to use for divider line (prints 40 of these)
+
         """
         app.render(
             dict(
@@ -113,21 +146,39 @@ class TokeoPrintOutputHandler(output.OutputHandler):
     It takes a dict and renders the contained arguments similar to the
     built-in print() function, but with framework features like pre_render
     and post_render hooks.
+
+    ### Methods:
+
+    - **render**: Formats and returns the text output
+    - **_print**: Internal method to format arguments for printing
+
+    ### Notes:
+
+    : This handler is registered with the label 'print' and is used by the
+      app.print() method. It formats the provided arguments with the
+      specified separator and end strings, similar to Python's built-in
+      print() function, but integrates with the application's rendering
+      pipeline for consistent output handling.
+
     """
 
     class Meta(output.OutputHandler.Meta):
         """
         Handler meta-data configuration.
 
-        Attributes:
-            label (str): The string identifier of this handler.
-            overridable (bool): Whether this handler can be overridden via CLI.
+        ### Notes:
+
+        : This class defines the metadata required by the Cement framework for
+          proper handler registration and operation. It specifies how the
+          output handler is identified and whether it can be overridden via
+          command line options.
+
         """
 
         label = 'print'
         """The string identifier of this handler."""
 
-        #: Whether or not to include ``json`` as an available choice
+        #: Whether or not to include ``print`` as an available choice
         #: to override the ``output_handler`` via command line options.
         overridable = False
 
@@ -137,14 +188,26 @@ class TokeoPrintOutputHandler(output.OutputHandler):
         """
         Format arguments for printing.
 
-        Args:
-            args: The arguments to print.
-            sep: Separator between printed items.
-            end: String to append at the end.
-            divider: Character to use for divider line.
+        Internal method that formats the provided arguments into a string
+        ready for output, similar to Python's built-in print() function.
 
-        Returns:
-            str: The formatted string ready for output.
+        ### Args:
+
+        - **args** (tuple): The arguments to print
+        - **sep** (str): Separator between printed items
+        - **end** (str): String to append at the end
+        - **divider** (str, optional): Character to use for divider line
+
+        ### Returns:
+
+        - **str**: The formatted string ready for output
+
+        ### Notes:
+
+        : This method joins the string representations of all provided arguments
+          using the specified separator, adds the end string, and optionally
+          prepends a divider line made of 40 repetitions of the divider character.
+
         """
         # initialize output
         out = ''
@@ -164,13 +227,32 @@ class TokeoPrintOutputHandler(output.OutputHandler):
         Takes a data dictionary and renders it as text output. The data dictionary
         should contain an 'args' key with the values to print.
 
-        Args:
-            data (dict): The data dictionary to render.
-            *args: Variable length argument list.
-            **kw: Arbitrary keyword arguments.
+        ### Args:
 
-        Returns:
-            str: A text string, or None if no 'args' key is found.
+        - **data** (dict): The data dictionary to render, containing:
+            - args: Tuple of arguments to print
+            - sep: Separator between items (default: space)
+            - end: String to append at the end (default: newline)
+            - name: Optional name for logging
+            - divider: Optional character for divider line
+
+        - ***args**: Variable length argument list
+        - ****kw**: Arbitrary keyword arguments
+
+        ### Returns:
+
+        - **str|None**: Formatted text string, or None if no 'args' key is found
+
+        ### Raises:
+
+        - **KeyError**: If required keys are missing from the data dictionary
+
+        ### Notes:
+
+        : This method checks for the presence of the 'args' key in the data
+          dictionary and logs a debug message if it's missing. When rendering,
+          it passes the arguments and formatting options to the _print method.
+
         """
         if 'args' in data.keys():
             name = f" named {data['name']}" if 'name' in data.keys() and data['name'] is not None and data['name'] != '' else ''
@@ -188,15 +270,49 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
     This class implements the Output Handler interface for dictionary printing.
     It renders dictionaries as key-value pairs, one per line, which is useful
     for development and debugging.
+
+    ### Methods:
+
+    - **render**: Formats and returns dictionary content as text
+
+    ### Notes:
+
+    : This handler is registered with the label 'print_dict' and provides
+      specialized rendering for dictionary objects. Unlike the standard print
+      handler, it formats each key-value pair on its own line, making it easier
+      to read complex dictionary structures.
+
+    : This handler is particularly useful for debugging configuration data,
+      API responses, and other structured data formats.
+
+    ### Example:
+
+    ```python
+    # Sample dictionary
+    config = {
+        'debug': True,
+        'log_level': 'INFO',
+        'max_retries': 3,
+        'timeout': 30
+    }
+
+    # Render with print_dict handler
+    app.render(config, handler='print_dict')
+    ```
+
     """
 
     class Meta(output.OutputHandler.Meta):
         """
         Handler meta-data configuration.
 
-        Attributes:
-            label (str): The string identifier of this handler.
-            overridable (bool): Whether this handler can be overridden via CLI.
+        ### Notes:
+
+        : This class defines the metadata required by the Cement framework for
+          proper handler registration and operation. It specifies how the
+          output handler is identified and whether it can be overridden via
+          command line options.
+
         """
 
         label = 'print_dict'
@@ -212,15 +328,25 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
         """
         Render a dictionary as text output.
 
-        Takes a data dictionary and renders it as key-value pairs, one per line.
+        Takes a data dictionary and renders it as key-value pairs, one per line,
+        creating a more readable format for dictionaries than standard print output.
 
-        Args:
-            data (dict): The data dictionary to render.
-            *args: Variable length argument list.
-            **kw: Arbitrary keyword arguments.
+        ### Args:
 
-        Returns:
-            str: A text string with one key-value pair per line.
+        - **data** (dict): The data dictionary to render
+        - ***args**: Variable length argument list
+        - ****kw**: Arbitrary keyword arguments
+
+        ### Returns:
+
+        - **str**: A text string with one key-value pair per line
+
+        ### Notes:
+
+        : This method logs a debug message when rendering begins, then iterates
+          through all keys and values in the dictionary, formatting each as a
+          key-value pair on its own line.
+
         """
         self.app.log.debug(f'rendering content as text via {self.__module__}')
         out = ''
@@ -236,16 +362,37 @@ class TokeoInspectOutputHandler(output.OutputHandler):
 
     This class implements the Output Handler interface for detailed object
     inspection. It can display object values, types, methods, and attributes
-    in a structured format.
+    in a structured format, providing a comprehensive view of objects for
+    debugging and exploration.
+
+    ### Methods:
+
+    - **render**: Process inspection data and format output
+    - **_inspect**: Internal method for detailed object introspection
+
+    ### Notes:
+
+    : This handler is registered with the label 'inspect' and is used by the
+      app.inspect() method. It provides detailed introspection of objects,
+      showing their values, types, methods, and attributes in a structured format.
+
+    : The handler can inspect multiple objects at once and provides options
+      for controlling the level of detail in the output, from basic value
+      inspection to comprehensive method and attribute listings.
+
     """
 
     class Meta(output.OutputHandler.Meta):
         """
         Handler meta-data configuration.
 
-        Attributes:
-            label (str): The string identifier of this handler.
-            overridable (bool): Whether this handler can be overridden via CLI.
+        ### Notes:
+
+        : This class defines the metadata required by the Cement framework for
+          proper handler registration and operation. It specifies how the
+          output handler is identified and whether it can be overridden via
+          command line options.
+
         """
 
         label = 'inspect'
@@ -271,18 +418,39 @@ class TokeoInspectOutputHandler(output.OutputHandler):
         """
         Format detailed inspection of objects.
 
-        Args:
-            args: Objects to inspect.
-            name: Optional name for the inspection.
-            system: Whether to include system methods/attributes.
-            methods: Whether to display object methods.
-            attributes: Whether to display object attributes.
-            values: Whether to display object values.
-            types: Whether to display object types.
-            divider: Character to use for divider line.
+        Internal method that performs introspection on objects and formats
+        the results as a string, including values, types, methods, and attributes
+        based on the provided options.
 
-        Returns:
-            str: The formatted inspection string.
+        ### Args:
+
+        - **args** (tuple): Objects to inspect
+        - **name** (str, optional): Optional name for the inspection
+        - **system** (bool): Whether to include system methods/attributes (__name__)
+        - **methods** (bool): Whether to display object methods
+        - **attributes** (bool): Whether to display object attributes
+        - **values** (bool): Whether to display object values
+        - **types** (bool): Whether to display object types
+        - **divider** (str, optional): Character to use for divider line
+
+        ### Returns:
+
+        - **str**: The formatted inspection string
+
+        ### Notes:
+
+        : This method performs a comprehensive inspection of the provided objects.
+          For each object, it can show:
+
+            - The object's value (string representation)
+            - The object's type
+            - A list of the object's methods (excluding system methods by default)
+            - A list of the object's attributes (excluding system attributes by default)
+            - System methods and attributes (those with __name__) when requested
+
+        : The output format varies based on which options are enabled, with
+          appropriate spacing and formatting for readability.
+
         """
         # prepare output
         out = ''
@@ -334,15 +502,40 @@ class TokeoInspectOutputHandler(output.OutputHandler):
         Render object inspection as text output.
 
         Takes a data dictionary with inspection parameters and renders the
-        inspection results as text output.
+        inspection results as text output. Supports debug mode for logging
+        inspection results instead of returning them.
 
-        Args:
-            data (dict): The data dictionary with inspection parameters.
-            *args: Variable length argument list.
-            **kw: Arbitrary keyword arguments.
+        ### Args:
 
-        Returns:
-            str: A string with inspection results, None if no 'args' key is found.
+        - **data** (dict): The data dictionary with inspection parameters, containing:
+
+            - args: Objects to inspect
+            - name: Optional name for the inspection
+            - system: Whether to include system methods/attributes
+            - methods: Whether to display object methods
+            - attributes: Whether to display object attributes
+            - values: Whether to display object values
+            - types: Whether to display object types
+            - debug: Whether to output to debug log instead of stdout
+            - divider: Character to use for divider line
+
+        - ***args**: Variable length argument list
+        - ****kw**: Arbitrary keyword arguments
+
+        ### Returns:
+
+        - **str|None**: A string with inspection results, empty string if in debug mode,
+                      or None if no 'args' key is found
+
+        ### Notes:
+
+        : This method checks for the presence of the 'args' key in the data
+          dictionary and logs a debug message if it's missing. When rendering,
+          it passes the arguments and inspection options to the _inspect method.
+
+        :When the 'debug' flag is set, the inspection results are logged to
+          the debug log instead of being returned for display.
+
         """
         if 'args' in data.keys():
             name = f" named {data['name']}" if 'name' in data.keys() and data['name'] is not None and data['name'] != '' else ''
@@ -374,8 +567,33 @@ def load(app: App) -> None:
     Registers the necessary output handlers and extends the application
     with print and inspect functionality.
 
-    Args:
-        app: The application object to extend.
+    ### Args:
+
+    - **app**: The application object to extend
+
+    ### Notes:
+
+    : This function is called automatically by the Cement framework when the
+      extension is loaded. It registers three output handlers:
+
+      1. TokeoInspectOutputHandler - For detailed object inspection
+      2. TokeoPrintDictOutputHandler - For dictionary formatting
+      3. TokeoPrintOutputHandler - For standard printing
+
+    : It also extends the application with app.print() and app.inspect() methods
+      via the register_tokeo_print function.
+
+    ### Example:
+
+    ```python
+    # In your application configuration:
+    class MyApp(App):
+        class Meta:
+            extensions = [
+                'tokeo.ext.print',
+                # other extensions...
+            ]
+    ```
     """
     app.handler.register(TokeoInspectOutputHandler)
     app.handler.register(TokeoPrintDictOutputHandler)

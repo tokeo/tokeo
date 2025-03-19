@@ -1,5 +1,5 @@
 """
-Tokeo gRPC Extension Module
+Tokeo gRPC Extension Module.
 
 This module provides gRPC integration for Tokeo applications, allowing Tokeo apps
 to serve as gRPC servers and clients. It includes a controller for managing gRPC
@@ -8,29 +8,15 @@ services and templates for generating client/server implementations.
 The extension handles server lifecycle management, dynamic loading of servicers,
 and configuration management.
 
-Example:
-    ```python
-    # In your app configuration
-    app.config['grpc']['url'] = 'localhost:50051'
-    app.config['grpc']['max_worker'] = 4
+### Features:
 
-    # To start the gRPC server
-    app.grpc.serve()
+- **Dynamic loading** of servicers and protocol buffer implementations based on configuration
+- **Server lifecycle management** with clean startup and shutdown
+- **CLI commands** for managing the gRPC server
+- **Integration** with the application's logging system
+- **Customization** through comprehensive configuration settings
+- **Template generation** for new Tokeo projects
 
-    # For client usage (from a controller method)
-    with grpc.insecure_channel(self.app.config.get('grpc', 'url')) as channel:
-        stub = app_pb2_grpc.AppStub(channel)
-        response = stub.MethodName(app_pb2.MethodRequest(param='value'))
-    ```
-
-The templates provided with this extension include:
-- A servicer implementation (AppServicer) that handles incoming requests
-- A client controller (GrpcCallController) that provides CLI commands
-    for invoking gRPC methods
-- Proto file integration for type definitions and service contracts
-
-For new projects, these templates are customized with the appropriate application
-name and can be further extended with additional methods as needed.
 """
 
 from sys import argv
@@ -49,34 +35,19 @@ class TokeoGrpc(MetaMixin):
 
     This class manages the gRPC server lifecycle and configuration.
     It dynamically loads the gRPC servicer and protocol buffer implementations
-    based on configuration.
+    based on configuration, providing a seamless integration between
+    Tokeo applications and gRPC services.
 
-    The server is lazily initialized when first accessed through the `server`
-    property, and configured using values from the application configuration.
+    ### Notes:
 
-    Attributes:
-        app: The Cement application instance
-        _server: The internal gRPC server instance
-        _proto_add_servicer_to_server_module: Module path for
-            the add_servicer_to_server function
-        _proto_add_servicer_to_server_method: Method name for
-            the add_servicer_to_server function
-        _grpc_servicer_module: Module path for the servicer class
-        _grpc_servicer_method: Class name for the servicer
+    - The server is lazily initialized when first accessed through the `server` property
+    - Server configuration is drawn from the application's 'grpc' config section
+    - Provides methods for startup, shutdown, and serving (blocking mode)
+    - Supports dynamic loading of servicer implementations
     """
 
     class Meta:
-        """
-        Extension meta-data for TokeoGrpc.
-
-        This inner class defines configuration metadata for the extension,
-        including default configuration values.
-
-        Attributes:
-            label: Unique identifier for this handler
-            config_section: Id for configuration section
-            config_defaults: Dictionary with default configuration values
-        """
+        """Extension meta-data and configuration defaults."""
 
         #: Unique identifier for this handler
         label = 'tokeo.grpc'
@@ -93,14 +64,6 @@ class TokeoGrpc(MetaMixin):
         )
 
     def __init__(self, app, *args, **kw):
-        """
-        Initialize the TokeoGrpc extension.
-
-        Args:
-            app: The Cement application instance
-            *args: Variable length argument list
-            **kw: Arbitrary keyword arguments
-        """
         super(TokeoGrpc, self).__init__(*args, **kw)
         self.app = app
         self._server = None
@@ -110,16 +73,6 @@ class TokeoGrpc(MetaMixin):
         self._grpc_servicer_method = ''
 
     def _setup(self, app):
-        """
-        Set up the TokeoGrpc extension.
-
-        This method initializes configuration and parses module and method paths
-        from the configuration. It splits the module:method strings into separate
-        components for later dynamic loading.
-
-        Args:
-            app: The Cement application instance
-        """
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
         a = self._config('proto_add_servicer_to_server').split(':')
         self._proto_add_servicer_to_server_module = a[0]
@@ -132,14 +85,18 @@ class TokeoGrpc(MetaMixin):
         """
         Get configuration value from the extension's config section.
 
-        This is a simple wrapper around the application's config.get method.
+        This is a convenient wrapper around the application's config.get method,
+        accessing values from the extension's config section.
 
-        Args:
-            key (str): Configuration key to retrieve.
-            **kwargs: Additional arguments passed to config.get().
+        ### Args:
 
-        Returns:
-            The configuration value for the specified key.
+        - **key** (str): Configuration key to retrieve
+        - **kwargs**: Additional arguments passed to config.get()
+
+        ### Returns:
+
+        - **Any**: The configuration value for the specified key
+
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
@@ -149,18 +106,23 @@ class TokeoGrpc(MetaMixin):
         Get the gRPC server instance, creating it if needed.
 
         This property lazily initializes the gRPC server when first accessed.
-        The initialization process:
-        1. Creates a server with ThreadPoolExecutor using configured
-            max_worker count
-        2. Dynamically imports the protocol buffer module containing
-            the add_servicer_to_server function
-        3. Dynamically imports the servicer class module
-        4. Registers the servicer with the server using
-            the add_servicer_to_server function
-        5. Configures the server to listen on the specified URL
+        The initialization dynamically imports the required modules and registers
+        the configured servicer with the gRPC server.
 
-        Returns:
-            grpc.Server: The configured gRPC server instance
+        ### Returns:
+
+        - **grpc.Server**: The configured gRPC server instance
+
+        ### Notes:
+
+        : The initialization process follows these steps:
+
+            1. Creates a server with ThreadPoolExecutor using configured max_worker count
+            1. Dynamically imports the protocol buffer module containing the add_servicer_to_server function
+            1. Dynamically imports the servicer class module
+            1. Registers the servicer with the server using the add_servicer_to_server function
+            1. Configures the server to listen on the specified URL
+
         """
         if self._server is None:
             self._server = grpc.server(futures.ThreadPoolExecutor(max_workers=self._config('max_worker')))
@@ -181,6 +143,7 @@ class TokeoGrpc(MetaMixin):
 
         This method initiates the server but does not block. The server
         begins accepting connections after this method is called.
+
         """
         self.server.start()
 
@@ -191,6 +154,13 @@ class TokeoGrpc(MetaMixin):
         This method stops the server with a grace period of 0 seconds,
         which means it will stop immediately without waiting for ongoing
         operations to complete.
+
+        ### Notes:
+
+        : Uses a grace period of 0 seconds for immediate shutdown
+
+        : Called automatically when handling Ctrl+C in serve() method or
+          can be called directly to stop the server programmatically
         """
         self.server.stop(0)
 
@@ -198,14 +168,20 @@ class TokeoGrpc(MetaMixin):
         """
         Start the gRPC server and block until interrupted.
 
-        This method:
-        1. Starts the server by calling startup()
-        2. Logs a message indicating the server is listening on the configured URL
-        3. Enters a loop that blocks until the server terminates
-        4. Handles KeyboardInterrupt (Ctrl+C) by shutting down the server
+        This method starts the server, logs a message indicating the server
+        is listening, and then blocks until a keyboard interrupt is received,
+        at which point it shuts down the server cleanly.
 
-        This is typically called from a command-line controller to run
-        the server as a standalone process.
+        ### Notes:
+
+        1. This method is blocking and is typically called from a CLI command
+
+        1. The server URL is determined from the configuration
+
+        ### Output:
+
+        : Logs the server URL to the application log
+
         """
         self.startup()
         self.app.log.info('Grpc server started, listening on ' + self._config('url'))
@@ -223,23 +199,10 @@ class TokeoGrpcController(Controller):
     This controller provides command-line commands for interacting with
     the gRPC server, such as starting the server with the 'serve' command.
 
-    It extends the Cement Controller class and is registered with the
-    application during the extension loading process.
     """
 
     class Meta:
-        """
-        Controller meta-data for command-line integration.
-
-        Attributes:
-            label: Command name in the CLI
-            stacked_type: Type of controller stacking
-            stacked_on: Parent controller to stack on
-            subparser_options: Options for command-line parsing
-            help: Short help text displayed in command listings
-            description: Longer description displayed in help output
-            epilog: Text displayed after the help text
-        """
+        """Controller meta-data for command-line integration."""
 
         label = 'grpc'
         stacked_type = 'nested'
@@ -250,12 +213,6 @@ class TokeoGrpcController(Controller):
         epilog = f'Example: {basename(argv[0])} grpc serve'
 
     def _setup(self, app):
-        """
-        Set up the controller.
-
-        Args:
-            app: The Cement application instance
-        """
         super(TokeoGrpcController, self)._setup(app)
 
     @ex(
@@ -277,13 +234,19 @@ def tokeo_grpc_extend_app(app):
     """
     Extend the application with the gRPC extension.
 
-    This function:
-    1. Creates a new TokeoGrpc instance
-    2. Adds it to the application as 'grpc'
-    3. Sets up the extension
+    This function adds the gRPC handler to the application and initializes it,
+    making it available as app.grpc.
 
-    Args:
-        app: The Cement application instance
+    ### Args:
+
+    - **app** (Application): The Cement application instance
+
+    ### Notes:
+
+    - This function is called during application setup
+
+    - It creates the TokeoGrpc instance and attaches it to the app as app.grpc
+
     """
     app.extend('grpc', TokeoGrpc(app))
     app.grpc._setup(app)
@@ -293,29 +256,21 @@ def load(app):
     """
     Load the gRPC extension into the application.
 
-    This is the main entry point for the extension, called by Cement
+    This function is the main entry point for the extension, called by Cement
     during the application initialization process.
 
-    This function:
-    1. Registers the TokeoGrpcController with the application
-    2. Registers a hook to extend the application with the gRPC extension
-
-    Args:
-        app: The Cement application instance
     """
     app.handler.register(TokeoGrpcController)
     app.hook.register('post_setup', tokeo_grpc_extend_app)
 
 
 """
-Template Usage Documentation
+## Template Usage Documentation
 
 The gRPC extension provides templates for implementing both gRPC server and client
-components in new Tokeo projects. These templates are located at:
-- tokeo/templates/generate/project/{{app_label}}/core/grpc/{{app_label}}_servicer.py
-- tokeo/templates/generate/project/{{app_label}}/controllers/grpccall.py
+components in new Tokeo projects.
 
-## Server Components ({{app_label}}_servicer.py)
+### Server Components:
 
 The AppServicer class implements the gRPC service defined in the proto file:
 
@@ -328,48 +283,30 @@ class AppServicer(app_pb2_grpc.AppServicer):
 ```
 
 The servicer:
+
 - Imports necessary protocol buffer modules (generated from .proto files)
 - Accesses the global app instance via tokeo.ext.appshare
 - Implements service methods defined in the .proto file
 - Can dispatch tasks to background workers using Dramatiq
 
-## Client Components (grpccall.py)
+### Client Components:
 
 The GrpcCallController provides CLI commands for invoking gRPC methods:
 
-```python
-class GrpcCallController(Controller):
-    class Meta:
-        label = 'grpccall'
-        stacked_type = 'nested'
-        stacked_on = 'base'
-        description = 'Call remote grpc methods.'
-        help = 'call remote grpc methods manually'
-
-    @ex(
-        help='call the CountWords method by grpc client',
-        arguments=[
-            (
-                ['--url'],
-                dict(
-                    action='store',
-                    required=True,
-                    help='Url for the resource to get counted',
-                ),
-            ),
-        ],
-    )
-    def count_words(self):
-        with grpc.insecure_channel(self.app.config.get('grpc', 'url')) as channel:
-            stub = app_pb2_grpc.AppStub(channel)
-            response = stub.CountWords(
-                app_pb2.CountWordsRequest(url=self.app.pargs.url)
-            )
-```
-
 The controller:
+
 - Provides human-friendly command-line interface to gRPC methods
 - Handles command-line argument parsing and validation
 - Creates an insecure gRPC channel to connect to the server
 - Constructs the appropriate request objects and makes RPC calls
+
+### Adding New Services:
+
+To add a new gRPC service method:
+
+1. Define the method in your .proto file
+2. Generate the Python code using the protoc compiler
+3. Implement the method in your ServicerClass
+4. Create a controller command for client-side access if needed
+
 """
