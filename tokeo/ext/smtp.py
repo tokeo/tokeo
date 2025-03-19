@@ -277,7 +277,10 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         # Text and HTML multipart email with custom settings
         app.mail.send(
-            ('Plain text version', '<html><body><h1>HTML version</h1></body></html>'),
+            (
+              'Plain text version',
+              '<html><body><h1>HTML version</h1></body></html>',
+            ),
             from_addr='sender@example.com',
             to=['recipient@example.com'],
             cc=['cc@example.com'],
@@ -352,7 +355,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         ### Args:
 
-        - **body** (str|tuple|dict): The message body content in one of supported formats
+        - **body** (str|tuple|dict): The message body content in one of
+          supported formats
         - **params**: Dictionary of email parameters from _get_params()
 
         ### Returns:

@@ -263,12 +263,18 @@ class TokeoDiskCacheLocksHandler:
         - **count** (int): Number of calls allowed in the specified time period
         - **per_seconds** (float): Time period in seconds over which to limit calls
         - **name** (str, optional): Custom cache key name for this throttle
-        - **name_f** (str, optional): Format string to generate key name based on function arguments
-        - **expire** (float, optional): Expiration time for the throttle key in seconds
-        - **time_func** (callable, optional): Function to get current time. Defaults to time.time.
-        - **sleep_func** (callable, optional): Function to sleep when rate limited. Defaults to time.sleep.
-        - **cb_on_locked** (callable, optional): Function to call when rate limited instead of waiting
-        - **verbose** (bool, optional): Whether to log throttling information. Defaults to True.
+        - **name_f** (str, optional): Format string to generate key name
+          based on function arguments
+        - **expire** (float, optional): Expiration time for the throttle key
+          in seconds
+        - **time_func** (callable, optional): Function to get current time.
+          Defaults to time.time.
+        - **sleep_func** (callable, optional): Function to sleep when rate limited.
+          Defaults to time.sleep.
+        - **cb_on_locked** (callable, optional): Function to call when rate limited
+          instead of waiting
+        - **verbose** (bool, optional): Whether to log throttling information.
+          Defaults to True.
 
         ### Returns:
 
@@ -417,11 +423,16 @@ class TokeoDiskCacheLocksHandler:
 
         - **count** (int): Maximum number of concurrent calls allowed
         - **name** (str, optional): Custom cache key name for this temper instance
-        - **name_f** (str, optional): Format string to generate key name based on function arguments
-        - **expire** (float, optional): Expiration time for the temper key in seconds
-        - **sleep_func** (callable, optional): Sleep function on resource limit. Defaults to time.sleep.
-        - **cb_on_locked** (callable, optional): Function to call on limit instead of waiting
-        - **verbose** (bool, optional): Whether to log tempering information. Defaults to True.
+        - **name_f** (str, optional): Format string to generate key name based
+          on function arguments
+        - **expire** (float, optional): Expiration time for the temper key
+          in seconds
+        - **sleep_func** (callable, optional): Sleep function on resource limit.
+          Defaults to time.sleep.
+        - **cb_on_locked** (callable, optional): Function to call on limit
+          instead of waiting
+        - **verbose** (bool, optional): Whether to log tempering information.
+          Defaults to True.
 
         ### Returns:
 
@@ -737,8 +748,10 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         ### Args:
 
-        - **fix** (bool, optional): Whether to fix any corruption found. Defaults to False.
-        - **retry** (bool, optional): Whether to retry if the database is locked. Defaults to False.
+        - **fix** (bool, optional): Whether to fix any corruption found.
+          Defaults to False.
+        - **retry** (bool, optional): Whether to retry if the database is locked.
+          Defaults to False.
 
         ### Returns:
 
@@ -757,7 +770,8 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         ### Args:
 
         - **tag** (str): Tag that identifies items to evict
-        - **retry** (bool, optional): Whether to retry if the database is locked. Defaults to False.
+        - **retry** (bool, optional): Whether to retry if the database
+          is locked. Defaults to False.
 
         ### Returns:
 
@@ -780,8 +794,10 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         ### Args:
 
-        - **now** (float, optional): Current time to use for expiration check. Defaults to None (uses current time).
-        - **retry** (bool, optional): Whether to retry if the database is locked. Defaults to False.
+        - **now** (float, optional): Current time to use for expiration check.
+          Defaults to None (uses current time).
+        - **retry** (bool, optional): Whether to retry if the database is locked.
+          Defaults to False.
 
         ### Returns:
 
@@ -806,14 +822,19 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         - **key** (str): The key to add to the cache
         - **value** (any): The value to add to the cache
-        - **expire** (float, optional): Expiration time in seconds. Defaults to None.
-        - **tag** (str, optional): Tag to categorize this cache item. Defaults to None.
-        - **read** (bool, optional): Whether to read without updating cache statistics. Defaults to False.
-        - **retry** (bool, optional): Whether to retry if the database is locked. Defaults to False.
+        - **expire** (float, optional): Expiration time in seconds.
+          Defaults to None.
+        - **tag** (str, optional): Tag to categorize this cache item.
+          Defaults to None.
+        - **read** (bool, optional): Whether to read without updating
+          cache statistics. Defaults to False.
+        - **retry** (bool, optional): Whether to retry if the database
+          is locked. Defaults to False.
 
         ### Returns:
 
-        - **bool**: True if the item was added successfully, False if the key already exists
+        - **bool**: True if the item was added successfully,
+          False if the key already exists
 
         """
         return self._cache.add(key, value, expire=expire, tag=tag, read=read, retry=retry)
@@ -825,8 +846,10 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         ### Args:
 
         - **key** (str): The key to update
-        - **expire** (float, optional): New expiration time in seconds. Defaults to None.
-        - **retry** (bool, optional): Whether to retry if the database is locked. Defaults to False.
+        - **expire** (float, optional): New expiration time in seconds.
+          Defaults to None.
+        - **retry** (bool, optional): Whether to retry if the database is locked.
+          Defaults to False.
 
         ### Returns:
 
@@ -841,7 +864,8 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         ### Args:
 
-        - **retry** (bool, optional): Whether to retry if the database is locked. Defaults to False.
+        - **retry** (bool, optional): Whether to retry if the database is locked.
+          Defaults to False.
 
         ### Returns:
 
@@ -856,7 +880,8 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         ### Args:
 
-        - **reset** (bool, optional): Whether to reset statistics after reading. Defaults to False.
+        - **reset** (bool, optional): Whether to reset statistics after reading.
+          Defaults to False.
 
         ### Returns:
 

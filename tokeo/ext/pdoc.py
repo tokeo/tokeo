@@ -1,9 +1,10 @@
 """
 Tokeo Pdoc Extension Module.
 
-This extension integrates the pdoc documentation generator with Tokeo applications,
-providing a way to generate API documentation directly from Python docstrings.
-It supports rendering documentation as HTML and serving it via a built-in web server.
+This extension integrates the pdoc documentation generator with Tokeo
+applications, providing a way to generate API documentation directly
+from Python docstrings. It supports rendering documentation as HTML and
+serving it via a built-in web server.
 
 The extension handles custom docstring formatting, template customization, and
 provides hooks for extensions to modify documentation rendering behavior.
@@ -62,7 +63,8 @@ class TokeoPdoc(MetaMixin):
 
     ### Notes:
 
-    - Automatically generates documentation for the application module, tests, and tokeo
+    - Automatically generates documentation for the application module,
+      tests, and tokeo
     - Supports custom docstring templates for extensions and decorators
     - Handles filtering of common warning messages
     - Provides a web server for browsing generated documentation
@@ -76,7 +78,8 @@ class TokeoPdoc(MetaMixin):
         ### Notes:
 
         - The config section is 'pdoc' in the application configuration
-        - Default configuration provides reasonable starting values for most applications
+        - Default configuration provides reasonable starting values
+          for most applications
         - All settings can be overridden in the application's configuration
 
         """

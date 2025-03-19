@@ -91,15 +91,19 @@ class TokeoCronAndFireTrigger(CronTrigger):
         - **month** (str|int, optional): Month to run on (1-12)
         - **day** (str|int, optional): Day of month to run on (1-31)
         - **week** (str|int, optional): Week of the year to run on (1-53)
-        - **day_of_week** (str|int, optional): Weekday to run on (0-6 or mon,tue,wed,thu,fri,sat,sun)
+        - **day_of_week** (str|int, optional): Weekday to run on
+          (0-6 or mon,tue,wed,thu,fri,sat,sun)
         - **hour** (str|int, optional): Hour to run on (0-23)
         - **minute** (str|int, optional): Minute to run on (0-59)
         - **second** (str|int, optional): Second to run on (0-59)
         - **start_date** (datetime|str, optional): Earliest date/time to run on
         - **end_date** (datetime|str, optional): Latest date/time to run on
-        - **timezone** (datetime.tzinfo|str, optional): Timezone to use for the date/time calculations
-        - **jitter** (int, optional): Advance or delay the job execution by jitter seconds at most
-        - **delay** (int, optional): Additional seconds to delay after the scheduled time
+        - **timezone** (datetime.tzinfo|str, optional): Timezone to use for
+          the date/time calculations
+        - **jitter** (int, optional): Advance or delay the job execution
+          by jitter seconds at most
+        - **delay** (int, optional): Additional seconds to delay after
+          the scheduled time
 
         ### Notes:
 
@@ -120,21 +124,25 @@ class TokeoCronAndFireTrigger(CronTrigger):
         """
         Create a trigger from a standard crontab expression.
 
-        Parses a crontab-format string and creates a trigger based on the expression.
-        The standard crontab format uses five space-separated fields for minute, hour,
-        day of month, month, and day of week.
+        Parses a crontab-format string and creates a trigger based on the
+        expression. The standard crontab format uses five space-separated
+        fields for minute, hour, day of month, month, and day of week.
 
         ### Args:
 
-        - **expr** (str): A crontab expression (5 fields: minute, hour, day of month,
-          month, day of week)
-        - **timezone** (datetime.tzinfo|str, optional): Timezone to use for date/time calculations
-        - **jitter** (int, optional): Random seconds to add or subtract from trigger time
-        - **delay** (int, optional): Fixed seconds to add after calculated trigger time
+        - **expr** (str): A crontab expression (5 fields: minute, hour,
+          day of month, month, day of week)
+        - **timezone** (datetime.tzinfo|str, optional): Timezone to use for
+          date/time calculations
+        - **jitter** (int, optional): Random seconds to add or subtract
+          from trigger time
+        - **delay** (int, optional): Fixed seconds to add after calculated
+          trigger time
 
         ### Returns:
 
-        - **TokeoCronAndFireTrigger**: A new trigger instance configured with the expression
+        - **TokeoCronAndFireTrigger**: A new trigger instance configured with
+          the expression
 
         ### Raises:
 
@@ -165,12 +173,14 @@ class TokeoCronAndFireTrigger(CronTrigger):
 
         ### Args:
 
-        - **previous_fire_time** (datetime, optional): Previous firing time of the job or None
+        - **previous_fire_time** (datetime, optional): Previous firing time
+          of the job or None
         - **now** (datetime): Current time (UTC)
 
         ### Returns:
 
-        - **datetime**: The next fire time or None if no future fire times are available
+        - **datetime**: The next fire time or None if no future fire times
+          are available
 
         ### Notes:
 
@@ -193,10 +203,10 @@ class TokeoScheduler(MetaMixin):
     """
     Main scheduler class for Tokeo applications.
 
-    This class provides comprehensive task scheduling functionality for Tokeo applications,
-    allowing for cron-style scheduled tasks and interactive management. It wraps the
-    APScheduler library and extends it with additional features specific to the
-    Tokeo framework.
+    This class provides comprehensive task scheduling functionality for Tokeo
+    applications, allowing for cron-style scheduled tasks and interactive
+    management. It wraps the APScheduler library and extends it with additional
+    features specific to the Tokeo framework.
 
     ### Methods:
 
@@ -303,7 +313,8 @@ class TokeoScheduler(MetaMixin):
         ### Args:
 
         - **key** (str): Configuration key to retrieve
-        - **kwargs**: Additional arguments passed to config.get(), such as default values
+        - **kwargs**: Additional arguments passed to config.get(), such as
+          default values
 
         ### Returns:
 
@@ -322,14 +333,16 @@ class TokeoScheduler(MetaMixin):
 
         ### Returns:
 
-        - **APScheduler**: The scheduler instance (BackgroundScheduler or BlockingScheduler)
+        - **APScheduler**: The scheduler instance (BackgroundScheduler or
+          BlockingScheduler)
 
         ### Notes:
 
-        : This property creates the scheduler on first access, configuring it with
-          the appropriate executor and thread pool size. In interactive mode, it uses
-          a BackgroundScheduler that doesn't block the main thread. In non-interactive
-          mode, it uses a BlockingScheduler that keeps the application running.
+        : This property creates the scheduler on first access, configuring it
+          with the appropriate executor and thread pool size. In interactive
+          mode, it uses a BackgroundScheduler that doesn't block the main
+          thread. In non-interactive mode, it uses a BlockingScheduler that
+          keeps the application running.
 
         """
         if self._scheduler is None:
@@ -415,13 +428,19 @@ class TokeoScheduler(MetaMixin):
 
         - **module** (str): The module containing the function to run
         - **func** (str): The function name to run
-        - **crontab** (str): Crontab expression for scheduling (format: "min hour day month day_of_week")
-        - **coalesce** (bool): Whether to coalesce missed executions (True = run once, False = run all)
-        - **misfire_grace_time** (int, optional): Seconds after the scheduled time that the job is
+        - **crontab** (str): Crontab expression for scheduling
+          (format: "min hour day month day_of_week")
+        - **coalesce** (bool): Whether to coalesce missed executions
+          (True = run once, False = run all)
+        - **misfire_grace_time** (int, optional): Seconds after the scheduled
+          time that the job is
           still allowed to be run
-        - **delay** (int, optional): Seconds to delay execution after scheduled time
-        - **max_jitter** (int, optional): Maximum jitter in seconds to add to the schedule
-        - **max_running_jobs** (int, optional): Maximum number of concurrently running
+        - **delay** (int, optional): Seconds to delay execution after
+          scheduled time
+        - **max_jitter** (int, optional): Maximum jitter in seconds to add to
+          the schedule
+        - **max_running_jobs** (int, optional): Maximum number of concurrently
+          running
           instances of this job
         - **kwargs** (dict): Keyword arguments to pass to the function
         - **title** (str): Human-readable title for the task
@@ -471,7 +490,8 @@ class TokeoScheduler(MetaMixin):
             - crontab: Cron expression or list of expressions (required)
             - name: Human-readable name for the task
             - kwargs: Dictionary of keyword arguments to pass to the function
-            - coalesce: How to handle missed executions ('latest', 'earliest', 'all')
+            - coalesce: How to handle missed executions ('latest', 'earliest',
+              'all')
             - misfire_grace_time: Seconds after scheduled time to still run
             - delay: Fixed seconds to delay execution
             - max_jitter: Random seconds to add to timing
@@ -553,7 +573,8 @@ class TokeoScheduler(MetaMixin):
         ### Args:
 
         - **signum** (int, optional): Signal number (used for signal handlers)
-        - **frame** (frame, optional): Current stack frame (used for signal handlers)
+        - **frame** (frame, optional): Current stack frame (used for signal
+          handlers)
 
         """
         # only shutdown if initialized
@@ -571,7 +592,8 @@ class TokeoScheduler(MetaMixin):
 
         ### Args:
 
-        - **interactive** (bool): Whether to run in interactive mode with command shell
+        - **interactive** (bool): Whether to run in interactive mode with
+          command shell
         - **paused** (bool): Whether to start in paused state
 
         ### Notes:
@@ -794,7 +816,8 @@ class TokeoScheduler(MetaMixin):
         Handle task-specific commands (pause, resume, remove, fire).
 
         Executes commands that operate on specific tasks, identified by their IDs.
-        Multiple task IDs can be specified to apply the same command to multiple tasks.
+        Multiple task IDs can be specified to apply the same command to multiple
+        tasks.
 
         ### Args:
 
@@ -804,7 +827,8 @@ class TokeoScheduler(MetaMixin):
 
         : This method handles several task-specific commands:
 
-            1. **pause**: Pauses specific tasks without affecting the scheduler as a whole
+            1. **pause**: Pauses specific tasks without affecting the scheduler
+              as a whole
             1. **resume**: Resumes specific tasks that have been paused
             1. **remove**: Permanently removes tasks from the scheduler
             1. **fire**: Executes tasks immediately, regardless of their schedule
@@ -952,7 +976,8 @@ class TokeoScheduler(MetaMixin):
 
         ### Returns:
 
-        - **bool**: True if the command was successful or showed help, False otherwise
+        - **bool**: True if the command was successful or showed help,
+          False otherwise
 
         ### Raises:
 
@@ -1402,9 +1427,9 @@ def tokeo_scheduler_shutdown(app):
 
     ### Notes:
 
-    : This function is called automatically during the application's pre_close phase.
-      It ensures the scheduler is properly shut down, stopping all running jobs and
-      releasing resources before the application exits.
+    : This function is called automatically during the application's pre_close
+      phase. It ensures the scheduler is properly shut down, stopping all
+      running jobs and releasing resources before the application exits.
 
     """
     app.scheduler.shutdown()

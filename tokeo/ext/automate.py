@@ -169,8 +169,10 @@ class TokeoAutomate(MetaMixin):
     - **_hosts** (dict): Cached dictionary of configured hosts
     - **_hostgroups** (dict): Cached dictionary of configured host groups
     - **_connections** (dict): Cached dictionary of configured connections
-    - **_hosts_cnt** (int): Counter for created host entries (used as unique ID)
-    - **_connections_cnt** (int): Counter for created connections (used as unique ID)
+    - **_hosts_cnt** (int): Counter for created host entries
+      (used as unique ID)
+    - **_connections_cnt** (int): Counter for created connections
+      (used as unique ID)
 
     """
 
@@ -651,8 +653,8 @@ class TokeoAutomate(MetaMixin):
 
         Returns:
 
-        - **dict**: Dictionary containing the default connection and a nested dictionary
-          of named connections.
+        - **dict**: Dictionary containing the default connection and a
+          nested dictionary of named connections.
 
         """
         # if set return
@@ -926,12 +928,15 @@ class TokeoAutomate(MetaMixin):
         ### Args:
 
         - **task** (dict): Task configuration dictionary
-        - **filter_host_ids** (tuple, optional): Optional tuple of host IDs to restrict execution
-        - **verbose** (bool, optional): Whether to enable verbose execution output. Defaults to False.
+        - **filter_host_ids** (tuple, optional): Optional tuple of host IDs
+          to restrict execution
+        - **verbose** (bool, optional): Whether to enable verbose execution output.
+          Defaults to False.
 
         ### Returns:
 
-        - **tuple**: Tuple of TokeoAutomateResult objects, one for each host execution
+        - **tuple**: Tuple of TokeoAutomateResult objects, one
+          for each host execution
 
         """
         # list results for all connections
@@ -960,7 +965,8 @@ class TokeoAutomate(MetaMixin):
         ### Args:
 
         - **task** (dict): Task configuration dictionary
-        - **verbose** (bool, optional): Whether to enable verbose execution output. Defaults to False.
+        - **verbose** (bool, optional): Whether to enable verbose execution output.
+          Defaults to False.
 
         ### Returns:
 
@@ -990,13 +996,20 @@ class TokeoAutomate(MetaMixin):
 
         ### Args:
 
-        - **task_ids** (str|list|tuple): String or sequence of task IDs to execute
-        - **with_hosts** (str|list|tuple|dict, optional): Host or hosts to override task configuration
-        - **with_connection** (str|dict, optional): Connection to override task configuration
-        - **continue_on_error** (bool, optional): Whether to continue executing tasks after errors. Defaults to False.
-        - **verbose** (bool, optional): Whether to enable verbose execution output. Defaults to False.
-        - **return_results** (bool, optional): Whether to include full result details in results. Defaults to False.
-        - **return_outputs** (bool, optional): Whether to include stdout/stderr in results. Defaults to True.
+        - **task_ids** (str|list|tuple): String or sequence of task IDs to
+          execute
+        - **with_hosts** (str|list|tuple|dict, optional): Host or hosts to
+          override task configuration
+        - **with_connection** (str|dict, optional): Connection to override
+          task configuration
+        - **continue_on_error** (bool, optional): Whether to continue executing
+          tasks after errors. Defaults to False.
+        - **verbose** (bool, optional): Whether to enable verbose execution
+          output. Defaults to False.
+        - **return_results** (bool, optional): Whether to include full result
+          details in results. Defaults to False.
+        - **return_outputs** (bool, optional): Whether to include stdout/stderr
+          in results. Defaults to True.
 
         ### Returns:
 
@@ -1126,12 +1139,18 @@ class TokeoAutomate(MetaMixin):
         ### Args:
 
         - **max_workers** (int): Maximum number of concurrent worker threads
-        - **task_ids** (str|list|tuple): String or sequence of task IDs to execute
-        - **with_hosts** (str|list|tuple|dict, optional): Host or hosts to override task configuration
-        - **with_connection** (str|dict, optional): Connection to override task configuration
-        - **verbose** (bool, optional): Whether to enable verbose execution output. Defaults to False.
-        - **return_results** (bool, optional): Whether to include full result details in results. Defaults to False.
-        - **return_outputs** (bool, optional): Whether to include stdout/stderr in results. Defaults to True.
+        - **task_ids** (str|list|tuple): String or sequence of task IDs to
+          execute
+        - **with_hosts** (str|list|tuple|dict, optional): Host or hosts to
+          override task configuration
+        - **with_connection** (str|dict, optional): Connection to override
+          task configuration
+        - **verbose** (bool, optional): Whether to enable verbose execution
+          output. Defaults to False.
+        - **return_results** (bool, optional): Whether to include full result
+          details in results. Defaults to False.
+        - **return_outputs** (bool, optional): Whether to include stdout/stderr in
+          results. Defaults to True.
 
         ### Returns:
 
@@ -1804,7 +1823,8 @@ class TokeoAutomateController(Controller):
 
         ### Notes:
 
-        - Tasks can be specified in the format "task_id:host_id" to target specific hosts
+        - Tasks can be specified in the format "task_id:host_id" to target
+          specific hosts
         - Results can be output as JSON with optional UTF-8 encoding
         - Task execution details can be displayed verbosely
         - Can continue execution even when tasks fail

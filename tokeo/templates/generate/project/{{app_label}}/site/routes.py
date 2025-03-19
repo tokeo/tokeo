@@ -47,19 +47,25 @@ def products_page():
                     with ui.card():
                         ui.label(f'Product {i+1}').classes('text-lg font-semibold')
                         ui.label('$99.99').classes('text-blue-500')
-                        ui.button('Add to Cart', on_click=lambda: ui.notify('Added to cart'))
+                        ui.button(
+                            'Add to Cart',
+                            on_click=lambda: ui.notify('Added to cart'),
+                        )
 ```
 
 The routes module works with the blocks and layout modules to create a
 consistent page structure while allowing page-specific content:
 
-- **blocks.page()**: Provides the standard page container with title, navigation, and footer
+- **blocks.page()**: Provides the standard page container with title, navigation,
+  and footer
 - **layout module**: Lower-level components that define the overall page structure
-- **ux element helper**: Provides access to HTML elements not directly exposed by NiceGUI
+- **ux element helper**: Provides access to HTML elements not directly exposed
+  by NiceGUI
 
 ### Notes:
 
-- The default route function (named 'default') is automatically registered as the index ('/')
+- The default route function (named 'default') is automatically registered as the
+  index ('/')
 - Routes are configured in the application's YAML configuration under nicegui.routes
 - The layout and blocks modules abstract away page structure for consistent design
 - Use Tailwind CSS classes for styling consistency and responsive design

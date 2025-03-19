@@ -3,9 +3,9 @@ Reusable business functions 'steps' for modular application workflows.
 
 This module provides a centralized location for defining atomic 'step' functions
 that perform specific, reusable operations within business workflows in Tokeo and
-Cement applications. Steps are modular, composable functions that implement individual
-parts of larger business processes, such as PDF generation, data transformation,
-or external service integration.
+Cement applications. Steps are modular, composable functions that implement
+individual parts of larger business processes, such as PDF generation, data
+transformation, or external service integration.
 
 ### Features:
 
