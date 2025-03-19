@@ -249,15 +249,44 @@
         color: inherit;
         margin-left: 1em;
       }
+    .source div.rounded {
+      background: #231e18;
+      padding: 1em;
+      border-radius: 10px;
+      margin: 0 0 3em 0;
+    }
+    .source div.rounded pre {
+      margin: 0;
+    }
     .source pre {
       max-height: 500px;
       overflow: auto;
-      margin: 0;
+      border: 0;
+      scrollbar-color: #484040 #231e18;
+    }
+    .source pre::-webkit-scrollbar {
+      background: #231e18;
+      width: 8px;
+      height: 8px;
+    }
+    .source pre::-webkit-scrollbar-corner {
+      background: #231e18;
+      width: 8px;
+      height: 8px;
+    }
+    .source pre::-webkit-scrollbar-thumb {
+      background: #484040;
+      width: 8px;
+      height: 8px;
+      border-radius: 8px;
     }
     .source pre code {
       font-size: 12px;
       overflow: visible;
       min-width: max-content;
+    }
+    .source pre code.hljs {
+      padding: 1.75em 0.75em;
     }
   .hlist {
     list-style: none;
