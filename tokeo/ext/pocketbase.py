@@ -133,7 +133,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         Set up the PocketBase handler.
 
         Initializes the PocketBase client with the configured URL and options.
-        This method is called by the framework after all configuration has been loaded.
+        This method is called by the framework after all configuration
+        has been loaded.
 
         ### Args:
 
@@ -161,7 +162,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Args:
 
         - **key** (str): Configuration key to retrieve
-        - **kwargs**: Additional arguments passed to config.get(), such as default values
+        - **kwargs**: Additional arguments passed to config.get(), such as
+          default values
 
         ### Returns:
 
@@ -191,17 +193,17 @@ class TokeoPocketBaseHandler(MetaMixin):
         """
         Get a reference to a PocketBase collection.
 
-        Retrieves a collection object that can be used to perform operations directly
-        with the PocketBase SDK. This provides access to all native SDK functionality
-        not specifically wrapped by the handler's methods.
+        Retrieves a collection object that can be used to perform operations
+        directly with the PocketBase SDK. This provides access to all
+        native SDK functionality not specifically wrapped by the handler's methods.
 
         ### Args:
 
-        - **collection_id_or_name** (str): The ID or name of the collection to access
+        - **collection_id_or_name** (str): The ID or name of the collection
 
         ### Returns:
 
-        - **Collection**: A PocketBase collection object that provides direct SDK access
+        - **Collection**: A PocketBase collection object, provides direct SDK access
 
         ### Example:
 
@@ -230,14 +232,15 @@ class TokeoPocketBaseHandler(MetaMixin):
         """
         Retrieve a single record from a collection by ID.
 
-        Fetches a record by its unique ID from the specified collection, with options
-        for caching, sorting, and additional query parameters.
+        Fetches a record by its unique ID from the specified collection,
+        with options for caching, sorting, and additional query parameters.
 
         ### Args:
 
         - **collection_id_or_name** (str): The ID or name of the collection
         - **id** (str): The ID of the record to retrieve
-        - **sort** (str, optional): Sort expression for the query (format: `field,-field`)
+        - **sort** (str, optional): Sort expression for the query
+          (format: `field,-field`)
         - **cache** (bool): Whether to use cached results if available
         - **q** (dict): Additional query parameters to pass to PocketBase
 
@@ -446,7 +449,8 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         ### Raises:
 
-        - **Exception**: If record deletion fails (e.g., record not found or unauthorized)
+        - **Exception**: If record deletion fails (e.g., record not found
+          or unauthorized)
 
         ### Example:
 
@@ -463,8 +467,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : Deletion is permanent and cannot be undone. For sensitive data, consider
-          implementing soft deletes by updating a status field instead of permanently
-          deleting records.
+          implementing soft deletes by updating a status field instead of
+          permanently deleting records.
 
         """
         # run database delete
@@ -506,7 +510,7 @@ def pocketbase_close(app):
 
     ### Notes:
 
-    : This function is called automatically during the application's pre_close phase.
+    : This function is called automatically during application's pre_close phase.
       It ensures any open connections are closed, authentication data is cleared,
       and resources are released properly before the application exits.
 

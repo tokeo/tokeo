@@ -110,7 +110,7 @@ try:
 
             ### Notes:
 
-            - Called automatically by watchdog when a matching file system event occurs
+            - Called automatically by watchdog on a matching file system event
 
             - Only invokes the callback if one was provided during initialization
 
@@ -209,7 +209,8 @@ class NiceguiElementHelper:
         1. The returned function creates either an Element or a TextElement
           depending on whether text content is provided
 
-        1. Usage example: app.nicegui.ux.article("My content") creates a <article> element
+        1. Usage example: app.nicegui.ux.article("My content") creates
+          a <article> element
 
         """
 
@@ -603,7 +604,8 @@ class TokeoNiceguiController(Controller):
 
         - Delegates to the app.nicegui.startup() method
         - Passes command-line arguments to control hot-reloading behavior
-        - The server runs until interrupted (Ctrl+C) or a file change triggers restart
+        - The server runs until interrupted (Ctrl+C) or a file change
+          triggers restart
 
         """
         self.app.nicegui.startup(
@@ -634,7 +636,8 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
 
     ### Notes:
 
-    1. Handles FastAPI route decorators (@app.nicegui.fastapi_app.get, @app.nicegui.fastapi_app.post)
+    1. Handles FastAPI route decorators (@app.nicegui.fastapi_app.get,
+      @app.nicegui.fastapi_app.post)
     1. Handles NiceGUI page decorators (@app.nicegui.ui.page, @ui.page)
     1. Extracts parameters values for better documentation
 

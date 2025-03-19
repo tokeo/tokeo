@@ -36,7 +36,9 @@ def process_order(order_id, notify_customer=True):
 
     # Validate order status
     if order.status != 'pending':
-        app.log.warning(f"Cannot process order {order_id} with status {order.status}")
+        app.log.warning(
+            f"Cannot process order {order_id} with status {order.status}"
+        )
         return {'success': False, 'reason': f"Invalid order status: {order.status}"}
 
     # Update order status in database
@@ -67,11 +69,15 @@ def process(self):
 
 ### Notes:
 
-- Performers act as the bridge between synchronous requests and asynchronous processing
+- Performers act as the bridge between synchronous requests and asynchronous
+  processing
 - Use performers to orchestrate complex workflows involving multiple steps
-- Performers typically interact with the database, perform business logic, and queue async tasks
-- Centralize business rules in performers to maintain consistency across the application
-- Controllers invoke performers, which in turn may invoke dramatiq actors for async work
+- Performers typically interact with the database, perform business logic,
+  and queue async tasks
+- Centralize business rules in performers to maintain consistency across
+  the application
+- Controllers invoke performers, which in turn may invoke dramatiq actors
+  for async work
 
 """
 

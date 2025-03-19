@@ -54,7 +54,8 @@ class App:
 
         ### Raises:
 
-        - **AttributeError**: If the app object is not set or the attribute does not exist
+        - **AttributeError**: If the app object is not set or the attribute
+          does not exist
 
         """
         # test _app object

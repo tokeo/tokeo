@@ -11,7 +11,7 @@ rendering templates.
 
 ### Features:
 
-1. **app.print()** - A framework-aware replacement for Python's built-in print() function
+1. **app.print()** - A framework-aware replacement for Python's built-in print()
 1. **app.inspect()** - A detailed inspection utility for examining objects
 1. **Output handlers** - Specialized handlers for different rendering styles:
     - Print - Basic text output with hooks
@@ -83,7 +83,8 @@ def register_tokeo_print(app: App) -> None:
         - **name** (str, optional): Name to identify this print operation in logs
         - **sep** (str): Separator between printed items (default: space)
         - **end** (str): String to append at the end (default: newline)
-        - **divider** (str, optional): Character to use for divider line (prints 40 of these)
+        - **divider** (str, optional): Character to use for divider line
+          (prints 40 of these)
 
         """
         app.render(dict(args=args, name=name, sep=sep, end=end, divider=divider), handler='print')
@@ -111,13 +112,15 @@ def register_tokeo_print(app: App) -> None:
 
         - ***args**: Objects to inspect
         - **name** (str, optional): Name to identify this inspection in output
-        - **system** (bool): Whether to include system methods/attributes (those with __name__)
+        - **system** (bool): Whether to include system methods/attributes
+          (those with __name__)
         - **methods** (bool): Whether to display object methods
         - **attributes** (bool): Whether to display object attributes
         - **values** (bool): Whether to display object values
         - **types** (bool): Whether to display object types
         - **debug** (bool): Whether to output to debug log instead of stdout
-        - **divider** (str, optional): Character to use for divider line (prints 40 of these)
+        - **divider** (str, optional): Character to use for divider line
+          (prints 40 of these)
 
         """
         app.render(
@@ -445,7 +448,8 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             - The object's value (string representation)
             - The object's type
             - A list of the object's methods (excluding system methods by default)
-            - A list of the object's attributes (excluding system attributes by default)
+            - A list of the object's attributes (excluding system attributes
+              by default)
             - System methods and attributes (those with __name__) when requested
 
         : The output format varies based on which options are enabled, with
@@ -507,7 +511,8 @@ class TokeoInspectOutputHandler(output.OutputHandler):
 
         ### Args:
 
-        - **data** (dict): The data dictionary with inspection parameters, containing:
+        - **data** (dict): The data dictionary with inspection parameters,
+          containing:
 
             - args: Objects to inspect
             - name: Optional name for the inspection
@@ -524,8 +529,8 @@ class TokeoInspectOutputHandler(output.OutputHandler):
 
         ### Returns:
 
-        - **str|None**: A string with inspection results, empty string if in debug mode,
-                      or None if no 'args' key is found
+        - **str|None**: A string with inspection results, empty string if
+          in debug mode, or None if no 'args' key is found
 
         ### Notes:
 

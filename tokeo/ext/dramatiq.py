@@ -105,8 +105,8 @@ class TokeoDramatiq(MetaMixin):
 
     ### Notes:
 
-    - All configuration is read from the 'dramatiq' section in the application config
-    - The diskcache extension is required for the locks and rate limiting functionality
+    - Configuration is read from the 'dramatiq' section in the application config
+    - The diskcache extension is required for the locks and rate limiting
     - Only RabbitMQ broker is currently supported
 
     """
@@ -339,9 +339,9 @@ class TokeoDramatiqController(Controller):
         """
         Manage distributed locks used by Dramatiq tasks.
 
-        This command provides access to the distributed locks stored in the diskcache.
-        It can display information about the locks configuration or purge all locks
-        from the cache when needed.
+        This command provides access to the distributed locks stored in the
+        diskcache. It can display information about the locks configuration or
+        purge all locks from the cache when needed.
 
         ### Notes:
 
@@ -409,8 +409,8 @@ class TokeoDramatiqController(Controller):
 
         ### Notes:
 
-        - Worker configuration includes process count, thread count, shutdown timeout,
-          restart delay, and queue prefetch settings
+        - Worker configuration includes process count, thread count, shutdown
+          timeout, restart delay, and queue prefetch settings
 
         - When using --watch, the command will monitor the specified directory for
           changes and automatically reload actors when files change

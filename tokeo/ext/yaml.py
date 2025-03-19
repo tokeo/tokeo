@@ -27,7 +27,8 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
     ### Methods:
 
-    - **merge**: Merges a dictionary into the current configuration with support for deep merging
+    - **merge**: Merges a dictionary into the current configuration with support
+      for deep merging
     - All methods inherited from YamlConfigHandler, including:
 
         - **get**: Get a config value

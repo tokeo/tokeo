@@ -10,7 +10,8 @@ and configuration management.
 
 ### Features:
 
-- **Dynamic loading** of servicers and protocol buffer implementations based on configuration
+- **Dynamic loading** of servicers and protocol buffer implementations
+  based on configuration
 - **Server lifecycle management** with clean startup and shutdown
 - **CLI commands** for managing the gRPC server
 - **Integration** with the application's logging system
@@ -40,7 +41,8 @@ class TokeoGrpc(MetaMixin):
 
     ### Notes:
 
-    - The server is lazily initialized when first accessed through the `server` property
+    - The server is lazily initialized when first accessed through
+      the `server` property
     - Server configuration is drawn from the application's 'grpc' config section
     - Provides methods for startup, shutdown, and serving (blocking mode)
     - Supports dynamic loading of servicer implementations
@@ -117,10 +119,13 @@ class TokeoGrpc(MetaMixin):
 
         : The initialization process follows these steps:
 
-            1. Creates a server with ThreadPoolExecutor using configured max_worker count
-            1. Dynamically imports the protocol buffer module containing the add_servicer_to_server function
+            1. Creates a server with ThreadPoolExecutor using configured
+              max_worker count
+            1. Dynamically imports the protocol buffer module containing the
+              add_servicer_to_server function
             1. Dynamically imports the servicer class module
-            1. Registers the servicer with the server using the add_servicer_to_server function
+            1. Registers the servicer with the server using the
+              add_servicer_to_server function
             1. Configures the server to listen on the specified URL
 
         """

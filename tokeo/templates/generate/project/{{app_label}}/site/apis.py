@@ -105,4 +105,4 @@ async def get_api():
     }
     ```
     """
-    return dict(msg=f'{{ app_label }} json api result')
+    return dict(msg='{{ app_label }} json api result')

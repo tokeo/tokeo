@@ -1,4 +1,4 @@
-"""                                                                                                                                                                                                 │ │
+"""
 Business task actors for distributed processing with Dramatiq.
 
 This module provides a centralized location for defining business-specific
@@ -39,7 +39,8 @@ def process_business_data(item_id):
 
 - Tasks defined here will be discovered automatically when dramatiq workers
   are started via the 'dramatiq serve' command
-- Define app.dramatiq.actors in your application's config file to point to this module
+- Define app.dramatiq.actors in your application's config file to point to
+  this module
 - Actors should handle serialization/deserialization of complex data structures
 
 """
