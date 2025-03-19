@@ -28,7 +28,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     ### Methods:
 
     - **merge**: Merges a dictionary into the current configuration with support
-      for deep merging
+        for deep merging
     - All methods inherited from YamlConfigHandler, including:
 
         - **get**: Get a config value
@@ -41,8 +41,8 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     ### Notes:
 
     : The handler preserves nested dictionary structures during merges using
-      a deep merge algorithm, which allows for more complex configuration
-      structures than the standard Cement config handlers support.
+        a deep merge algorithm, which allows for more complex configuration
+        structures than the standard Cement config handlers support.
 
     ### Example:
 
@@ -78,7 +78,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         ### Notes:
 
         : This class defines metadata required by the Cement framework
-          for proper handler registration and operation.
+            for proper handler registration and operation.
 
         """
 
@@ -97,13 +97,13 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         ### Args:
 
         - **dict_obj** (dict): Dictionary of configuration keys/values to merge
-          into the existing configuration
+            into the existing configuration
 
         ### Keyword Args:
 
         - **override** (bool): Whether to override existing values in the
-          configuration. If True, existing values are replaced or deep-merged
-          if they are dictionaries. If False, only new keys are added.
+            configuration. If True, existing values are replaced or deep-merged
+            if they are dictionaries. If False, only new keys are added.
 
         ### Raises:
 
@@ -135,8 +135,8 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         ### Notes:
 
         : For nested dictionaries, a deep merge is performed, allowing for
-          preserving existing nested values while adding or updating specific
-          keys. This is particularly useful for complex configuration structures.
+            preserving existing nested values while adding or updating specific
+            keys. This is particularly useful for complex configuration structures.
 
         """
         # Skip processing if dict_obj is None
@@ -211,7 +211,7 @@ def load(app):
         1. Sets it as the default configuration handler
 
     : After loading this extension, all configuration operations will use
-      this handler for loading, parsing and merging configuration data.
+        this handler for loading, parsing and merging configuration data.
 
     """
     app.handler.register(TokeoYamlConfigHandler)

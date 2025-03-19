@@ -172,7 +172,7 @@ def tokeo_jinja2_config(app):
     ### Notes:
 
     : This function addresses a limitation in Cement by ensuring the template
-      handler is properly initialized and has access to the application
+        handler is properly initialized and has access to the application
 
     : Adds template directories from the configuration if specified
 

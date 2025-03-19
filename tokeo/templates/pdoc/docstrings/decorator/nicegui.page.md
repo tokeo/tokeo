@@ -8,9 +8,9 @@ This means it is private to the user and not shared with others (as it is done w
 - The name of the decorated function is unused and can be anything.
 - The page route is determined by the path argument and registered globally.
 - The decorator does only work for free functions and static methods.
-  Instance methods or initializers would require a self argument,
-  which the router cannot associate. See the nicegui modularization
-  example for strategies to structure your code.
+    Instance methods or initializers would require a self argument,
+    which the router cannot associate. See the nicegui modularization
+    example for strategies to structure your code.
 
 ### Page Configuration:
 

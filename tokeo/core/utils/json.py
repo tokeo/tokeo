@@ -50,9 +50,9 @@ def jsonDump(obj, default=jsonTokeoEncoder, encoding=None):
 
     - **obj** (any): The object to serialize to JSON
     - **default** (callable, optional): A function that gets called for
-      bjects that can't be serialized. Defaults to jsonTokeoEncoder.
+        bjects that can't be serialized. Defaults to jsonTokeoEncoder.
     - **encoding** (str, optional): If provided, the resulting JSON string
-      will be encoded to bytes using this encoding (e.g., 'utf-8')
+        will be encoded to bytes using this encoding (e.g., 'utf-8')
 
     ### Returns:
 
@@ -61,7 +61,7 @@ def jsonDump(obj, default=jsonTokeoEncoder, encoding=None):
     ### Notes:
 
     : This function maintains proper serialization of Tokeo-specific types like
-      dates and datetimes by using the jsonTokeoEncoder as the default encoder.
+        dates and datetimes by using the jsonTokeoEncoder as the default encoder.
 
     """
     j = json.dumps(obj, default=default)

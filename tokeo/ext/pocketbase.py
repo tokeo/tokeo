@@ -76,9 +76,9 @@ class TokeoPocketBaseHandler(MetaMixin):
     ### Notes:
 
     : The handler is registered as 'db' in the application and can be
-      accessed through app.db in your application code. It provides a
-      simplified interface to the PocketBase SDK, abstracting away some
-      of the complexity while still providing access to all functionality.
+        accessed through app.db in your application code. It provides a
+        simplified interface to the PocketBase SDK, abstracting away some
+        of the complexity while still providing access to all functionality.
 
     """
 
@@ -89,8 +89,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : This class defines the configuration section, default values,
-          and unique identifier required by the Cement framework for
-          proper handler registration and operation.
+            and unique identifier required by the Cement framework for
+            proper handler registration and operation.
         """
 
         # Unique identifier for this handler
@@ -121,8 +121,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : This constructor only stores the application reference. The actual
-          PocketBase client initialization is deferred until the _setup method
-          is called by the framework to ensure proper configuration loading.
+            PocketBase client initialization is deferred until the _setup method
+            is called by the framework to ensure proper configuration loading.
 
         """
         super(TokeoPocketBaseHandler, self).__init__(*args, **kw)
@@ -143,9 +143,9 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : This method merges the default configuration with any user-provided
-          configuration and initializes the PocketBase client. The client is
-          stored in the `pb` attribute and is used by all other methods to
-          interact with the PocketBase server.
+            configuration and initializes the PocketBase client. The client is
+            stored in the `pb` attribute and is used by all other methods to
+            interact with the PocketBase server.
 
         """
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
@@ -163,7 +163,7 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         - **key** (str): Configuration key to retrieve
         - **kwargs**: Additional arguments passed to config.get(), such as
-          default values
+            default values
 
         ### Returns:
 
@@ -183,8 +183,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : This method is called automatically when the application is shutting down
-          via the pre_close hook. It ensures proper cleanup of resources and
-          session data.
+            via the pre_close hook. It ensures proper cleanup of resources and
+            session data.
 
         """
         pass
@@ -221,8 +221,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : While most common operations are available through the handler's
-          higher-level methods, this method provides access to the underlying
-          SDK for more specialized or advanced use cases.
+            higher-level methods, this method provides access to the underlying
+            SDK for more specialized or advanced use cases.
 
         """
         # return a general collection
@@ -240,7 +240,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         - **collection_id_or_name** (str): The ID or name of the collection
         - **id** (str): The ID of the record to retrieve
         - **sort** (str, optional): Sort expression for the query
-          (format: `field,-field`)
+            (format: `field,-field`)
         - **cache** (bool): Whether to use cached results if available
         - **q** (dict): Additional query parameters to pass to PocketBase
 
@@ -328,8 +328,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : The filter parameter uses PocketBase's filter syntax, which is similar to
-          JavaScript expressions. You can use logical operators (&&, ||), comparison
-          operators (=, !=, >, <, >=, <=), and various filter functions.
+            JavaScript expressions. You can use logical operators (&&, ||), comparison
+            operators (=, !=, >, <, >=, <=), and various filter functions.
 
         """
         # check query options
@@ -376,8 +376,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : When creating users or other records with passwords, be sure to include
-          both the `password` and `passwordConfirm` fields with identical values
-          as required by PocketBase.
+            both the `password` and `passwordConfirm` fields with identical values
+            as required by PocketBase.
 
         """
         # run database create
@@ -424,8 +424,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : Updates are partial by default, meaning only the fields specified in
-          update_fields will be modified. To remove a field value, set it to null
-          explicitly in the update_fields dictionary.
+            update_fields will be modified. To remove a field value, set it to null
+            explicitly in the update_fields dictionary.
 
         """
         # run database update
@@ -450,7 +450,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Raises:
 
         - **Exception**: If record deletion fails (e.g., record not found
-          or unauthorized)
+            or unauthorized)
 
         ### Example:
 
@@ -467,8 +467,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : Deletion is permanent and cannot be undone. For sensitive data, consider
-          implementing soft deletes by updating a status field instead of
-          permanently deleting records.
+            implementing soft deletes by updating a status field instead of
+            permanently deleting records.
 
         """
         # run database delete
@@ -489,8 +489,8 @@ def pocketbase_extend_app(app):
     ### Notes:
 
     : This function is called automatically during the application's post_setup
-      phase. It creates an instance of TokeoPocketBaseHandler, configures it,
-      and attaches it to the application as the 'db' attribute.
+        phase. It creates an instance of TokeoPocketBaseHandler, configures it,
+        and attaches it to the application as the 'db' attribute.
 
     """
     app.extend('db', TokeoPocketBaseHandler(app))
@@ -511,8 +511,8 @@ def pocketbase_close(app):
     ### Notes:
 
     : This function is called automatically during application's pre_close phase.
-      It ensures any open connections are closed, authentication data is cleared,
-      and resources are released properly before the application exits.
+        It ensures any open connections are closed, authentication data is cleared,
+        and resources are released properly before the application exits.
 
     """
     app.db.close()
@@ -551,7 +551,7 @@ def load(app):
         1. Registers a pre_close hook for proper cleanup
 
     : After loading this extension, the PocketBase client is available
-      through the app.db attribute in your application code.
+        through the app.db attribute in your application code.
 
     """
     # Set the default database handler for the application

@@ -17,6 +17,7 @@ polling mechanism.
 - **Element helper** for custom HTML elements not directly exposed by NiceGUI
 - **Extensive configuration** with sensible defaults for most use cases
 - **Complete lifecycle management** integrated with Tokeo application hooks
+
 """
 
 from sys import argv, executable as sys_executable
@@ -44,10 +45,10 @@ class TokeoNiceguiError(TokeoError):
     ### Notes:
 
     1. Used for NiceGUI-specific error conditions like configuration issues,
-      file watching problems, or missing dependencies
+        file watching problems, or missing dependencies
 
     1. Inherits from the base TokeoError class to maintain error handling
-      consistency across the framework
+        consistency across the framework
 
     """
 
@@ -207,10 +208,10 @@ class NiceguiElementHelper:
         ### Notes:
 
         1. The returned function creates either an Element or a TextElement
-          depending on whether text content is provided
+            depending on whether text content is provided
 
         1. Usage example: app.nicegui.ux.article("My content") creates
-          a <article> element
+            a <article> element
 
         """
 
@@ -564,6 +565,7 @@ class TokeoNiceguiController(Controller):
         ### Args:
 
         - **app** (Application): The Cement application instance
+
         """
         super()._setup(app)
 
@@ -605,7 +607,7 @@ class TokeoNiceguiController(Controller):
         - Delegates to the app.nicegui.startup() method
         - Passes command-line arguments to control hot-reloading behavior
         - The server runs until interrupted (Ctrl+C) or a file change
-          triggers restart
+            triggers restart
 
         """
         self.app.nicegui.startup(
@@ -637,7 +639,7 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
     ### Notes:
 
     1. Handles FastAPI route decorators (@app.nicegui.fastapi_app.get,
-      @app.nicegui.fastapi_app.post)
+        @app.nicegui.fastapi_app.post)
     1. Handles NiceGUI page decorators (@app.nicegui.ui.page, @ui.page)
     1. Extracts parameters values for better documentation
 
@@ -698,7 +700,7 @@ def tokeo_nicegui_extend_app(app):
 
     1. This function is called during application setup
     1. It creates the TokeoNicegui instance and attaches it to the app
-      as app.nicegui
+        as app.nicegui
 
     """
     app.extend('nicegui', TokeoNicegui(app))

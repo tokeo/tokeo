@@ -224,7 +224,7 @@ def getitem_first_not_blank(values, default=None):
     ### Raises:
 
     - **TypeError**: If values is not a list or tuple, or if any value
-      is not a string
+        is not a string
 
     """
     if not isinstance(values, (list, tuple)):

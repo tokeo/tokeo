@@ -25,7 +25,7 @@ def deep_merge(a, b):
     ### Notes:
 
     : **IMPORTANT**: Tuples and arbitrary objects are not handled as
-      their merge behavior would be ambiguous.
+        their merge behavior would be ambiguous.
 
     """
     try:

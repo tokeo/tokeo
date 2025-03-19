@@ -38,9 +38,9 @@ def process_business_data(item_id):
 ### Notes:
 
 - Tasks defined here will be discovered automatically when dramatiq workers
-  are started via the 'dramatiq serve' command
+    are started via the 'dramatiq serve' command
 - Define app.dramatiq.actors in your application's config file to point to
-  this module
+    this module
 - Actors should handle serialization/deserialization of complex data structures
 
 """
@@ -60,8 +60,8 @@ def count_words(url):
     ### Args:
 
     - **url** (str, optional): URL of the webpage to analyze.
-      Argument is given by the worker from RabbitMQ on start.
-      Value was set on putting the task on the queue.
+        Argument is given by the worker from RabbitMQ on start.
+        Value was set on putting the task on the queue.
 
     """
     try:

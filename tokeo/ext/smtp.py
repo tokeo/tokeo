@@ -44,8 +44,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
     ### Notes:
 
     : This handler requires proper SMTP server configuration in the application
-      configuration. The configuration can be overridden per message via keyword
-      arguments when sending emails.
+        configuration. The configuration can be overridden per message via keyword
+        arguments when sending emails.
 
     ### See Also:
 
@@ -61,8 +61,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         ### Notes:
 
         : This class defines the configuration section, default values,
-          and other metadata required by the Cement framework for
-          proper handler registration and operation.
+            and other metadata required by the Cement framework for
+            proper handler registration and operation.
 
         """
 
@@ -116,7 +116,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         ### Notes:
 
         : Initializes an internal cache to optimize template existence checks
-          during template-based email generation.
+            during template-based email generation.
 
         """
         super().__init__(**kw)
@@ -170,9 +170,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         ### Notes:
 
         : Parameter merging follows specific rules: message parameters like 'to'
-          and 'subject' can be overridden by keyword arguments, while connection
-          parameters like 'host' and 'port' are always taken from configuration.
-          Special headers like Date and X-headers receive special handling.
+            and 'subject' can be overridden by keyword arguments, while connection
+            parameters like 'host' and 'port' are always taken from configuration.
+            Special headers like Date and X-headers receive special handling.
 
         ### Example:
 
@@ -340,7 +340,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         ### Notes:
 
         : Returns a Header object with proper encoding if header_encoding is
-          specified in the params, otherwise returns the value as-is.
+            specified in the params, otherwise returns the value as-is.
 
         """
         return Header(value, charset=_charset) if params['header_encoding'] else value
@@ -356,7 +356,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         ### Args:
 
         - **body** (str|tuple|dict): The message body content in one of
-          supported formats
+            supported formats
         - **params**: Dictionary of email parameters from _get_params()
 
         ### Returns:
@@ -370,8 +370,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         ### Notes:
 
         : This method handles all the complexity of creating multipart messages,
-          setting proper encodings, and handling attachments. The message structure
-          will vary depending on the content:
+            setting proper encodings, and handling attachments. The message structure
+            will vary depending on the content:
 
             1. text/plain: For text-only emails
             1. text/html: For HTML-only emails
@@ -612,8 +612,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             1. `{template}.html.jinja2`: For HTML body (optional)
 
         : At least one of plain text or HTML templates should exist.
-          The mail_params context variable is provided to templates
-          containing the email parameters.
+            The mail_params context variable is provided to templates
+            containing the email parameters.
 
         ### Example:
 

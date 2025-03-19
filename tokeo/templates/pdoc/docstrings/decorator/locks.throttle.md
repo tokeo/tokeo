@@ -9,7 +9,7 @@ it suitable for distributed applications.
 When the rate limit is exceeded, the decorator will either:
 
 1. Block and sleep until enough tokens are available to call the function
-2. Call an alternative callback function if cb_on_locked is provided
+1. Call an alternative callback function if cb_on_locked is provided
 
 ### Args:
 
@@ -39,7 +39,7 @@ def limited_api_call(resource_id):
 ### Notes:
 
 - The throttle state persists in the cache based on the function name
-  or custom name/name_f parameter
+    or custom name/name_f parameter
 - When rate-limited, execution will be delayed unless cb_on_locked
-  is provided
+    is provided
 - Token bucket algorithm allows for bursts up to 'count' calls at once

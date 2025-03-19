@@ -70,14 +70,14 @@ def process(self):
 ### Notes:
 
 - Performers act as the bridge between synchronous requests and asynchronous
-  processing
+    processing
 - Use performers to orchestrate complex workflows involving multiple steps
 - Performers typically interact with the database, perform business logic,
-  and queue async tasks
+    and queue async tasks
 - Centralize business rules in performers to maintain consistency across
-  the application
+    the application
 - Controllers invoke performers, which in turn may invoke dramatiq actors
-  for async work
+    for async work
 
 """
 

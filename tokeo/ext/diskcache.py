@@ -5,9 +5,9 @@ This module extends the standard diskcache library to provide a robust caching
 system with additional features including:
 
 1. Distributed locks for synchronization across processes
-2. Rate limiting decorators for API calls and resource management
-3. Concurrency control for resource-intensive operations
-4. Command-line interface for cache inspection and management
+1. Rate limiting decorators for API calls and resource management
+1. Concurrency control for resource-intensive operations
+1. Command-line interface for cache inspection and management
 
 The module implements two main rate-control mechanisms:
 - throttle: Limits the rate of function calls over time (token bucket algorithm)
@@ -152,7 +152,7 @@ class TokeoDiskCacheLocksHandler:
 
         - **key** (str): The lock key to acquire
         - **expire** (float, optional): Time in seconds after which the lock
-          automatically expires. Defaults to None.
+            automatically expires. Defaults to None.
 
         ### Returns:
 
@@ -206,7 +206,7 @@ class TokeoDiskCacheLocksHandler:
 
         - **key** (str): The lock key to acquire
         - **expire** (float, optional): Time in seconds after which the lock
-          automatically expires. Defaults to None.
+            automatically expires. Defaults to None.
 
         ### Yields:
 
@@ -256,7 +256,7 @@ class TokeoDiskCacheLocksHandler:
 
         When the rate limit is exceeded, the decorator will either:
         1. Block and sleep until enough tokens are available to call the function
-        2. Call an alternative callback function if cb_on_locked is provided
+        1. Call an alternative callback function if cb_on_locked is provided
 
         ### Args:
 
@@ -264,17 +264,17 @@ class TokeoDiskCacheLocksHandler:
         - **per_seconds** (float): Time period in seconds over which to limit calls
         - **name** (str, optional): Custom cache key name for this throttle
         - **name_f** (str, optional): Format string to generate key name
-          based on function arguments
+            based on function arguments
         - **expire** (float, optional): Expiration time for the throttle key
-          in seconds
+            in seconds
         - **time_func** (callable, optional): Function to get current time.
-          Defaults to time.time.
+            Defaults to time.time.
         - **sleep_func** (callable, optional): Function to sleep when rate limited.
-          Defaults to time.sleep.
+            Defaults to time.sleep.
         - **cb_on_locked** (callable, optional): Function to call when rate limited
-          instead of waiting
+            instead of waiting
         - **verbose** (bool, optional): Whether to log throttling information.
-          Defaults to True.
+            Defaults to True.
 
         ### Returns:
 
@@ -292,9 +292,9 @@ class TokeoDiskCacheLocksHandler:
         ### Notes:
 
         - The throttle state persists in the cache based on the function name
-          or custom name/name_f parameter
+            or custom name/name_f parameter
         - When rate-limited, execution will be delayed unless cb_on_locked
-          is provided
+            is provided
         - Token bucket algorithm allows for bursts up to 'count' calls at once
 
         """
@@ -414,7 +414,7 @@ class TokeoDiskCacheLocksHandler:
 
         When the concurrent limit is reached, the decorator will either:
         1. Block and sleep until a slot becomes available
-        2. Call an alternative callback function if cb_on_locked is provided
+        1. Call an alternative callback function if cb_on_locked is provided
 
         The decorator maintains a counter of available slots. Each call decrements
         the counter. When the function completes, the counter is incremented again.
@@ -424,15 +424,15 @@ class TokeoDiskCacheLocksHandler:
         - **count** (int): Maximum number of concurrent calls allowed
         - **name** (str, optional): Custom cache key name for this temper instance
         - **name_f** (str, optional): Format string to generate key name based
-          on function arguments
+            on function arguments
         - **expire** (float, optional): Expiration time for the temper key
-          in seconds
+            in seconds
         - **sleep_func** (callable, optional): Sleep function on resource limit.
-          Defaults to time.sleep.
+            Defaults to time.sleep.
         - **cb_on_locked** (callable, optional): Function to call on limit
-          instead of waiting
+            instead of waiting
         - **verbose** (bool, optional): Whether to log tempering information.
-          Defaults to True.
+            Defaults to True.
 
         ### Returns:
 
@@ -451,13 +451,13 @@ class TokeoDiskCacheLocksHandler:
         ### Notes:
 
         - The temper state persists in the cache based on the function
-          name or custom name/name_f parameter
+            name or custom name/name_f parameter
         - If a process crashes while holding a slot, the slot will be released
-          when the cache key expires, preventing permanent deadlock
+            when the cache key expires, preventing permanent deadlock
         - Unlike throttle, temper has a fixed delay when blocked
-          (0.05 seconds by default)
+            (0.05 seconds by default)
         - The function will automatically restore slots when complete, ensuring
-          resources become available again
+            resources become available again
 
         """
 
@@ -663,10 +663,10 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         - **key** (str): The key of the item in the cache to get
         - **default** (any, optional): The value to return if the item is not found.
-          Defaults to None.
+            Defaults to None.
         - ****kw**: Additional keyword arguments
-          - **read** (bool): Whether to read without updating cache statistics
-          - **retry** (bool): Whether to retry if the database is locked
+            - **read** (bool): Whether to read without updating cache statistics
+            - **retry** (bool): Whether to retry if the database is locked
 
         ### Returns:
 
@@ -749,9 +749,9 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         ### Args:
 
         - **fix** (bool, optional): Whether to fix any corruption found.
-          Defaults to False.
+            Defaults to False.
         - **retry** (bool, optional): Whether to retry if the database is locked.
-          Defaults to False.
+            Defaults to False.
 
         ### Returns:
 
@@ -771,7 +771,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         - **tag** (str): Tag that identifies items to evict
         - **retry** (bool, optional): Whether to retry if the database
-          is locked. Defaults to False.
+            is locked. Defaults to False.
 
         ### Returns:
 
@@ -795,9 +795,9 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         ### Args:
 
         - **now** (float, optional): Current time to use for expiration check.
-          Defaults to None (uses current time).
+            Defaults to None (uses current time).
         - **retry** (bool, optional): Whether to retry if the database is locked.
-          Defaults to False.
+            Defaults to False.
 
         ### Returns:
 
@@ -823,18 +823,18 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         - **key** (str): The key to add to the cache
         - **value** (any): The value to add to the cache
         - **expire** (float, optional): Expiration time in seconds.
-          Defaults to None.
+            Defaults to None.
         - **tag** (str, optional): Tag to categorize this cache item.
-          Defaults to None.
+            Defaults to None.
         - **read** (bool, optional): Whether to read without updating
-          cache statistics. Defaults to False.
+            cache statistics. Defaults to False.
         - **retry** (bool, optional): Whether to retry if the database
-          is locked. Defaults to False.
+            is locked. Defaults to False.
 
         ### Returns:
 
         - **bool**: True if the item was added successfully,
-          False if the key already exists
+            False if the key already exists
 
         """
         return self._cache.add(key, value, expire=expire, tag=tag, read=read, retry=retry)
@@ -847,9 +847,9 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         - **key** (str): The key to update
         - **expire** (float, optional): New expiration time in seconds.
-          Defaults to None.
+            Defaults to None.
         - **retry** (bool, optional): Whether to retry if the database is locked.
-          Defaults to False.
+            Defaults to False.
 
         ### Returns:
 
@@ -944,16 +944,16 @@ class TokeoDiskCacheController(Controller):
 
         Performs a series of maintenance operations:
         1. Checks and fixes database integrity
-        2. Reports cache usage statistics
-        3. Removes expired items
-        4. Counts current cache entries
+        1. Reports cache usage statistics
+        1. Removes expired items
+        1. Counts current cache entries
 
         This command is useful for regular maintenance and troubleshooting.
 
         ### Notes:
 
         : All operations are performed with database locking retry enabled
-          to ensure reliability even when the cache is under heavy use.
+            to ensure reliability even when the cache is under heavy use.
 
         """
         directory = self.app.cache._cache.directory
@@ -1166,7 +1166,7 @@ class TokeoDiskCacheController(Controller):
 
         Provides two modes of operation:
         1. Tag-based purging: Removes all items with a specific tag
-        2. Complete purging: Removes all items from the cache
+        1. Complete purging: Removes all items from the cache
 
         This command requires either --tag or --all options to prevent
         accidental deletion of cache items.
@@ -1472,8 +1472,8 @@ def load(app):
     This function is called by Cement when loading extensions. It:
 
     1. Sets the default cache handler to TokeoDiskCacheCacheHandler
-    2. Registers the cache handler with the application
-    3. Registers the command-line controller for cache management
+    1. Registers the cache handler with the application
+    1. Registers the command-line controller for cache management
 
     ### Args:
 
@@ -1508,7 +1508,7 @@ def unpack_func_args(func, *args):
 
     - Only handles positional arguments, not keyword arguments
     - If a parameter has a default value and no argument is provided,
-      it will not be included in the returned dictionary
+        it will not be included in the returned dictionary
     - Used primarily for generating cache keys based on function arguments
 
     """

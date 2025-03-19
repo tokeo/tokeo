@@ -51,11 +51,11 @@ class DecoratedFunction:
         - **app** (object): The application instance
         - **func** (object): The function object to analyze
         - **update_func_docstring** (bool, optional): Whether to update the
-          function's docstring with decorator docs. Defaults to True.
+            function's docstring with decorator docs. Defaults to True.
         - **prepend_docstrings** (str, optional): Text to prepend to each
-          decorator's docstring
+            decorator's docstring
         - **append_docstrings** (str, optional): Text to append to each
-          decorator's docstring
+            decorator's docstring
 
         """
         self.app = app
@@ -106,7 +106,7 @@ class DecoratedFunction:
         ### Returns:
 
         - **bool|None**: True if decorators were successfully parsed, False
-          or None otherwise
+            or None otherwise
 
         """
         block_start = re.search(rf'\s*{self.func.funcdef()}\s+{self.func.name}', self.func.source, re.MULTILINE)
@@ -202,14 +202,14 @@ class DecoratedFunction:
         ### Args:
 
         - **prepend_docstrings** (str, optional): Text to prepend to each
-          decorator's docstring
+            decorator's docstring
         - **append_docstrings** (str, optional): Text to append to each
-          decorator's docstring
+            decorator's docstring
 
         ### Notes:
 
         : This method appends unique decorator docstrings to the function's
-          existing docstring, avoiding duplicates from the same decorator type.
+            existing docstring, avoiding duplicates from the same decorator type.
 
         """
         # do insert same decorator's docstring twice
