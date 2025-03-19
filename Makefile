@@ -46,12 +46,14 @@ prod:
 	pip install -e .
 
 proto:
+	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	python -m grpc_tools.protoc -I./ --python_out=. --pyi_out=. --grpc_python_out=. ./tokeo/core/grpc/proto/tokeo.proto
 
 doc:
+	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	rm -rf html
-	pdoc3 --html tokeo tests
-	pdoc3 --html --http localhost:9999 tokeo tests
+	tokeo pdoc render
+	python -m http.server -d html 9999
 
 # check for verbosity
 ifdef verbose
@@ -84,6 +86,7 @@ endif
 # limit the tests to run by files and tests filters
 # make test files=test_logging.py tests=logging debug=1
 test:
+	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	rm -rf tmp/tests
 	mkdir -p tmp/tests
 	touch tmp/tests/.gitkeep
@@ -103,10 +106,12 @@ sources=tokeo docs tests
 endif
 
 fmt:
+	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	# align with https://google.github.io/styleguide/pyguide.html
 	pyink --pyink-use-majority-quotes --line-length 139 --include "\.py" --exclude="/(\.git|__pycache__)/" $(sources)
 
 lint:
+	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	# align with https://google.github.io/styleguide/pyguide.html
 	flake8 --max-line-length 140 --max-doc-length 84 --extend-ignore "" --exclude "*/grpc/proto/*_pb2*.py,.git,__pycache__" $(sources)
 
