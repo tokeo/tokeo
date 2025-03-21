@@ -72,7 +72,7 @@
 <%def name="show_module_list(modules)">
 <div class="page-header">
   <h1>🚀 ${html_title}</h1>
-  <p>Explore the API documentation for project modules</p>
+  <p>Explore the API documentation of project modules</p>
 </div>
 
 % if not modules:
