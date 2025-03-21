@@ -328,8 +328,9 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes:
 
         : The filter parameter uses PocketBase's filter syntax, which is similar to
-            JavaScript expressions. You can use logical operators (&&, ||), comparison
-            operators (=, !=, >, <, >=, <=), and various filter functions.
+            JavaScript expressions. You can use logical operators (&&, ||),
+            comparison operators (=, !=, >, <, >=, <=), and
+            various filter functions.
 
         """
         # check query options

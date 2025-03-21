@@ -345,11 +345,7 @@ class TokeoPdoc(MetaMixin):
 
             # Create a single base `index.html`
             with open(fs.join(self._output_dir, 'index.html'), 'w', encoding='utf-8') as f:
-                f.write(
-                    pdoc._render_template(
-                        '/html.mako', app=self.app, modules=((module.name, module.docstring) for module in modules)
-                    )
-                )
+                f.write(pdoc._render_template('/html.mako', app=self.app, modules=((module.name, module.docstring) for module in modules)))
 
             # Copy assets into output dir
             try:
@@ -411,6 +407,7 @@ class TokeoPdoc(MetaMixin):
             html_dir = self._output_dir
 
             class CustomHandler(handler):
+
                 def __init__(self, *args, **kwargs):
                     super().__init__(*args, directory=html_dir, **kwargs)
 
@@ -447,12 +444,12 @@ class TokeoPdoc(MetaMixin):
 
         """
         if self._http_server_running and self._http_server:
-            self.app.log.info("Shutting down Tokeo pdoc server...")
+            self.app.log.info('Shutting down Tokeo pdoc server...')
             self._http_server_running = False
             self._http_server.shutdown()
             if self._http_server_thread:
                 self._http_server_thread.join()
-            self.app.log.info("Tokeo pdoc server was shut down")
+            self.app.log.info('Tokeo pdoc server was shut down')
 
     def serve(self):
         """
@@ -705,24 +702,22 @@ def _get_config(**kwargs):
     MAKO_INTERNALS = Template('').module.__dict__.keys()
     DEFAULT_CONFIG = fs.join(get_module_path('tokeo.templates.pdoc.html'), 'config.mako')
     config = {}
-    for config_module in (Template(filename=DEFAULT_CONFIG).module,
-                          pdoc.tpl_lookup.get_template('/config.mako').module):
-        config.update((var, getattr(config_module, var, None))
-                      for var in config_module.__dict__
-                      if var not in MAKO_INTERNALS)
+    for config_module in (Template(filename=DEFAULT_CONFIG).module, pdoc.tpl_lookup.get_template('/config.mako').module):
+        config.update((var, getattr(config_module, var, None)) for var in config_module.__dict__ if var not in MAKO_INTERNALS)
 
-    known_keys = (set(config)
-                  | {'docformat'}  # Feature. https://github.com/pdoc3/pdoc/issues/169
-                  # deprecated
-                  | {'module', 'modules', 'http_server', 'external_links', 'search_query'})
+    known_keys = (
+        set(config)
+        | {'docformat'}  # Feature. https://github.com/pdoc3/pdoc/issues/169
+        # deprecated
+        | {'module', 'modules', 'http_server', 'external_links', 'search_query'}
+    )
     invalid_keys = {k: v for k, v in kwargs.items() if k not in known_keys}
     if invalid_keys:
-        warn(f'Unknown configuration variables (not in config.mako): {invalid_keys}')
+        warnings.warn(f'Unknown configuration variables (not in config.mako): {invalid_keys}')
     config.update(kwargs)
 
     if 'search_query' in config:
-        warn('Option `search_query` has been deprecated. Use `google_search_query` instead',
-             DeprecationWarning, stacklevel=2)
+        warnings.warn('Option `search_query` has been deprecated. Use `google_search_query` instead', DeprecationWarning, stacklevel=2)
         config['google_search_query'] = config['search_query']
         del config['search_query']
 

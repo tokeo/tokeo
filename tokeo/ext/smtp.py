@@ -370,8 +370,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         ### Notes:
 
         : This method handles all the complexity of creating multipart messages,
-            setting proper encodings, and handling attachments. The message structure
-            will vary depending on the content:
+            setting proper encodings, and handling attachments. The message
+            structure will vary depending on the content:
 
             1. text/plain: For text-only emails
             1. text/html: For HTML-only emails
