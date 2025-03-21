@@ -73,7 +73,7 @@
 
 <%def name="show_module_list(modules)">
 <div class="page-header">
-  <h1>${html_title}</h1>
+  <h1>🚀 ${html_title}</h1>
   <p>Explore the API documentation for project modules</p>
 </div>
 
@@ -336,7 +336,7 @@
     % endif
 
     % if submodules:
-    <li><h3><a href="#header-submodules">Sub-modules</a></h3>
+    <li><h3>Sub-modules</h3>
       <ul>
       % for m in submodules:
         <li><code>${link(m)}</code></li>
@@ -346,19 +346,19 @@
     % endif
 
     % if variables:
-    <li><h3><a href="#header-variables">Global variables</a></h3>
+    <li><h3>Global variables</h3>
       ${show_column_list(variables)}
     </li>
     % endif
 
     % if functions:
-    <li><h3><a href="#header-functions">Functions</a></h3>
+    <li><h3>Functions</h3>
       ${show_column_list(functions)}
     </li>
     % endif
 
     % if classes:
-    <li><h3><a href="#header-classes">Classes</a></h3>
+    <li><h3>Classes</h3>
       <ul>
       % for c in classes:
         <li>
@@ -483,7 +483,7 @@
 <body>
 <main>
   % if module_list:
-    <article id="content">
+    <article id="module-list">
       ${show_module_list(modules)}
     </article>
   % else:
