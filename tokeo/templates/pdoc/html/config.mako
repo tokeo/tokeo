@@ -8,6 +8,7 @@
 
     app = None
     html_lang = 'en'
+    html_title = 'Tokeo modules'
     show_inherited_members = False
     extract_module_toc_into_sidebar = False
     list_class_variables_in_index = True

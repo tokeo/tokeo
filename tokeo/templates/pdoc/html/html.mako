@@ -71,7 +71,7 @@
 </%def>
 
 <%def name="show_module_list(modules)">
-<h1>Python module list</h1>
+<h1>${html_title}</h1>
 
 % if not modules:
   <p>No modules found.</p>
@@ -404,7 +404,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
   % if syntax_highlighting:
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/${hljs_style}.min.css" crossorigin>
+    <link rel="stylesheet" href="/assets/hljs/styles/${hljs_style}.min.css">
   %endif
 
   <%namespace name="css" file="css.mako" />
@@ -437,9 +437,9 @@
   % endif
 
   % if syntax_highlighting:
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+    <script defer src="/assets/highlight.min.js"></script>
     <script>window.addEventListener('DOMContentLoaded', () => {
-        hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+        hljs.configure({languages: ['accesslog', 'bash', 'c', 'cmake', 'cpp', 'css', 'diff', 'django', 'go', 'graphql', 'handlebars', 'ini', 'javascript', 'json', 'less', 'lua', 'makefile', 'markdown', 'nginx', 'pgsql', 'php', 'plaintext', 'powershell', 'protobuf', 'python', 'python-repl', 'ruby', 'rust', 'scss', 'shell', 'sql', 'typescript', 'wasm', 'xml', 'yaml']});
         hljs.highlightAll();
     })</script>
   % endif
