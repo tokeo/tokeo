@@ -22,10 +22,11 @@ provides hooks for extensions to modify documentation rendering behavior.
 """
 
 from sys import argv
-from os.path import basename
-import importlib
+from os.path import basename, isdir
+import shutil
 import warnings
 import pdoc
+from mako.template import Template
 import re
 from cement import ex
 from cement.utils import fs
@@ -33,6 +34,7 @@ from cement.core.meta import MetaMixin
 from tokeo.core.exc import TokeoError
 from tokeo.ext.argparse import Controller
 from tokeo.core.utils.controllers import controller_log_info_help
+from tokeo.core.utils.modules import get_module_path
 
 
 class TokeoPdocError(TokeoError):
@@ -97,7 +99,7 @@ class TokeoPdoc(MetaMixin):
             host='127.0.0.1',
             port=9999,
             favicon=None,
-            templates='tokeo.templates.pdoc.html',
+            templates=['tokeo.templates.pdoc.html'],
         )
 
     def __init__(self, *args, **kw):
@@ -113,9 +115,8 @@ class TokeoPdoc(MetaMixin):
 
         """
         super(TokeoPdoc, self).__init__(*args, **kw)
-        self._docstrings = dict()
-        docstrings_module = importlib.import_module('tokeo.templates.pdoc.docstrings')
-        self._docstrings_dirs = [fs.abspath(docstrings_module.__path__[0])]
+        self._docstrings_cache = dict()
+        self._docstrings_dirs = [get_module_path('tokeo.templates.pdoc.docstrings')]
 
     def _setup(self, app):
         """
@@ -145,18 +146,22 @@ class TokeoPdoc(MetaMixin):
         self._port = self._config('port')
         self._favicon = self._config('favicon')
         self._templates = self._config('templates')
-        # identify modules to document
+        # identify modules to document and unique them
         if self._config('modules', fallback=None) is None:
-            self._modules = []
-            for mod in [self.app._meta.label, 'tests', 'tokeo']:
-                if mod not in self._modules:
-                    self._modules.append(mod)
+            mods = [self.app._meta.label, 'tests', 'tokeo']
         elif isinstance(self._config('modules'), str):
-            self._modules = self._config('modules').split(',')
+            mods = self._config('modules').split(',')
         elif isinstance(self._config('modules'), (list, tuple)):
-            self._modules = self._config('modules')
+            mods = self._config('modules')
         else:
             raise TokeoPdocError('To define modules for rendering pdoc it must be from type str or list')
+        # make list unique but ordered by given list
+        self._modules = []
+        for mod in mods:
+            if mod not in self._modules:
+                self._modules.append(mod)
+        # rewrite the pdoc._get_config to primary load from tokeo
+        pdoc._get_config = _get_config
         # return self as reference
         return self
 
@@ -205,15 +210,15 @@ class TokeoPdoc(MetaMixin):
 
         """
         # check if docstring is already cached
-        if f'{group}/{identifier}' in self._docstrings:
-            return self._docstrings[f'{group}/{identifier}']
+        if f'{group}/{identifier}' in self._docstrings_cache:
+            return self._docstrings_cache[f'{group}/{identifier}']
 
         # try to get docstring from dirs and cache if found
         for dir in self._docstrings_dirs:
             try:
                 with open(fs.join(dir, group, f'{identifier}.md'), 'r') as f:
                     docstring = f.read()
-                    self._docstrings[f'{group}/{identifier}'] = docstring
+                    self._docstrings_cache[f'{group}/{identifier}'] = docstring
                     return docstring
             except Exception:
                 pass
@@ -289,15 +294,16 @@ class TokeoPdoc(MetaMixin):
             if self._templates is not None:
                 # only use templates as set
                 pdoc.tpl_lookup.directories.clear()
-                try:
-                    # try given string as module name
-                    tpl_module = importlib.import_module(self._templates)
-                except Exception:
-                    # if not module then add as file path
-                    pdoc.tpl_lookup.directories.append(fs.abspath(self._templates))
-                else:
-                    # append the directory from module as source for templates
-                    pdoc.tpl_lookup.directories.append(fs.abspath(tpl_module.__path__[0]))
+                for template in self._templates:
+                    try:
+                        # try given string as module name
+                        tpl_module_path = get_module_path(template)
+                    except Exception:
+                        # if not module then add as file path
+                        pdoc.tpl_lookup.directories.append(fs.abspath(template))
+                    else:
+                        # append the directory from module as source for templates
+                        pdoc.tpl_lookup.directories.append(tpl_module_path)
 
             # loop modules to generate documentation
             context = pdoc.Context()
@@ -329,6 +335,16 @@ class TokeoPdoc(MetaMixin):
                         '/html.mako', app=self.app, modules=((module.name, module.docstring) for module in modules)
                     )
                 )
+
+            # Copy assets into output dir
+            try:
+                for tpl_dir in reversed(pdoc.tpl_lookup.directories):
+                    assets_dir = fs.join(tpl_dir, 'assets')
+                    if isdir(assets_dir):
+                        shutil.copytree(assets_dir, fs.join(self._output_dir, 'assets'))
+            except Exception as err:
+                # ignore the exception but log
+                self.app.log.error(err)
 
             # send out hook to process other modules after pdoc rendering
             for res in self.app.hook.run('tokeo_pdoc_post_render', self.app):
@@ -611,3 +627,40 @@ def load(app):
     app.hook.define('tokeo_pdoc_render_decorator')
     app.hook.register('post_setup', tokeo_pdoc_extend_app)
     app.hook.register('tokeo_pdoc_render_decorator', tokeo_pdoc_render_decorator)
+
+
+def _get_config(**kwargs):
+    """
+    This is a overload function from original pdoc.__init__.py (_get_config).
+
+    The DEFAULT_CONFIG is not changeable by API and the pdoc.tpl_lookup.get_template
+    function will only returns the first other config.mako. So instead of repeating
+    all values to newly created app, here overload and set tokeo as primary.
+
+    """
+    # Apply config.mako configuration
+    MAKO_INTERNALS = Template('').module.__dict__.keys()
+    DEFAULT_CONFIG = fs.join(get_module_path('tokeo.templates.pdoc.html'), 'config.mako')
+    config = {}
+    for config_module in (Template(filename=DEFAULT_CONFIG).module,
+                          pdoc.tpl_lookup.get_template('/config.mako').module):
+        config.update((var, getattr(config_module, var, None))
+                      for var in config_module.__dict__
+                      if var not in MAKO_INTERNALS)
+
+    known_keys = (set(config)
+                  | {'docformat'}  # Feature. https://github.com/pdoc3/pdoc/issues/169
+                  # deprecated
+                  | {'module', 'modules', 'http_server', 'external_links', 'search_query'})
+    invalid_keys = {k: v for k, v in kwargs.items() if k not in known_keys}
+    if invalid_keys:
+        warn(f'Unknown configuration variables (not in config.mako): {invalid_keys}')
+    config.update(kwargs)
+
+    if 'search_query' in config:
+        warn('Option `search_query` has been deprecated. Use `google_search_query` instead',
+             DeprecationWarning, stacklevel=2)
+        config['google_search_query'] = config['search_query']
+        del config['search_query']
+
+    return config
