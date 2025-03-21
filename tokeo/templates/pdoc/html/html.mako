@@ -401,8 +401,8 @@
     <meta name="description" content="${module.docstring | glimpse, trim, h}">
   % endif
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+  <link rel="stylesheet" href="/assets/sanitize.min.css">
+  <link rel="stylesheet" href="/assets/typography.min.css">
   % if syntax_highlighting:
     <link rel="stylesheet" href="/assets/hljs/styles/${hljs_style}.min.css">
   %endif
