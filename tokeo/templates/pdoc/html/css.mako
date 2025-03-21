@@ -49,6 +49,12 @@
       margin-bottom: 2cm;
     }
 
+  #module-list {
+    width: 100%;
+    padding: 1em 1em;
+    margin: 0 auto;
+  }
+
   % if lunr_search is not None:
   #lunr-search {
     width: 100%;
@@ -329,7 +335,7 @@
       background: transparent;
     }
     #index h3 {
-      border-bottom: 1px solid #ddd;
+      border: none;
     }
     #index ul {
       padding: 0;
@@ -550,6 +556,12 @@
       backdrop-filter: blur(10px);
       border-right: 1px solid rgba(0, 0, 0, 0.05);
     }
+    #module-list {
+      width: 100%;
+      max-width: 1100px;
+      padding: 4em 4em;
+      margin: 0 auto;
+    }
     #content {
       width: 70%;
       max-width: 120ch;
@@ -580,17 +592,9 @@
     }
 
     #index h3 {
-      padding: 8px 12px;
-      background: var(--background-gradient);
-      border-radius: 6px;
-      border-bottom: none;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-      transition: all 0.2s ease;
+      padding: 8px 0px;
+      border: none;
       margin-top: 1.5em;
-    }
-
-    #index h3:hover {
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
     }
   }
 </%def>
