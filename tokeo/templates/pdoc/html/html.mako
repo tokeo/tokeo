@@ -499,7 +499,7 @@
 
 <footer id="footer">
   <%include file="credits.mako"/>
-  <p>Generated with <a href="https://github.com/tokeo/tokeo" title="tokeo.ext.pdoc: Python API documentation generator">Tokeo 🚀 ( ${get_version()} ) and pdoc <cite>( ${pdoc.__version__} )</cite></a></p>
+  <p>Generated with <a href="https://github.com/tokeo/tokeo" title="tokeo.ext.pdoc: Python API documentation generator">Tokeo 🚀 ( ${get_version()} ) and pdoc ( ${pdoc.__version__} )</a></p>
 </footer>
 
 </body>

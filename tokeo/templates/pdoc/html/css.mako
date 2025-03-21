@@ -591,6 +591,14 @@
       margin-top: 1.5em;
     }
   }
+  @media screen and (min-width: 1000px) {
+    #sidebar {
+      width: 25%;
+    }
+    #content {
+      width: 75%;
+    }
+  }
 </%def>
 
 <%def name="print()" filter="minify_css">
