@@ -261,7 +261,9 @@ pdoc:
   ### relative filepath or absolute URL to a favicon
   favicon: public/favicon.ico
   ### module or absolute path to the mako templates
-  templates: tokeo.templates.pdoc.html
+  templates:
+    - {{ app_label }}.templates.pdoc.html
+    - tokeo.templates.pdoc.html
 
 #####################################
 
