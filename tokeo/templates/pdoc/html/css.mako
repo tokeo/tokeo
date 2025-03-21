@@ -5,7 +5,16 @@
 <%def name="mobile()" filter="minify_css">
   :root {
     --highlight-color: #fe9;
+    --primary-color: #3a7ab9;
+    --secondary-color: #2a5885;
+    --accent-color: #4568dc;
+    --background-gradient: linear-gradient(135deg, rgba(245, 247, 250, 0.1) 0%, rgba(228, 232, 235, 0.1) 100%);
+    --header-gradient: linear-gradient(135deg, #ff68dc 0%, #3a6073 100%);
+    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --text-color: #333;
+    --text-light: #666;
   }
+
   .flex {
     display: flex !important;
   }
@@ -17,6 +26,12 @@
 
   body {
     line-height: 1.5em;
+    background: var(--background-gradient);
+    color: var(--text-color);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
   }
 
   #content {
@@ -26,6 +41,9 @@
   #sidebar {
     padding: 1.5em;
     overflow: hidden;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    border-right: 1px solid rgba(0, 0, 0, 0.05);
   }
     #sidebar > *:last-child {
       margin-bottom: 2cm;
@@ -35,21 +53,139 @@
   #lunr-search {
     width: 100%;
     font-size: 1em;
-    padding: 6px 9px 5px 9px;
-    border: 1px solid silver;
+    padding: 8px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) inset;
   }
   % endif
+
+  .page-header {
+    background: var(--header-gradient);
+    color: white;
+    padding: 2em;
+    margin-bottom: 2em;
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transform: translateY(0);
+    transition: transform 0.5s ease-out, box-shadow 0.5s ease-out;
+  }
+
+  .page-header.loaded {
+    transform: translateY(0);
+  }
+
+  .page-header:before {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+    animation: pulse 15s infinite;
+  }
+
+  .page-header:after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg,
+      rgba(255,255,255,0.3) 0%,
+      rgba(255,255,255,0.6) 25%,
+      rgba(255,255,255,0.6) 75%,
+      rgba(255,255,255,0.3) 100%);
+    animation: shimmer 3s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -100% 0; }
+    100% { background-position: 100% 0; }
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.05); opacity: 0.2; }
+    100% { transform: scale(1); opacity: 0.5; }
+  }
+
+  /* Hover effects for module cards */
+  .module-card {
+  transition: all 0.3s ease;
+  }
+
+  .module-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Page header animation */
+  .page-header {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+
+  .page-header.loaded {
+  opacity: 1;
+  transform: translateY(0);
+  }
+
+  /* Add the class "loaded" to the page-header element when the page loads */
+  @keyframes headerLoading {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  }
+
+  /* Auto-apply animation without JavaScript */
+  .page-header {
+  animation: headerLoading 0.4s ease 0.1s forwards;
+  }
+
+  .page-header h1 {
+    margin: 0;
+    font-weight: 600;
+    position: relative;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .page-header p {
+    margin: 0.5em 0 0;
+    opacity: 0.9;
+    position: relative;
+  }
 
   .http-server-breadcrumbs {
     font-size: 130%;
     margin: 0 0 15px 0;
+    background: rgba(255, 255, 255, 0.7);
+    padding: 8px 15px;
+    border-radius: 4px;
   }
 
   #footer {
+    margin-top: auto; /* This is the key - pushes footer to bottom when content is short */
+    padding: 20px 0;
+    left: 0;
+    width: 100%;
     font-size: .75em;
-    padding: 5px 30px;
-    border-top: 1px solid #ddd;
-    text-align: right;
+    padding: 15px 30px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    text-align: center;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(5px);
   }
     #footer p {
       margin: 0 0 0 1em;
@@ -89,12 +225,12 @@
   }
 
   a {
-    color: #058;
+    color: var(--primary-color);
     text-decoration: none;
     transition: color .2s ease-in-out;
   }
-  a:visited {color: #503}
-  a:hover {color: #b62}
+  a:visited {color: var(--secondary-color)}
+  a:hover {color: var(--accent-color)}
 
   .title code {
     font-weight: bold;
@@ -133,17 +269,54 @@
   }
 
   #http-server-module-list {
-    display: flex;
-    flex-flow: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5em;
+    margin-top: 2em;
   }
-    #http-server-module-list div {
+    #http-server-module-list div.module-card {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5em;
+      box-shadow: var(--card-shadow);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
       display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    #http-server-module-list div.module-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+    #http-server-module-list div.module-card:after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: var(--header-gradient);
     }
     #http-server-module-list dt {
       min-width: 10%;
+      margin-bottom: 0.5em;
     }
-    #http-server-module-list p {
-      margin-top: 0;
+    #http-server-module-list dt a {
+      color: var(--secondary-color);
+      font-weight: 600;
+      font-size: 1.2em;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    #http-server-module-list dt a:hover {
+      color: var(--accent-color);
+    }
+    #http-server-module-list dd {
+      margin: 0.75em 0 0;
+      color: var(--text-light);
+      line-height: 1.5;
     }
 
   .toc ul,
@@ -189,15 +362,20 @@
       margin: 10px 0;
     }
     .name {
-      background:#e9f1f4;
+      background: linear-gradient(135deg,#f0f6fa 0%,#e0eff4 100%);
       font-size: .85em;
-      padding: 5px 10px;
+      padding: 8px 14px;
       display: inline-block;
       min-width: 40%;
-      border-radius: 5px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(0, 0, 0, 0.03);
+      transition: all 0.2s ease;
     }
       .name:hover {
-        background: #dcecf1;
+        background: linear-gradient(135deg,#e5f1f4 0%,#9bbeca 100%);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+        transform: translateY(-1px);
       }
       dt:target .name {
         background: var(--highlight-color);
@@ -368,12 +546,15 @@
       overflow: auto;
       position: sticky;
       top: 0;
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      border-right: 1px solid rgba(0, 0, 0, 0.05);
     }
     #content {
       width: 70%;
       max-width: 120ch;
       padding: 3em 4em;
-      border-left: 1px solid #ddd;
+      border-left: 1px solid rgba(0, 0, 0, 0.05);
     }
     pre code {
       font-size: 1em;
@@ -392,6 +573,24 @@
     }
     .toc > ul > li {
       margin-top: .5em;
+    }
+
+    #http-server-module-list {
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    }
+
+    #index h3 {
+      padding: 8px 12px;
+      background: var(--background-gradient);
+      border-radius: 6px;
+      border-bottom: none;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: all 0.2s ease;
+      margin-top: 1.5em;
+    }
+
+    #index h3:hover {
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
     }
   }
 </%def>
