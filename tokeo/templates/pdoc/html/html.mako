@@ -15,10 +15,8 @@
                    top_ancestor=not show_inherited_members)
     return f'<a title="{dobj.refname}" href="{url}">{name}</a>'
 
-
   def to_html(text):
     return _to_html(text, docformat=docformat, module=module, link=link, latex_math=latex_math)
-
 
   def get_annotation(bound_method, sep=':'):
     annot = show_type_annotations and bound_method(link=link) or ''
@@ -153,8 +151,8 @@
   ${module.docstring | to_html}
   </section>
 
+  % if submodules:
   <section>
-    % if submodules:
     <h2 class="section-title" id="header-submodules">Sub-modules</h2>
     <dl>
     % for m in submodules:
@@ -162,11 +160,11 @@
       <dd>${show_desc(m, short=True)}</dd>
     % endfor
     </dl>
-    % endif
   </section>
+  % endif
 
+  % if variables:
   <section>
-    % if variables:
     <h2 class="section-title" id="header-variables">Global variables</h2>
     <dl>
     % for v in variables:
@@ -175,22 +173,22 @@
       <dd>${show_desc(v)}</dd>
     % endfor
     </dl>
-    % endif
   </section>
+  % endif
 
+  % if functions:
   <section>
-    % if functions:
     <h2 class="section-title" id="header-functions">Functions</h2>
     <dl>
     % for f in functions:
       ${show_func(f)}
     % endfor
     </dl>
-    % endif
   </section>
+  % endif
 
+  % if classes:
   <section>
-    % if classes:
     <h2 class="section-title" id="header-classes">Classes</h2>
     <dl>
     % for c in classes:
@@ -282,18 +280,16 @@
                               <li><code>${link(m, name=m.name)}</code></li>
                           % endfor
                       </ul>
-
                   </li>
               % endfor
               </ul>
           % endif
       % endif
-
       </dd>
     % endfor
     </dl>
-    % endif
   </section>
+  % endif
 </%def>
 
 <%def name="module_index(module)">
@@ -305,7 +301,6 @@
   supermodule = module.supermodule
   %>
   <nav id="sidebar">
-
     <%include file="logo.mako"/>
 
     % if google_search_query:
@@ -381,7 +376,6 @@
       </ul>
     </li>
     % endif
-
     </ul>
   </nav>
 </%def>
@@ -394,7 +388,7 @@
   <meta name="generator" content="pdoc3 ${pdoc.__version__}">
 
 <%
-    module_list = 'modules' in context.keys()  # Whether we're showing module list in server mode
+    module_list = 'modules' in context.keys()
 %>
 
   % if module_list:
@@ -430,8 +424,8 @@
     <link rel="preconnect" href="https://www.google.com">
     <script async src="https://cse.google.com/cse.js?cx=017837193012385208679:pey8ky8gdqw"></script>
     <style>
-        .gsc-control-cse {padding:0 !important;margin-top:1em}
-        body.gsc-overflow-hidden #sidebar {overflow: visible;}
+      .gsc-control-cse {padding:0 !important;margin-top:1em}
+      body.gsc-overflow-hidden #sidebar {overflow: visible;}
     </style>
   % endif
 
@@ -446,35 +440,44 @@
   % if mermaid_support:
     <script defer src="/assets/mermaid.min.js"></script>
   % endif
-    <script>
-      window.addEventListener('DOMContentLoaded', () => {
-  % if mermaid_support:
-        // First process mermaid blocks before highlighting
-        document.querySelectorAll('pre code.language-mermaid').forEach(el => {
-            // Remove the code block from highlight.js processing
-            el.classList.remove('language-mermaid');
-            el.classList.add('nohighlight');
-            // Create a div for mermaid
-            const mermaidDiv = document.createElement('div');
-            mermaidDiv.className = 'mermaid';
-            mermaidDiv.innerHTML = el.textContent;
-            // Replace the code block with the mermaid div
-            const pre = el.parentElement;
-            pre.parentElement.replaceChild(mermaidDiv, pre);
-        });
-  % endif
-  % if syntax_highlighting:
-        hljs.configure({languages: ['accesslog', 'bash', 'c', 'cmake', 'cpp', 'css', 'diff', 'django', 'go', 'graphql', 'handlebars', 'ini', 'javascript', 'json', 'less', 'lua', 'makefile', 'markdown', 'mermaid', 'nginx', 'pgsql', 'php', 'plaintext', 'powershell', 'protobuf', 'python', 'python-repl', 'ruby', 'rust', 'scss', 'shell', 'sql', 'typescript', 'wasm', 'xml', 'yaml']});
-        hljs.highlightAll();
-  % endif
-  % if mermaid_support:
-        // Initialize mermaid
-        mermaid.initialize({
-            startOnLoad: true,
-            theme: 'forest',
-            securityLevel: 'loose'
-        });
-  % endif
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+% if mermaid_support:
+      // Process mermaid blocks before highlighting
+      document.querySelectorAll('pre code.language-mermaid').forEach(el => {
+        // Remove the code block from highlight.js processing
+        el.classList.remove('language-mermaid');
+        el.classList.add('nohighlight');
+        // Create a div for mermaid
+        const mermaidDiv = document.createElement('div');
+        mermaidDiv.className = 'mermaid';
+        mermaidDiv.innerHTML = el.textContent;
+        // Replace the code block with the mermaid div
+        const pre = el.parentElement;
+        pre.parentElement.replaceChild(mermaidDiv, pre);
+      });
+% endif
+% if syntax_highlighting:
+      hljs.configure({
+        languages: [
+          'accesslog', 'bash', 'c', 'cmake', 'cpp', 'css', 'diff', 'django',
+          'go', 'graphql', 'handlebars', 'ini', 'javascript', 'json', 'less',
+          'lua', 'makefile', 'markdown', 'mermaid', 'nginx', 'pgsql', 'php',
+          'plaintext', 'powershell', 'protobuf', 'python', 'python-repl',
+          'ruby', 'rust', 'scss', 'shell', 'sql', 'typescript', 'wasm',
+          'xml', 'yaml'
+        ]
+      });
+      hljs.highlightAll();
+% endif
+% if mermaid_support:
+      // Initialize mermaid
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: 'forest',
+        securityLevel: 'loose'
+      });
+% endif
     })
   </script>
 
@@ -495,19 +498,9 @@
 </main>
 
 <footer id="footer">
-    <%include file="credits.mako"/>
-    <p>Generated with <a href="https://github.com/tokeo/tokeo" title="tokeo.ext.pdoc: Python API documentation generator">Tokeo 🚀 ( ${get_version()} ) and pdoc <cite>( ${pdoc.__version__} )</cite></a></p>
+  <%include file="credits.mako"/>
+  <p>Generated with <a href="https://github.com/tokeo/tokeo" title="tokeo.ext.pdoc: Python API documentation generator">Tokeo 🚀 ( ${get_version()} ) and pdoc <cite>( ${pdoc.__version__} )</cite></a></p>
 </footer>
 
-% if http_server and module:  ## Auto-reload on file change in dev mode
-    <script>
-    setInterval(() =>
-        fetch(window.location.href, {
-            method: "HEAD",
-            cache: "no-store",
-            headers: {"If-None-Match": "${os.stat(module.obj.__file__).st_mtime}"},
-        }).then(response => response.ok && window.location.reload()), 700);
-    </script>
-% endif
 </body>
 </html>
