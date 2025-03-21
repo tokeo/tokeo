@@ -26,11 +26,17 @@ from os.path import basename, isdir
 import shutil
 import warnings
 import pdoc
+import socketserver
+import http.server
+import threading
 from mako.template import Template
 import re
+import time
 from cement import ex
 from cement.utils import fs
 from cement.core.meta import MetaMixin
+from cement.core.foundation import SIGNALS
+from cement.core.exc import CaughtSignal
 from tokeo.core.exc import TokeoError
 from tokeo.ext.argparse import Controller
 from tokeo.core.utils.controllers import controller_log_info_help
@@ -117,6 +123,10 @@ class TokeoPdoc(MetaMixin):
         super(TokeoPdoc, self).__init__(*args, **kw)
         self._docstrings_cache = dict()
         self._docstrings_dirs = [get_module_path('tokeo.templates.pdoc.docstrings')]
+        # http server
+        self._http_server = None
+        self._http_server_thread = None
+        self._http_server_running = False
 
     def _setup(self, app):
         """
@@ -143,7 +153,7 @@ class TokeoPdoc(MetaMixin):
         # get values from config
         self._output_dir = self._config('output_dir')
         self._host = self._config('host')
-        self._port = self._config('port')
+        self._port = int(self._config('port'))
         self._favicon = self._config('favicon')
         self._templates = self._config('templates')
         # identify modules to document and unique them
@@ -254,7 +264,7 @@ class TokeoPdoc(MetaMixin):
         else:
             self.app.print(f'⚠️ {message}')
 
-    def render(self):
+    def render(self, clean=False):
         """
         Generate HTML documentation for the configured modules.
 
@@ -263,6 +273,7 @@ class TokeoPdoc(MetaMixin):
         1. Runs pre-render hooks to allow extensions to prepare
         1. Sets up custom warning handling and template directories
         1. Loads and processes all modules and their submodules
+        1. Removes existing output-dir before new render
         1. Generates HTML output for each module
         1. Creates an index.html file
         1. Runs post-render hooks for cleanup
@@ -322,6 +333,10 @@ class TokeoPdoc(MetaMixin):
                 for submod in mod.submodules():
                     yield from recursive_htmls(submod)
 
+            if clean:
+                self.app.log.info('Cleaning output-dir before rendering...')
+                shutil.rmtree(self._output_dir, ignore_errors=True)
+
             for mod in modules:
                 for module_name, html, path, page in recursive_htmls(mod):
                     fs.ensure_dir_exists(path)
@@ -341,7 +356,7 @@ class TokeoPdoc(MetaMixin):
                 for tpl_dir in reversed(pdoc.tpl_lookup.directories):
                     assets_dir = fs.join(tpl_dir, 'assets')
                     if isdir(assets_dir):
-                        shutil.copytree(assets_dir, fs.join(self._output_dir, 'assets'))
+                        shutil.copytree(assets_dir, fs.join(self._output_dir, 'assets'), dirs_exist_ok=True)
             except Exception as err:
                 # ignore the exception but log
                 self.app.log.error(err)
@@ -353,6 +368,17 @@ class TokeoPdoc(MetaMixin):
         finally:
             # restore saved show method
             warnings.showwarning = warnings_showwarning
+
+    def _run_http_server(self):
+        """
+        Helper method to run the server.
+
+        """
+        try:
+            self._http_server.serve_forever()
+        except Exception as err:
+            self.app.log.error(f'Error in Tokeo pdoc server: {err}')
+            self.running = False
 
     def startup(self):
         """
@@ -373,12 +399,39 @@ class TokeoPdoc(MetaMixin):
         - **TokeoPdocError**: If the server cannot be started
 
         """
+
+        """Start serving the HTML documentation."""
+        if self._http_server_running:
+            self.app.log.warning('Tokeo pdoc server is already running')
+            return
+
         try:
-            # Create server if not already created
-            self.server.start()
+            # Create a custom handler that serves from the html directory
+            handler = http.server.SimpleHTTPRequestHandler
+            html_dir = self._output_dir
+
+            class CustomHandler(handler):
+                def __init__(self, *args, **kwargs):
+                    super().__init__(*args, directory=html_dir, **kwargs)
+
+                def end_headers(self):
+                    # Add caching headers for the assets directory
+                    if self.path.startswith('/assets/'):
+                        # Send cache control headers before content type
+                        self.send_header('Cache-Control', 'max-age=600, public')
+                    super().end_headers()
+
+            # Start the server in a separate thread
+            self._http_server = socketserver.TCPServer((self._host, self._port), CustomHandler)
+            self._http_server_thread = threading.Thread(target=self._run_http_server)
+            self._http_server_thread.daemon = True
+            self._http_server_thread.start()
+
+            self._http_server_running = True
+            self.app.log.info(f'Tokeo pdoc server started at http://{self._host}:{self._port}')
 
         except Exception as err:
-            raise TokeoPdocError(f'Failed to start documentation server: {err}')
+            raise TokeoPdocError(f'Failed to start Tokeo pdoc server: {err}')
 
     def shutdown(self):
         """
@@ -393,10 +446,13 @@ class TokeoPdoc(MetaMixin):
         1. Cleans up server resources to prevent resource leaks
 
         """
-        if self.server:
-            self.server.shutdown()
-            self.server.server_close()
-            self.server = None
+        if self._http_server_running and self._http_server:
+            self.app.log.info("Shutting down Tokeo pdoc server...")
+            self._http_server_running = False
+            self._http_server.shutdown()
+            if self._http_server_thread:
+                self._http_server_thread.join()
+            self.app.log.info("Tokeo pdoc server was shut down")
 
     def serve(self):
         """
@@ -415,15 +471,17 @@ class TokeoPdoc(MetaMixin):
 
         """
         self.startup()
-        self.app.log.info(f'Documentation server started, listening on {self._config("url")}')
         try:
             # This is a simple way to block until interrupted
-            import time
-
             while True:
-                time.sleep(15)
+                time.sleep(2.5)
         except KeyboardInterrupt:
             self.shutdown()
+        except CaughtSignal as err:
+            # check for catched signals and allow shutdown by signals
+            self.app.print()
+            if err.signum in SIGNALS:
+                self.shutdown()
 
 
 class TokeoPdocController(Controller):
@@ -471,7 +529,22 @@ class TokeoPdocController(Controller):
     @ex(
         help='render the documentation',
         description='Generate HTML documentation from Python docstrings.',
-        arguments=[],
+        arguments=[
+            (
+                ['--clean'],
+                dict(
+                    action='store_true',
+                    help='delete output-dir recursively before rendering',
+                ),
+            ),
+            (
+                ['--serve'],
+                dict(
+                    action='store_true',
+                    help='serve the documentation after rendering',
+                ),
+            ),
+        ],
     )
     def render(self):
         """
@@ -483,25 +556,17 @@ class TokeoPdocController(Controller):
         """
         controller_log_info_help(self)
         # Generate the documentation
-        self.app.pdoc.render()
+        self.app.pdoc.render(clean=self.app.pargs.clean)
         # Print success message
         self.app.log.info(f'Documentation generated in: {self.app.pdoc._output_dir}')
+        # Start server
+        if self.app.pargs.serve:
+            self.app.pdoc.serve()
 
     @ex(
         help='start http service',
         description='Spin up an HTTP server to serve the generated documentation.',
-        arguments=[
-            (
-                ['--output-dir'],
-                dict(
-                    type=str,
-                    action='store',
-                    required=False,
-                    default='html',
-                    help='Directory containing the HTML documentation',
-                ),
-            ),
-        ],
+        arguments=[],
     )
     def serve(self):
         """
@@ -510,13 +575,11 @@ class TokeoPdocController(Controller):
         This command starts an HTTP server that serves the generated
         documentation, making it accessible through a web browser.
 
-        ### Args:
-
-        - **--output-dir** (str): Directory containing the HTML documentation
-
         ### Notes:
 
         - The server host and port are configurable in the application config
+
+        - The configs can also be set by env vars like MYAPP_PDOC_PORT
 
         - The command blocks until interrupted with Ctrl+C
 
