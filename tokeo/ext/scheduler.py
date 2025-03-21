@@ -270,8 +270,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes:
 
         : This constructor only initializes basic attributes. The actual scheduler
-            is created on-demand when needed, and tasks are loaded during the startup
-            process rather than at initialization time.
+            is created on-demand when needed, and tasks are loaded during
+            the startup process rather than at initialization time.
 
         """
         super(TokeoScheduler, self).__init__(*args, **kw)
@@ -297,8 +297,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes:
 
         : This method is called automatically by the Cement framework during
-            the application's setup process. It ensures the scheduler's configuration
-            section exists with proper default values.
+            the application's setup process. It ensures the scheduler's
+            configuration section exists with proper default values.
 
         """
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)

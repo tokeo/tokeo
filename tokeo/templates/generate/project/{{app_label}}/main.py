@@ -1,9 +1,9 @@
 """
 {{ app_class_name }} main module providing CLI application framework.
 
-This module defines the main {{ app_class_name }} application classes and entry point.
-It leverages the Cement framework to create a robust and extensible CLI
-application with support for various extensions and handlers.
+This module defines the main {{ app_class_name }} application classes and
+entry point. It leverages the Cement framework to create a robust and
+extensible CLI application with support for various extensions and handlers.
 
 """
 
@@ -26,8 +26,9 @@ class {{ app_class_name }}(App):
     The {{ app_class_name }} CLI application core class.
 
     Extends the Cement App class to provide a configurable and extensible
-    CLI application framework. {{ app_class_name }} applications use the Cement framework
-    for command-line parsing, configuration management, logging, and more.
+    CLI application framework. {{ app_class_name }} applications use the
+    Cement framework for command-line parsing, configuration management,
+    logging, and more.
 
     ### Notes:
 
@@ -108,9 +109,10 @@ class {{ app_class_name }}Test(TestApp, {{ app_class_name }}):
     """
     A specialized subclass of {{ app_class_name }} designed for testing purposes.
 
-    This class extends both TestApp from the Cement framework and the {{ app_class_name }}
-    application class to provide a testing environment for {{ app_class_name }} applications.
-    It modifies various settings to be more suitable for automated testing.
+    This class extends both TestApp from the Cement framework and
+    the {{ app_class_name }} application class to provide a testing environment
+    for {{ app_class_name }} applications. It modifies various settings to be more
+    suitable for automated testing.
 
     ### Usage:
 
@@ -144,8 +146,8 @@ def dramatiq():
 
     This function initializes the application with Dramatiq configuration
     and settings when the application is started as a Dramatiq worker.
-    It sets up the necessary environment without running the full CLI
-    application stack.
+    It sets up the necessary environment without running the full
+    CLI application stack.
 
     ### Used by {{ app_name }} CLI for the dramatiq workers:
 
@@ -175,9 +177,10 @@ def main():
     """
     Main entry point for the {{ app_name }} application.
 
-    Creates a {{ app_class_name }} application instance, runs it, and handles any exceptions
-    that may occur during execution. This function serves as the primary entry
-    point when running {{ app_name }} as a command-line application.
+    Creates a {{ app_class_name }} application instance, runs it, and handles
+    any exceptions that may occur during execution. This function serves as
+    the primary entry point when running {{ app_name }} as
+    a command-line application.
 
     ### Returns:
 
@@ -186,7 +189,8 @@ def main():
     ### Raises:
 
     - **AssertionError**: When an assertion fails during application execution
-    - **{{ app_class_name }}Error**: When a {{ app_class_name }}-specific error occurs
+    - **{{ app_class_name }}Error**: When a {{ app_class_name }}-specific
+        error occurs
     - **CaughtSignal**: When a signal (e.g., SIGINT, SIGTERM) is caught
 
     """

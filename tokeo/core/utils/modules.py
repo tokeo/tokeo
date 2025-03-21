@@ -35,6 +35,6 @@ def get_module_path(module):
     elif isinstance(module, str):
         obj = importlib.import_module(module)
     else:
-        raise TokeoError(f'Can\'t use {module} as module to get the path')
+        raise TokeoError(f"Can't use {module} as module to get the path")
     # get the path of the module
     return abspath(obj.__path__[0]) if (len(obj.__path__) > 0) else None
