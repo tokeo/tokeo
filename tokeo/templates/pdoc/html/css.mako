@@ -177,7 +177,7 @@
       margin-bottom: 4em;
     }
   dd {
-    margin: 0 0 1em 3em;
+    margin: 0 0 1em 0;
   }
     #header-classes + dl > dd {
       margin-bottom: 3em;
@@ -189,14 +189,15 @@
       margin: 10px 0;
     }
     .name {
-      background: #eee;
+      background:#e9f1f4;
       font-size: .85em;
       padding: 5px 10px;
       display: inline-block;
       min-width: 40%;
+      border-radius: 5px;
     }
       .name:hover {
-        background: #e0e0e0;
+        background: #dcecf1;
       }
       dt:target .name {
         background: var(--highlight-color);
@@ -206,6 +207,9 @@
       }
       .name.class > span:nth-child(2) {
         margin-left: .4em;
+      }
+      .gap-name {
+        column-gap: .666em;
       }
     .inherited {
       color: #999;
@@ -229,6 +233,9 @@
       background: inherit;  /* Don't grey-back parameters */
     }
 
+    div.desc {
+      margin-left: 2em
+    }
     div.desc:has(> p) {
       margin-bottom: 4rem;
     }
@@ -361,7 +368,7 @@
     }
     #content {
       width: 70%;
-      max-width: 100ch;
+      max-width: 120ch;
       padding: 3em 4em;
       border-left: 1px solid #ddd;
     }

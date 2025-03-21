@@ -154,7 +154,7 @@
     <h2 class="section-title" id="header-submodules">Sub-modules</h2>
     <dl>
     % for m in submodules:
-      <dt><code class="name">${link(m)}</code></dt>
+      <dt><code class="name flex gap-name">${link(m)}</code></dt>
       <dd>${show_desc(m, short=True)}</dd>
     % endfor
     </dl>
@@ -167,7 +167,7 @@
     <dl>
     % for v in variables:
       <% return_type = get_annotation(v.type_annotation) %>
-      <dt id="${v.refname}"><code class="name">var ${ident(v.name)}${return_type}</code></dt>
+      <dt id="${v.refname}"><code class="name flex gap-name">var ${ident(v.name)}${return_type}</code></dt>
       <dd>${show_desc(v)}</dd>
     % endfor
     </dl>
@@ -201,7 +201,7 @@
       sep = ',<br>' if sum(map(len, params)) > 75 else ', '
       params = sep.join(params)
       %>
-      <dt id="${c.refname}"><code class="flex name class">
+      <dt id="${c.refname}"><code class="name class flex">
           <span>class ${ident(c.name)}</span>
           % if params:
               <span>(</span><span>${params})</span>
@@ -232,7 +232,7 @@
           <dl>
           % for v in class_vars:
               <% return_type = get_annotation(v.type_annotation) %>
-              <dt id="${v.refname}"><code class="name">var ${ident(v.name)}${return_type}</code></dt>
+              <dt id="${v.refname}"><code class="name flex gap-name">var ${ident(v.name)}${return_type}</code></dt>
               <dd>${show_desc(v)}</dd>
           % endfor
           </dl>
@@ -250,7 +250,7 @@
           <dl>
           % for v in inst_vars:
               <% return_type = get_annotation(v.type_annotation) %>
-              <dt id="${v.refname}"><code class="name">${v.kind} ${ident(v.name)}${return_type}</code></dt>
+              <dt id="${v.refname}"><code class="name flex gap-name">${v.kind} ${ident(v.name)}${return_type}</code></dt>
               <dd>${show_desc(v)}</dd>
           % endfor
           </dl>
