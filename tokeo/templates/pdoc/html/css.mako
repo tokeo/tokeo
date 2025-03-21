@@ -303,6 +303,9 @@
     details.source pre code.hljs {
       padding: 1.75em 0.75em;
     }
+    div.desc div.mermaid > svg {
+      background-color: inherited;
+    }
   .hlist {
     list-style: none;
   }

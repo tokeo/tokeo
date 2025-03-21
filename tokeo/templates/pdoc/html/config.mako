@@ -41,6 +41,9 @@
     #     Demo: https://highlightjs.org/static/demo/
     hljs_style = 'base16/woodland'
 
+    # Enable marmaid graphs for mermaid code blocks by including mermaid.js
+    mermaid_support = True
+
     # If set, insert Google Analytics 4 tracking code. Value is GA
     # tracking id (G-XXXXXXXXXX).
     google_analytics = ''

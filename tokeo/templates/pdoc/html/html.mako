@@ -438,11 +438,41 @@
 
   % if syntax_highlighting:
     <script defer src="/assets/highlight.min.js"></script>
-    <script>window.addEventListener('DOMContentLoaded', () => {
-        hljs.configure({languages: ['accesslog', 'bash', 'c', 'cmake', 'cpp', 'css', 'diff', 'django', 'go', 'graphql', 'handlebars', 'ini', 'javascript', 'json', 'less', 'lua', 'makefile', 'markdown', 'nginx', 'pgsql', 'php', 'plaintext', 'powershell', 'protobuf', 'python', 'python-repl', 'ruby', 'rust', 'scss', 'shell', 'sql', 'typescript', 'wasm', 'xml', 'yaml']});
-        hljs.highlightAll();
-    })</script>
   % endif
+  % if mermaid_support:
+    <script defer src="/assets/mermaid.min.js"></script>
+  % endif
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+  % if mermaid_support:
+        // First process mermaid blocks before highlighting
+        document.querySelectorAll('pre code.language-mermaid').forEach(el => {
+            // Remove the code block from highlight.js processing
+            el.classList.remove('language-mermaid');
+            el.classList.add('nohighlight');
+            // Create a div for mermaid
+            const mermaidDiv = document.createElement('div');
+            mermaidDiv.className = 'mermaid';
+            mermaidDiv.innerHTML = el.textContent;
+            // Replace the code block with the mermaid div
+            const pre = el.parentElement;
+            pre.parentElement.replaceChild(mermaidDiv, pre);
+        });
+  % endif
+  % if syntax_highlighting:
+        hljs.configure({languages: ['accesslog', 'bash', 'c', 'cmake', 'cpp', 'css', 'diff', 'django', 'go', 'graphql', 'handlebars', 'ini', 'javascript', 'json', 'less', 'lua', 'makefile', 'markdown', 'mermaid', 'nginx', 'pgsql', 'php', 'plaintext', 'powershell', 'protobuf', 'python', 'python-repl', 'ruby', 'rust', 'scss', 'shell', 'sql', 'typescript', 'wasm', 'xml', 'yaml']});
+        hljs.highlightAll();
+  % endif
+  % if mermaid_support:
+        // Initialize mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'forest',
+            securityLevel: 'loose'
+        });
+  % endif
+    })
+  </script>
 
   <%include file="head.mako"/>
 </head>
