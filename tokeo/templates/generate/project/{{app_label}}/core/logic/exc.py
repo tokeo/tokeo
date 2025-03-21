@@ -1,4 +1,4 @@
-from tokeo.core.exc import TokeoException
+from tokeo.core.exc import TokeoError
 
 
 class {{ app_class_name }}LogicError(TokeoError):
