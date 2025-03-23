@@ -22,7 +22,7 @@ provides hooks for extensions to modify documentation rendering behavior.
 """
 
 from sys import argv
-from os.path import basename, isdir
+from os.path import basename, isdir, isfile
 import shutil
 import warnings
 import pdoc
@@ -32,6 +32,7 @@ import threading
 from mako.template import Template
 import re
 import time
+import yaml
 from cement import ex
 from cement.utils import fs
 from cement.core.meta import MetaMixin
@@ -39,6 +40,7 @@ from cement.core.foundation import SIGNALS
 from cement.core.exc import CaughtSignal
 from tokeo.core.exc import TokeoError
 from tokeo.ext.argparse import Controller
+from tokeo.ext.appenv import PRODUCTION, STAGING, DEVELOPMENT, TESTING, ENVIRONMENTS
 from tokeo.core.utils.controllers import controller_log_info_help
 from tokeo.core.utils.modules import get_module_path
 
@@ -295,6 +297,9 @@ class TokeoPdoc(MetaMixin):
         # save original show method
         warnings_showwarning = warnings.showwarning
         try:
+            # get the pdoc config from config.mako
+            pdoc_config = pdoc._get_config()
+
             # send out hook to prepare other modules for pdoc rendering
             for res in self.app.hook.run('tokeo_pdoc_pre_render', self.app):
                 pass
@@ -303,8 +308,11 @@ class TokeoPdoc(MetaMixin):
             warnings.showwarning = self.showwarning
             # change templates if given
             if self._templates is not None:
-                # only use templates as set
+                # only use templates as set, so clear dirs
+                # and all currently cached
                 pdoc.tpl_lookup.directories.clear()
+                pdoc.tpl_lookup._collection.clear()
+                pdoc.tpl_lookup._uri_cache.clear()
                 for template in self._templates:
                     try:
                         # try given string as module name
@@ -347,6 +355,34 @@ class TokeoPdoc(MetaMixin):
             with open(fs.join(self._output_dir, 'index.html'), 'w', encoding='utf-8') as f:
                 f.write(pdoc._render_template('/html.mako', app=self.app, modules=((module.name, module.docstring) for module in modules)))
 
+            # Create the config documentation
+            if hasattr(self.app, 'env') and pdoc_config['show_config']:
+                configdict = dict()
+                for configfile in (
+                    f'{self.app.env.APP_LABEL}',
+                    *(
+                        f'{self.app.env.APP_LABEL}.{env}{suffix}' for env in ENVIRONMENTS for suffix in (f'', f'.local')
+                    ),
+                ):
+                    try:
+                        filename = f'{self.app.env.APP_CONFIG_DIR}/{configfile}{self.app._meta.config_file_suffix}'
+                        if isfile(filename):
+                            with open(filename, 'r') as f:
+                                configcontent = f.read()
+                                configyaml = yaml.safe_load(configcontent)
+                                configdict[configfile] = dict(
+                                    content=configcontent.split('\n'),
+                                    yaml=configyaml,
+                                )
+
+                    except Exception as err:
+                        self.app.error(f'⚠️ Error: Processing config file "{configfile}": {err}')
+
+                # Create a single base `config/index.html`
+                fs.ensure_dir_exists(fs.join(self._output_dir, 'config'))
+                with open(fs.join(self._output_dir, 'config', 'index.html'), 'w', encoding='utf-8') as f:
+                    f.write(pdoc._render_template('/html.mako', app=self.app, configdict=configdict))
+
             # Copy assets into output dir
             try:
                 for tpl_dir in reversed(pdoc.tpl_lookup.directories):
@@ -372,9 +408,10 @@ class TokeoPdoc(MetaMixin):
         """
         try:
             self._http_server.serve_forever()
+        except KeyboardInterrupt:
+            pass
         except Exception as err:
             self.app.log.error(f'Error in Tokeo pdoc server: {err}')
-            self.running = False
 
     def startup(self):
         """
@@ -473,7 +510,7 @@ class TokeoPdoc(MetaMixin):
             while True:
                 time.sleep(2.5)
         except KeyboardInterrupt:
-            self.shutdown()
+            pass
         except CaughtSignal as err:
             # check for catched signals and allow shutdown by signals
             self.app.print()

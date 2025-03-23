@@ -1,11 +1,14 @@
 <%
   import os
+  import re
+  import yaml
   from tokeo.core.version import get_version
 
   import pdoc
   from pdoc.html_helpers import extract_toc, glimpse, to_html as _to_html, format_git_link
 
   from tokeo.core.utils.pdoc import DecoratedFunction
+  from tokeo.core.utils.dict import redact_data
 
   def link(dobj: pdoc.Doc, name=None):
     name = name or dobj.qualname + ('()' if isinstance(dobj, pdoc.Function) else '')
@@ -70,23 +73,33 @@
 </%def>
 
 <%def name="show_module_list(modules)">
-<div class="page-header">
-  <h1>🚀 ${html_title}</h1>
-  <p>Explore the API documentation of project modules</p>
-</div>
+  <div class="page-header">
+    <h1>🚀 ${html_title}</h1>
+    <p>Explore the API documentation of project modules</p>
+  </div>
 
-% if not modules:
-  <p>No modules found.</p>
-% else:
-  <dl id="http-server-module-list">
-  % for name, desc in modules:
-      <div class="module-card">
-      <dt><a href="${link_prefix}${name}">${name}</a></dt>
-      <dd>${desc | glimpse, to_html}</dd>
-      </div>
-  % endfor
-  </dl>
-% endif
+  % if not modules:
+    <p>No modules found.</p>
+  % else:
+    <dl id="index-module-list">
+    % for name, desc in modules:
+        <div class="module-card">
+        <dt><a href="${link_prefix}${name}">${name}</a></dt>
+        <dd>${desc | glimpse, to_html}</dd>
+        </div>
+    % endfor
+    % if hasattr(app, 'env') and show_config:
+        <%
+            name = "config"
+            desc = "The configuration files."
+        %>
+        <div class="module-card">
+        <dt><a href="${link_prefix}${name}">${name}</a></dt>
+        <dd>${desc | glimpse, to_html}</dd>
+        </div>
+    %endif
+    </dl>
+  % endif
 </%def>
 
 <%def name="show_column_list(items)">
@@ -98,6 +111,101 @@
     <li><code>${link(item, item.name)}</code></li>
   % endfor
   </ul>
+</%def>
+
+<%def name="show_config()">
+
+  <%def name="show_settings(_setting)">
+    <dt id="setting-${_setting}"><code class="name flex flex-col">
+        <div>
+            <span>${ident(_setting)}</span>
+        </div>
+    </code></dt>
+    <% first_intro = True %>
+    % for f in configdict.keys():
+        <dd>
+            <%
+                intro = ''
+                source = ''
+                content = configdict[f]['content']
+                try:
+                    n = content.index(f'{_setting}:')
+                except:
+                    continue
+                i = n - 1
+                while i >= 0 and len(content[i]) > 0 and content[i][0] == '#':
+                    i -= 1
+                intro = re.sub(r'^\s*#+\s', '', '\n'.join(content[i + 1:n]), flags=re.MULTILINE)
+                i = n + 1
+                while i < len(content) and not re.match(r'^([a-zA-Z0-9]+\:$|#)', content[i]):
+                    i += 1
+                i -= 1
+                while i > n and content[i] == '':
+                    i -= 1
+                source = '\n'.join(content[n:i+1])
+                if f.endswith('.local'):
+                    try:
+                        source = yaml.dump(redact_data(yaml.safe_load(source), '***'))
+                    except Exception as err:
+                        source = f"# Source is hidden and can't be redacted\n{err}"
+            %>
+            % if intro == '' and first_intro:
+                <div class="desc-settings-line"></div>
+            % endif
+            % if intro != '':
+                <div class="desc-settings">
+                    ${intro | to_html}
+                </div>
+            % endif
+            <details class="source source-settings">
+              <summary>
+                  <span>${f} | Expand source code</span>
+              </summary>
+              <div class="rounded"><pre><code class="yaml">${source | h}</code></pre></div>
+            </details>
+        </dd>
+        <% first_intro = False %>
+    % endfor
+  </%def>
+
+  <header>
+  % if breadcrumbs:
+    <nav class="breadcrumbs">
+      <a href="/">All packages</a>
+    </nav>
+  % endif
+
+  <h1 class="title">Tokeo Configuration System</h1>
+  </header>
+
+  <section id="section-intro">
+    <h2>Yaml Files</h2>
+    % for f in configdict.keys():
+      <h3 class="code-font secondary-color">${f}</h3>
+      <%
+        content = configdict[f]['content']
+        try:
+            n = content.index('---')
+            desc = '\n'.join(content[0:n])
+            desc = re.sub(r'^\s*#+\s', '', desc, flags=re.MULTILINE) if n < len(content) else None
+        except Exception as err:
+            desc = ''
+      %>
+      % if desc:
+        ${desc | to_html}
+      % endif
+    % endfor
+  </section>
+
+  <section>
+    <h2 class="section-title" id="header-settings">Settings</h2>
+    <dl>
+    % for _setting in configsettings:
+      ${show_settings(_setting)}
+    % endfor
+    </dl>
+  </section>
+
 </%def>
 
 <%def name="show_module(module)">
@@ -132,8 +240,8 @@
   </%def>
 
   <header>
-  % if http_server:
-    <nav class="http-server-breadcrumbs">
+  % if breadcrumbs:
+    <nav class="breadcrumbs">
       <a href="/">All packages</a>
       <% parts = module.name.split('.')[:-1] %>
       % for i, m in enumerate(parts):
@@ -142,6 +250,7 @@
       % endfor
     </nav>
   % endif
+
   <h1 class="title">${'Namespace' if module.is_namespace else  \
                       'Package' if module.is_package and not module.supermodule else \
                       'Module'} <code>${module.name}</code></h1>
@@ -292,6 +401,37 @@
   % endif
 </%def>
 
+<%def name="config_index()">
+  <nav id="sidebar">
+    <%include file="logo.mako"/>
+
+    % if lunr_search is not None:
+      <%include file="_lunr_search.inc.mako"/>
+    % endif
+
+    <ul id="index">
+    <li><h3 id="home">Home</h3>
+      <ul>
+        <li><code><a title="All packages" href="/">All packages</a></code></li>
+      </ul>
+    </li>
+
+    % if configdict:
+    <li><h3>Settings</h3>
+      <ul>
+      % for _setting in configsettings:
+          <li><code>
+            <a title="${_setting}" href="#setting-${_setting}">${_setting}</a>
+          </code></li>
+      % endfor
+      </ul>
+    </li>
+    % endif
+
+    </ul>
+  </nav>
+</%def>
+
 <%def name="module_index(module)">
   <%
   variables = module.variables(sort=sort_identifiers)
@@ -316,9 +456,9 @@
 
     ${extract_toc(module.docstring) if extract_module_toc_into_sidebar else ''}
     <ul id="index">
-    <li><h3>Home</h3>
+    <li><h3 id="home">Home</h3>
       <ul>
-        <li><code><a title="Home" href="/">Home</a></code></li>
+        <li><code><a title="All packages" href="/">All packages</a></code></li>
       </ul>
     </li>
 
@@ -389,11 +529,22 @@
 
 <%
     module_list = 'modules' in context.keys()
+    config_list = 'configdict' in context.keys() and context['configdict'] is not None
+    if config_list:
+        configdict = context['configdict']
+        configsettings = []
+        for _config in configdict:
+              for _setting in configdict[_config]['yaml']:
+                  if _setting not in configsettings:
+                      configsettings.append(_setting)
 %>
 
   % if module_list:
     <title>${html_title} list</title>
     <meta name="description" content="A list of documented ${html_title}.">
+  % elif config_list:
+    <title>Configs documentation</title>
+    <meta name="description" content="A list of configs.">
   % else:
     <title>${module.name} API documentation</title>
     <meta name="description" content="${module.docstring | glimpse, trim, h}">
@@ -489,6 +640,11 @@
     <article id="module-list">
       ${show_module_list(modules)}
     </article>
+  % elif config_list:
+    <article id="content">
+      ${show_config()}
+    </article>
+    ${config_index()}
   % else:
     <article id="content">
       ${show_module(module)}

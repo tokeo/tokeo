@@ -7,7 +7,7 @@
     --highlight-color: #fe9;
     --primary-color: #3a7ab9;
     --secondary-color: #2a5885;
-    --accent-color: #4568dc;
+    --accent-color: #d150e2;
     --background-gradient: linear-gradient(135deg, rgba(245, 247, 250, 0.1) 0%, rgba(228, 232, 235, 0.1) 100%);
     --header-gradient: linear-gradient(135deg, #ff68dc 0%, #3a6073 100%);
     --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -155,12 +155,13 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 
-  .http-server-breadcrumbs {
-    font-size: 130%;
-    margin: 0 0 15px 0;
-    background: rgba(255, 255, 255, 0.7);
-    padding: 8px 15px;
-    border-radius: 4px;
+  .breadcrumbs {
+    font-family: "DejaVu Sans Mono", monospace;
+    font-size: 100%;
+    letter-spacing: -1px;
+    margin: 0;
+    background: transparent;
+    padding: 0;
   }
 
   /* Footer Styles */
@@ -258,6 +259,19 @@
     overflow-wrap: break-word;
   }
   h1 code { background: transparent; }
+  .code-font {
+    font-family: "DejaVu Sans Mono", monospace;
+    overflow-wrap: break-word;
+  }
+  .primary-color {
+    color: var(--primary-color);
+  }
+  .secondary-color {
+    color: var(--secondary-color);
+  }
+  .accent-color {
+    color: var(--accent-color);
+  }
 
   pre {
     border-top: 1px solid #ccc;
@@ -266,13 +280,13 @@
   }
 
   /* Module List Grid */
-  #http-server-module-list {
+  #index-module-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5em;
     margin-top: 2em;
   }
-  #http-server-module-list div.module-card {
+  #index-module-list div.module-card {
     background: white;
     border-radius: 8px;
     padding: 1.5em;
@@ -284,11 +298,11 @@
     overflow: hidden;
     border: 1px solid rgba(0, 0, 0, 0.05);
   }
-  #http-server-module-list div.module-card:hover {
+  #index-module-list div.module-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   }
-  #http-server-module-list div.module-card:after {
+  #index-module-list div.module-card:after {
     content: "";
     position: absolute;
     top: 0;
@@ -297,21 +311,21 @@
     height: 4px;
     background: var(--header-gradient);
   }
-  #http-server-module-list dt {
+  #index-module-list dt {
     min-width: 10%;
     margin-bottom: 0.5em;
   }
-  #http-server-module-list dt a {
+  #index-module-list dt a {
     color: var(--secondary-color);
     font-weight: 600;
     font-size: 1.2em;
     text-decoration: none;
     transition: color 0.2s;
   }
-  #http-server-module-list dt a:hover {
+  #index-module-list dt a:hover {
     color: var(--accent-color);
   }
-  #http-server-module-list dd {
+  #index-module-list dd {
     margin: 0.75em 0 0;
     color: var(--text-light);
     line-height: 1.5;
@@ -417,8 +431,32 @@
   div.desc {
     margin-left: 2em;
   }
-  div.desc:has(> p) {
+  div.desc:has(> h3, h4, p) {
     margin-bottom: 4rem;
+  }
+
+  /* Settings Formatting */
+  div.desc-settings {
+    margin-left: 2em;
+  }
+  .desc-settings-line {
+    margin-top: 0.7em;
+  }
+  .desc-settings h2 {
+    font-weight: 400;
+    font-size: 1.25em;
+    margin: 1em 0 0.7em 0;
+  }
+  .desc-settings h3 {
+    font-size: 1.2em;
+    margin: 1em 0 0.7em 0;
+  }
+  .desc-settings h4 {
+    font-size: 1.1em;
+    margin: 1em 0 0.7em 0;
+  }
+  .desc-settings dt code {
+    background: inherit;
   }
 
   /* Source Code Display */
@@ -438,12 +476,12 @@
     color: inherit;
     margin-left: 1em;
   }
-  section > pre:has(code) {
+  section pre:has(code) {
     border-radius: 10px;
     border: 0;
     margin-bottom: 3em;
   }
-  section > pre code {
+  section pre code {
     font-size: 13.5px;
   }
   details.source div.rounded {
@@ -478,6 +516,9 @@
   }
   details.source pre code.hljs {
     padding: 1.75em 0.75em;
+  }
+  details.source-settings {
+    margin-left: 2em;
   }
   div.desc div.mermaid > svg {
     background-color: inherited;
@@ -582,13 +623,16 @@
     .toc > ul > li {
       margin-top: 0.5em;
     }
-    #http-server-module-list {
+    #index-module-list {
       grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     }
     #index h3 {
       padding: 8px 0;
       border: none;
       margin-top: 1.5em;
+    }
+    #index h3#home {
+      margin-top: 0.5em;
     }
   }
   @media screen and (min-width: 1000px) {
