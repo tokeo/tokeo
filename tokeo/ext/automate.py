@@ -1895,15 +1895,15 @@ class TokeoAutomateController(Controller):
         """
         # use colored output?
         if self.app.pargs.no_colors:
-            self.app.log.info = self.log_info_bw
-            self.app.log.warning = self.log_warning_bw
-            self.app.log.error = self.log_error_bw
-            self.app.log.debug = self.log_debug_bw
+            self.app.log.info = self._log_info_bw
+            self.app.log.warning = self._log_warning_bw
+            self.app.log.error = self._log_error_bw
+            self.app.log.debug = self._log_debug_bw
         else:
-            self.app.log.info = self.log_info
-            self.app.log.warning = self.log_warning
-            self.app.log.error = self.log_error
-            self.app.log.debug = self.log_debug
+            self.app.log.info = self._log_info
+            self.app.log.warning = self._log_warning
+            self.app.log.error = self._log_error
+            self.app.log.debug = self._log_debug
 
         # start the shell
         shell = TokeoAutomateShell(self.app)
