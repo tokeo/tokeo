@@ -17,6 +17,9 @@
 # -> !/path/subdirectory/
 #
 
+!/.docker/
+!/.docker/**
+
 !/config/
 !/config/**
 /config/**/*.local.*
