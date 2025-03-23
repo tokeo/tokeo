@@ -1,10 +1,11 @@
 """
-Business automation functions for CLI and remote execution in Tokeo applications.
+Business automation functions for CLI and remote execution in
+{{ app_name }} applications.
 
-This module provides a centralized location for defining business automation functions
-that can be executed via CLI commands in Tokeo and Cement applications. Automation
-functions typically handle local or remote task execution and are primarily
-triggered by direct CLI invocation.
+This module provides a centralized location for defining business automation
+functions that can be executed via CLI commands in Tokeo and Cement applications.
+Automation functions typically handle local or remote task execution and are
+primarily triggered by direct CLI invocation.
 
 ### Features:
 
@@ -30,10 +31,14 @@ def process_report(app, connection, verbose=False, report_type='summary'):
 
     ### Args:
 
-    - **app** (Application): Application context with configuration and logging
-    - **connection** (Connection): SSH or local shell connection to execute commands
-    - **verbose** (bool, optional): Whether to show command output. Defaults to False.
-    - **report_type** (str, optional): Type of report to generate. Defaults to 'summary'.
+    - **app** (Application): Application context with configuration
+        and logging
+    - **connection** (Connection): SSH or local shell connection
+        to execute commands
+    - **verbose** (bool, optional): Whether to show command output.
+        Defaults to False.
+    - **report_type** (str, optional): Type of report to generate.
+        Defaults to 'summary'.
 
     ### Returns:
 
@@ -91,9 +96,12 @@ def count_words(app, connection, verbose=False):
 
     ### Args:
 
-    - **app** (Application): Application context with configuration and logging
-    - **connection** (Connection): SSH or local shell connection to execute commands
-    - **verbose** (bool, optional): Whether to show command output. Defaults to False.
+    - **app** (Application): Application context with configuration
+        and logging
+    - **connection** (Connection): SSH or local shell connection to
+        execute commands
+    - **verbose** (bool, optional): Whether to show command output.
+        Defaults to False.
 
     ### Returns:
 
@@ -117,10 +125,14 @@ def uname(app, connection, verbose=False, flags=None):
 
     ### Args:
 
-    - **app** (Application): Application context with configuration and logging
-    - **connection** (Connection): SSH or local shell connection to execute commands
-    - **verbose** (bool, optional): Whether to show command output. Defaults to False.
-    - **flags** (list, optional): List of flags to pass to the uname command
+    - **app** (Application): Application context with configuration
+        and logging
+    - **connection** (Connection): SSH or local shell connection to
+        execute commands
+    - **verbose** (bool, optional): Whether to show command output.
+        Defaults to False.
+    - **flags** (list, optional): List of flags to pass to
+        the uname command
 
     ### Returns:
 

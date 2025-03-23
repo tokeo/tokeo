@@ -40,7 +40,7 @@ from cement.core.foundation import SIGNALS
 from cement.core.exc import CaughtSignal
 from tokeo.core.exc import TokeoError
 from tokeo.ext.argparse import Controller
-from tokeo.ext.appenv import PRODUCTION, STAGING, DEVELOPMENT, TESTING, ENVIRONMENTS
+from tokeo.ext.appenv import ENVIRONMENTS
 from tokeo.core.utils.controllers import controller_log_info_help
 from tokeo.core.utils.modules import get_module_path
 
@@ -360,9 +360,7 @@ class TokeoPdoc(MetaMixin):
                 configdict = dict()
                 for configfile in (
                     f'{self.app.env.APP_LABEL}',
-                    *(
-                        f'{self.app.env.APP_LABEL}.{env}{suffix}' for env in ENVIRONMENTS for suffix in (f'', f'.local')
-                    ),
+                    *(f'{self.app.env.APP_LABEL}.{env}{suffix}' for env in ENVIRONMENTS for suffix in ('', '.local')),
                 ):
                     try:
                         filename = f'{self.app.env.APP_CONFIG_DIR}/{configfile}{self.app._meta.config_file_suffix}'
