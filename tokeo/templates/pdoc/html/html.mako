@@ -534,9 +534,10 @@
         configdict = context['configdict']
         configsettings = []
         for _config in configdict:
-              for _setting in configdict[_config]['yaml']:
-                  if _setting not in configsettings:
-                      configsettings.append(_setting)
+            if configdict[_config]['yaml'] is not None:
+                for _setting in configdict[_config]['yaml']:
+                    if _setting not in configsettings:
+                        configsettings.append(_setting)
 %>
 
   % if module_list:
