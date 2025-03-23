@@ -10,7 +10,7 @@ readme = "README.md"
 authors = [
     {name = "Tom Freudenberg", email = "th.freudenberg@gmail.com"}
 ]
-license = {text = "MIT"}
+license = "MIT"
 urls = {"Homepage" = "https://github.com/tokeo/tokeo"}
 requires-python = ">=3.10"  # Adjust based on your needs
 dependencies = [
