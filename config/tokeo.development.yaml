@@ -5,6 +5,7 @@
 
 
 scheduler:
+  ### list of tasks to plan in a crontab style defined by it's key
   tasks:
     ### each entry is defined by its method to call
     count_words_timer:

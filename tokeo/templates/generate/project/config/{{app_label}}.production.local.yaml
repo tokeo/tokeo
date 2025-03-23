@@ -3,15 +3,15 @@
 ### - This files should not be checked into source repos.
 ---
 
-dramatiq:
 
+
+dramatiq:
   ### connection url to rabbitmq server
   rabbitmq_url: amqp://guest:guest@localhost:5672/
 
-#####################################
+
 
 smtp:
-
   ### enable authentication for service
   auth: true
   ### auth username
