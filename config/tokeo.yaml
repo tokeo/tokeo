@@ -41,7 +41,7 @@
 ### - When running in production mode, ```smtp.host``` will be ```production.host.domain```
 ### - All other smtp settings from the base config.yaml remain unchanged
 ###
-### ### Local Configuration Files:
+### ### Extende Local Configuration Files:
 ###
 ### <p>
 ### Local configuration files (ending with `.local.yaml`) are used for environment-specific
@@ -52,9 +52,9 @@
 
 
 
-### ### Application settings
+### ### Core Application Configuration
 ###
-### Main configuration settings and general application values
+### Main Tokeo application settings including debugging, plugins, and template locations
 tokeo:
   ### Toggle application level debug (does not toggle framework debugging)
   # debug: false
@@ -67,6 +67,9 @@ tokeo:
 
 
 
+### ### Jinja2 Template Configuration
+###
+### Settings for Jinja2 templating engine behavior and template locations
 jinja2:
   # preserve the trailing newline when rendering templates.
   keep_trailing_newline: true
@@ -79,6 +82,10 @@ jinja2:
 
 
 
+### ### Dramatiq Task Queue Configuration
+###
+### Settings for Dramatiq task processing system including workers,
+### brokers, and queue management
 dramatiq:
   ### module and method to launch dramatiq serve service
   serve: tokeo.main:dramatiq
@@ -116,6 +123,9 @@ dramatiq:
 
 
 
+### ### gRPC Service Configuration
+###
+### Settings for gRPC API service connectivity and implementation
 grpc:
   ### serve and connect to the grpc service
   url: localhost:50051
@@ -128,6 +138,9 @@ grpc:
 
 
 
+### ### Disk Cache Configuration
+###
+### Settings for persistent disk-based cache storage and locking mechanisms
 diskcache:
   ### file path to store permanent data content
   directory: ./tokeo_diskcache
@@ -140,15 +153,19 @@ diskcache:
 
 
 
+### ### PocketBase Database Configuration
+###
+### Settings for PocketBase database connectivity
 pocketbase:
   ### connection string to database
   url: http://127.0.0.1:8090
 
 
 
-### ### Application settings
+### ### SMTP Email Configuration
 ###
-### Main configuration settings and general application values
+### Settings for email delivery including server connectivity, message formatting,
+### and default recipients
 smtp:
   ### define one or more standard recipients
   # to: null
@@ -197,14 +214,25 @@ smtp:
 
 
 
-### Crontab schema
-###   Min, Hour, Day (Month), Month, Day (Week)
+### ### Scheduler Configuration
+###
+### Settings for scheduled task execution using crontab-style scheduling
+###
+### <p>
+### <br/>
+### Crontab schema:
+### </p>
+### : Min, Hour, Day (Month), Month, Day (Week)
+###
+### <p>
 ### Examples:
-###   '*'    means 'every'
-###   '*/10' means 'every tens, e.g. every 10 minutes'
-###   '1'    means at fix value '1'
-###   '5,25,40' means at '5 and 25 and 40'
-###   'SUN-SAT' means day of week, alternative '0-6'
+### </p>
+###
+### - '*'    means 'every'
+### - '*/10' means 'every tens, e.g. every 10 minutes'
+### - '1'    means at fix value '1'
+### - '5,25,40' means at '5 and 25 and 40'
+### - 'SUN-SAT' means day of week, alternative '0-6'
 scheduler:
   ### number of concurrent running tasks overall
   max_concurrent_jobs: 5
@@ -236,6 +264,9 @@ scheduler:
 
 
 
+### ### Automation Tasks Configuration
+###
+### Settings for defining automation tasks that can be run on-demand
 automate:
   tasks:
     module: tokeo.core.tasks.automate
@@ -247,6 +278,9 @@ automate:
 
 
 
+### ### NiceGUI Web Interface Configuration
+###
+### Settings for the NiceGUI web framework and interface behavior
 nicegui:
   ### serve the web service
   host: '127.0.0.1'
@@ -279,6 +313,9 @@ nicegui:
 
 
 
+### ### PDoc Documentation Generator Configuration
+###
+### Settings for the PDoc Python documentation generator and server
 pdoc:
   ### modules to render (str | list), app and test as default
   modules: null
@@ -296,6 +333,9 @@ pdoc:
 
 
 
+### ### Logging Configuration
+###
+### Settings for application logging using the colorlog package
 log.colorlog:
   ### Where the log file lives (no log file by default)
   file: null
