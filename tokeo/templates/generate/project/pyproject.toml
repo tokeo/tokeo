@@ -14,7 +14,7 @@ authors = [
 urls = {"Homepage" = "{{ project_url }}"}
 requires-python = ">=3.10"  # Adjust based on your needs
 dependencies = [
-    "tokeo==1.1.4",
+    "tokeo==1.1.6",
     "cement==3.0.12",
     "cement[jinja2]",
     "jinja2",
