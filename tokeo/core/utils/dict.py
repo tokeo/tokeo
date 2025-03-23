@@ -57,11 +57,13 @@ def deep_merge(a, b):
 
 def redact_data(data, replace_value='***'):
     """
-    Recursively redact all values in a data structure by replacing them with a placeholder.
+    Recursively redact all values in a data structure by replacing them with
+    a placeholder.
 
-    Traverses through dictionaries and lists to replace all scalar values with the specified
-    replacement value, preserving the original structure. This is useful for logging or
-    displaying sensitive data without exposing the actual values.
+    Traverses through dictionaries and lists to replace all scalar values with
+    the specified replacement value, preserving the original structure. This is
+    useful for logging or displaying sensitive data without exposing
+    the actual values.
 
     ### Args:
 
@@ -71,8 +73,8 @@ def redact_data(data, replace_value='***'):
 
     ### Returns:
 
-    - **dict|list|str**: A new data structure with the same shape as the input, but with all
-      scalar values replaced by the redaction placeholder
+    - **dict|list|str**: A new data structure with the same shape as the input,
+        but with all scalar values replaced by the redaction placeholder
 
     ### Notes:
 

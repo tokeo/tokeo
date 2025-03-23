@@ -23,7 +23,12 @@ PRODUCTION = 'production'
 STAGING = 'staging'
 DEVELOPMENT = 'development'
 TESTING = 'testing'
-ENVIRONMENTS = (PRODUCTION, STAGING, DEVELOPMENT, TESTING,)
+ENVIRONMENTS = (
+    PRODUCTION,
+    STAGING,
+    DEVELOPMENT,
+    TESTING,
+)
 
 
 class TokeoAppEnv:
