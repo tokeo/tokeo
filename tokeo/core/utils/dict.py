@@ -53,3 +53,37 @@ def deep_merge(a, b):
     except TypeError as e:
         raise ValueError(f'TypeError "{e}" in key "{key}" when merging "{b}" into "{a}"')
     return a
+
+
+def redact_data(data, replace_value='***'):
+    """
+    Recursively redact all values in a data structure by replacing them with a placeholder.
+
+    Traverses through dictionaries and lists to replace all scalar values with the specified
+    replacement value, preserving the original structure. This is useful for logging or
+    displaying sensitive data without exposing the actual values.
+
+    ### Args:
+
+    - **data** (dict|list|any): The data structure containing values to be redacted
+    - **replace_value** (str, optional): The placeholder to use for redacted values.
+        Defaults to '***'
+
+    ### Returns:
+
+    - **dict|list|str**: A new data structure with the same shape as the input, but with all
+      scalar values replaced by the redaction placeholder
+
+    ### Notes:
+
+    - Dictionary keys are preserved as-is, only values are redacted
+    - The function creates a new data structure and does not modify the original
+
+    """
+    if isinstance(data, dict):
+        return {k: redact_data(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [redact_data(item) for item in data]
+    else:
+        # Replace any scalar value with replace_value
+        return replace_value
