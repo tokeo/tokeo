@@ -1,12 +1,3 @@
-"""
-Tokeo main module providing CLI application framework.
-
-This module defines the main Tokeo application classes and entry point.
-It leverages the Cement framework to create a robust and extensible CLI
-application with support for various extensions and handlers.
-
-"""
-
 import os
 from cement import App, TestApp
 from cement.core.exc import CaughtSignal
