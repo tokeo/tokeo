@@ -1,6 +1,8 @@
-### The Tokeo Testing Configuration Settings
-### Settings will be merged into Application Configuration
+### <p><strong>The Tokeo Testing Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
 ---
+
+
 
 test_ext_smtp:
   ### define non secret testing set

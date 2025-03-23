@@ -1,0 +1,14 @@
+### <p><strong>The Tokeo Production Configuration Secrets</strong></p>
+### - Secrets will be merged into Application Configuration.
+### - This files should not be checked into source repos.
+---
+
+
+
+smtp:
+  ### enable authentication for service
+  auth: true
+  ### auth username
+  username: production.user
+  ### auth password
+  password: top.secret

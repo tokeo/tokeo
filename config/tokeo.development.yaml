@@ -1,9 +1,10 @@
-### The Tokeo Development Configuration Settings
-### Settings will be merged into Application Configuration
+### <p><strong>The Tokeo Development Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
 ---
 
-scheduler:
 
+
+scheduler:
   tasks:
     ### each entry is defined by its method to call
     count_words_timer:
