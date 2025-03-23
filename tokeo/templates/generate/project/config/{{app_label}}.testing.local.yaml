@@ -1,6 +1,6 @@
-### The Tokeo Testing Configuration Secrets
-### Secrets will be merged into Application Configuration
-### This files should not be checked into source repos
+### <p><strong>The {{ app_name }} Testing Configuration Secrets</strong></p>
+### - Secrets will be merged into Application Configuration.<br/>
+### - This files should not be checked into source repos.
 ---
 
 dramatiq:
