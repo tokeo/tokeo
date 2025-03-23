@@ -21,6 +21,7 @@ dependencies = [
     "PyYAML",
     "cement[colorlog]",
     "colorlog",
+    "pdoc3",
     "lazy_loader",
 ]
 
@@ -35,7 +36,6 @@ dev = [
     "wheel>=0.31.0",
     "pyink",
     "flake8",
-    "pdoc3",
     # packages necessary to run all macros
     "prompt_toolkit",
     "diskcache",
