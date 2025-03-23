@@ -93,7 +93,7 @@ Set up a Tokeo project in seconds:
 cd basepath/for/project
 
 # Use docker image to generate a new project (interactive prompts)
-docker run -it -v $(pwd)/your_app:/your_app tokeocli/tokeo generate project /your_app
+docker run -it -v $(pwd)/your_app:/src tokeocli/tokeo generate project /src
 ```
 
 ### Setting Up Your Development Environment
