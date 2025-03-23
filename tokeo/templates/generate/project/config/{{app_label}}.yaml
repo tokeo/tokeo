@@ -1,26 +1,76 @@
-### The {{ app_name }} Application Configuration Settings
+### **The {{ app_name }} Main Configuration Settings**<br/>
+### <p>
+### The tokeo.ext.appenv module handles the configuration loading and overriding mechanism for
+### Tokeo and derivated applications. Each configuration file is based on YAML files with a
+### hierarchical structure that supports environment-specific settings and local overrides.
+### </p>
+###
+### ### Configuration File Hierarchy:
+###
+### <p>
+### The configuration is loaded in the following order, with each file overriding
+### settings from the previous ones:
+### </p>
+###
+### 1. Base configuration: `config/{{ app_label }}.yaml`
+### 1. Environment-specific configuration: `config/{{ app_label }}.[environment].yaml`
+### 1. Local environment-specific configuration: `config/{{ app_label }}.[environment].local.yaml`
+###
+### <p>
+### Where `[environment]` can be one of:
+### </p>
+###
+### - `development` - Used during development
+### - `testing` - Used for testing environments
+### - `production` - Used in production deployments
+###
+### ### Overloading Configuration:
+###
+### <p>
+### The overloading mechanism allows for partial settings to be defined in environment-specific
+### or local configuration files. Only the specified settings will be overridden, while all other
+### settings will be inherited from the base configuration.
+### </p>
+###
+### <p>
+### Example:
+### </p>
+###
+### - Base config.yaml defines ```smtp.host: localhost```
+### - Production config.yaml defines ```smtp.host: production.host.domain```
+### - When running in production mode, ```smtp.host``` will be ```production.host.domain```
+### - All other smtp settings from the base config.yaml remain unchanged
+###
+### ### Extende Local Configuration Files:
+###
+### <p>
+### Local configuration files (ending with `.local.yaml`) are used for environment-specific
+### secrets and settings that should not be checked into source control. These files should
+### be left added to `.gitignore`.
+### </p>
 ---
 
-#####################################
 
+
+### ### Core Application Configuration
+###
+### Main {{ app_name }} application settings including debugging, plugins, and template locations
 {{ app_label }}:
-
   ### Toggle application level debug (does not toggle framework debugging)
   # debug: false
-
   ### Where external (third-party) plugins are loaded from
   # plugin_dir: /var/lib/{{ app_label }}/plugins/
-
   ### Where all plugin configurations are loaded from
   # plugin_config_dir: /etc/{{ app_label }}/plugins.d/
-
   ### Where external templates are loaded from
   # template_dir: /var/lib/{{ app_label }}/templates/
 
-#####################################
 
+
+### ### Jinja2 Template Configuration
+###
+### Settings for Jinja2 templating engine behavior and template locations
 jinja2:
-
   # preserve the trailing newline when rendering templates.
   keep_trailing_newline: true
   # If this is set to True the first newline after a block is removed
@@ -30,10 +80,13 @@ jinja2:
   # template_dirs:
   #   - extra/templates
 
-#####################################
 
+
+### ### Dramatiq Task Queue Configuration
+###
+### Settings for Dramatiq task processing system including workers,
+### brokers, and queue management
 dramatiq:
-
   ### module and method to launch dramatiq serve service
   serve: {{ app_label }}.main:dramatiq
   ### actors module to launch with services
@@ -68,10 +121,12 @@ dramatiq:
   ### mark lock keys with prefix
   locks_key_prefix: dq_
 
-#####################################
 
+
+### ### gRPC Service Configuration
+###
+### Settings for gRPC API service connectivity and implementation
 grpc:
-
   ### serve and connect to the grpc service
   url: localhost:50051
   ### Thread Pool max-workers for grpc service
@@ -81,10 +136,12 @@ grpc:
   ### module and servicer for grpc implementations
   grpc_servicer: {{ app_label }}.core.grpc.{{ app_label }}_servicer:{{ app_class_name }}Servicer
 
-#####################################
 
+
+### ### Disk Cache Configuration
+###
+### Settings for persistent disk-based cache storage and locking mechanisms
 diskcache:
-
   ### file path to store permanent data content
   directory: ./{{ app_label }}_diskcache
   ### default connection timeout
@@ -94,17 +151,22 @@ diskcache:
   ### mark lock keys with prefix
   locks_key_prefix: dc_
 
-#####################################
 
+
+### ### PocketBase Database Configuration
+###
+### Settings for PocketBase database connectivity
 pocketbase:
-
   ### connection string to database
   url: http://127.0.0.1:8090
 
-#####################################
 
+
+### ### SMTP Email Configuration
+###
+### Settings for email delivery including server connectivity, message formatting,
+### and default recipients
 smtp:
-
   ### define one or more standard recipients
   # to: null
   ### define the senders address
@@ -150,16 +212,27 @@ smtp:
   ### define the domain for Message-Id (null use current server.domain)
   # msgid_domain: localhost
 
-#####################################
 
-### Crontab schema
-###   Min, Hour, Day (Month), Month, Day (Week)
+
+### ### Scheduler Configuration
+###
+### Settings for scheduled task execution using crontab-style scheduling
+###
+### <p>
+### <br/>
+### Crontab schema:
+### </p>
+### : Min, Hour, Day (Month), Month, Day (Week)
+###
+### <p>
 ### Examples:
-###   '*'    means 'every'
-###   '*/10' means 'every tens, e.g. every 10 minutes'
-###   '1'    means at fix value '1'
-###   '5,25,40' means at '5 and 25 and 40'
-###   'SUN-SAT' means day of week, alternative '0-6'
+### </p>
+###
+### - '*'    means 'every'
+### - '*/10' means 'every tens, e.g. every 10 minutes'
+### - '1'    means at fix value '1'
+### - '5,25,40' means at '5 and 25 and 40'
+### - 'SUN-SAT' means day of week, alternative '0-6'
 scheduler:
   ### number of concurrent running tasks overall
   max_concurrent_jobs: 5
@@ -189,8 +262,11 @@ scheduler:
       kwargs:
         url: https://github.com
 
-#####################################
 
+
+### ### Automation Tasks Configuration
+###
+### Settings for defining automation tasks that can be run on-demand
 automate:
   hosts:
     local:
@@ -203,8 +279,11 @@ automate:
         flags:
           - '-a'
 
-#####################################
 
+
+### ### NiceGUI Web Interface Configuration
+###
+### Settings for the NiceGUI web framework and interface behavior
 nicegui:
   ### serve the web service
   host: '127.0.0.1'
@@ -247,8 +326,11 @@ nicegui:
   ### logging level for uvicorn server
   logging_level: warning
 
-#####################################
 
+
+### ### PDoc Documentation Generator Configuration
+###
+### Settings for the PDoc Python documentation generator and server
 pdoc:
   ### modules to render (str | list), app and test as default
   modules: null
@@ -265,24 +347,21 @@ pdoc:
     - {{ app_label }}.templates.pdoc.html
     - tokeo.templates.pdoc.html
 
-#####################################
 
+
+### ### Logging Configuration
+###
+### Settings for application logging using the colorlog package
 log.colorlog:
-
   ### Where the log file lives (no log file by default)
   file: null
-
   ### The level for which to log.  One of: info, warning, error, fatal, debug
   level: info
-
   ### Whether or not to log to console
   to_console: true
-
   ### Whether or not to rotate the log file when it reaches `max_bytes`
   # rotate: false
-
   ### Max size in bytes that a log file can grow until it is rotated.
   # max_bytes: 512000
-
   ### The maximum number of log files to maintain when rotating
   # max_files: 4
