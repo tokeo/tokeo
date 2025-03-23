@@ -46,8 +46,8 @@ variables:
     default: "https://github.com/johndoe/inspire/"
 
   - name: project_license
-    prompt: "Project license"
-    default: "unlicensed"
+    prompt: "Project license (select from https://spdx.org/licenses/)"
+    default: "Proprietary"
 
   - name: feature_diskcache
     prompt: "Enable diskcache [(Y)es/(N)o]"
