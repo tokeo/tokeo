@@ -268,12 +268,18 @@ scheduler:
 ###
 ### Settings for defining automation tasks that can be run on-demand
 automate:
+  ### list of hosts reference
   hosts:
     local:
+      ### define shell for local tasks
       shell: /bin/sh
+  ### list of tasks
   tasks:
+    ### default module for tasks implementations if not specified other
     module: {{ app_label }}.core.tasks.automate
+    ### simplest `count_words` task configuration by just an empty dict
     count_words: {}
+    ### `uname` task configuration with arguments config
     uname:
       kwargs:
         flags:
