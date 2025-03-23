@@ -2,18 +2,30 @@
 ### - Settings will be merged into Application Configuration.
 ---
 
-#####################################
+
 
 scheduler:
-
+  ### list of tasks to plan in a crontab style defined by it's key
   tasks:
     ### each entry is defined by its method to call
     count_words_timer:
       ### one or multiple entries in crontab style when to run the task
       crontab: '* * * * *'
 
-#####################################
+
+
+grpc:
+  ### serve and connect to the grpc service
+  url: '0.0.0.0:50051'
+
+
 
 nicegui:
   ### serve the web service on all interfaces
+  host: '0.0.0.0'
+
+
+
+pdoc:
+  ### serve the pdoc service
   host: '0.0.0.0'

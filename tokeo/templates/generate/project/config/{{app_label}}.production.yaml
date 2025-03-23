@@ -2,9 +2,8 @@
 ### - Settings will be merged into Application Configuration.
 ---
 
-#####################################
+
 
 smtp:
-
   ### SMTP server address to connect for service
   host: production.host.domain
