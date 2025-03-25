@@ -1,18 +1,14 @@
 """
-Web page routes and UI definitions for the application's website.
+Web page routes for the application's website.
 
 This module provides a centralized location for defining website routes and
-page handlers in Tokeo and Cement applications using NiceGUI. It contains
-the default (index) route and additional page routes that make up the website's
-navigation structure, leveraging the components.blocks and components.layout
-modules for consistent page structure and design.
+page handlers in Tokeo applications using NiceGUI. It contains the routes
+that make up the website's navigation structure.
 
 ### Features:
 
 - **Default route** (`/`) serving as the application's homepage
-- **Page definitions** with consistent layout and navigation
 - **Route handlers** for different application URL paths
-- **UI component organization** using a modular component approach
 - **Responsive design** that works across different device types
 
 ### Route Structure:
@@ -66,7 +62,6 @@ consistent page structure while allowing page-specific content:
 
 - The default route function (named 'default') is automatically registered as the
     index ('/')
-- Routes are configured in the application's YAML configuration under nicegui.routes
 - The layout and blocks modules abstract away page structure for consistent design
 - Use Tailwind CSS classes for styling consistency and responsive design
 - Each route handler should focus on its specific page content
@@ -74,11 +69,11 @@ consistent page structure while allowing page-specific content:
 """
 
 from tokeo.ext.appshare import app
-from .components import blocks
+from .pages.default import page_default
+from .pages.hello_world import page_hello_world
 
 
 ui = app.nicegui.ui
-ux = app.nicegui.ux
 
 
 def default():
@@ -93,23 +88,13 @@ def default():
 
     - Automatically registered as the '/' route in the application
     - Configured via the 'default_route' setting in nicegui config
-    - Creates a dashboard view with introductory content
 
     """
-    with blocks.page(title='This is the {{ app_name }} dashboard'):
-        ux.p(
-            """
-            This single-page "app" style layout features a sidebar, main content area, and footer.
-            This full-height layout is never more than viewport height. The content area scrolls
-            independently as needed. For this example, we're using the Tailwind CSS utility framework.
-            As part of it's default classes, Tailwind includes Flexbox classes which make this layout
-            implementation simple!
-            """
-        ).classes('text-lg')
+    page_default()
 
 
 @ui.page('/hello-world')
-def hello_function():
+def hello_world():
     """
     Example route showing a simple page with custom content.
 
@@ -119,9 +104,6 @@ def hello_function():
     ### Notes:
 
     - Accessible at the '/hello-world' URL path
-    - Uses the standard page layout for consistency
-    - Demonstrates adding custom styled content to a page
 
     """
-    with blocks.page(title='Customers administration'):
-        ui.label('Hello world!').classes('text-2xl text-orange-500')
+    page_hello_world()
