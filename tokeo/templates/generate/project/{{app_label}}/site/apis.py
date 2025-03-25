@@ -2,7 +2,7 @@
 REST API endpoints and business logic integration for the application.
 
 This module provides a centralized location for defining API endpoints and
-integrating business logic in Tokeo and Cement applications using NiceGUI's
+integrating business logic in Tokeo applications using NiceGUI's
 FastAPI integration. It contains REST API routes that expose application
 functionality to clients, connecting web interfaces with the core business
 logic implemented in the application's core modules.

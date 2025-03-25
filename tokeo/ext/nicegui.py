@@ -268,7 +268,9 @@ class TokeoNicegui(MetaMixin):
             tailwind=True,
             prod_js=True,
             welcome_message=None,
-            endpoint_documentation=None,
+            openapi_documentation=None,
+            openapi_url=None,
+            openapi_custom=None,
             storage_secret=None,
             binding_refresh_interval=0.5,
             reconnect_timeout=5.0,
@@ -305,6 +307,8 @@ class TokeoNicegui(MetaMixin):
         self._apis = self._config('apis')
         self._routes = self._config('routes')
         self._default_route = self._config('default_route')
+        self._openapi_url = self._config('openapi_url')
+        self._openapi_custom = self._config('openapi_custom')
         # test welcome message
         self._welcome_message = self._config('welcome_message')
         if self._welcome_message is None:
@@ -422,12 +426,14 @@ class TokeoNicegui(MetaMixin):
         - Dynamically imports API and route modules based on configuration
         - Sets up the default route handler if specified
         - Configures file monitoring if hot-reloading is enabled
+        - Loads and configure OpenAPI endpoint and custom swagger and redoc ui
         - Starts the NiceGUI server with configuration from the application
 
         """
         # load the api and routes module
-        apis_module = importlib.import_module(self._apis)
-        routes_module = importlib.import_module(self._routes)
+        apis_module = importlib.import_module(self._apis) if self._apis else None
+        routes_module = importlib.import_module(self._routes) if self._routes else None
+
         # check default web handler
         if self._default_route and isinstance(self._default_route, str) and self._default_route != '':
             default_route = getattr(routes_module, self._default_route, None)
@@ -439,6 +445,7 @@ class TokeoNicegui(MetaMixin):
                 )
             # initialize registered default route
             default_route()
+
         # check config for watchdog
         if hotload:
             self._hotload_dir = hotload_dir if hotload_dir else self._config('hotload_dir', fallback=None)
@@ -446,14 +453,15 @@ class TokeoNicegui(MetaMixin):
             if self._hotload_dir is None:
                 self._hotload_dir = getattr(routes_module, '__file__', getattr(apis_module, '__file__', None))
             # check to point for a dir
-            if self._hotload_dir and isfile(self._hotload_dir):
-                self._hotload_dir = dirname(self._hotload_dir)
-            else:
+            if not self._hotload_dir:
                 self._hotload_dir = self.app._meta.main_dir
+            elif isfile(self._hotload_dir):
+                self._hotload_dir = dirname(self._hotload_dir)
             # activate watchdog
             self._setup_watchdog()
             # Create the file monitor task to run in the FastAPI's event loop
             fastapi_app.on_startup(self._watchdog_file_changes)
+
         # use custom welcome message
         fastapi_app.on_startup(
             # fmt: off
@@ -462,6 +470,22 @@ class TokeoNicegui(MetaMixin):
             )
             # fmt: on
         )
+
+        # config the openapi service and customizing
+        if self._config('openapi_documentation') and self._openapi_url:
+            # define general openapi.json url
+            fastapi_app.openapi_url = self._openapi_url
+            # setup openapi
+            fastapi_app.setup()
+            # use module to customize ui
+            openapi_custom = importlib.import_module(self._openapi_custom) if self._openapi_custom else None
+            try:
+                # try to customize get_openapi settings
+                fastapi_app.openapi = openapi_custom.get_openapi_custom
+            except Exception:
+                # use default get_openapi from fastapi
+                pass
+
         # spin up service
         ui.run(
             # config
@@ -477,12 +501,13 @@ class TokeoNicegui(MetaMixin):
             binding_refresh_interval=float(self._config('binding_refresh_interval')),
             reconnect_timeout=float(self._config('reconnect_timeout')),
             uvicorn_logging_level=self._config('logging_level'),
-            endpoint_documentation=self._config('endpoint_documentation'),
+            endpoint_documentation=self._config('openapi_documentation'),
             # config fixed
             show_welcome_message=False,
             show=False,
             native=False,
             reload=False,
+            fastapi_docs=False,
             uvicorn_reload_dirs=None,
             uvicorn_reload_includes=None,
             uvicorn_reload_excludes=None,
