@@ -16,6 +16,7 @@ if app.env.IS_DEV_MODE:
 
 import os
 from cement.utils import fs
+import glob
 
 
 # Environment constants
@@ -103,24 +104,56 @@ class TokeoAppEnv:
         # get the main dir from meta
         self.APP_MAIN_DIR = app._meta.main_dir
         # build the base app dir relatively from __main__
-        self.APP_DIR = fs.abspath(self.APP_MAIN_DIR + '/..')
+        self.APP_DIR = fs.abspath(os.path.join(self.APP_MAIN_DIR, '..'))
         # build the config dir
-        self.APP_CONFIG_DIR = fs.abspath(self.APP_DIR + '/config')
+        self.APP_CONFIG_DIR = fs.abspath(os.path.join(self.APP_DIR, 'config', self.APP_LABEL))
+        # add base configs
+        app._meta.config_files = self.get_config_files(app_config_file_suffix=app._meta.config_file_suffix)
         # add environment configs
         if self.APP_ENV:
-            config_filenames = [
-                self.APP_LABEL,
-                self.APP_LABEL + '.' + self.APP_ENV,
-                self.APP_LABEL + '.' + self.APP_ENV + '.local',
-            ]
-        else:
-            config_filenames = [
-                self.APP_LABEL,
-            ]
-        # load the config from appenv files
-        app._meta.config_files = list()
-        for config_filename in config_filenames:
-            app._meta.config_files.append(f'{self.APP_CONFIG_DIR}/{config_filename}{app._meta.config_file_suffix}')
+            app._meta.config_files.extend(self.get_config_files(app_env=self.APP_ENV, app_config_file_suffix=app._meta.config_file_suffix))
+
+    def get_config_files(self, app_env='base', app_config_file_suffix='.yaml'):
+        """
+        Get a list of files for configuration based on environments
+
+        This function scans the configured config folders for configuration files.
+
+        ### Args:
+
+        - **app_env** (String): The id of the selected environment (base or other)
+        - **app_config_file_suffix** (String): The suffix for the config files.
+
+        """
+        # read main file and scan related env.d directory
+        result = [
+            # main environment config
+            os.path.join(self.APP_CONFIG_DIR, f'{app_env}{app_config_file_suffix}'),
+            # partial environment config files but ignore .local
+            *(
+                f
+                for f in glob.glob(
+                    os.path.join(self.APP_CONFIG_DIR, f'{app_env}.d', '**', f'*{app_config_file_suffix}'),
+                    recursive=True,
+                )
+                if not f.endswith(f'.local{app_config_file_suffix}')
+            ),
+        ]
+        # if not base check for .local config files
+        if app_env != 'base':
+            result.extend(
+                [
+                    # main environment .local config
+                    os.path.join(self.APP_CONFIG_DIR, f'{app_env}.local{app_config_file_suffix}'),
+                    # partial environment .local config files
+                    *glob.glob(
+                        os.path.join(self.APP_CONFIG_DIR, f'{app_env}.d', '**', f'*.local{app_config_file_suffix}'),
+                        recursive=True,
+                    ),
+                ]
+            )
+        # return list
+        return result
 
 
 def load(app):
