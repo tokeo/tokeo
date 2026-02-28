@@ -79,10 +79,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             'from_addr': 'noreply@localhost',  # Sender email address
             'cc': [],  # Carbon copy recipients
             'bcc': [],  # Blind carbon copy recipients
-            # Email content configuration
+            # Email subject
             'subject': None,  # Email subject line
             'subject_prefix': None,  # Optional prefix for all subjects
-            'files': None,  # Attachments or inline images
             # SMTP server configuration
             'host': 'localhost',  # SMTP server hostname
             'port': '25',  # SMTP server port
@@ -92,6 +91,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             'auth': False,  # Use SMTP authentication
             'username': None,  # SMTP username
             'password': None,  # SMTP password
+            # Email content
+            'files': None,  # Attachments or inline images
             # Email encoding options
             'charset': 'utf-8',  # Character set for email
             'header_encoding': None,  # Encoding for headers (None, 'base64', 'qp')
@@ -319,9 +320,20 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             server.login(params['username'], params['password'])
 
         msg = self._make_message(body, **params)
-        server.send_message(msg)
+        res = server.send_message(msg)
 
         server.quit()
+
+        # FIXME: should deprecate for 3.0 and change in 3.2
+        # For smtplib this would be "senderrs" (dict), but for backward compat
+        # we need to return bool
+        # https://github.com/python/cpython/blob/3.13/Lib/smtplib.py#L899
+        self.app.log.error(f"SMTPHandler Errors: {res}")
+        if len(res) > 0:
+            # this will be difficult to test with Mailpit as it accepts everything... no cover
+            return False  # pragma: nocover
+        else:
+            return True
 
     def _header(self, value, _charset=None, **params):
         """
