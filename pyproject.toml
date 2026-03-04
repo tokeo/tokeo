@@ -14,7 +14,7 @@ license = "MIT"
 urls = {"Homepage" = "https://github.com/tokeo/tokeo"}
 requires-python = ">=3.10"  # Adjust based on your needs
 dependencies = [
-    "cement==3.0.12",
+    "cement==3.0.14",
     "cement[jinja2]",
     "jinja2",
     "cement[yaml]",
