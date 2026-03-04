@@ -1,4 +1,4 @@
-.PHONY: help clean venv outdated dev prod proto doc test fmt lint docker sdist wheel dist-upload
+.PHONY: help clean venv outdated dev prod doc test fmt lint docker sdist wheel dist-upload
 
 help:
 	@echo
@@ -65,10 +65,6 @@ prod:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	pip install --upgrade pip
 	pip install -e .
-
-proto:
-	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
-	python -m grpc_tools.protoc -I./ --python_out=. --pyi_out=. --grpc_python_out=. ./tokeo/core/grpc/proto/tokeo.proto
 
 doc:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
