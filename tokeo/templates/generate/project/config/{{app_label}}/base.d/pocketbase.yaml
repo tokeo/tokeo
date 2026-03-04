@@ -1,0 +1,12 @@
+### <p><strong>The {{ app_name }} PocketBase Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+### ### PocketBase Database Configuration
+###
+### Settings for PocketBase database connectivity
+pocketbase:
+  ### connection string to database
+  url: http://127.0.0.1:8090

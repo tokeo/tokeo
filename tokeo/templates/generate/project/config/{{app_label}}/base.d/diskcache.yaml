@@ -1,0 +1,18 @@
+### <p><strong>The {{ app_name }} DiskCache Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+### ### Disk Cache Configuration
+###
+### Settings for persistent disk-based cache storage and locking mechanisms
+diskcache:
+  ### file path to store permanent data content
+  directory: ./{{ app_label }}_diskcache
+  ### default connection timeout
+  timeout: 60
+  ### mark lock keys by tag
+  locks_tag: diskcache_locks
+  ### mark lock keys with prefix
+  locks_key_prefix: dc_

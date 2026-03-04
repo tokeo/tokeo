@@ -1,0 +1,13 @@
+### <p><strong>The {{ app_name }} Logging Testing Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+log.colorlog:
+  ### Where the log file lives (no log file by default)
+  file: null
+  ### The level for which to log.  One of: info, warning, error, fatal, debug
+  level: info
+  ### Whether or not to log to console
+  to_console: true

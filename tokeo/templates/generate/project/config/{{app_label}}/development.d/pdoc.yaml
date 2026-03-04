@@ -1,0 +1,9 @@
+### <p><strong>The {{ app_name }} PDoc Development Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+pdoc:
+  ### serve the pdoc service
+  host: '0.0.0.0'

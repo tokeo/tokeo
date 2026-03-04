@@ -1,0 +1,71 @@
+### **The {{ app_name }} Main Configuration Settings**<br/>
+### <p>
+### The tokeo.ext.appenv module handles the configuration loading and overriding mechanism for
+### Tokeo and derivated applications. Each configuration file is based on YAML files with a
+### hierarchical structure that supports environment-specific settings and local overrides.
+### </p>
+###
+### ### Configuration File Hierarchy:
+###
+### <p>
+### The configuration is loaded in the following order, with each file overriding
+### settings from the previous ones:
+### </p>
+###
+### 1. Base configuration: `config/{{ app_label }}.yaml`
+### 1. Environment-specific configuration: `config/{{ app_label }}.[environment].yaml`
+### 1. Local environment-specific configuration: `config/{{ app_label }}.[environment].local.yaml`
+### 1. Directory based configuration: `config/{{ app_label }}/base.yaml`
+### 1. Directory splitted configuration: `config/{{ app_label }}/base.d/function.yaml`
+### 1. Directory splitted environment-specific configuration: `config/{{ app_label }}/development.d/function.yaml`
+###
+### <p>
+### Where `[environment]` can be one of:
+### </p>
+###
+### - `development` - Used during development
+### - `testing` - Used for testing environments
+### - `production` - Used in production deployments
+###
+### - `base` - Used for Standard on directory based configurations
+###
+### ### Overloading Configuration:
+###
+### <p>
+### The overloading mechanism allows for partial settings to be defined in environment-specific
+### or local configuration files. Only the specified settings will be overridden, while all other
+### settings will be inherited from the base configuration.
+### </p>
+###
+### <p>
+### Example:
+### </p>
+###
+### - Base config.yaml defines ```smtp.host: localhost```
+### - Production config.yaml defines ```smtp.host: production.host.domain```
+### - When running in production mode, ```smtp.host``` will be ```production.host.domain```
+### - All other smtp settings from the base config.yaml remain unchanged
+###
+### ### Extende Local Configuration Files:
+###
+### <p>
+### Local configuration files (ending with `.local.yaml`) are used for environment-specific
+### secrets and settings that should not be checked into source control. These files should
+### be left added to `.gitignore`.
+### </p>
+---
+
+
+
+### ### Core Application Configuration
+###
+### Main {{ app_name }} application settings including debugging, plugins, and template locations
+{{ app_label }}:
+  ### Toggle application level debug (does not toggle framework debugging)
+  # debug: false
+  ### Where external (third-party) plugins are loaded from
+  # plugin_dir: /var/lib/{{ app_label }}/plugins/
+  ### Where all plugin configurations are loaded from
+  # plugin_config_dir: /etc/{{ app_label }}/plugins.d/
+  ### Where external templates are loaded from
+  # template_dir: /var/lib/{{ app_label }}/templates/

@@ -1,0 +1,53 @@
+### <p><strong>The {{ app_name }} Scheduler Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+### ### Scheduler Configuration
+###
+### Settings for scheduled task execution using crontab-style scheduling
+###
+### <p>
+### <br/>
+### Crontab schema:
+### </p>
+### : Min, Hour, Day (Month), Month, Day (Week)
+###
+### <p>
+### Examples:
+### </p>
+###
+### - '*'    means 'every'
+### - '*/10' means 'every tens, e.g. every 10 minutes'
+### - '1'    means at fix value '1'
+### - '5,25,40' means at '5 and 25 and 40'
+### - 'SUN-SAT' means day of week, alternative '0-6'
+scheduler:
+  ### number of concurrent running tasks overall
+  max_concurrent_jobs: 5
+  ### the default time zone
+  timezone: UTC
+  ### list of tasks to plan in a crontab style defined by it's key
+  tasks:
+    ### each entry is defined by its method to call
+    count_words_timer:
+      ### module where the method is located
+      module: {{ app_label }}.core.tasks.agents
+      ### a name for the entry in schedule list
+      name: count-word timer
+      ### what to do if multiple run times occur until task starts (earliest, latest, all)
+      coalesce: latest
+      ### maximum number of seconds the scheduled job’s actual run time is allowed to be late
+      misfire_grace_time: null
+      ### number of seconds to add to the scheduled time for each job
+      delay: null
+      ### maximum number of seconds to randomly add to the scheduled time for each job
+      max_jitter: null
+      ###  maximum number of instances of the task that are allowed to run concurrently
+      max_running_jobs: null
+      ### one or multiple entries in crontab style when to run the task
+      crontab: '*/5 * * * *'
+      ### optional arguments send by named args to the method
+      kwargs:
+        url: https://github.com
