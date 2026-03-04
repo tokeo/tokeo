@@ -1,0 +1,24 @@
+### <p><strong>The {{ app_name }} PDoc Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+### ### PDoc Documentation Generator Configuration
+###
+### Settings for the PDoc Python documentation generator and server
+pdoc:
+  ### modules to render (str | list), app and test as default
+  modules: null
+  ### render content into output directory
+  output_dir: html
+  ### serve the pdoc service
+  host: '127.0.0.1'
+  ### port for serving the pdoc service
+  port: 9999
+  ### relative filepath or absolute URL to a favicon
+  favicon: public/favicon.ico
+  ### module or absolute path to the mako templates
+  templates:
+    - {{ app_label }}.templates.pdoc.html
+    - tokeo.templates.pdoc.html

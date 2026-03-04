@@ -4,6 +4,3 @@
 
 
 
-smtp:
-  ### SMTP server address to connect for service
-  host: production.host.domain

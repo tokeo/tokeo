@@ -1,0 +1,18 @@
+### <p><strong>The {{ app_name }} Templating Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+### ### Jinja2 Template Configuration
+###
+### Settings for Jinja2 templating engine behavior and template locations
+jinja2:
+  # preserve the trailing newline when rendering templates.
+  keep_trailing_newline: true
+  # If this is set to True the first newline after a block is removed
+  # (block, not variable tag!)
+  trim_blocks: true
+  # extra where to find templates
+  # template_dirs:
+  #   - extra/templates

@@ -1,0 +1,18 @@
+### <p><strong>The {{ app_name }} Grpc Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+### ### gRPC Service Configuration
+###
+### Settings for gRPC API service connectivity and implementation
+grpc:
+  ### serve and connect to the grpc service
+  url: localhost:50051
+  ### Thread Pool max-workers for grpc service
+  max_worker: 2
+  ### module and method to launch grpc server
+  proto_add_servicer_to_server: {{ app_label }}.core.grpc.proto.{{ app_label }}_pb2_grpc:add_{{ app_class_name }}Servicer_to_server
+  ### module and servicer for grpc implementations
+  grpc_servicer: {{ app_label }}.core.grpc.{{ app_label }}_servicer:{{ app_class_name }}Servicer

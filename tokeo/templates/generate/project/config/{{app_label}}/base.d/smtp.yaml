@@ -1,0 +1,55 @@
+### <p><strong>The {{ app_name }} Smtp Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+### ### SMTP Email Configuration
+###
+### Settings for email delivery including server connectivity, message formatting,
+### and default recipients
+smtp:
+  ### define one or more standard recipients
+  # to: null
+  ### define the senders address
+  # from_addr: no-reply@example.com
+  ### define one or more carbon copy recipients
+  # cc: null
+  ### define one or more blind copy recipients
+  # bcc: null
+  ### define a default subject
+  # subject: null
+  ### define a defeault prefix on subjects
+  # subject_prefix: null
+  ### SMTP server address to connect for service
+  host: localhost
+  ### SMTP port to connect for service
+  port: 25
+  ### default timeout when connection will cause an error
+  timeout: 30
+  ### enable SSL connection
+  # ssl: false
+  ### enable TLS on connection, available for SSL and non SSL connections
+  tls: true
+  ### enable authentication for service
+  # auth: false
+  ### auth username
+  # username: null
+  ### auth password
+  # password: null
+  ### attach one or more files by default to the messages
+  # files: null
+  ### define the characterset for message
+  # charset: utf-8
+  ### define the encoding of headers qp|base64
+  # header_encoding: null
+  ### define the encoding of bodies qp|base64
+  # body_encoding: null
+  ### check for Date field and append if not exist
+  # date_enforce: True
+  ### check for Message-Id and append if not exist
+  # msgid_enforce: True
+  ### some prepend string for Message-Id
+  # msgid_str: null
+  ### define the domain for Message-Id (null use current server.domain)
+  # msgid_domain: localhost

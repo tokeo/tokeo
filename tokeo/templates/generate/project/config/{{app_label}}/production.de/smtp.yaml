@@ -1,0 +1,9 @@
+### <p><strong>The {{ app_name }} Smtp Production Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+smtp:
+  ### SMTP server address to connect for service
+  host: production.host.domain

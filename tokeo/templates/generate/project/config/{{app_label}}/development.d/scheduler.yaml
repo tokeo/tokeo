@@ -1,4 +1,4 @@
-### <p><strong>The {{ app_name }} Development Configuration Settings</strong></p>
+### <p><strong>The {{ app_name }} Scheduler Development Configuration Settings</strong></p>
 ### - Settings will be merged into Application Configuration.
 ---
 
@@ -11,21 +11,3 @@ scheduler:
     count_words_timer:
       ### one or multiple entries in crontab style when to run the task
       crontab: '* * * * *'
-
-
-
-grpc:
-  ### serve and connect to the grpc service
-  url: '0.0.0.0:50051'
-
-
-
-nicegui:
-  ### serve the web service on all interfaces
-  host: '0.0.0.0'
-
-
-
-pdoc:
-  ### serve the pdoc service
-  host: '0.0.0.0'

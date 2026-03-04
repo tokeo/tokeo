@@ -1,0 +1,9 @@
+### <p><strong>The {{ app_name }} Grpc Development Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+grpc:
+  ### serve and connect to the grpc service
+  url: '0.0.0.0:50051'

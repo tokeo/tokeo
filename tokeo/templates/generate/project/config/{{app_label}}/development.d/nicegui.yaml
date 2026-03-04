@@ -1,0 +1,9 @@
+### <p><strong>The {{ app_name }} NiceGui Development Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+nicegui:
+  ### serve the web service on all interfaces
+  host: '0.0.0.0'

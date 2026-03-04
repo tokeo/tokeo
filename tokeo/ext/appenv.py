@@ -17,6 +17,7 @@ if app.env.IS_DEV_MODE:
 import os
 from cement.utils import fs
 import glob
+from tokeo.core.utils.sort import SORT_KEY_BY_LEX_NUM_ORDER_LAMBDA
 
 
 # Environment constants
@@ -110,8 +111,10 @@ class TokeoAppEnv:
         # add base configs
         app._meta.config_files = self.get_config_files(app_config_file_suffix=app._meta.config_file_suffix)
         # add environment configs
-        if self.APP_ENV:
-            app._meta.config_files.extend(self.get_config_files(app_env=self.APP_ENV, app_config_file_suffix=app._meta.config_file_suffix))
+        if self.APP_ENV and self.APP_ENV != 'base':
+            app._meta.config_files.extend(
+                self.get_config_files(app_env=self.APP_ENV, app_config_file_suffix=app._meta.config_file_suffix),
+            )
 
     def get_config_files(self, app_env='base', app_config_file_suffix='.yaml'):
         """
@@ -125,35 +128,31 @@ class TokeoAppEnv:
         - **app_config_file_suffix** (String): The suffix for the config files.
 
         """
-        # read main file and scan related env.d directory
-        result = [
-            # main environment config
-            os.path.join(self.APP_CONFIG_DIR, f'{app_env}{app_config_file_suffix}'),
-            # partial environment config files but ignore .local
-            *(
-                f
-                for f in glob.glob(
-                    os.path.join(self.APP_CONFIG_DIR, f'{app_env}.d', '**', f'*{app_config_file_suffix}'),
-                    recursive=True,
-                )
-                if not f.endswith(f'.local{app_config_file_suffix}')
-            ),
-        ]
-        # if not base check for .local config files
-        if app_env != 'base':
-            result.extend(
-                [
-                    # main environment .local config
-                    os.path.join(self.APP_CONFIG_DIR, f'{app_env}.local{app_config_file_suffix}'),
-                    # partial environment .local config files
-                    *glob.glob(
-                        os.path.join(self.APP_CONFIG_DIR, f'{app_env}.d', '**', f'*.local{app_config_file_suffix}'),
-                        recursive=True,
-                    ),
-                ]
-            )
-        # return list
-        return result
+
+        # define empty arrays for env and local configurations
+        configs = []
+        local_configs = []
+
+        # main environment config
+        configs.append(os.path.join(self.APP_CONFIG_DIR, f'{app_env}{app_config_file_suffix}'))
+
+        # partial environment config files in .d directories
+        files = glob.glob(os.path.join(self.APP_CONFIG_DIR, f'{app_env}.d', '**', f'*{app_config_file_suffix}'), recursive=True)
+        # sort the files by lexicographically order and respect numbers in strings while ordering
+        files.sort(key=SORT_KEY_BY_LEX_NUM_ORDER_LAMBDA)
+        # loop files and group by standard and local config file
+        for f in files:
+            # test for .local config file
+            if f.endswith(f'.local{app_config_file_suffix}'):
+                # if not base check allow add of .local config files
+                if app_env != 'base':
+                    local_configs.append(f)
+            else:
+                # add config file
+                configs.append(f)
+
+        # return empty list
+        return [ *configs, *local_configs ]
 
 
 def load(app):
