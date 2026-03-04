@@ -1,4 +1,4 @@
-.PHONY: help clean venv outdated dev prod proto doc test fmt lint docker sdist wheel dist-upload
+.PHONY: help clean venv outdated dev prod {% if feature_grpc == "Y" %}proto {% endif -%} doc test fmt lint docker sdist wheel dist-upload
 
 help:
 	@echo
@@ -16,6 +16,9 @@ help:
 	@echo "  test (debug=1) files=tests/file - run tests"
 	@echo "  fmt (source=module) = run formatter"
 	@echo "  lint (source=module) = run linter"
+{% if feature_grpc == "Y" %}
+	@echo "  proto - create grpc proto files"
+{% endif %}
 	@echo "  docker - create docker image"
 	@echo "  sdist - create source tgz"
 	@echo "  wheel - create installation wheel"
@@ -71,9 +74,12 @@ prod:
 	pip install --upgrade pip
 	pip install -e .
 
+{% if feature_grpc == "Y" %}
 proto:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	python -m grpc_tools.protoc -I./ --python_out=. --pyi_out=. --grpc_python_out=. ./{{ app_label }}/core/grpc/proto/{{ app_label }}.proto
+
+{% endif -%}
 
 doc:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
