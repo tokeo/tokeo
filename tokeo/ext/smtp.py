@@ -328,9 +328,10 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # For smtplib this would be "senderrs" (dict), but for backward compat
         # we need to return bool
         # https://github.com/python/cpython/blob/3.13/Lib/smtplib.py#L899
-        self.app.log.error(f"SMTPHandler Errors: {res}")
+        self.app.log.error(f'SMTPHandler Errors: {res}')
         if len(res) > 0:
-            # this will be difficult to test with Mailpit as it accepts everything... no cover
+            # this will be difficult to test with Mailpit
+            # as it accepts everything... no cover
             return False  # pragma: nocover
         else:
             return True
