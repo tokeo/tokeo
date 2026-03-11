@@ -15,8 +15,15 @@ automate:
       shell: /bin/sh
   ### list of tasks
   tasks:
-    ### default module for tasks implementations if not specified other
-    module: {{ app_label }}.core.tasks.automate
+    ### optional default settings
+    _defaults:
+      ### default module for tasks implementations
+      module: {{ app_label }}.core.tasks.automate
+      ### ensure non overwritable keywords when calling shell commands
+      ### options: strict | append | null
+      protect: null
+      ### ensure to sanitize values and keys before calling shell commands
+      sanitize: true
     ### simplest `count_words` task configuration by just an empty dict
     count_words: {}
     ### `uname` task configuration with arguments config

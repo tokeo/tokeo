@@ -35,13 +35,15 @@ def check_uptime(app, connection, verbose=False):
 from sys import argv
 from os.path import basename
 from datetime import datetime, timezone
+import time
 import yaml
+import copy
 from threading import Thread
 from concurrent import futures as concurrent_futures
 import importlib
 import invoke
-import fabric
 import paramiko
+import paramiko.agent
 from paramiko.hostkeys import HostKeys, HostKeyEntry
 from argparse import ArgumentParser
 import shlex
@@ -57,7 +59,241 @@ from cement.core.exc import CaughtSignal
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.base import hasprops, getprop, default_when_blank
 from tokeo.core.utils.json import jsonDump, jsonTokeoEncoder
+from tokeo.core.utils import sanitize
 from tokeo.ext.argparse import Controller
+
+
+def _patched_invoke_command_timeout_str(self):
+    command = getprop(self.result, 'command', fallback=None)
+    template = 'Command: {!r} timed out and did not complete within {} seconds!'
+    return template.format(command, self.timeout)
+
+# monkey patch invoke class CommandTimedOut Exception
+invoke.CommandTimedOut.__str__ = _patched_invoke_command_timeout_str
+
+
+class TokeoAutomateError(TokeoError):
+    """
+    Exception class for automation-related errors.
+
+    Used for errors specific to the automation system, such as
+    configuration problems, connection issues, or task execution failures.
+
+    """
+
+    pass
+
+
+class TokeoInvokeLocalContext(invoke.Context):
+
+    def __init__(self, config=None, task_ref=None):
+        super().__init__(config=config)
+        self.task_ref = task_ref
+        self.task_kwprotected = task_ref['kwprotected']
+        self.task_kwargs = copy.deepcopy(task_ref['kwargs'])
+        self.protect = self.task_kwprotected['protect']
+        self.sanitize = self.task_kwprotected['sanitize']
+
+    @staticmethod
+    def protect_kwargs_inplace(self, kwargs):
+        # get the protected values
+        pty = self.task_kwprotected.get('pty', False)
+        env = copy.deepcopy(self.task_kwprotected.get('env', {}))
+        timeout = self.task_kwprotected.get('timeout', None)  # None means infinite
+        # check if the runner context is protected vs. changes during processing
+        if self.protect is None:
+            pty = kwargs.get('pty', pty)
+            env = kwargs.get('env', env)
+            timeout = kwargs.get('timeout', timeout)  # None means infinite
+        # encoding is always overwritable by task
+        encoding = kwargs.get('encoding', self.task_kwprotected.get('encoding', None))
+        # check valid encoding
+        if encoding is None:
+           encoding = invoke.runners.default_encoding()
+        # if the task should be sanitized then check the envs
+        if env and self.sanitize:
+            env = sanitize.keyword_dict(env)
+        # if strict protected, remove all kwargs, except ssave once
+        if self.protect == 'strict':
+            for k in kwargs.keys() - {'hide', 'warn'}:
+                del kwargs[k]
+        # (re-)set the kwargs parameters
+        kwargs['pty'] = pty
+        kwargs['env'] = env
+        kwargs['timeout'] = timeout
+        kwargs['encoding'] = encoding
+
+    def run(self, command, **kwargs):
+        # take care of kwargs
+        TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs)
+        # call the normal invoke runner
+        return super().run(command, **kwargs)
+
+
+class TokeoInvokeRemoteContext(invoke.Context):
+    """
+    Internal connection to route invoke-style runs through Paramiko lazily.
+
+    Replace handling as with fabric but without fabric dependency.
+
+    """
+
+    def __init__(
+        self,
+        host=None,
+        user=None,
+        port=None,
+        config=None,
+        host_keys=None,
+        forward_agent=None,
+        connect_kwargs=None,
+        task_ref=None,
+    ):
+        super().__init__(config=config)
+        self.host = host
+        self.user = user
+        self.port = port
+        self.config = config
+        self.host_keys =host_keys
+        self.forward_agent = forward_agent
+        self.connect_kwargs = connect_kwargs
+        self.task_ref = task_ref
+        self.task_kwprotected = task_ref['kwprotected']
+        self.task_kwargs = copy.deepcopy(task_ref['kwargs'])
+        self.protect = self.task_kwprotected['protect']
+        self.sanitize = self.task_kwprotected['sanitize']
+        self.client = None
+
+    def _connect(self):
+        # Lazily establish the SSH connection only if it hasn't been established yet.
+        if self.client is None:
+            self.client = paramiko.SSHClient()
+            # update connections
+            if self.host_keys:
+                # disable connection to unknown hosts
+                self.client.set_missing_host_key_policy(paramiko.RejectPolicy())
+                # append the valid host_keys
+                self.client.get_host_keys().update(self.host_keys)
+            else:
+                # allow to connect to any host
+                self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            # Lazy connect on first call
+            self.client.connect(
+                hostname=self.host,
+                username=self.user,
+                port=self.port,
+                **self.connect_kwargs,
+            )
+
+    def run(self, command, **kwargs):
+        # Execute a command, supporting basic Invoke kwargs and sudo injection.
+        self._connect()
+
+        # Extract common invoke kwargs
+        hide = kwargs.get('hide', None)
+        hide_out = hide == 'both' or hide == True or hide == 'stdout' or hide == 'out'
+        hide_err = hide == 'both' or hide == True or hide == 'stderr' or hide == 'err'
+
+        # take care of kwargs
+        TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs)
+
+        # get encoding
+        encoding = kwargs.get('encoding', None)
+
+        # Safely extract the sudo password from the invoke.Config if it exists
+        sudo_config = self.config.get('sudo', {})
+        sudo_pass = sudo_config.get('password')
+
+        # Sudo almost always requires a PTY to prompt properly over SSH
+        if sudo_pass:
+            kwargs['pty'] = True
+
+        # Open the channel (session)
+        transport = self.client.get_transport()
+        channel = transport.open_session()
+
+        if self.forward_agent:
+            paramiko.agent.AgentRequestHandler(channel)
+
+        if kwargs.get('pty', False):
+            channel.get_pty()
+
+        # create the export string to survive env while on ssh
+        env = kwargs.get('env', {})
+        if env:
+            # explicitely do not quote here anything
+            # quoteing can be configure by sanitize
+            # but not here like in invoke
+            env_exports = 'export ' + ' '.join(f'{k}={str(v)}' for k, v in env.items()) + ' ; '
+        else:
+            env_exports = ''
+
+        # Start the clock and execute the command
+        timeout = kwargs.get('timeout', None)
+        start_time = time.time()
+        channel.exec_command(f'{env_exports}{command}')
+
+        stdout_buffer = b''
+        stderr_buffer = b''
+
+        # --- THE POLLING LOOP ---
+        while not channel.exit_status_ready():
+            # 1. Enforce the Timeout
+            if timeout and (time.time() - start_time) > timeout:
+                channel.close()
+                raise invoke.CommandTimedOut(invoke.runners.Result(stdout="", stderr="CommandTimeOut", exited=-1, command=command), timeout)
+
+            # 2. Read standard output
+            if channel.recv_ready():
+                chunk = channel.recv(4096)
+                stdout_buffer += chunk
+                if not hide_out:
+                    print(chunk.decode(encoding, errors='replace'), end='', flush=True)
+
+                # Detect sudo prompt in the tail of the buffer
+                if sudo_pass and b'password' in stdout_buffer.lower()[-50:]:
+                    # Inject the password with a newline
+                    channel.sendall(sudo_pass.encode(encoding) + b'\n')
+                    # Set to None so we don't accidentally inject it again
+                    sudo_pass = None
+
+            # 3. Read standard error
+            if channel.recv_stderr_ready():
+                chunk = channel.recv_stderr(4096)
+                stderr_buffer += chunk
+                if not hide_err:
+                    print(chunk.decode(encoding, errors='replace'), end='', flush=True)
+
+            # 4. Sleep briefly to prevent pinning the CPU at 100%
+            time.sleep(0.01)
+
+        # Drain any remaining bytes after the command finishes
+        while channel.recv_ready():
+            chunk = channel.recv(4096)
+            stdout_buffer += chunk
+            if not hide_out:
+                print(chunk.decode(encoding, errors='replace'), end='', flush=True)
+        while channel.recv_stderr_ready():
+            chunk = channel.recv_stderr(4096)
+            stderr_buffer += chunk
+            if not hide_err:
+                print(chunk.decode(encoding, errors='replace'), end='', flush=True)
+
+        # Decode the buffers into strings (ignoring weird characters)
+        out = stdout_buffer.decode(encoding, errors='replace')
+        err = stderr_buffer.decode(encoding, errors='replace')
+        exited = channel.recv_exit_status()
+
+        return invoke.runners.Result(
+            stdout=out, stderr=err, exited=exited, command=command
+        )
+
+
+    def close(self):
+        # Safely close the underlying Paramiko SSH connection if exist.
+        if getattr(self, 'client', None) is not None:
+            self.client.close()
+            self.client = None
 
 
 def jsonTokeoAutomateEncoder(obj):
@@ -80,18 +316,6 @@ def jsonTokeoAutomateEncoder(obj):
         return vars(obj)
     # continue with tokeo encoder
     return jsonTokeoEncoder(obj)
-
-
-class TokeoAutomateError(TokeoError):
-    """
-    Exception class for automation-related errors.
-
-    Used for errors specific to the automation system, such as
-    configuration problems, connection issues, or task execution failures.
-
-    """
-
-    pass
 
 
 class TokeoAutomateResult:
@@ -133,6 +357,7 @@ class TokeoAutomateResult:
         self.stderr = getprop(result, 'stderr', fallback=None)
         self.command = getprop(result, 'command', fallback=None)
         self.exited = getprop(result, 'exited', fallback=0)
+        self.exception = getprop(result, 'exception', fallback=None)
         # in case that result looks like an invoke.runners.Result
         # try to get values from an additional values attribute
         # otherwise save the result as values for latter processing
@@ -165,7 +390,7 @@ class TokeoAutomate(MetaMixin):
 
     - **app** (Application): The Cement application instance
     - **_tasks** (dict): Cached dictionary of configured tasks
-    - **_modules** (dict): Cache of imported task modules
+    - **_imported_modules** (dict): Cache of imported task modules
     - **_hosts** (dict): Cached dictionary of configured hosts
     - **_hostgroups** (dict): Cached dictionary of configured host groups
     - **_connections** (dict): Cached dictionary of configured connections
@@ -191,22 +416,22 @@ class TokeoAutomate(MetaMixin):
             passwords={},
             hostgroups={},
             connections=dict(
-                id=None,
-                name=None,
-                connect_timeout=60,
-                hosts=None,
-                port=22,
-                user=None,
-                password=None,
-                sudo=None,
-                identity=None,
-                lookup_keys=False,
-                allow_agent=False,
-                forward_agent=False,
-                forward_local=None,
-                forward_remote=None,
-                known_hosts=None,
-                connections={},
+                _defaults=dict(
+                    id=None,
+                    name=None,
+                    connect_timeout=60,
+                    hosts=None,
+                    port=22,
+                    user=None,
+                    password=None,
+                    sudo=None,
+                    identity=None,
+                    lookup_keys=False,
+                    allow_agent=False,
+                    forward_agent=False,
+                    known_hosts=None,
+                    connections={},
+                ),
             ),
         )
 
@@ -216,7 +441,7 @@ class TokeoAutomate(MetaMixin):
         # copy from list of tasks with expanded entries
         self._tasks = None
         # refernces for imported modules
-        self._modules = {}
+        self._imported_modules = {}
         # configured hosts list with settings per host
         self._hosts = None
         # counter of created host entries, also used as unique id
@@ -289,7 +514,7 @@ class TokeoAutomate(MetaMixin):
             raise TokeoAutomateError('To define a host entry there must be at least a "host" field')
         # setup the dict
         _host = dict(id=key, name=entry['name'] if 'name' in entry else key, host=entry['host'])
-        for field in ('port', 'user', 'password', 'sudo', 'identity', 'host_key', 'shell'):
+        for field in ('port', 'user', 'password', 'sudo', 'identity', 'host_key', 'shell', 'encoding'):
             if field in entry:
                 _host[field] = entry[field]
         # return the record
@@ -367,13 +592,13 @@ class TokeoAutomate(MetaMixin):
         ### Notes:
 
         : Only specific fields can be overruled: id, name, host, port, user,
-            password, sudo, identity, host_key, and shell.
+            password, sudo, identity, host_key, shell and encoding.
 
         """
         # use the counter also as running id
         self._hosts_cnt += 1
         # make a copy from base dict
-        _host = base.copy()
+        _host = copy.deepcopy(base)
         # test for overrule content
         if overrule is None or not isinstance(overrule, dict):
             return _host
@@ -382,7 +607,7 @@ class TokeoAutomate(MetaMixin):
         # drop 'use' attribute if was defined
         overrule.pop('use', None)
         # overrulable fields from host dict
-        for field in ('id', 'name', 'host', 'port', 'user', 'password', 'sudo', 'identity', 'host_key', 'shell'):
+        for field in ('id', 'name', 'host', 'port', 'user', 'password', 'sudo', 'identity', 'host_key', 'shell', 'encoding'):
             if field in overrule:
                 _host[field] = overrule[field]
         # return the record
@@ -418,7 +643,7 @@ class TokeoAutomate(MetaMixin):
         # create the base dict
         _connection = dict(
             id=key,
-            name=entry['name'] if 'name' in entry and key != '_default' else key,
+            name=entry['name'] if 'name' in entry and key != '_defaults' else key,
         )
         for field in (
             'hosts',
@@ -431,10 +656,9 @@ class TokeoAutomate(MetaMixin):
             'lookup_keys',
             'allow_agent',
             'forward_agent',
-            'forward_local',
-            'forward_remote',
             'known_hosts',
             'shell',
+            'encoding',
         ):
             if field in entry:
                 _connection[field] = entry[field]
@@ -455,7 +679,7 @@ class TokeoAutomate(MetaMixin):
 
         2. Default Settings Application:
             - Applies default connection settings from Meta.config_defaults
-            - Put user-defined default connection settings into a ['_default'] dict
+            - Put user-defined default connection settings into a ['_defaults'] dict
             - Ensures connection-specific settings override defaults
 
         3. Host Resolution Process:
@@ -490,11 +714,11 @@ class TokeoAutomate(MetaMixin):
 
         """
         # merge with use if defined
-        connection = (self.connections['connections'][connection['use']] if 'use' in connection else {}) | connection
+        connection = (self.connections[connection['use']] if 'use' in connection else {}) | connection
         # drop 'use' attribute if was defined
         connection.pop('use', None)
         # merge with default but drop sub 'connections' structs
-        connection = self.Meta.config_defaults['connections'] | self.connections['_default'] | connection
+        connection = self.Meta.config_defaults['connections'] | self.connections['_defaults'] | connection
         connection.pop('connections', None)
         # expand list of hosts to list of host_dicts
         hosts_list = []
@@ -509,9 +733,11 @@ class TokeoAutomate(MetaMixin):
                 # host is key, maybe more fields
                 entry = connection_hosts[host]
             elif isinstance(host, dict):
+                entry = host
+            elif isinstance(host, list):
                 # list of dicts
                 if len(host) > 1:
-                    raise TokeoAutomateError('A host dict must contains just 1 host dict structure')
+                    raise TokeoAutomateError('A host list must contains just 1 host dict structure')
                 _host = next(iter(host))
                 entry = host[_host]
                 host = _host
@@ -520,18 +746,20 @@ class TokeoAutomate(MetaMixin):
             if isinstance(entry, str):
                 entry = self._get_host_dict_from_str(None, entry)
             # check if entry needs fullfill while ref
-            if entry and 'use' in entry:
+            if isinstance(entry, dict) and 'use' in entry:
                 entry = self._get_host_dict(host, entry)
 
-            if host in self.hosts:
+            if isinstance(host, str) and host in self.hosts:
                 hosts_list.append(self._overrule_host_dict(self.hosts[host], entry))
-            elif host in self.hostgroups:
+            elif isinstance(host, str) and host in self.hostgroups:
                 hosts_list.extend(self.hostgroups[host])
             else:
-                if entry:
+                if isinstance(entry, dict):
                     hosts_list.append(entry)
-                else:
+                elif isinstance(entry, str):
                     hosts_list.append(self._get_host_dict_from_str(None, host))
+                else:
+                    raise TokeoAutomateError(f'Can\'t create or find a valid entry for host [{host}]')
         # make dict list of hosts unique
         unique_hosts_list = {}
         for host in hosts_list:
@@ -580,6 +808,8 @@ class TokeoAutomate(MetaMixin):
                     _config_local['sudo'] = _config_host['sudo']
                 if 'shell' in _config_host:
                     _config_local['shell'] = _config_host['shell']
+                if 'encoding' in _config_host:
+                    _config_local['encoding'] = _config_host['encoding']
                 # set local for host dict
                 _config_host = _config_local
             # build entry
@@ -631,7 +861,7 @@ class TokeoAutomate(MetaMixin):
             for host in _config_hostgroup:
                 # check if found as host
                 if host in self.hosts:
-                    hosts_list.append(self.hosts[host].copy())
+                    hosts_list.append(copy.deepcopy(self.hosts[host]))
                 elif host in self._hostgroups:
                     hosts_list.extend(self._hostgroups[host])
                 else:
@@ -664,21 +894,23 @@ class TokeoAutomate(MetaMixin):
         self._connections = {}
         # read config sections
         _config_connections = self._config('connections', fallback={})
-        # take the base fields as _default connection
-        connection = self._get_connection_dict('_default', _config_connections)
-        self._connections['_default'] = connection
-        # add a dictionary for additional connections
-        self._connections['connections'] = {}
-        # take additional connections configuration or leave empty if none
-        _config_connections = _config_connections.get('connections', {})
-        # loop and add
+        # start and take the base fields as _defaults connection
+        _defaults = dict(self._meta.config_defaults['connections']['_defaults'])
+        connection = self._get_connection_dict('_defaults', _config_connections.get('_defaults', {}))
+        connection = self._overrule_host_dict(_defaults, connection)
+        # add the composed entry
+        self._connections['_defaults'] = connection
+        # loop and add additional connections
         for key in _config_connections:
-            # get params for host
-            _config_connection = _config_connections[key]
-            # build entry
-            connection = self._get_connection_dict(key, _config_connection)
-            # add the composed entry
-            self._connections['connections'][key] = connection
+            # do not add _defaults again if exist
+            if key != '_defaults':
+                # get params for host
+                _config_connection = _config_connections[key]
+                if _config_connection:
+                    # build entry
+                    connection = self._get_connection_dict(key, _config_connection)
+                    # add the composed entry
+                    self._connections[key] = connection
         # return property
         return self._connections
 
@@ -696,7 +928,7 @@ class TokeoAutomate(MetaMixin):
             - Caches imported modules for performance
 
         2. Task function resolution:
-            - Looks up the function in the module matching the task name
+            - Looks up the function in the imported_modules matching the task name
             - Creates fallback error-raising functions for missing implementations
             - Proper exception handling for import and lookup errors
 
@@ -710,7 +942,7 @@ class TokeoAutomate(MetaMixin):
 
         4. Standardizes task objects with:
             - Function reference
-            - Module reference
+            - Module path and name
             - ID and name
             - Timeout settings
             - Additional keyword arguments
@@ -730,7 +962,7 @@ class TokeoAutomate(MetaMixin):
         # a simple wrapper to raise not exist function error on runtime
         def __unknown_function(module, key):
             def wrapper(app, connection, **kwargs):
-                raise TokeoAutomateError(f'A function named "{key}" does not exist in module "{_config_task['module']}"')
+                raise TokeoAutomateError(f'A function named "{key}" does not exist in module "{module}"')
 
             return wrapper
 
@@ -738,10 +970,20 @@ class TokeoAutomate(MetaMixin):
         self._tasks = {}
         # save list reference
         _config_tasks = self._config('tasks', fallback={})
+        # get the _defaults dict
+        _defaults = _config_tasks.pop('_defaults', {})
         # test for a default module
-        _default_module = _config_tasks.pop('module', None)
+        _default_module = _defaults.get('module', None)
         if _default_module is not None and (not isinstance(_default_module, str) or str.strip(_default_module) == ''):
             raise TokeoAutomateError('A default module for tasks must be defined by a string')
+        # get some global config settings for all tasks
+        _default_task_protect  = _defaults.get('protect', 'strict')
+        _default_task_sanitize  = _defaults.get('sanitize', True)
+        _default_task_timeout  = _defaults.get('timeout', None)
+        _default_env  = _defaults.get('env', {})
+        # test valid protect mode
+        if _default_task_protect not in [None, 'strict', 'append']:
+            raise TokeoAutomateError(f'Value of protect for tasks is not valid!')
         # loop and fullfill
         for key in _config_tasks:
             # get params for task
@@ -752,30 +994,53 @@ class TokeoAutomate(MetaMixin):
                     raise TokeoAutomateError(f'The task "{key}" for automate must have a module defined to exist')
                 else:
                     _config_task['module'] = _default_module
+            module = _config_task['module']
             # cache import module
-            if _config_task['module'] not in self._modules:
+            if module not in self._imported_modules:
                 try:
-                    self._modules[_config_task['module']] = importlib.import_module(_config_task['module'])
+                    self._imported_modules[module] = importlib.import_module(module)
                 except ModuleNotFoundError:
-                    raise TokeoAutomateError(f'A module "{_config_task['module']}" could not be imported')
+                    raise TokeoAutomateError(f'A module "{module}" could not be imported')
                 except Exception:
                     raise
-            # get the function
-            module = self._modules[_config_task['module']]
+            # get the function from imported modules cache
             try:
-                func = getattr(module, key)
+                func = getattr(self._imported_modules[module], key)
             except AttributeError:
                 func = __unknown_function(module, key)
             except Exception:
                 raise
+            # create protected dict
+            task_protect = _config_task.get('protect', _default_task_protect)
+            if task_protect not in [None, 'strict', 'append']:
+                raise TokeoAutomateError(f'Value of protect for task "{key}" is not valid!')
+            kwprotected = dict(protect=task_protect)
+            # fullfill task kwargs
+            kwargs = copy.deepcopy(_config_task.get('kwargs', {}))
+            # timeout
+            task_timeout = _config_task.get('timeout', _default_task_timeout)
+            if task_timeout:
+                kwprotected['timeout'] = task_timeout
+                if task_protect is None:
+                    kwargs['timeout'] = kwprotected['timeout']
+            # pty
+            kwprotected['pty'] = _config_task.get('pty', False)
+            if task_protect is None:
+                kwargs['pty'] = kwprotected['pty']
+            # sanitize kwargs and env on run (True by default)
+            kwprotected['sanitize'] = _config_task.get('sanitize', _default_task_sanitize)
+            # check env
+            kwprotected['env'] = _config_task.get('env', _default_env)
+            if task_protect is None:
+                kwargs['env'] = kwprotected['env']
             # fullfill task
             task = dict(
                 func=func,
                 module=module,
                 id=key,
                 name=default_when_blank(_config_task.get('name'), key),
-                timeout=_config_task.get('timeout'),
-                kwargs=_config_task.get('kwargs', {}),
+                kwargs=kwargs,
+                kwprotected=kwprotected,
             )
             # Check for connection settings. The rule follows
             # first if 'connections' exist, second a `use`
@@ -808,7 +1073,7 @@ class TokeoAutomate(MetaMixin):
                         task['connection']['shell'] = _config_task['shell']
 
             # replace with fullfilled connection
-            task['connection'] = self._setup_connection(task['connection'].copy())
+            task['connection'] = self._setup_connection(copy.deepcopy(task['connection']))
             # add the task to the list
             self._tasks[key] = task
 
@@ -832,9 +1097,12 @@ class TokeoAutomate(MetaMixin):
         return self._tasks
 
     def _run_connections(self, task):
+        # create the invokable connections
         run_connections = []
         connection = task.get('connection', {})
         for _host in connection['hosts']:
+            # create reference to task but shallow copy inner dicts
+            task_ref = dict(id=task['id'], name=task['name'], kwargs=dict(task['kwargs']), kwprotected=dict(task['kwprotected']))
             # setup dynamic arguments for connection and connect_kwargs
             connect_args = {}
             connect_kwargs = {}
@@ -844,13 +1112,23 @@ class TokeoAutomate(MetaMixin):
                 connect_config['sudo'] = dict(password=_host['sudo'] if 'sudo' in _host and _host['sudo'] else connection['sudo'])
             if 'shell' in _host and _host['shell'] or 'shell' in connection and connection['shell']:
                 connect_config['run'] = dict(shell=_host['shell'] if 'shell' in _host and _host['shell'] else connection['shell'])
+            # set encoding per task based on host or connection
+            if 'encoding' in _host and _host['encoding'] or 'encoding' in connection and connection['encoding']:
+                encoding = _host['encoding'] if 'encoding' in _host and _host['encoding'] else connection['encoding']
+            else:
+                encoding = None
+            task_ref['kwprotected']['encoding'] = encoding
+            task_ref['kwargs']['encoding'] = encoding
             # create local invoke or ssh client
             if _host['host'] == 'local':
                 run_connections.append(
                     dict(
                         connection_id=connection['id'],
                         host_id=_host['id'],
-                        context=invoke.Context(config=invoke.Config(overrides={**connect_config})),
+                        context=TokeoInvokeLocalContext(
+                            config=invoke.Config(overrides={**connect_config}),
+                            task_ref=task_ref,
+                        ),
                     )
                 )
             else:
@@ -880,11 +1158,7 @@ class TokeoAutomate(MetaMixin):
                     connect_kwargs['timeout'] = int(connection['connect_timeout'])
                 if 'identity' in connection and connection['identity'] is not None:
                     connect_kwargs['key_filename'] = connection['identity']
-                # create the connection
-                fabric_conn = fabric.Connection(
-                    **connect_args, config=fabric.Config(overrides={**connect_config}), connect_kwargs={**connect_kwargs}
-                )
-                # modify connection
+                # check for key information
                 if 'host_key' in _host and _host['host_key'] or 'known_hosts' in connection and connection['known_hosts']:
                     # get the list of host keys from known_hosts like strings
                     if 'host_key' in _host and _host['host_key']:
@@ -900,18 +1174,21 @@ class TokeoAutomate(MetaMixin):
                     for k in known_hosts:
                         entry = HostKeyEntry.from_line(k)
                         host_keys.add(entry.hostnames[0], entry.key.get_name(), entry.key)
-                    # disable connection to unknown hosts
-                    fabric_conn.client.set_missing_host_key_policy(paramiko.RejectPolicy())
-                    # append the valid host_keys
-                    fabric_conn.client.get_host_keys().update(host_keys)
                 else:
-                    fabric_conn.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    host_keys = None
+
                 # append to stack
                 run_connections.append(
                     dict(
                         connection_id=connection['id'],
                         host_id=_host['id'],
-                        context=fabric_conn,
+                        context=TokeoInvokeRemoteContext(
+                            **connect_args,
+                            config=invoke.Config(overrides={**connect_config}),
+                            host_keys=host_keys,
+                            connect_kwargs={**connect_kwargs},
+                            task_ref=task_ref,
+                        ),
                     )
                 )
 
@@ -944,14 +1221,30 @@ class TokeoAutomate(MetaMixin):
         run_connections = self._run_connections(task)
         for run_connection in run_connections:
             if len(filter_host_ids) == 0 or run_connection['host_id'] in filter_host_ids:
-                results.append(
-                    TokeoAutomateResult(
-                        task['id'],
-                        run_connection['connection_id'],
-                        run_connection['host_id'],
-                        task['func'](self.app, run_connection['context'], verbose=verbose, **task['kwargs']),
+                try:
+                    results.append(
+                        TokeoAutomateResult(
+                            task['id'],
+                            run_connection['connection_id'],
+                            run_connection['host_id'],
+                            task['func'](run_connection['context'].run, verbose=verbose, **run_connection['context']['task_ref']['kwargs']),
+                        )
                     )
-                )
+                except Exception as e:
+                    results.append(
+                        TokeoAutomateResult(
+                            task['id'],
+                            run_connection['connection_id'],
+                            run_connection['host_id'],
+                            dict(
+                                stdout=None,
+                                stderr=f'{e}',
+                                command=None,
+                                exited=-1,
+                                exception=f'{type(e).__name__}',
+                            )
+                        )
+                    )
         # return that content
         return tuple(results)
 
@@ -1014,7 +1307,7 @@ class TokeoAutomate(MetaMixin):
         ### Returns:
 
         - **dict**: Dictionary with execution results containing:
-            - **sum_exited_code** (int): 0 for success, non-zero for errors
+            - **all_exited_code** (int): 0 for success, non-zero for errors
             - **results** (list): List of task results if return_results is True
 
         ### Raises:
@@ -1046,7 +1339,7 @@ class TokeoAutomate(MetaMixin):
 
         # check overrulers for connection
         if isinstance(with_connection, str):
-            _with_connection = self.connections['connections'][with_connection]
+            _with_connection = self.connections[with_connection]
         elif isinstance(with_connection, dict):
             _with_connection = self._get_connection_dict(None, with_connection)
             if 'use' in with_connection:
@@ -1055,12 +1348,12 @@ class TokeoAutomate(MetaMixin):
             _with_connection = None
 
         # flag for getting all exit codes from run commands
-        sum_exited_code = 0
+        all_exited_code = 0
         # list for all result details
         results = []
         # run all given tasks from command line
         for task_host_id in task_ids:
-            if sum_exited_code == 0 or continue_on_error:
+            if all_exited_code == 0 or continue_on_error:
                 try:
                     # split into separated task and host filter
                     split_task_host_id = task_host_id.split(':') + [None]
@@ -1069,8 +1362,8 @@ class TokeoAutomate(MetaMixin):
                     # check before start
                     if task_id not in self.tasks:
                         raise TokeoAutomateError(f'Task "{task_id}" is not defined yet')
-                    # get the task object
-                    task = self.tasks[task_id].copy()
+                    # get the task object by deep shallow copy
+                    task = dict(self.tasks[task_id])
                     # test overules
                     if _with_connection:
                         task['connection'] = self._setup_connection(_with_connection)
@@ -1085,7 +1378,7 @@ class TokeoAutomate(MetaMixin):
                     for run_result in run_results:
                         # check for any error and set flag
                         if run_result.exited != 0:
-                            sum_exited_code = 1
+                            all_exited_code = 1
                         # check if results need to be stored for output
                         if return_results:
                             # drop outputs
@@ -1102,8 +1395,8 @@ class TokeoAutomate(MetaMixin):
                     # handle all other errors
                     self.app.log.error(e)
                     # save flag only if no other error was encountered
-                    if sum_exited_code == 0:
-                        sum_exited_code = -1
+                    if all_exited_code == 0:
+                        all_exited_code = -1
                     # prepare output
                     if return_results:
                         results.append(
@@ -1112,12 +1405,18 @@ class TokeoAutomate(MetaMixin):
                                 task_id,
                                 None,
                                 None,
-                                dict(stdout='', stderr=f'{e}', command=f'automate run {task_id}', exited=-1),
+                                dict(
+                                    stdout=None,
+                                    stderr=f'{e}',
+                                    command=f'automate run {task_id}',
+                                    exited=-1,
+                                    exception=f'{type(e).__name__}',
+                                )
                             )
                         )
 
         # return the results as dict
-        return dict(sum_exited_code=sum_exited_code, results=results)
+        return dict(all_exited_code=all_exited_code, results=results)
 
     def run_threaded(
         self,
@@ -1155,7 +1454,7 @@ class TokeoAutomate(MetaMixin):
         ### Returns:
 
         - **dict**: Dictionary with execution results containing:
-            - **sum_exited_code** (int): 0 for success, non-zero for errors
+            - **all_exited_code** (int): 0 for success, non-zero for errors
             - **results** (list): List of task results if return_results is True
 
         ### Raises:
@@ -1188,7 +1487,7 @@ class TokeoAutomate(MetaMixin):
 
         # check overrulers for connection
         if isinstance(with_connection, str):
-            _with_connection = self.connections['connections'][with_connection]
+            _with_connection = self.connections[with_connection]
         elif isinstance(with_connection, dict):
             _with_connection = self._get_connection_dict(None, with_connection)
             if 'use' in with_connection:
@@ -1197,7 +1496,7 @@ class TokeoAutomate(MetaMixin):
             _with_connection = None
 
         # flag for getting all exit codes from run commands
-        sum_exited_code = 0
+        all_exited_code = 0
         # list for all result details
         results = []
         # create the thread pool
@@ -1214,8 +1513,8 @@ class TokeoAutomate(MetaMixin):
                     # check before start
                     if task_id not in self.tasks:
                         raise TokeoAutomateError(f'Task "{task_id}" is not defined yet')
-                    # get the task object
-                    task = self.tasks[task_id].copy()
+                    # get the task object by deep shadow copy
+                    task = dict(self.tasks[task_id])
                     # test overules
                     if _with_connection:
                         task['connection'] = self._setup_connection(_with_connection)
@@ -1230,8 +1529,8 @@ class TokeoAutomate(MetaMixin):
                     # handle all other errors
                     self.app.log.error(e)
                     # save flag only if no other error was encountered
-                    if sum_exited_code == 0:
-                        sum_exited_code = -1
+                    if all_exited_code == 0:
+                        all_exited_code = -1
                     # prepare output
                     if return_results:
                         results.append(
@@ -1240,7 +1539,13 @@ class TokeoAutomate(MetaMixin):
                                 task_id,
                                 None,
                                 None,
-                                dict(stdout='', stderr=f'{e}', command=f'automate run {task_id}', exited=-1),
+                                dict(
+                                    stdout=None,
+                                    stderr=f'{e}',
+                                    command=f'automate run {task_id}',
+                                    exited=-1,
+                                    exception=f'{type(e).__name__}',
+                                )
                             )
                         )
 
@@ -1255,7 +1560,7 @@ class TokeoAutomate(MetaMixin):
                     for run_result in run_results:
                         # check for any error and set flag
                         if run_result.exited != 0:
-                            sum_exited_code = 1
+                            all_exited_code = 1
                         # check if results need to be stored for output
                         if return_results:
                             # drop outputs
@@ -1273,8 +1578,8 @@ class TokeoAutomate(MetaMixin):
                     # handle all other errors
                     self.app.log.error(e)
                     # save flag only if no other error was encountered
-                    if sum_exited_code == 0:
-                        sum_exited_code = -1
+                    if all_exited_code == 0:
+                        all_exited_code = -1
                     # prepare output
                     if return_results:
                         results.append(
@@ -1283,12 +1588,18 @@ class TokeoAutomate(MetaMixin):
                                 task_id,
                                 None,
                                 None,
-                                dict(stdout='', stderr=f'{e}', command=f'automate run {task_id}', exited=-1),
+                                dict(
+                                    stdout=None,
+                                    stderr=f'{e}',
+                                    command=f'automate run {task_id}',
+                                    exited=-1,
+                                    exception=f'{type(e).__name__}',
+                                )
                             )
                         )
 
         # return the results as dict
-        return dict(sum_exited_code=sum_exited_code, results=results)
+        return dict(all_exited_code=all_exited_code, results=results)
 
 
 class TokeoAutomateShell:
@@ -1494,10 +1805,12 @@ class TokeoAutomateShell:
                 for hostgroup in self.app.automate.hostgroups:
                     print(f'{hostgroup}: {self.app.automate.hostgroups[hostgroup]}')
             elif args.cmd == 'conns.list':
-                conn = '_default'
+                # print connection list but ensure _defaults is first printed
+                conn = '_defaults'
                 print(f'{conn}: {self.app.automate.connections[conn]}')
-                for conn in self.app.automate.connections['connections']:
-                    print(f'{conn}: {self.app.automate.connections['connections'][conn]}')
+                for conn in self.app.automate.connections:
+                    if conn != '_defaults':
+                        print(f'{conn}: {self.app.automate.connections[conn]}')
         except Exception as err:
             self.app.log.error(err)
 
@@ -1864,7 +2177,7 @@ class TokeoAutomateController(Controller):
             )
 
         # return the loggeg exit codes
-        self.app.exit_code = res['sum_exited_code']
+        self.app.exit_code = getprop(res, 'all_exited_code', fallback=-2)
 
     @ex(
         help='start the automate command shell',

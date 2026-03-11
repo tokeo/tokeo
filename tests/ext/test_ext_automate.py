@@ -185,14 +185,16 @@ def defaults_automate_connections(validate=False):
             connections=c,
         )
     else:
+        # add _defaults
+        b['id'] = '_defaults'
+        b['name'] = '_defaults'
+        c['_defaults'] = b
         # add same fullfiller
-        b['id'] = '_default'
-        b['name'] = '_default'
         c['con1']['id'] = 'con1'
         c['con2']['id'] = 'con2'
         # return as expanded dict
+
         d = dict(
-            _default=b,
             connections=c,
         )
     # return the dict
@@ -240,8 +242,8 @@ def defaults_automate_tasks(validate=False):
                 timeout=None,
                 kwargs={},
                 connection=dict(
-                    id='_default',
-                    name='_default',
+                    id='_defaults',
+                    name='_defaults',
                     hosts=tuple(
                         (
                             dict(
@@ -333,8 +335,8 @@ def defaults_automate_tasks(validate=False):
                 timeout=None,
                 kwargs={},
                 connection=dict(
-                    id='_default',
-                    name='_default',
+                    id='_defaults',
+                    name='_defaults',
                     hosts=tuple(
                         (
                             dict(

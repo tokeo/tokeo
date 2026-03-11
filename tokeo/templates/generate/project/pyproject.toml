@@ -56,9 +56,8 @@ dependencies = [
     "pocketbase",
 {% endif -%}
 {% if feature_automate == "Y" %}
-    "invoke",
-    "fabric",
-    "paramiko",
+    "invoke>=2.1.4",
+    "paramiko>=2.7,<4",
 {% endif -%}
 ]
 
