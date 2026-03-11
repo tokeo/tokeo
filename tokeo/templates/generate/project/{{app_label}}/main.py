@@ -7,6 +7,7 @@ extensible CLI application with support for various extensions and handlers.
 
 """
 
+import tokeo.core.utils.strict
 import os
 from cement import App, TestApp
 from cement.utils import fs
