@@ -17,7 +17,7 @@ if app.env.IS_DEV_MODE:
 import os
 from cement.utils import fs
 import glob
-from tokeo.core.utils.sort import SORT_KEY_BY_LEX_NUM_ORDER_LAMBDA
+from tokeo.core.utils.sort import sort_key_by_lex_and_num_ordered
 
 
 # Environment constants
@@ -138,8 +138,9 @@ class TokeoAppEnv:
 
         # partial environment config files in .d directories
         files = glob.glob(os.path.join(self.APP_CONFIG_DIR, f'{app_env}.d', '**', f'*{app_config_file_suffix}'), recursive=True)
-        # sort the files by lexicographically order and respect numbers in strings while ordering
-        files.sort(key=SORT_KEY_BY_LEX_NUM_ORDER_LAMBDA)
+        # sort the files by lexicographically order and
+        # respect numbers in strings while ordering
+        files.sort(key=sort_key_by_lex_and_num_ordered)
         # loop files and group by standard and local config file
         for f in files:
             # test for .local config file
@@ -152,7 +153,7 @@ class TokeoAppEnv:
                 configs.append(f)
 
         # return empty list
-        return [ *configs, *local_configs ]
+        return [*configs, *local_configs]
 
 
 def load(app):
