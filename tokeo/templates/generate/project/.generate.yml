@@ -49,6 +49,12 @@ variables:
     prompt: "Project license (select from https://spdx.org/licenses/)"
     default: "Proprietary"
 
+  - name: feature_python_strict
+    prompt: "Use python strict for Errors than Warnings [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+
   - name: feature_diskcache
     prompt: "Enable diskcache [(Y)es/(N)o]"
     validate: "^[YN]$"
