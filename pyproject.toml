@@ -53,9 +53,8 @@ dev = [
     "pscript",
     "vbuild",
     "pocketbase",
-    "invoke",
-    "fabric",
-    "paramiko",
+    "invoke>=2.2.1",
+    "paramiko>=2.7,<4",
 ]
 
 [project.scripts]
