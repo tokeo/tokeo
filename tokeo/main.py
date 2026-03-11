@@ -1,3 +1,4 @@
+import .core.utils.strict
 import os
 from cement import App, TestApp
 from cement.core.exc import CaughtSignal
