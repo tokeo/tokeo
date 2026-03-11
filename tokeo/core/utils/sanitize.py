@@ -32,7 +32,7 @@ def keyword_dict(d):
         raise ValueError('No iterable dict given to sanitize dict.')
 
     _sanitize_d = dict()
-    for k,v in d.items():
+    for k, v in d.items():
         if is_keyword(k):
             _sanitize_d[k] = quoted(v)
 
