@@ -68,6 +68,7 @@ def _patched_invoke_command_timeout_str(self):
     template = 'Command: {!r} timed out and did not complete within {} seconds!'
     return template.format(command, self.timeout)
 
+
 # monkey patch invoke class CommandTimedOut Exception
 invoke.CommandTimedOut.__str__ = _patched_invoke_command_timeout_str
 
@@ -109,7 +110,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         encoding = kwargs.get('encoding', self.task_kwprotected.get('encoding', None))
         # check valid encoding
         if encoding is None:
-           encoding = invoke.runners.default_encoding()
+            encoding = invoke.runners.default_encoding()
         # if the task should be sanitized then check the envs
         if env and self.sanitize:
             env = sanitize.keyword_dict(env)
@@ -154,7 +155,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         self.user = user
         self.port = port
         self.config = config
-        self.host_keys =host_keys
+        self.host_keys = host_keys
         self.forward_agent = forward_agent
         self.connect_kwargs = connect_kwargs
         self.task_ref = task_ref
@@ -165,7 +166,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         self.client = None
 
     def _connect(self):
-        # Lazily establish the SSH connection only if it hasn't been established yet.
+        # Lazily establish the SSH connection if it not established yet.
         if self.client is None:
             self.client = paramiko.SSHClient()
             # update connections
@@ -191,8 +192,8 @@ class TokeoInvokeRemoteContext(invoke.Context):
 
         # Extract common invoke kwargs
         hide = kwargs.get('hide', None)
-        hide_out = hide == 'both' or hide == True or hide == 'stdout' or hide == 'out'
-        hide_err = hide == 'both' or hide == True or hide == 'stderr' or hide == 'err'
+        hide_out = hide == 'both' or hide is True or hide == 'stdout' or hide == 'out'
+        hide_err = hide == 'both' or hide is True or hide == 'stderr' or hide == 'err'
 
         # take care of kwargs
         TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs)
@@ -241,7 +242,9 @@ class TokeoInvokeRemoteContext(invoke.Context):
             # 1. Enforce the Timeout
             if timeout and (time.time() - start_time) > timeout:
                 channel.close()
-                raise invoke.CommandTimedOut(invoke.runners.Result(stdout="", stderr="CommandTimeOut", exited=-1, command=command), timeout)
+                raise invoke.CommandTimedOut(
+                    invoke.runners.Result(stdout='', stderr='CommandTimeOut', exited=-1, command=command), timeout
+                )
 
             # 2. Read standard output
             if channel.recv_ready():
@@ -284,10 +287,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         err = stderr_buffer.decode(encoding, errors='replace')
         exited = channel.recv_exit_status()
 
-        return invoke.runners.Result(
-            stdout=out, stderr=err, exited=exited, command=command
-        )
-
+        return invoke.runners.Result(stdout=out, stderr=err, exited=exited, command=command)
 
     def close(self):
         # Safely close the underlying Paramiko SSH connection if exist.
@@ -759,7 +759,7 @@ class TokeoAutomate(MetaMixin):
                 elif isinstance(entry, str):
                     hosts_list.append(self._get_host_dict_from_str(None, host))
                 else:
-                    raise TokeoAutomateError(f'Can\'t create or find a valid entry for host [{host}]')
+                    raise TokeoAutomateError(f"Can't create or find a valid entry for host [{host}]")
         # make dict list of hosts unique
         unique_hosts_list = {}
         for host in hosts_list:
@@ -977,13 +977,13 @@ class TokeoAutomate(MetaMixin):
         if _default_module is not None and (not isinstance(_default_module, str) or str.strip(_default_module) == ''):
             raise TokeoAutomateError('A default module for tasks must be defined by a string')
         # get some global config settings for all tasks
-        _default_task_protect  = _defaults.get('protect', 'strict')
-        _default_task_sanitize  = _defaults.get('sanitize', True)
-        _default_task_timeout  = _defaults.get('timeout', None)
-        _default_env  = _defaults.get('env', {})
+        _default_task_protect = _defaults.get('protect', 'strict')
+        _default_task_sanitize = _defaults.get('sanitize', True)
+        _default_task_timeout = _defaults.get('timeout', None)
+        _default_env = _defaults.get('env', {})
         # test valid protect mode
         if _default_task_protect not in [None, 'strict', 'append']:
-            raise TokeoAutomateError(f'Value of protect for tasks is not valid!')
+            raise TokeoAutomateError('Value of protect for tasks is not valid!')
         # loop and fullfill
         for key in _config_tasks:
             # get params for task
@@ -1227,7 +1227,11 @@ class TokeoAutomate(MetaMixin):
                             task['id'],
                             run_connection['connection_id'],
                             run_connection['host_id'],
-                            task['func'](run_connection['context'].run, verbose=verbose, **run_connection['context']['task_ref']['kwargs']),
+                            task['func'](
+                                run_connection['context'].run,
+                                verbose=verbose,
+                                **run_connection['context']['task_ref']['kwargs'],
+                            ),
                         )
                     )
                 except Exception as e:
@@ -1242,7 +1246,7 @@ class TokeoAutomate(MetaMixin):
                                 command=None,
                                 exited=-1,
                                 exception=f'{type(e).__name__}',
-                            )
+                            ),
                         )
                     )
         # return that content
@@ -1411,7 +1415,7 @@ class TokeoAutomate(MetaMixin):
                                     command=f'automate run {task_id}',
                                     exited=-1,
                                     exception=f'{type(e).__name__}',
-                                )
+                                ),
                             )
                         )
 
@@ -1545,7 +1549,7 @@ class TokeoAutomate(MetaMixin):
                                     command=f'automate run {task_id}',
                                     exited=-1,
                                     exception=f'{type(e).__name__}',
-                                )
+                                ),
                             )
                         )
 
@@ -1594,7 +1598,7 @@ class TokeoAutomate(MetaMixin):
                                     command=f'automate run {task_id}',
                                     exited=-1,
                                     exception=f'{type(e).__name__}',
-                                )
+                                ),
                             )
                         )
 
