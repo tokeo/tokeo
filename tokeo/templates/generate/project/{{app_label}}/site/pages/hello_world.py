@@ -1,7 +1,8 @@
 """
-Web page and UI definition for the application's website.
+Demonstration UI component for the application's website.
 
-This module provides a page handler in Tokeo applications using NiceGUI.
+Constructed as an isolated, stateless module to comply with NiceGUI 3.x
+multi-user routing requirements.
 
 """
 
@@ -15,12 +16,14 @@ ux = app.nicegui.ux
 
 def page_hello_world():
     """
+    Construct and render the hello world demonstration page.
 
-    This function demonstrates how to create additional pages.
+    This function is executed dynamically by the Tokeo router. It demonstrates
+    adding custom styled content within the shared layout block.
 
     ### Notes:
 
-    - Uses the standard page layout for consistency
+    - Uses the standard page layout for UI consistency
     - Demonstrates adding custom styled content to a page
 
     """

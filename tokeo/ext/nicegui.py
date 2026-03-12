@@ -2,8 +2,9 @@
 Tokeo NiceGUI Extension Module.
 
 This extension integrates NiceGUI with Tokeo applications, providing a modern
-web interface capability. NiceGUI allows for creating responsive web UIs with
-Python, and this extension makes it available within the Tokeo framework.
+web interface capability. In compliance with NiceGUI 3.x architecture, this
+module strictly manages server state, configuration, and dynamic route orchestration
+without defining any global UI elements.
 
 The extension provides file monitoring capabilities for hot reloading during
 development, with both watchdog-based monitoring (preferred) and a fallback
@@ -11,12 +12,16 @@ polling mechanism.
 
 ### Features:
 
-- **Direct UI components** via app.nicegui.ui for building web interfaces
-- **FastAPI integration** for advanced web functionality and REST endpoints
-- **File watching** with hot-reloading support during development
-- **Element helper** for custom HTML elements not directly exposed by NiceGUI
-- **Extensive configuration** with sensible defaults for most use cases
-- **Complete lifecycle management** integrated with Tokeo application hooks
+- **Isolated UI Contexts**: Enforces multi-user safety by orchestrating routes
+  programmatically
+- **FastAPI integration**: Advanced web functionality, headless REST endpoints,
+  and custom OpenAPI docs
+- **File watching**: Hot-reloading support during development via Watchdog
+- **Element helper**: Custom HTML elements not directly exposed by NiceGUI via
+  `app.nicegui.ux`
+- **Extensive configuration**: Sensible defaults for most use cases
+- **Complete lifecycle management**: Integrated tightly with Tokeo application
+  hooks
 
 """
 
@@ -226,19 +231,20 @@ class NiceguiElementHelper:
 
 class TokeoNicegui(MetaMixin):
     """
-    Main NiceGUI extension class for Tokeo.
+    Main controller for the NiceGUI web server environment.
 
-    This class provides the core functionality for integrating NiceGUI with
-    Tokeo applications, including configuration, startup, shutdown, and
-    hot-reloading capabilities. It serves as the primary interface between
-    the Tokeo application and the NiceGUI library.
+    Orchestrates the FastAPI backend, configures the server, and starts the
+    NiceGUI engine. It serves as the primary interface between the Tokeo
+    application and the NiceGUI library, ensuring that dynamic routes and
+    APIs are mapped before the server binds to the port.
 
     ### Notes:
 
-    - Provides direct access to NiceGUI components via ui and fastapi_app attributes
+    - Provides direct access to NiceGUI components via `ui` and `fastapi_app`
+      attributes
     - Manages file monitoring for hot-reloading during development
     - Handles application configuration and startup/shutdown lifecycle
-    - Exposes a custom element helper for creating arbitrary HTML elements
+    - Exposes a custom element helper `ux` for creating arbitrary HTML elements
 
     """
 
@@ -321,7 +327,7 @@ class TokeoNicegui(MetaMixin):
         # test welcome message
         self._welcome_message = self._config('welcome_message')
         if self._welcome_message is None:
-            self._welcome_message = f'{self._config('title')} ready to go on'
+            self._welcome_message = f'{self._config("title")} ready to go on'
         # watchdog files components
         self._hotload_dir = None
         self._watchdog_hotload_requested = False
@@ -458,7 +464,7 @@ class TokeoNicegui(MetaMixin):
             else:
                 raise TokeoNiceguiError(
                     # fmt: skip
-                    f'Miss configuration for route handler. Must be null or name of method, but is: [{str(type(self._routes))}]'
+                    f'Misconfiguration for route handler. Must be null or name of method, but is: [{str(type(self._routes))}]'
                 )
 
         # check config for watchdog
@@ -501,18 +507,20 @@ class TokeoNicegui(MetaMixin):
                 # try to launch swagger doc
                 if self._openapi_swagger_url:
                     try:
-                      self.fastapi_app.get(self._openapi_swagger_url, include_in_schema=False)(openapi_custom_module.custom_swagger_ui_html)
+                        self.fastapi_app.get(self._openapi_swagger_url, include_in_schema=False)(
+                            openapi_custom_module.custom_swagger_ui_html
+                        )
                     except Exception as e:
-                      # ignore, just missing documentation ui
-                      self.app.log.warning(f'Could not start the openapi swagger ui for documentation: {str(e)}')
+                        # ignore, just missing documentation ui
+                        self.app.log.warning(f'Could not start the openapi swagger ui for documentation: {str(e)}')
 
                 # try to launch redoc doc
                 if self._openapi_redoc_url:
                     try:
-                      self.fastapi_app.get(self._openapi_redoc_url, include_in_schema=False)(openapi_custom_module.custom_redoc_html)
+                        self.fastapi_app.get(self._openapi_redoc_url, include_in_schema=False)(openapi_custom_module.custom_redoc_html)
                     except Exception as e:
-                      # ignore, just missing documentation ui
-                      self.app.log.warning(f'Could not start the openapi redoc for documentation: {str(e)}')
+                        # ignore, just missing documentation ui
+                        self.app.log.warning(f'Could not start the openapi redoc for documentation: {str(e)}')
 
             except Exception as e:
                 # use default get_openapi from fastapi

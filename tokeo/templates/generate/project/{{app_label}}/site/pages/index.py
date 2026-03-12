@@ -1,7 +1,9 @@
 """
-Web page and UI definition for the application's website.
+Homepage UI component for the application's website.
 
-This module provides a page handler in Tokeo applications using NiceGUI.
+Provides the UI implementation for the root dashboard view. Constructed as an
+isolated, stateless module to comply with NiceGUI 3.x multi-user routing
+requirements.
 
 """
 
@@ -15,14 +17,17 @@ ux = app.nicegui.ux
 
 def page_root():
     """
+    Construct and render the website's landing page (index route).
 
-    This function defines the content of the website's landing page (index route).
-    It uses the standard page layout from the blocks module and adds
-    homepage-specific content.
+    This function is executed dynamically by the Tokeo router whenever a user
+    navigates to the root path. It initializes local UI elements specific to
+    the active user session. In addition add hompage-specific
 
     ### Notes:
 
     - Creates a dashboard view with introductory content
+    - Uses the standard page layout from the `blocks` module
+    - Must not be called directly; it is orchestrated by `site/routes.py`
 
     """
     with blocks.page(title='This is the {{ app_name }} dashboard'):
