@@ -81,11 +81,8 @@ The APIs module can interact with various parts of the application:
 
 """
 
-from tokeo.ext.appshare import app
 
-
-@app.nicegui.fastapi_app.get('/api')
-async def get_api():
+async def api_example():
     """
     Basic API endpoint demonstrating the structure.
 
