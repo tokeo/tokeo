@@ -22,7 +22,7 @@ Define automation functions with the standard interface pattern:
 ```python
 from tokeo.ext.appshare import app
 
-def process_report(runner, verbose=False, report_type='summary'):
+def process_report(runner, verbose=False, report_type='summary', **kwargs):
     '''
     Generate a business report on the target system.
 
@@ -37,6 +37,8 @@ def process_report(runner, verbose=False, report_type='summary'):
         Defaults to False.
     - **report_type** (str, optional): Type of report to generate.
         Defaults to 'summary'.
+    - **kwargs** (dict, kwargs): Additional arguments for task and runner.
+        Standards are 'pty', 'env', 'encoding', 'timeout' and others.
 
     ### Returns:
 
@@ -85,7 +87,7 @@ from tokeo.ext.appshare import app
 from {{ app_label }}.core import tasks
 
 
-def count_words(runner, verbose=False):
+def count_words(runner, verbose=False, **kwargs):
     """
     Count words on a web page after gathering system information.
 
@@ -99,6 +101,8 @@ def count_words(runner, verbose=False):
         to execute commands
     - **verbose** (bool, optional): Whether to show command output.
         Defaults to False.
+    - **kwargs** (dict, kwargs): Additional arguments for task and runner.
+        Standards are 'pty', 'env', 'encoding', 'timeout' and others.
 
     ### Returns:
 
@@ -113,7 +117,7 @@ def count_words(runner, verbose=False):
     return True
 
 
-def uname(runner, verbose=False, flags=None):
+def uname(runner, verbose=False, flags=None, **kwargs):
     """
     Execute the uname command on a target system with specified flags.
 
@@ -128,6 +132,8 @@ def uname(runner, verbose=False, flags=None):
         Defaults to False.
     - **flags** (list, optional): List of flags to pass to
         the uname command
+    - **kwargs** (dict, kwargs): Additional arguments for task and runner.
+        Standards are 'pty', 'env', 'encoding', 'timeout' and others.
 
     ### Returns:
 
