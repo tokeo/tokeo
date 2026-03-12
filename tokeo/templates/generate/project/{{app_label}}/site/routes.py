@@ -69,41 +69,36 @@ consistent page structure while allowing page-specific content:
 """
 
 from tokeo.ext.appshare import app
-from .pages.default import page_default
-from .pages.hello_world import page_hello_world
+from .apis import api_example
+from .pages import page_root, page_hello_world
 
 
 ui = app.nicegui.ui
+fa = app.nicegui.fastapi_app
 
 
-def default():
+def apis_map():
+    # Set direct routes mapping URL paths to the actual api functions
+    fa.get('/_/api/example')(api_example)
+
+
+def pages_map():
+    # A dictionary mapping URL paths to the actual UI generation functions
+    pages = {
+        '/': page_root,
+        '/hello-world': page_hello_world,
+    }
+
+    # register all of them in a loop
+    for path, method in pages.items():
+        # pass additional arguments like dark mode or title here!
+        ui.page(path, title=f'Tokeo - {path[2:]}')(method)
+
+
+def routes():
     """
-    Default route handler for the application homepage.
-
-    This function defines the content of the website's landing page (index route).
-    It uses the standard page layout from the blocks module and adds
-    homepage-specific content.
-
-    ### Notes:
-
-    - Automatically registered as the '/' route in the application
-    - Configured via the 'default_route' setting in nicegui config
-
-    """
-    page_default()
-
-
-@ui.page('/hello-world')
-def hello_world():
-    """
-    Example route showing a simple page with custom content.
-
-    This function demonstrates how to create additional pages beyond
-    the default route, using the @ui.page decorator to specify the URL path.
-
-    ### Notes:
-
-    - Accessible at the '/hello-world' URL path
+    Activate the routes for APIs and pages
 
     """
-    page_hello_world()
+    apis_map()
+    pages_map()

@@ -13,7 +13,7 @@ ui = app.nicegui.ui
 ux = app.nicegui.ux
 
 
-def page_default():
+def page_root():
     """
 
     This function defines the content of the website's landing page (index route).

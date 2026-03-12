@@ -49,6 +49,7 @@ dependencies = [
     "nicegui",
     "fastapi",
     "starlette",
+    "email-validator",
     "pscript",
     "vbuild",
 {% endif -%}

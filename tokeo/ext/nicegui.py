@@ -258,26 +258,33 @@ class TokeoNicegui(MetaMixin):
         config_defaults = dict(
             host='127.0.0.1',
             port='4123',
-            apis=None,
+            apis_module=None,
+            routes_module=None,
             routes=None,
-            default_route=None,
             title='Tokeo NiceGUI',
             favicon=None,
             viewport='width=device-width, initial-scale=1',
             dark=None,
             tailwind=True,
+            unocss=None,
             prod_js=True,
             welcome_message=None,
+            openapi_custom_module=None,
             openapi_documentation=None,
             openapi_url=None,
-            openapi_custom=None,
+            openapi_swagger_url=None,
+            openapi_redoc_url=None,
             storage_secret=None,
+            session_middleware_kwargs=None,
             binding_refresh_interval=0.5,
             reconnect_timeout=5.0,
+            message_history_length=1000,
+            cache_control_directives='public, max-age=31536000, immutable, stale-while-revalidate=31536000',
             hotload_dir=None,
             hotload_includes='*.py',
             hotload_excludes='.*, .py[cod], .sw.*, ~*',
             logging_level='warning',
+            run_kwargs=None,
         )
 
     def _setup(self, app):
@@ -303,12 +310,14 @@ class TokeoNicegui(MetaMixin):
         self.fastapi_app = fastapi_app
         # add the ux helper
         self.ux = NiceguiElementHelper()
-        # lazy import apis and routes modul
-        self._apis = self._config('apis')
+        # lazy import apis and routes modules
+        self._apis_module = self._config('apis_module')
+        self._routes_module = self._config('routes_module')
         self._routes = self._config('routes')
-        self._default_route = self._config('default_route')
+        self._openapi_custom_module = self._config('openapi_custom_module')
         self._openapi_url = self._config('openapi_url')
-        self._openapi_custom = self._config('openapi_custom')
+        self._openapi_swagger_url = self._config('openapi_swagger_url')
+        self._openapi_redoc_url = self._config('openapi_redoc_url')
         # test welcome message
         self._welcome_message = self._config('welcome_message')
         if self._welcome_message is None:
@@ -430,21 +439,27 @@ class TokeoNicegui(MetaMixin):
         - Starts the NiceGUI server with configuration from the application
 
         """
-        # load the api and routes module
-        apis_module = importlib.import_module(self._apis) if self._apis else None
-        routes_module = importlib.import_module(self._routes) if self._routes else None
+        # load the api and routes modules
+        apis_module = importlib.import_module(self._apis_module) if self._apis_module else None
+        routes_module = importlib.import_module(self._routes_module) if self._routes_module else None
 
-        # check default web handler
-        if self._default_route and isinstance(self._default_route, str) and self._default_route != '':
-            default_route = getattr(routes_module, self._default_route, None)
-            # verify
-            if default_route is None:
+        # check default routes handler
+        if self._routes:
+            if isinstance(self._routes, str) and self._routes != '':
+                routes_handler = getattr(routes_module, self._routes, None)
+                # verify
+                if routes_handler is None:
+                    raise TokeoNiceguiError(
+                        # fmt: skip
+                        f'Route handler "{self._routes}" could not be found in module "{self._routes_module}"'
+                    )
+                # initialize registered default route
+                routes_handler()
+            else:
                 raise TokeoNiceguiError(
                     # fmt: skip
-                    f'Default route handler "{self._default_route}" could not be found in module "{self._routes}"'
+                    f'Miss configuration for route handler. Must be null or name of method, but is: [{str(type(self._routes))}]'
                 )
-            # initialize registered default route
-            default_route()
 
         # check config for watchdog
         if hotload:
@@ -477,18 +492,34 @@ class TokeoNicegui(MetaMixin):
             fastapi_app.openapi_url = self._openapi_url
             # setup openapi
             fastapi_app.setup()
-            # use module to customize ui
-            openapi_custom = importlib.import_module(self._openapi_custom) if self._openapi_custom else None
             try:
+                # use module to customize ui
+                openapi_custom_module = importlib.import_module(self._openapi_custom_module) if self._openapi_custom_module else None
                 # try to customize get_openapi settings
-                fastapi_app.openapi = openapi_custom.get_openapi_custom
-            except Exception:
-                # use default get_openapi from fastapi
-                pass
+                fastapi_app.openapi = openapi_custom_module.get_openapi_custom
 
-        # spin up service
-        ui.run(
-            # config
+                # try to launch swagger doc
+                if self._openapi_swagger_url:
+                    try:
+                      self.fastapi_app.get(self._openapi_swagger_url, include_in_schema=False)(openapi_custom_module.custom_swagger_ui_html)
+                    except Exception as e:
+                      # ignore, just missing documentation ui
+                      self.app.log.warning(f'Could not start the openapi swagger ui for documentation: {str(e)}')
+
+                # try to launch redoc doc
+                if self._openapi_redoc_url:
+                    try:
+                      self.fastapi_app.get(self._openapi_redoc_url, include_in_schema=False)(openapi_custom_module.custom_redoc_html)
+                    except Exception as e:
+                      # ignore, just missing documentation ui
+                      self.app.log.warning(f'Could not start the openapi redoc for documentation: {str(e)}')
+
+            except Exception as e:
+                # use default get_openapi from fastapi
+                self.app.log.warning(f'Could not start the custom openapi interface and documentation: {str(e)}')
+
+        # config
+        nicegui_run_config = dict(
             host=self._config('host'),
             port=int(self._config('port')),
             title=self._config('title'),
@@ -497,9 +528,13 @@ class TokeoNicegui(MetaMixin):
             dark=self._config('dark'),
             tailwind=self._config('tailwind'),
             prod_js=self._config('prod_js'),
+            unocss=self._config('unocss'),
             storage_secret=self._config('storage_secret'),
+            session_middleware_kwargs=self._config('session_middleware_kwargs'),
             binding_refresh_interval=float(self._config('binding_refresh_interval')),
             reconnect_timeout=float(self._config('reconnect_timeout')),
+            message_history_length=int(self._config('message_history_length')),
+            cache_control_directives=self._config('cache_control_directives'),
             uvicorn_logging_level=self._config('logging_level'),
             endpoint_documentation=self._config('openapi_documentation'),
             # config fixed
@@ -513,6 +548,13 @@ class TokeoNicegui(MetaMixin):
             uvicorn_reload_excludes=None,
             on_air=None,
         )
+        # overwrite by any custom nicegui run kwargs
+        overwrite_with_run_kwargs = self._config('run_kwargs')
+        if overwrite_with_run_kwargs and isinstance(overwrite_with_run_kwargs, dict):
+            for k, v in overwrite_with_run_kwargs.items():
+                nicegui_run_config[k] = v
+        # spin up the service
+        ui.run(**nicegui_run_config)
 
     def shutdown(self):
         """
@@ -669,7 +711,7 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
     1. Extracts parameters values for better documentation
 
     """
-    if decorator == '@app.nicegui.fastapi_app.get':
+    if decorator in ['@app.nicegui.fastapi_app.get', '@fastapi_app.get', '@fa.get']:
         params = None
         if args is not None:
             try:
@@ -682,7 +724,7 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
             params=params,
             docstring=app.pdoc.docstrings('decorator', 'fastapi.get'),
         )
-    elif decorator == '@app.nicegui.fastapi_app.post':
+    elif decorator in ['@app.nicegui.fastapi_app.post', '@fastapi_app.post', '@fa.post']:
         params = None
         if args is not None:
             try:
@@ -695,7 +737,7 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
             params=params,
             docstring=app.pdoc.docstrings('decorator', 'fastapi.post'),
         )
-    elif decorator == '@app.nicegui.ui.page' or decorator == '@ui.page':
+    elif decorator in ['@app.nicegui.ui.page', '@nicegui.ui.page', '@ui.page']:
         params = None
         if args is not None:
             try:

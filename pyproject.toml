@@ -50,6 +50,7 @@ dev = [
     "nicegui",
     "fastapi",
     "starlette",
+    "email-validator",
     "pscript",
     "vbuild",
     "pocketbase",

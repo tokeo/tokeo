@@ -121,7 +121,6 @@ def get_openapi_custom():
     return app.nicegui.fastapi_app.openapi_schema
 
 
-@app.nicegui.fastapi_app.get('/_/api/docs', include_in_schema=False)
 async def custom_swagger_ui_html():
     """
     Serve customized Swagger UI documentation page.
@@ -142,14 +141,17 @@ async def custom_swagger_ui_html():
       https://fastapi.tiangolo.com/de/reference/openapi/docs/#fastapi.openapi.docs.get_swagger_ui_html
 
     """
-    return get_swagger_ui_html(
+    resp = get_swagger_ui_html(
         openapi_url=app.nicegui.fastapi_app.openapi_url,
         title=None,
         swagger_favicon_url='/favicon.ico',
+        # to disable CDN use e.g. swagger_js_url="/static/swagger-ui-bundle.js",
+        # to disable CDN use e.g. swagger_css_url="/static/swagger-ui.css",    )
     )
 
+    return resp
 
-@app.nicegui.fastapi_app.get('/_/api/redoc', include_in_schema=False)
+
 async def custom_redoc_html():
     """
     Serve customized ReDoc documentation page.
@@ -170,8 +172,11 @@ async def custom_redoc_html():
       https://fastapi.tiangolo.com/de/reference/openapi/docs/#fastapi.openapi.docs.get_redoc_html
 
     """
-    return get_redoc_html(
+    resp = get_redoc_html(
         openapi_url=app.nicegui.fastapi_app.openapi_url,
         title=None,
         redoc_favicon_url='/favicon.ico',
+        # to disable CDN use e.g. redoc_js_url='/static/redoc.standalone.js'
     )
+
+    return resp
