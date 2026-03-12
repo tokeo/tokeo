@@ -1,70 +1,49 @@
 """
-Web page routes for the application's website.
+Web page routes and API endpoint mapping for the application.
 
-This module provides a centralized location for defining website routes and
-page handlers in Tokeo applications using NiceGUI. It contains the routes
-that make up the website's navigation structure.
+This module acts as the central registry for all web pages and API endpoints.
+It imports isolated page and API functions and binds them to specific URL
+paths using NiceGUI and FastAPI's programmatic routers.
 
-### Features:
-
-- **Default route** (`/`) serving as the application's homepage
-- **Route handlers** for different application URL paths
-- **Responsive design** that works across different device types
+**CRITICAL (NiceGUI 3.x Architecture):** Absolutely no UI elements (`ui.label`,
+`ui.button`, etc.) may be instantiated in the global scope of this file.
+All UI construction must happen strictly inside the registered page functions
+to prevent memory leaks and cross-session state contamination.
 
 ### Route Structure:
 
-Routes are defined either as simple functions (for the default route) or as
-decorated functions using `@ui.page('/path')` for specific paths. Each route
-handler typically uses the shared layout components to maintain design
-consistency while implementing page-specific content.
+Routes are defined as pure, stateless functions in the `pages/` and `apis/`
+directories, and are mapped to URL paths in this file via dictionaries or
+direct programmatic calls.
 
 ### Usage:
 
-Define a new page route by adding a function with the `@ui.page` decorator:
+To add a new page or API endpoint to your application:
+
+1. Create a pure function in `site/pages/` or `site/apis/`.
+2. Import it into this module.
+3. Add it to the `pages` mapping dictionary or API registry.
+
+### Example of adding a new page dynamically:
 
 ```python
-from tokeo.ext.appshare import app
-from .components import blocks
+from .pages import page_catalog
 
-ui = app.nicegui.ui
-ux = app.nicegui.ux
+def pages_map():
+    pages = {
+        '/': page_root,
+        '/catalog': page_catalog,  # Newly mapped route
+    }
 
-@ui.page('/products')
-def products_page():
-    '''Products catalog page showing available items.'''
-    with blocks.page(title='Product Catalog'):
-        # Page-specific content
-        with ui.card().classes('w-full'):
-            ui.label('Product Listings').classes('text-xl font-bold')
-
-            # Product grid
-            with ui.grid(columns=3).classes('gap-4 mt-4'):
-                for i in range(6):
-                    with ui.card():
-                        ui.label(f'Product {i+1}').classes('text-lg font-semibold')
-                        ui.label('$99.99').classes('text-blue-500')
-                        ui.button(
-                            'Add to Cart',
-                            on_click=lambda: ui.notify('Added to cart'),
-                        )
+    for path, method in pages.items():
+        ui.page(path, title=f'Tokeo - {path[2:]}')(method)
 ```
-
-The routes module works with the blocks and layout modules to create a
-consistent page structure while allowing page-specific content:
-
-- **blocks.page()**: Provides the standard page container with title, navigation,
-    and footer
-- **layout module**: Lower-level components that define the overall page structure
-- **ux element helper**: Provides access to HTML elements not directly exposed
-    by NiceGUI
 
 ### Notes:
 
-- The default route function (named 'default') is automatically registered as the
-    index ('/')
-- The layout and blocks modules abstract away page structure for consistent design
-- Use Tailwind CSS classes for styling consistency and responsive design
-- Each route handler should focus on its specific page content
+- `ui.page()` and `fastapi_app.get()` are used as programmatic wrappers in a loop,
+  not as decorators
+- The `routes()` function is invoked by the `TokeoNicegui` engine during startup
 
 """
 
@@ -78,11 +57,26 @@ fa = app.nicegui.fastapi_app
 
 
 def apis_map():
+    """
+    Programmatically register all FastAPI REST endpoints.
+
+    As an example implementation it maps URL paths programmatically directly.
+    The API functions are isolated, by serving raw JSON and data via FastAPI.
+
+    """
     # Set direct routes mapping URL paths to the actual api functions
     fa.get('/_/api/example')(api_example)
 
 
 def pages_map():
+    """
+    Programmatically register all NiceGUI web pages.
+
+    As an example implementation it iterates through a dictionary of
+    routes and binds them to their respective UI generation functions.
+    Additional it injects dynamic parameters like page titles.
+
+    """
     # A dictionary mapping URL paths to the actual UI generation functions
     pages = {
         '/': page_root,
@@ -97,7 +91,10 @@ def pages_map():
 
 def routes():
     """
-    Activate the routes for APIs and pages
+    Activate the routes for APIs and pages.
+
+    This function is called by the application orchestrator during startup
+    to finalize the routing map before the web server binds to the port.
 
     """
     apis_map()

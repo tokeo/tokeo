@@ -1,37 +1,32 @@
 """
 REST API endpoints and business logic integration for the application.
 
-This module provides a centralized location for defining API endpoints and
-integrating business logic in Tokeo applications using NiceGUI's
+This module provides isolated API functions for Tokeo applications using
 FastAPI integration. It contains REST API routes that expose application
-functionality to clients, connecting web interfaces with the core business
-logic implemented in the application's core modules.
+functionality to clients, connecting web interfaces with core business logic.
 
 ### Features:
 
-- **REST API endpoints** for client-server communication
-- **Business logic integration** with core.tasks modules
-- **JSON data exchange** for frontend/backend interaction
-- **Structured request/response handling** with FastAPI
+- **Isolated endpoint functions**: Prevents global state pollution
+- **Business logic integration**: Seamless connection with `core.tasks`
+- **JSON data exchange**: For frontend/backend interaction
 - **API documentation** through automatically generated OpenAPI specs
 
 ### API Structure:
 
-API endpoints are defined as functions decorated with FastAPI decorators
-like `@app.nicegui.fastapi_app.get`, `@app.nicegui.fastapi_app.post`, etc.
-These endpoints connect web interfaces with the application's business logic
-by invoking appropriate functions from the core.tasks modules (performers,
-operators, steps).
+Endpoints are defined as pure asynchronous functions. Instead of using
+decorators directly in this file, these functions are imported and mapped
+programmatically inside `site/routes.py`.
 
 ### Usage:
 
-Define a new API endpoint using FastAPI decorators:
+Define a new API endpoint as a pure function:
+
+##### create `site/apis/products.py`
 
 ```python
-from tokeo.ext.appshare import app
 from myapp.core.tasks import performers
 
-@app.nicegui.fastapi_app.post('/api/products/search')
 async def search_products(request: ProductRequest):
     '''
     Search for products by category with optional limit.
@@ -60,6 +55,13 @@ async def search_products(request: ProductRequest):
     return products
 ```
 
+##### register it in `site/routes.py`:
+
+```python
+def apis_map():
+    fa.post('/_/api/products/search')(search_products)
+```
+
 ### Integration Points:
 
 The APIs module can interact with various parts of the application:
@@ -72,12 +74,11 @@ The APIs module can interact with various parts of the application:
 
 ### Notes:
 
-- API endpoints should follow REST conventions and best practices
+- Keep business logic in `core.*` modules, not in the API handlers
 - Use FastAPI's typing system for request/response validation
 - Implement proper error handling and status codes
-- Keep business logic in core.tasks modules, not in API handlers
 - Consider authentication and authorization requirements
-- API endpoints are automatically documented via OpenAPI/Swagger UI
+- Endpoints are automatically documented via OpenAPI/Swagger UI
 
 """
 
@@ -101,5 +102,6 @@ async def api_example():
         "msg": "myapp json api result"
     }
     ```
+
     """
     return dict(msg='{{ app_label }} json api result')

@@ -6,9 +6,12 @@ UI endpoints for the application. It configures both Swagger UI and ReDoc
 interfaces with application-specific metadata including title, description,
 version information, and branding.
 
-The module handles an OpenAPI schema and provides endpoints to serve
-both Swagger UI and ReDoc HTML documentation at '/_/api/docs' and
-'/_/api/redoc' respectively.
+The module handles the OpenAPI schema and provides pure FastAPI endpoints
+to serve both Swagger UI and ReDoc HTML documentation. In alignment with
+the application's strict routing architecture, these endpoints bypass the
+NiceGUI UI engine entirely and are registered programmatically. The default
+pathes are `/_/openapi/info` for Swagger UI and `/_/openapi/docs` for ReDoc
+documentation pages. The OpenAPI schema is at `/_/openapi/openapi.json`.
 
 ### Notes:
 
@@ -79,7 +82,7 @@ def get_openapi_custom():
 
     ### Notes:
 
-    : The function implements a caching mechanism - if the schema is already
+    : The function implements a caching mechanism. If the schema is already
       generated and stored in app.nicegui.fastapi_app.openapi_schema, it will
       return the cached version rather than regenerating it.
 
@@ -126,8 +129,8 @@ async def custom_swagger_ui_html():
     Serve customized Swagger UI documentation page.
 
     Creates and returns a customized Swagger UI HTML page for interactive
-    API documentation. The endpoint is mounted at '/_/api/docs' and uses
-    the application's favicon.
+    API documentation. The endpoint is mounted programmatically by the
+    NiceGUI extension orchestrator.
 
     ### Returns:
 
@@ -135,10 +138,9 @@ async def custom_swagger_ui_html():
 
     ### Notes:
 
-    : This endpoint is excluded from the API schema itself via
+    : This endpoint is excluded from the API schema itself via the
       include_in_schema=False parameter to avoid recursive documentation.
-      Further customization options are available in the FastAPI docs:
-      https://fastapi.tiangolo.com/de/reference/openapi/docs/#fastapi.openapi.docs.get_swagger_ui_html
+      Further customization options are available in the FastAPI docs.
 
     """
     resp = get_swagger_ui_html(
@@ -146,7 +148,7 @@ async def custom_swagger_ui_html():
         title=None,
         swagger_favicon_url='/favicon.ico',
         # to disable CDN use e.g. swagger_js_url="/static/swagger-ui-bundle.js",
-        # to disable CDN use e.g. swagger_css_url="/static/swagger-ui.css",    )
+        # to disable CDN use e.g. swagger_css_url="/static/swagger-ui.css",
     )
 
     return resp
@@ -157,8 +159,8 @@ async def custom_redoc_html():
     Serve customized ReDoc documentation page.
 
     Creates and returns a customized ReDoc HTML page for API documentation
-    with an alternative UI to Swagger. The endpoint is mounted at '/_/api/redoc'
-    and uses the application's favicon.
+    with an alternative UI to Swagger. The endpoint is mounted programmatically
+    by the NiceGUI extension orchestrator.
 
     ### Returns:
 
@@ -166,10 +168,9 @@ async def custom_redoc_html():
 
     ### Notes:
 
-    : This endpoint is excluded from the API schema itself via
+    : This endpoint is excluded from the API schema itself via the
       include_in_schema=False parameter to avoid recursive documentation.
-      Further customization options are available in the FastAPI docs:
-      https://fastapi.tiangolo.com/de/reference/openapi/docs/#fastapi.openapi.docs.get_redoc_html
+    : Further customization options are available in the FastAPI docs
 
     """
     resp = get_redoc_html(
