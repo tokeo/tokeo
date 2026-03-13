@@ -1,5 +1,54 @@
+"""
+Low-level layout primitives, styling configurations, and the theme engine.
+
+This module serves as the foundational design system for the application.
+It defines core responsive breakpoints (aligned with Tailwind CSS), color
+palettes (`COLORS` dictionary), base CSS injections, and the lowest-level
+HTML wrappers.
+
+While `blocks.py` provides high-level composition, this module dictates
+*how* those blocks look and behave. To re-theme the application or adjust
+global padding, routing behavior, and typography, modify the configurations
+in this file.
+
+### ⚠️ CRITICAL: Multi-User Safety Architecture
+
+This framework adheres to a strict stateless, multi-user architecture.
+Instantiating NiceGUI elements (`ui.button`, `ui.label`, etc.) in the
+global scope of any module will cause severe memory leaks and cross-user
+state contamination (attaching elements to NiceGUI's background shared client).
+
+### 🛡️ The `guard_user_context()` Tripwire
+
+To protect the framework, **ALL** newly created layout functions, root-level
+context managers, or wrappers that execute native NiceGUI `ui.*` commands must
+trigger the security guard before rendering.
+
+The guard verifies that the function is being called from safely inside an
+active user's page route.
+
+**How to implement:**
+
+```python
+from tokeo.ext.nicegui import guard_user_context
+
+def my_new_layout_block():
+    # ensure multi-user safety
+    guard_user_context()
+
+    # add additional elements
+    ui.label('This element is now safe from global leaks')
+```
+
+If a guarded function is accidentally called at the global/import level,
+the guard will instantly raise a `TokeoNiceguiError` and crash the app on
+startup, intentionally preventing the memory leak from ever reaching production.
+
+"""
+
 from contextlib import contextmanager
 from tokeo.ext.appshare import app
+from tokeo.ext.nicegui import guard_user_context
 
 
 ui = app.nicegui.ui
@@ -64,6 +113,9 @@ def page(
     nav=None,
     footer=None,
 ):
+    # ensure multi-user safety
+    guard_user_context()
+
     # update some nicegui / quasar basics
     css_inject()
 
@@ -108,6 +160,9 @@ def nav_item(
     icon='link',
     icon_classes='text-2xl',
 ):
+    # ensure multi-user safety
+    guard_user_context()
+
     with ux.li().classes(f'hover:!{COLORS["nav_hover"]} hover:{COLORS["nav_hover_bg"]} rounded flex items-center {height}').style():
         if href:
             action = (
@@ -128,6 +183,9 @@ def nav_item(
 
 @contextmanager
 def nav():
+    # ensure multi-user safety
+    guard_user_context()
+
     with ux.div().classes(f'p-4 {COLORS["nav"]} {COLORS["nav_bg"]} rounded-xl w-full'):
         with ux.ul().classes('flex sm:flex-col overflow-hidden content-center justify-between'):
             yield
@@ -135,6 +193,9 @@ def nav():
 
 @contextmanager
 def footer(footer_info=None, footer_copyright='{{ app_copyright }}'):
+    # ensure multi-user safety
+    guard_user_context()
+
     # sticky footer
     with ux.footer().classes(f'{COLORS["footer_bg"]} mt-auto'):
         with ux.div().classes(f'px-4 py-3 {COLORS["footer"]} mx-auto'):

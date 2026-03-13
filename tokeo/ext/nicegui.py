@@ -35,7 +35,7 @@ from tokeo.ext.argparse import Controller
 from tokeo.core.exc import TokeoError
 from cement.core.meta import MetaMixin
 from cement import ex
-from nicegui import ui, app as fastapi_app
+from nicegui import ui, app as fastapi_app, context
 from nicegui.element import Element
 from nicegui.elements.mixins.text_element import TextElement
 
@@ -175,6 +175,41 @@ except ImportError:
             pass
 
 
+def guard_user_context():
+    """
+    Ensure that UI elements are only instantiated inside a user's active page route.
+    Stores the validation flag directly on the NiceGUI client object to eliminate
+    the need for external ContextVars.
+
+    """
+    try:
+        # ctx.get_client() is just proxy for ContextVar.get() call inside NiceGUI
+        client = context.client
+
+        # SIMPLE TEST: If valid flag, skip!
+        if getattr(client, '_tokeo_ctx_guard_flag', False):
+            return
+
+        # check for shared global client ('id' points to 'shared')
+        if client.id == 'shared' or getattr(client, 'is_shared', False):
+            raise TokeoNiceguiError(
+                # nofmt
+                'CRITICAL: Attempted to create an UI element in the global scope! '
+                'UI elements must only be created inside an active page route function.'
+            )
+
+        # place the flag for next requests
+        client._tokeo_ctx_guard_flag = True
+
+    except RuntimeError:
+        # NiceGUI throws a RuntimeError if no active context
+        raise TokeoNiceguiError(
+            # nofmt
+            'CRITICAL: No active NiceGUI client context found. '
+            'Are you trying to instantiate a UI element outside of a route?'
+        )
+
+
 class NiceguiElementHelper:
     """
     Helper class to facilitate creation of NiceGUI elements.
@@ -221,6 +256,9 @@ class NiceguiElementHelper:
         """
 
         def wrapper(text=None, *args, **kwargs):
+            # check multi-user safety BEFORE creating the new element
+            guard_user_context()
+
             if text is None:
                 return Element(tag=tag)
             else:

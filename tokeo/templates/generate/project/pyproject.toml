@@ -46,7 +46,7 @@ dependencies = [
     "requests",
 {% endif -%}
 {% if feature_nicegui == "Y" %}
-    "nicegui",
+    "nicegui>=3.8.0",
     "fastapi",
     "starlette",
     "email-validator",
