@@ -47,7 +47,7 @@ dev = [
     "protobuf",
     "apscheduler>=3.0,<4.0",
     "requests",
-    "nicegui",
+    "nicegui>=3.8.0",
     "fastapi",
     "starlette",
     "email-validator",
