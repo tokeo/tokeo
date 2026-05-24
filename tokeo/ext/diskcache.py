@@ -118,13 +118,8 @@ class TokeoDiskCacheLocksHandler:
         - **int**: Number of locks purged from the cache
 
         """
-        total = 0
-        while True:
-            num = self._cache.evict(self._tag, retry=True)
-            if num > 0:
-                total += num
-            else:
-                break
+        # evict already removes all matching entries in one call
+        total = self._cache.evict(self._tag, retry=True)
 
         return total
 
@@ -247,38 +242,48 @@ class TokeoDiskCacheLocksHandler:
         verbose=True,
     ):
         """
-        Rate-limiting decorator to throttle function calls to a specified frequency.
+        Rate-limiting decorator to throttle function calls to a given
+        frequency.
 
-        This decorator implements a token bucket algorithm to limit how often
-        a function can be called, distributing calls evenly over time. It uses
-        DiskCache to maintain state across multiple processes and threads, making
-        it suitable for distributed applications.
+        This decorator implements a token bucket algorithm to limit how
+        often a function can be called, distributing calls evenly over
+        time. It uses DiskCache to maintain state across multiple
+        processes and threads, making it suitable for distributed
+        applications.
 
         When the rate limit is exceeded, the decorator will either:
-        1. Block and sleep until enough tokens are available to call the function
-        1. Call an alternative callback function if cb_on_locked is provided
+        1. Block and sleep until enough tokens are available to call the
+            function
+        1. Call an alternative callback function if cb_on_locked is
+            provided
 
         ### Args:
 
-        - **count** (int): Number of calls allowed in the specified time period
-        - **per_seconds** (float): Time period in seconds over which to limit calls
-        - **name** (str, optional): Custom cache key name for this throttle
-        - **name_f** (str, optional): Format string to generate key name
-            based on function arguments
-        - **expire** (float, optional): Expiration time for the throttle key
-            in seconds
-        - **time_func** (callable, optional): Function to get current time.
-            Defaults to time.time.
-        - **sleep_func** (callable, optional): Function to sleep when rate limited.
-            Defaults to time.sleep.
-        - **cb_on_locked** (callable, optional): Function to call when rate limited
-            instead of waiting
-        - **verbose** (bool, optional): Whether to log throttling information.
-            Defaults to True.
+        - **count** (int): Number of calls allowed in the time period.
+            Defaults to 1.
+        - **per_seconds** (float): Time period in seconds over which to
+            limit calls. Defaults to 1.
+        - **name** (str, optional): Custom cache key name for this
+            throttle.
+        - **name_f** (str, optional): Format string to build the key name
+            from the function arguments.
+        - **expire** (float, optional): Expiration time for the throttle
+            key in seconds. When the key expires, the bucket simply starts
+            full again on the next call.
+        - **time_func** (callable, optional): Function to get the current
+            time. Defaults to time.time.
+        - **sleep_func** (callable, optional): Function to sleep while rate
+            limited. Defaults to time.sleep. If falsy and no cb_on_locked
+            is set, a limited call returns immediately without running the
+            wrapped function.
+        - **cb_on_locked** (callable, optional): Function to call when rate
+            limited, instead of waiting.
+        - **verbose** (bool, optional): Whether to log throttling
+            information. Defaults to True.
 
         ### Returns:
 
-        - **callable**: The decorated function with rate limiting applied
+        - **callable**: The decorated function with rate limiting applied.
 
         ### Example:
 
@@ -291,24 +296,22 @@ class TokeoDiskCacheLocksHandler:
 
         ### Notes:
 
-        - The throttle state persists in the cache based on the function name
-            or custom name/name_f parameter
-        - When rate-limited, execution will be delayed unless cb_on_locked
-            is provided
-        - Token bucket algorithm allows for bursts up to 'count' calls at once
+        - The throttle state persists in the cache under the key derived
+            from name, name_f or the function full name.
+        - When rate-limited, execution is delayed unless cb_on_locked is
+            provided.
+        - The token bucket allows bursts up to count calls at once.
 
         """
 
         def decorator(func):
             # create the full name of the @decorated function
             func_full_name = diskcache.core.full_name(func)
-            # calc the rate
+            # calc the rate per second
             rate = count / float(per_seconds)
 
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
-                # flag for function call to use
-                use_cb = False
                 # unpack arguments in dictionary
                 arguments = dict(
                     func_name=func.__name__,
@@ -327,29 +330,32 @@ class TokeoDiskCacheLocksHandler:
                     # use full_name as key
                     key = self._key_prefix + func_full_name
 
-                # some outputr info
+                # log which cache key is used for this call
                 if verbose:
                     self.app.log.info(f'@throttle {func.__name__} using key {key}')
 
-                # loop
+                # loop until tokens are available or the call is handled
                 while True:
-                    # run in a transaction<
+                    # run in a transaction
                     with self._cache.transact(retry=True):
-                        # get values from cache
+                        # read the current bucket state from cache
                         values = self._cache.get(key)
-                        # check if already a valid initialized tuple(int, int)
-                        # exist where ints must have values > 0
-                        if type(values) is tuple and len(values) == 2 and type(values[0]) is int and type(values[1]) is int:
-                            # expand the cached tuple values
+                        # accept only a valid (number, number) bucket tuple;
+                        # time_func may return int or float, so check both
+                        if (type(values) is tuple and len(values) == 2
+                                and isinstance(values[0], (int, float))
+                                and isinstance(values[1], (int, float))):
+                            # unpack the cached bucket state
                             last, tally = values
-                            # validate the values
-                            if last < 1 or tally < 1:
+                            # drop only truly broken states; an empty bucket
+                            # (tally == 0) is valid and must not be reset
+                            if last <= 0 or tally < 0:
                                 # invalidate the tuple
                                 values = None
                         else:
-                            # invalidate any other values read or not from cache
+                            # anything else is treated as uninitialized
                             values = None
-                        # on read failure or values failure, reset the values
+                        # (re)initialize the bucket when no valid state exists
                         if values is None:
                             # initialize the variables
                             last = time_func()
@@ -357,7 +363,7 @@ class TokeoDiskCacheLocksHandler:
                             # initialize the cache immediately
                             self._cache.set(key, (last, tally), expire=expire, tag=self._tag)
 
-                        # calc the next values
+                        # refill tokens based on the elapsed time
                         now = time_func()
                         tally += (now - last) * rate
                         delay = 0
@@ -369,20 +375,23 @@ class TokeoDiskCacheLocksHandler:
                         else:
                             delay = (1 - tally) / rate
 
-                    if delay:
-                        # break and call callback outside the transaction
-                        if cb_on_locked:
-                            use_cb = True
-                            break
-                        # without callback stay here and sleep
-                        else:
-                            sleep_func(delay)
-                    else:
-                        # break and call func
+                    # enough tokens: run the function
+                    if delay == 0:
                         break
 
+                    # no token free: hand over to the callback outside lock
+                    if cb_on_locked:
+                        break
+
+                    # no callback and no sleep: give up without running
+                    if not sleep_func:
+                        break
+
+                    # wait before the next attempt
+                    sleep_func(delay)
+
                 # call the wrapped function or callback if set
-                result = func(*args, **kwargs) if not use_cb else cb_on_locked(**arguments)
+                result = func(*args, **kwargs) if delay == 0 else cb_on_locked(**arguments) if cb_on_locked else None
 
                 # return the @decorated result
                 return result
@@ -400,43 +409,54 @@ class TokeoDiskCacheLocksHandler:
         name_f=None,
         expire=None,
         sleep_func=time.sleep,
+        sleep_time=0.05,
         cb_on_locked=None,
         verbose=True,
     ):
         """
-        Resource-limiting decorator to control concurrent access to a function.
+        Resource-limiting decorator to control concurrent access to a
+        function.
 
-        This decorator implements a semaphore-like mechanism that limits the
-        number of concurrent calls to a function across processes or threads.
-        Unlike throttle which focuses on rate over time, temper focuses on
-        limiting concurrent usage. It uses DiskCache to maintain state, making
-        it suitable for distributed applications.
+        This decorator implements a semaphore-like mechanism that limits
+        the number of concurrent calls to a function across processes or
+        threads. Unlike throttle, which limits the call rate over time,
+        temper limits how many calls may run at the same moment. The state
+        is kept in DiskCache, so the limit is shared by all processes and
+        threads that use the same cache.
 
-        When the concurrent limit is reached, the decorator will either:
-        1. Block and sleep until a slot becomes available
-        1. Call an alternative callback function if cb_on_locked is provided
-
-        The decorator maintains a counter of available slots. Each call decrements
-        the counter. When the function completes, the counter is incremented again.
+        The decorator keeps a counter of free slots. Acquiring a slot
+        decrements the counter; finishing the call increments it again,
+        capped at count. When no slot is free, the call either waits and
+        retries or, if cb_on_locked is set, runs that callback instead of
+        the wrapped function.
 
         ### Args:
 
-        - **count** (int): Maximum number of concurrent calls allowed
-        - **name** (str, optional): Custom cache key name for this temper instance
-        - **name_f** (str, optional): Format string to generate key name based
-            on function arguments
+        - **count** (int): Maximum number of concurrent calls allowed.
+            Defaults to 1.
+        - **name** (str, optional): Custom cache key name for this temper
+            instance.
+        - **name_f** (str, optional): Format string to build the key name
+            from the function arguments.
         - **expire** (float, optional): Expiration time for the temper key
-            in seconds
-        - **sleep_func** (callable, optional): Sleep function on resource limit.
-            Defaults to time.sleep.
-        - **cb_on_locked** (callable, optional): Function to call on limit
-            instead of waiting
-        - **verbose** (bool, optional): Whether to log tempering information.
-            Defaults to True.
+            in seconds. Also acts as a safety net: a crashed holder frees
+            its slot once the key expires.
+        - **sleep_func** (callable, optional): Sleep function used while
+            waiting for a free slot. Defaults to time.sleep. If falsy and
+            no cb_on_locked is set, a blocked call returns immediately
+            without running the wrapped function.
+        - **sleep_time** (float, optional): Seconds to wait between retries
+            while blocked. Defaults to 0.05.
+        - **cb_on_locked** (callable, optional): Function to call when no
+            slot is free, instead of waiting. It receives the unpacked
+            function arguments and never consumes a slot.
+        - **verbose** (bool, optional): Whether to log tempering
+            information. Defaults to True.
 
         ### Returns:
 
-        - **callable**: The decorated function with concurrency control applied
+        - **callable**: The decorated function with concurrency control
+            applied.
 
         ### Example:
 
@@ -450,14 +470,23 @@ class TokeoDiskCacheLocksHandler:
 
         ### Notes:
 
-        - The temper state persists in the cache based on the function
-            name or custom name/name_f parameter
-        - If a process crashes while holding a slot, the slot will be released
-            when the cache key expires, preventing permanent deadlock
-        - Unlike throttle, temper has a fixed delay when blocked
-            (0.05 seconds by default)
-        - The function will automatically restore slots when complete, ensuring
-            resources become available again
+        - The temper state persists in the cache under the key derived
+            from name, name_f or the function full name.
+        - A slot is only released by a call that actually acquired one;
+            the cb_on_locked path never changes the counter.
+        - The release does not recreate a key that has vanished in the
+            meantime, so purging the cache while no call holds a slot
+            leaves it empty.
+        - **Important:** expire must be larger than the longest possible
+            run time of the wrapped function. If a call runs longer than
+            expire, its key expires mid-run and the next caller treats the
+            key as uninitialized, resets the counter to count and may start
+            up to count additional calls on top of those still running,
+            breaking the limit. Choose expire generously, or set it to None
+            to disable expiry (losing the crash-safety net in return).
+        - Purging the cache while calls are in flight is destructive: it
+            clears the very counter that enforces the limit and resets the
+            accounting, so it can breach the limit temporarily as well.
 
         """
 
@@ -467,8 +496,6 @@ class TokeoDiskCacheLocksHandler:
 
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
-                # flag for function call to use
-                use_cb = False
                 # unpack arguments in dictionary
                 arguments = dict(
                     func_name=func.__name__,
@@ -487,53 +514,58 @@ class TokeoDiskCacheLocksHandler:
                     # use full_name as key
                     key = self._key_prefix + func_full_name
 
-                # some outputr info
+                # log which cache key is used for this call
                 if verbose:
                     self.app.log.info(f'@temper {func.__name__} using key {key}')
 
-                # loop
+                # loop until a slot is acquired or the call is handled
                 while True:
                     # run in a transaction
                     with self._cache.transact(retry=True):
-                        # get value from cache
-                        value = self._cache.get(key)
-                        # check if already correctly initialized
-                        if type(value) is int and value > 0:
-                            # expand the cached value
+                        # read free slots; a missing key means all are free
+                        value = self._cache.get(key, default=count)
+                        # treat any non-negative int as a valid slot count
+                        if type(value) is int and value >= 0:
+                            # use the cached value
                             available = value
                         else:
-                            # re-initialize the variables
+                            # re-initialize on an invalid or missing value
                             available = count
-                            # initialize the cache immediately
-                            self._cache.set(key, available, expire=expire, tag=self._tag)
 
-                        # calc the next values
-                        delay = 0
-
-                        if available >= 1:
+                        # acquire a slot and run the function outside the lock
+                        if available > 0:
                             self._cache.set(key, available - 1, expire=expire, tag=self._tag)
-                        else:
-                            delay = 0.05
-
-                    if delay:
-                        # break and call callback outside the transaction
-                        if cb_on_locked:
-                            use_cb = True
                             break
-                        # without callback stay here and sleep
-                        else:
-                            sleep_func(delay)
-                    else:
-                        # break and call func
-                        break
 
-                # call the wrapped function or callback if set
-                result = func(*args, **kwargs) if not use_cb else cb_on_locked(**arguments)
+                        # no slot free: hand over to the callback outside lock
+                        if cb_on_locked:
+                            break
 
-                # run in a transaction
-                with self._cache.transact(retry=True):
-                    # add to counter
-                    self._cache.set(key, self._cache.get(key, default=count) + 1, expire=expire, tag=self._tag)
+                        # no callback and no sleep: give up without running
+                        if not sleep_func:
+                            break
+
+                        # wait before the next attempt
+                        sleep_func(sleep_time)
+
+                if available > 0:
+                    try:
+                        # call the wrapped function
+                        result = func(*args, **kwargs)
+                    finally:
+                        # run in a transaction
+                        with self._cache.transact(retry=True):
+                            # re-read; other processes may have changed it
+                            value = self._cache.get(key)
+                            # release only when the key still exists
+                            if type(value) is int:
+                                # raise by one but never above count
+                                value = 1 if value < 1 else (value + 1) if value < count else count
+                                # write into cache
+                                self._cache.set(key, value, expire=expire, tag=self._tag)
+                else:
+                    # call callback if set
+                    result = cb_on_locked(**arguments) if cb_on_locked else None
 
                 # return the @decorated result
                 return result
@@ -579,7 +611,9 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         #: Dict with initial settings
         config_defaults = dict(
-            # Directory where cache files are stored (None = auto-determine)
+            # Directory where cache db files are stored. When using
+            # diskcache to synchronize processes, make sure that all
+            # pointed to the same directory.
             directory=None,
             # Default timeout for cache operations in seconds
             timeout=60,
@@ -778,13 +812,8 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         - **int**: Number of items evicted from the cache
 
         """
-        total = 0
-        while True:
-            num = self._cache.evict(tag, retry=True)
-            if num > 0:
-                total += num
-            else:
-                break
+        # evict already removes all matching entries in one call
+        total = self._cache.evict(tag, retry=retry)
 
         return total
 
