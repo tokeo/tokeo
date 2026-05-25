@@ -368,18 +368,23 @@ class TokeoDiskCacheLocksHandler:
                         tally += (now - last) * rate
                         delay = 0
 
+                        # available slot, then run the function outside the lock
                         if tally > count:
                             self._cache.set(key, (now, count - 1), expire=expire, tag=self._tag)
-                        elif tally >= 1:
+                            break
+
+                        # available slot, then run the function outside the lock
+                        if tally >= 1:
                             self._cache.set(key, (now, tally - 1), expire=expire, tag=self._tag)
-                        else:
-                            delay = (1 - tally) / rate
+                            break
 
-                    # enough tokens: run the function
-                    if delay == 0:
-                        break
+                    # Attention! This must be run outside the transact block,
+                    # otherwise this will HOLD the code with no end (DEADLOCK)
 
-                    # no token free: hand over to the callback outside lock
+                    # signal a non available slot and set a sleep time
+                    delay = (1 - tally) / rate
+
+                    # no token free: check for hand over to the callback outside lock
                     if cb_on_locked:
                         break
 
@@ -537,16 +542,19 @@ class TokeoDiskCacheLocksHandler:
                             self._cache.set(key, available - 1, expire=expire, tag=self._tag)
                             break
 
-                        # no slot free: hand over to the callback outside lock
-                        if cb_on_locked:
-                            break
+                    # Attention! This must be run outside the transact block,
+                    # otherwise this will HOLD the code with no end (DEADLOCK)
 
-                        # no callback and no sleep: give up without running
-                        if not sleep_func:
-                            break
+                    # no slot free: hand over to the callback outside lock
+                    if cb_on_locked:
+                        break
 
-                        # wait before the next attempt
-                        sleep_func(sleep_time)
+                    # no callback and no sleep: give up without running
+                    if not sleep_func:
+                        break
+
+                    # wait before the next attempt
+                    sleep_func(sleep_time)
 
                 if available > 0:
                     try:
