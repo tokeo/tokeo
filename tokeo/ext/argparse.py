@@ -23,6 +23,9 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
 
     """
 
+    # default until a _SubParsersAction sets the real width in _format_action
+    _subcommand_max_length = 0
+
     def _iter_indented_subactions(self, action):
         """
         Iterate over subactions with proper indentation and sorting.
@@ -65,6 +68,9 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
         - **str**: Formatted text with proper indentation
 
         """
+        # explicitly append ' \n ' to the end of any help text. this keeps
+        # HelpFormatter.format_help() from collapsing/stripping the longer
+        # line breaks, since we want some space between the help sections
         return ''.join(indent + line for line in text.splitlines(keepends=True)) + ' \n '
 
     def _format_action(self, action):
@@ -84,7 +90,8 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
             # inject new class variable for subcommand formatting
             subactions = action._get_subactions()
             invocations = [self._format_action_invocation(a) for a in subactions]
-            self._subcommand_max_length = max(len(i) for i in invocations)
+            if invocations:
+                self._subcommand_max_length = max(len(i) for i in invocations)
 
         if isinstance(action, argparse._SubParsersAction._ChoicesPseudoAction):
             # format subcommand help line
