@@ -5,7 +5,8 @@ This module allows external modules to interact with the Cement app without
 explicitly passing the app object around. It implements a proxy pattern to
 make the app accessible through a singleton.
 
-Example:
+### Example:
+
 ```python
 # Use the imported app object
 from tokeo.ext.appshare import app
@@ -21,13 +22,21 @@ class App:
     """
     A proxy class to access the shared app object.
 
-    This class acts as a stand-in for the actual Cement app object, allowing
-    external modules to access the app's attributes and methods as if they were
-    directly accessing the app object itself.
+    This class acts as a stand-in for the actual Cement app object. Regular
+    attribute and method access (app.foo, app.foo()) is forwarded to the
+    underlying app object.
 
     ### Attributes:
 
     - **_app** (Application): The actual Cement app object
+
+    ### Notes:
+
+    : Only regular attribute and method access is proxied. Item access
+        (app[...]) and implicitly invoked dunder methods (e.g. __enter__,
+        __exit__, __call__) are not forwarded, since python resolves those
+        on the type rather than through __getattr__. The proxy targets an
+        already running app, so its lifecycle is deliberately out of scope.
 
     """
 
@@ -58,10 +67,16 @@ class App:
             does not exist
 
         """
-        # test _app object
+        # guard against recursion if _app was never set on the instance,
+        # e.g. an App built without __init__ (copy/pickle): accessing
+        # self._app would otherwise re-enter __getattr__ endlessly
+        if key == '_app':
+            raise AttributeError(key)
+        # the shared app is only set once load() ran; surface that as the
+        # real reason instead of a misleading "no attribute" error
         if self._app is None:
-            raise AttributeError(f"'App' object has no attribute '{key}'")
-        # return attribute
+            raise AttributeError(f"shared app not set yet; call appshare.load() first (accessing '{key}')")
+        # delegate to the shared app
         return getattr(self._app, key)
 
 
