@@ -5,12 +5,20 @@ This module provides environment detection and configuration based on
 environment variables. It supports different runtime environments like
 production, staging, development, and testing.
 
-Usage Example:
+When the appenv extension is used, the normal cement config file behavior
+is replaced by tokeo's environment based configuration. A cement
+runtime configuration is built from base plus a detected environment.
+
+### Example:
+
+A detected environment is also easily usable in own conditions like:
+
 ```python
 # Check current environment
 if app.env.IS_DEV_MODE:
     # Development-specific code
     pass
+```
 
 """
 
@@ -47,7 +55,7 @@ class TokeoAppEnv:
     - **APP_ENV_VAR_NAME** (str): The environment variable name for app environment
     - **APP_ENV_VAR_VALUE** (str): The value of the environment variable
     - **APP_ENV** (str): The detected environment (production, development, staging,
-        testing)
+        testing) or None if no environment could be detected
     - **IS_PROD_MODE** (bool): True if running in production environment
     - **IS_STAGE_MODE** (bool): True if running in staging environment
     - **IS_DEV_MODE** (bool): True if running in development environment
@@ -70,7 +78,12 @@ class TokeoAppEnv:
 
         - Detects environment from environment variables or app name suffix
         - Configures application paths and directories
-        - Sets up environment-specific configuration files
+        - Includes environment-specific configuration files
+        - Handles the cement test app class in a specific manner. Replaces
+            the "_test" suffix to allow easily the usage for testing configuration
+            in the same place
+        - If no environment is detected (APP_ENV is None), only the base config
+            files are loaded and all IS_*_MODE flags are False
 
         """
         # get the app label
@@ -89,8 +102,13 @@ class TokeoAppEnv:
         elif self.APP_ENV_VAR_VALUE in ['test', 'testing']:
             self.APP_ENV = TESTING
         elif self.APP_LABEL.endswith('_test'):
-            # check if _test app was called
-            app._meta.label = self.APP_LABEL[:-5]
+            # an "<app>_test" app runs automatically in testing mode but
+            # reuses its base app identity. The "_test" suffix gets stripped
+            # so label, env var name and (most important) config dir will
+            # resolve and align to "<app>" instead of "<app>_test".
+            # Otherwise it would be necessary to have a different testing
+            # config dir and files when running tests by cements test app.
+            app._meta.label = self.APP_LABEL[:-len('_test')]
             self.APP_LABEL = app._meta.label
             self.APP_ENV_VAR_NAME = self.APP_LABEL.upper() + '_ENV'
             self.APP_ENV_VAR_VALUE = 'test'
@@ -110,22 +128,32 @@ class TokeoAppEnv:
         self.APP_CONFIG_DIR = fs.abspath(os.path.join(self.APP_DIR, 'config', self.APP_LABEL))
         # add base configs
         app._meta.config_files = self.get_config_files(app_config_file_suffix=app._meta.config_file_suffix)
-        # add environment configs
-        if self.APP_ENV and self.APP_ENV != 'base':
+        # add environment configs on top of base, but only if an
+        # environment was actually detected (APP_ENV is not None)
+        if self.APP_ENV:
             app._meta.config_files.extend(
                 self.get_config_files(app_env=self.APP_ENV, app_config_file_suffix=app._meta.config_file_suffix),
             )
 
     def get_config_files(self, app_env='base', app_config_file_suffix='.yaml'):
         """
-        Get a list of files for configuration based on environments
+        Resolve all config files for a single environment.
 
-        This function scans the configured config folders for configuration files.
+        Builds the file list for the given environment: the top-level
+        <env> config first, then any partial configs found recursively in
+        the <env>.d folder (ordered lexicographically and with numbers
+        respected). .local files are appended last and are skipped entirely
+        for the base environment.
 
         ### Args:
 
-        - **app_env** (String): The id of the selected environment (base or other)
-        - **app_config_file_suffix** (String): The suffix for the config files.
+        - **app_env** (str): The id of the selected environment (base or other)
+        - **app_config_file_suffix** (str): The suffix for the config files.
+
+        ### Returns:
+
+        - **list**: List of configuration file paths, with the base and
+            environment config files first, followed by any .local config files
 
         """
 
@@ -133,7 +161,8 @@ class TokeoAppEnv:
         configs = []
         local_configs = []
 
-        # main environment config
+        # main env config is added unconditionally
+        # a missing file will be skipped by the config reader
         configs.append(os.path.join(self.APP_CONFIG_DIR, f'{app_env}{app_config_file_suffix}'))
 
         # partial environment config files in .d directories
@@ -145,14 +174,15 @@ class TokeoAppEnv:
         for f in files:
             # test for .local config file
             if f.endswith(f'.local{app_config_file_suffix}'):
-                # if not base check allow add of .local config files
+                # .local overrides are only collected for real environments
+                # base intentionally ignores any .local files
                 if app_env != 'base':
                     local_configs.append(f)
             else:
                 # add config file
                 configs.append(f)
 
-        # return empty list
+        # return standard configs first, then local configs appended
         return [*configs, *local_configs]
 
 
