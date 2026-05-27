@@ -113,7 +113,7 @@ def register_tokeo_print(app: App) -> None:
         - ***args**: Objects to inspect
         - **name** (str, optional): Name to identify this inspection in output
         - **system** (bool): Whether to include system methods/attributes
-            (those with __name__)
+            (those whose name starts and ends with __)
         - **methods** (bool): Whether to display object methods
         - **attributes** (bool): Whether to display object attributes
         - **values** (bool): Whether to display object values
@@ -429,7 +429,8 @@ class TokeoInspectOutputHandler(output.OutputHandler):
 
         - **args** (tuple): Objects to inspect
         - **name** (str, optional): Optional name for the inspection
-        - **system** (bool): Whether to include system methods/attributes (__name__)
+        - **system** (bool): Whether to include system methods/attributes
+            (those whose name starts and ends with __)
         - **methods** (bool): Whether to display object methods
         - **attributes** (bool): Whether to display object attributes
         - **values** (bool): Whether to display object values
@@ -450,7 +451,8 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             - A list of the object's methods (excluding system methods by default)
             - A list of the object's attributes (excluding system attributes
               by default)
-            - System methods and attributes (those with __name__) when requested
+            - System methods and attributes (those whose name starts and
+              ends with __) when requested
 
         : The output format varies based on which options are enabled, with
             appropriate spacing and formatting for readability.
@@ -473,28 +475,30 @@ class TokeoInspectOutputHandler(output.OutputHandler):
                     t_arg = type(arg).__name__
                     line += f' |:{t_arg}|'
                 if name or methods or attributes:
-                    line += '\n'
+                    prepend = '\n'
                 elif types:
                     prepend = ', '
                 else:
                     prepend = ' | '
             # inspect methods
             if methods:
-                m_inspect = inspect.getmembers(arg, lambda attr: not (inspect.ismethod(attr)))
+                m_inspect = inspect.getmembers(arg, lambda attr: inspect.isroutine(attr))
                 if system:
                     m_system = [m[0] for m in m_inspect if (m[0].startswith('__') and m[0].endswith('__'))]
-                    line += f'System methods: {m_system}\n'
+                    line += f'{prepend}System methods: {m_system}'
+                    prepend = '\n'
                 m_filtered = [m[0] for m in m_inspect if not (m[0].startswith('__') and m[0].endswith('__'))]
-                line += f'Methods: {m_filtered}'
+                line += f'{prepend}Methods: {m_filtered}'
                 prepend = '\n'
             # inspect attributes
             if attributes:
                 a_inspect = inspect.getmembers(arg, lambda attr: not (inspect.isroutine(attr)))
                 if system:
                     a_system = [a[0] for a in a_inspect if (a[0].startswith('__') and a[0].endswith('__'))]
-                    line += f'System attributes: {a_system}\n'
+                    line += f'{prepend}System attributes: {a_system}'
+                    prepend = '\n'
                 a_filtered = [a[0] for a in a_inspect if not (a[0].startswith('__') and a[0].endswith('__'))]
-                line += f'Attributes: {a_filtered}'
+                line += f'{prepend}Attributes: {a_filtered}'
                 prepend = '\n'
             # append o
             out += line
@@ -538,7 +542,7 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             dictionary and logs a debug message if it's missing. When rendering,
             it passes the arguments and inspection options to the _inspect method.
 
-        :When the 'debug' flag is set, the inspection results are logged to
+        : When the 'debug' flag is set, the inspection results are logged to
             the debug log instead of being returned for display.
 
         """
