@@ -16,3 +16,17 @@ grpc:
   proto_add_servicer_to_server: {{ app_label }}.core.grpc.proto.{{ app_label }}_pb2_grpc:add_{{ app_class_name }}Servicer_to_server
   ### module and servicer for grpc implementations
   grpc_servicer: {{ app_label }}.core.grpc.{{ app_label }}_servicer:{{ app_class_name }}Servicer
+  # tls is optional
+  tls_enabled: false
+  # custom cert: paths to pem files for cert and key (both or none)
+  tls_certificate: null
+  tls_key: null
+  # validity for the in-memory auto cert when no custom cert is set
+  tls_valid_days: 90
+  # auto cert subject common name, if not given taken from url host
+  tls_cn: null
+  # auto cert extra names/ips for SAN (url host is always included)
+  tls_sans: null
+  # auto cert key: 'rsa' (size in bits) or 'ec' (size = curve 256/384/521)
+  tls_key_type: ec
+  tls_key_size: 521
