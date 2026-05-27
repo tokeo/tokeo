@@ -1,3 +1,22 @@
+"""
+gRPC client controller for the {{ app_class_name }} service.
+
+GrpcCallController exposes the remote gRPC methods as nested CLI commands
+(stacked on the base controller). Each command parses its arguments, opens
+an insecure channel to the configured grpc url, builds the matching request
+and calls the stub method.
+
+### Notes:
+
+- The channel target is read from the grpc config section (grpc.url), the
+    same url the server binds to
+- The channel is opened via grpc.insecure_channel inside a with block, so it
+    is closed automatically when the command returns
+- count_words is the shipped example: it sends a CountWordsRequest built from
+    --url to the CountWords stub method and ignores the empty response
+
+"""
+
 from concurrent import futures  # noqa: F401
 import grpc
 from cement import ex

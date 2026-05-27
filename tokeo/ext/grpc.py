@@ -23,11 +23,30 @@ and configuration management.
 from sys import argv
 from os.path import basename
 from tokeo.ext.argparse import Controller
+from tokeo.core.exc import TokeoError
 from cement.core.meta import MetaMixin
 from cement import ex
 from concurrent import futures
 import grpc
 import importlib
+
+
+class TokeoGrpcError(TokeoError):
+    """
+    Exception class for gRPC extension errors.
+
+    This class is used to raise and catch exceptions that are specific to
+    the Tokeo gRPC extension functionality.
+
+    ### Notes:
+
+    : Inherits from TokeoError to maintain consistent error handling
+
+    : Raised on configuration or wiring issues of the gRPC extension
+
+    """
+
+    pass
 
 
 class TokeoGrpc(MetaMixin):
@@ -75,6 +94,10 @@ class TokeoGrpc(MetaMixin):
         self._grpc_servicer_method = ''
 
     def _setup(self, app):
+        # the app handed to _setup must be the same instance this handler
+        # was initialized with; guard against accidental mis-wiring
+        if app is not self.app:
+            raise TokeoGrpcError('_setup() received a different app than the one TokeoGrpc was initialized with')
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
         a = self._config('proto_add_servicer_to_server').split(':')
         self._proto_add_servicer_to_server_module = a[0]
@@ -192,8 +215,7 @@ class TokeoGrpc(MetaMixin):
         self.startup()
         self.app.log.info('Grpc server started, listening on ' + self._config('url'))
         try:
-            while True:
-                self.server.wait_for_termination()
+            self.server.wait_for_termination()
         except KeyboardInterrupt:
             self.shutdown()
 
@@ -268,51 +290,3 @@ def load(app):
     """
     app.handler.register(TokeoGrpcController)
     app.hook.register('post_setup', tokeo_grpc_extend_app)
-
-
-"""
-## Template Usage Documentation
-
-The gRPC extension provides templates for implementing both gRPC server and client
-components in new Tokeo projects.
-
-### Server Components:
-
-The AppServicer class implements the gRPC service defined in the proto file:
-
-```python
-class AppServicer(app_pb2_grpc.AppServicer):
-    def CountWords(self, request, context):
-        app.print('AppServicer CountWords called for: ', request.url)
-        tasks.actors.count_words.send(request.url)
-        return empty_pb2.Empty()
-```
-
-The servicer:
-
-- Imports necessary protocol buffer modules (generated from .proto files)
-- Accesses the global app instance via tokeo.ext.appshare
-- Implements service methods defined in the .proto file
-- Can dispatch tasks to background workers using Dramatiq
-
-### Client Components:
-
-The GrpcCallController provides CLI commands for invoking gRPC methods:
-
-The controller:
-
-- Provides human-friendly command-line interface to gRPC methods
-- Handles command-line argument parsing and validation
-- Creates an insecure gRPC channel to connect to the server
-- Constructs the appropriate request objects and makes RPC calls
-
-### Adding New Services:
-
-To add a new gRPC service method:
-
-1. Define the method in your .proto file
-1. Generate the Python code using the protoc compiler
-1. Implement the method in your ServicerClass
-1. Create a controller command for client-side access if needed
-
-"""
