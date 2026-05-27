@@ -78,10 +78,27 @@ class TokeoGrpc(MetaMixin):
 
         #: Dict with initial settings
         config_defaults = dict(
+            # address and port to run the service on
             url='localhost:50051',
+            # number of concurrent workers
             max_worker=1,
+            # modules and methods for server and service
             proto_add_servicer_to_server='proto.module:add_servicer_to_server',
             grpc_servicer='tokeo.core.grpc.tokeo_servicer:TokeoServicer',
+            # tls is opt-in; while disabled no tls code or library is touched
+            tls_enabled=False,
+            # custom cert: paths to pem files for cert and key (both or none)
+            tls_certificate=None,
+            tls_key=None,
+            # validity for the in-memory auto cert when no custom cert is set
+            tls_valid_days=90,
+            # auto cert subject common name (cosmetic); None -> from url host
+            tls_cn=None,
+            # auto cert extra names/ips for SAN (url host is always included)
+            tls_sans=None,
+            # auto cert key: 'rsa' (size in bits) or 'ec' (size = curve 256/384/521)
+            tls_key_type='ec',
+            tls_key_size=521,
         )
 
     def __init__(self, app, *args, **kw):
@@ -149,7 +166,14 @@ class TokeoGrpc(MetaMixin):
             1. Dynamically imports the servicer class module
             1. Registers the servicer with the server using the
                 add_servicer_to_server function
-            1. Configures the server to listen on the specified URL
+            1. Binds the listen url, either as a TLS secured port when
+                tls_enabled is set or as a plain insecure port otherwise
+
+        : TLS is fully opt-in. With tls_enabled false the server never imports
+            or calls any TLS code. With it true, a custom tls_certificate /
+            tls_key pair is used when both are given, otherwise an in-memory
+            self signed cert (valid for tls_valid_days) is generated and never
+            written to disk
 
         """
         if self._server is None:
@@ -161,9 +185,150 @@ class TokeoGrpc(MetaMixin):
             grpc_servicer_method = getattr(grpc_servicer_module, self._grpc_servicer_method)
             # append services
             proto_add_servicer_to_server_method(grpc_servicer_method(), self._server)
-            self._server.add_insecure_port(self._config('url'))
+            # bind the listen port; tls is opt-in and only that branch pulls
+            # in any tls machinery, so a plain server never touches tls code
+            if self._config('tls_enabled'):
+                self._server.add_secure_port(self._config('url'), self._tls_server_credentials())
+            else:
+                self._server.add_insecure_port(self._config('url'))
 
         return self._server
+
+    def _tls_server_credentials(self):
+        """
+        Build the gRPC server credentials for a TLS secured port.
+
+        Two modes are selected by configuration: a custom certificate when
+        both tls_certificate and tls_key point to PEM files, otherwise an
+        auto generated in-memory self signed certificate.
+
+        ### Returns:
+
+        - **grpc.ServerCredentials**: Credentials to pass to add_secure_port
+
+        ### Raises:
+
+        - **TokeoGrpcError**: If only one of tls_certificate / tls_key is set
+
+        ### Notes:
+
+        : The custom cert files are the only thing read from disk; the auto
+            cert path keeps everything in memory
+
+        """
+        cert = self._config('tls_certificate')
+        key = self._config('tls_key')
+        if cert and key:
+            # custom cert: read the configured pem files as given
+            with open(key, 'rb') as f:
+                key_pem = f.read()
+            with open(cert, 'rb') as f:
+                cert_pem = f.read()
+        elif cert or key:
+            raise TokeoGrpcError('tls_certificate and tls_key must both be set to use a custom certificate')
+        else:
+            # auto cert: generate a self signed certificate in memory
+            key_pem, cert_pem = self._generate_self_signed_cert()
+        return grpc.ssl_server_credentials([(key_pem, cert_pem)])
+
+    def _generate_self_signed_cert(self):
+        """
+        Create an in-memory self signed certificate and matching key.
+
+        The certificate is valid for tls_valid_days days and is never written
+        to disk; both PEM blobs only live in memory for the server lifetime.
+        Key, subject and SANs are driven by the tls_* auto cert config.
+
+        ### Returns:
+
+        - **tuple**: A (key_pem, cert_pem) pair of PEM encoded bytes
+
+        ### Raises:
+
+        - **TokeoGrpcError**: On an unsupported tls_key_type or an ec
+            tls_key_size that is not one of 256, 384, 521
+
+        ### Notes:
+
+        : The cryptography package is imported lazily here, so it stays out
+            of the non-tls and custom-cert code paths entirely
+
+        : The host from the url plus every tls_sans entry become SANs, each
+            added as an ip address when it parses as one, otherwise as a dns
+            name; client validation uses these SANs, not the CN
+
+        : tls_cn only sets the (cosmetic) subject common name; when unset the
+            url host is used
+
+        """
+        # lazy import: cryptography is only needed for the auto cert path
+        import ipaddress
+        from datetime import datetime, timedelta, timezone
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa, ec
+
+        # derive the host from a "host:port" url (strip ipv6 brackets); the
+        # host is both the cn fallback and the first san
+        host = self._config('url').rsplit(':', 1)[0].strip('[]') or 'localhost'
+        # private key: rsa by bit size, or ec by curve (256, 384, 521)
+        key_type = (self._config('tls_key_type') or 'ec').lower()
+        # get key_size as int
+        try:
+            key_size = int(str(self._config('tls_key_size') or 521))
+        except ValueError:
+            raise TokeoGrpcError('tls_key_size is not a valid number')
+        # generate key but validate also senseful key_size
+        if key_type == 'rsa':
+            if key_size < 2048:
+                raise TokeoGrpcError(f'tls_key_size {key_size} is not valid for rsa (use 2048 or greater)')
+            key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
+        elif key_type == 'ec':
+            curves = {256: ec.SECP256R1, 384: ec.SECP384R1, 521: ec.SECP521R1}
+            if key_size not in curves:
+                raise TokeoGrpcError(f'tls_key_size {key_size} is not valid for ec (use 256, 384 or 521)')
+            key = ec.generate_private_key(curves[key_size]())
+        else:
+            raise TokeoGrpcError(f"tls_key_type '{key_type}' is not supported (use 'rsa' or 'ec')")
+
+        # subject/issuer cn: tls_cn override or the url host
+        cn = self._config('tls_cn') or host
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+
+        # build sans from host + tls_sans, dedup, typed as ip or dns name
+        sans = []
+        seen = set()
+        for entry in [host, *(self._config('tls_sans') or [])]:
+            if not entry or entry in seen:
+                continue
+            seen.add(entry)
+            # using the builtin validation and exception to check wether an entry
+            # is an ip address or DNS name
+            try:
+                sans.append(x509.IPAddress(ipaddress.ip_address(entry)))
+            except ValueError:
+                sans.append(x509.DNSName(entry))
+
+        now = datetime.now(timezone.utc)
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(name)
+            .issuer_name(name)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now)
+            .not_valid_after(now + timedelta(days=self._config('tls_valid_days')))
+            .add_extension(x509.SubjectAlternativeName(sans), critical=False)
+            .sign(key, hashes.SHA256())
+        )
+        key_pem = key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+        return key_pem, cert_pem
 
     def startup(self):
         """
