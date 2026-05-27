@@ -86,6 +86,14 @@ class TokeoAutomateError(TokeoError):
 
 
 class TokeoInvokeLocalContext(invoke.Context):
+    """
+    Internal context that runs commands locally through invoke's default runner.
+
+    Mirrors the remote variant's interface so both can be driven the same way;
+    task-configured protect/sanitize rules and the protected kwargs (pty, env,
+    timeout, encoding) are applied via protect_kwargs_inplace before each run.
+
+    """
 
     def __init__(self, config=None, task_ref=None):
         super().__init__(config=config)
@@ -97,6 +105,14 @@ class TokeoInvokeLocalContext(invoke.Context):
 
     @staticmethod
     def protect_kwargs_inplace(self, kwargs):
+        """
+        Apply task-configured protect/sanitize rules to a kwargs dict in place.
+
+        Declared as a static method so the remote context can share the same
+        logic without subclassing; both contexts call it as
+        TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs).
+
+        """
         # get the protected values
         pty = self.task_kwprotected.get('pty', False)
         env = copy.deepcopy(self.task_kwprotected.get('env', {}))
@@ -701,16 +717,19 @@ class TokeoAutomate(MetaMixin):
             - Converts host configurations to a standardized format
             - Creates a tuple of fully-resolved host configurations
 
-        Args:
-            connection: A connection configuration dictionary which may be partial
-                and reference other connections via 'use'.
+        ### Args:
 
-        Returns:
-            A fully resolved connection dictionary with all settings merged
-            according to precedence rules and all hosts fully resolved.
+        - **connection** (dict): A connection configuration dictionary which may
+            be partial and reference other connections via 'use'
 
-        Raises:
-            TokeoAutomateError: If host configurations are invalid.
+        ### Returns:
+
+        - **dict**: A fully resolved connection dictionary with all settings
+            merged according to precedence rules and all hosts fully resolved
+
+        ### Raises:
+
+        - **TokeoAutomateError**: If host configurations are invalid
 
         """
         # merge with use if defined
@@ -779,7 +798,7 @@ class TokeoAutomate(MetaMixin):
         application configuration. Each host entry includes connection details
         like hostname, port, username, and authentication information.
 
-        Returns:
+        ### Returns:
 
         - **dict**: Dictionary mapping host IDs to host configuration dictionaries.
 
@@ -833,7 +852,7 @@ class TokeoAutomate(MetaMixin):
         1. Second lookup the ID in already defined hostgroups
         1. As a fallback, create a new host entry from the string
 
-        Returns:
+        ### Returns:
 
         - **dict**: Dictionary mapping group names to lists of
             host configuration dictionaries.
@@ -855,7 +874,7 @@ class TokeoAutomate(MetaMixin):
             _config_hostgroup = _config_hostgroups[key]
             # check split for host and user
             if not isinstance(_config_hostgroup, list) and not isinstance(_config_hostgroup, tuple):
-                raise TokeoAutomateError('To create the hostgroup "{key}" there must be a list of hosts')
+                raise TokeoAutomateError(f'To create the hostgroup "{key}" there must be a list of hosts')
             # expand hosts to host_dicts
             hosts_list = []
             for host in _config_hostgroup:
@@ -881,7 +900,7 @@ class TokeoAutomate(MetaMixin):
         The connection config includes a default connection and can be extended
         with additional named connections.
 
-        Returns:
+        ### Returns:
 
         - **dict**: Dictionary containing the default connection and a
             nested dictionary of named connections.
@@ -952,7 +971,7 @@ class TokeoAutomate(MetaMixin):
         to determine where tasks should be executed, with proper fallback to
         local execution if no remote hosts are specified.
 
-        Raises:
+        ### Raises:
 
         - **TokeoAutomateError**: If task module is missing, invalid, or cannot
             be imported, or for other configuration errors.
@@ -1087,7 +1106,7 @@ class TokeoAutomate(MetaMixin):
         to execute, the hosts or connections to use, and any additional
         parameters.
 
-        Returns:
+        ### Returns:
 
         - **dict**: Dictionary mapping task IDs to task configuration dictionaries.
 
@@ -1314,14 +1333,15 @@ class TokeoAutomate(MetaMixin):
             - **all_exited_code** (int): 0 for success, non-zero for errors
             - **results** (list): List of task results if return_results is True
 
-        ### Raises:
-
-        - **TokeoAutomateError**: If a task ID does not exist
-
         ### Notes:
 
         : Tasks can be specified in the format "task_id:host_id" to run a specific
             task on a specific host.
+
+        : Errors raised while preparing a task (e.g. unknown task id) are
+            logged and surfaced via the returned all_exited_code (and the
+            results entry when return_results is set); they do not propagate
+            to the caller.
 
         """
         # test tasks_ids
@@ -1335,7 +1355,7 @@ class TokeoAutomate(MetaMixin):
             if with_hosts in self.hosts:
                 _with_hosts = tuple((self.hosts[with_hosts],))
             else:
-                _with_hosts = tuple((self._get_host_dict_from_str(with_hosts),))
+                _with_hosts = tuple((self._get_host_dict_from_str(None, with_hosts),))
         elif isinstance(with_hosts, (list, tuple, dict)):
             _with_hosts = with_hosts
         else:
@@ -1366,8 +1386,9 @@ class TokeoAutomate(MetaMixin):
                     # check before start
                     if task_id not in self.tasks:
                         raise TokeoAutomateError(f'Task "{task_id}" is not defined yet')
-                    # get the task object by deep shallow copy
-                    task = dict(self.tasks[task_id])
+                    # deep copy the cached task so the per-run host/connection
+                    # overrides below never mutate the shared task cache
+                    task = copy.deepcopy(self.tasks[task_id])
                     # test overules
                     if _with_connection:
                         task['connection'] = self._setup_connection(_with_connection)
@@ -1461,15 +1482,16 @@ class TokeoAutomate(MetaMixin):
             - **all_exited_code** (int): 0 for success, non-zero for errors
             - **results** (list): List of task results if return_results is True
 
-        ### Raises:
-
-        - **TokeoAutomateError**: If a task ID does not exist
-
         ### Notes:
 
         : Tasks can be specified in the format "task_id:host_id" to run a specific
             task on a specific host. All tasks are submitted to the thread pool at
             once, and results are collected as they complete.
+
+        : Errors raised while preparing a task (e.g. unknown task id) are
+            logged and surfaced via the returned all_exited_code (and the
+            results entry when return_results is set); they do not propagate
+            to the caller.
 
         """
         # test tasks_ids
@@ -1483,7 +1505,7 @@ class TokeoAutomate(MetaMixin):
             if with_hosts in self.hosts:
                 _with_hosts = tuple((self.hosts[with_hosts],))
             else:
-                _with_hosts = tuple((self._get_host_dict_from_str(with_hosts),))
+                _with_hosts = tuple((self._get_host_dict_from_str(None, with_hosts),))
         elif isinstance(with_hosts, (list, tuple, dict)):
             _with_hosts = with_hosts
         else:
@@ -1517,8 +1539,10 @@ class TokeoAutomate(MetaMixin):
                     # check before start
                     if task_id not in self.tasks:
                         raise TokeoAutomateError(f'Task "{task_id}" is not defined yet')
-                    # get the task object by deep shadow copy
-                    task = dict(self.tasks[task_id])
+                    # deep copy the cached task so the per-run overrides below
+                    # never mutate the shared cache; also gives each thread its
+                    # own task instead of sharing one
+                    task = copy.deepcopy(self.tasks[task_id])
                     # test overules
                     if _with_connection:
                         task['connection'] = self._setup_connection(_with_connection)
