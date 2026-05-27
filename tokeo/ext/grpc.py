@@ -82,9 +82,10 @@ class TokeoGrpc(MetaMixin):
             url='localhost:50051',
             # number of concurrent workers
             max_worker=1,
-            # modules and methods for server and service
-            proto_add_servicer_to_server='proto.module:add_servicer_to_server',
-            grpc_servicer='tokeo.core.grpc.tokeo_servicer:TokeoServicer',
+            # modules and methods for server, interceptor and service
+            proto_add_servicer_to_server=None,
+            grpc_servicer=None,
+            grpc_interceptor=None,
             # tls is opt-in; while disabled no tls code or library is touched
             tls_enabled=False,
             # custom cert: paths to pem files for cert and key (both or none)
@@ -99,6 +100,10 @@ class TokeoGrpc(MetaMixin):
             # auto cert key: 'rsa' (size in bits) or 'ec' (size = curve 256/384/521)
             tls_key_type='ec',
             tls_key_size=521,
+            # client ca to allow client validation by client certificates
+            tls_client_ca=None,
+            # require a valid client cert, else forward validation to interceptors
+            tls_require_client_cert=False,
         )
 
     def __init__(self, app, *args, **kw):
@@ -109,6 +114,8 @@ class TokeoGrpc(MetaMixin):
         self._proto_add_servicer_to_server_method = ''
         self._grpc_servicer_module = ''
         self._grpc_servicer_method = ''
+        self._grpc_interceptor_module = ''
+        self._grpc_interceptor_method = ''
 
     def _setup(self, app):
         # the app handed to _setup must be the same instance this handler
@@ -116,12 +123,24 @@ class TokeoGrpc(MetaMixin):
         if app is not self.app:
             raise TokeoGrpcError('_setup() received a different app than the one TokeoGrpc was initialized with')
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
-        a = self._config('proto_add_servicer_to_server').split(':')
+        a = self._config('proto_add_servicer_to_server')
+        if not a:
+            raise TokeoGrpcError('Missing mandatory proto_add_servicer_to_server setting in config')
+        a = a.split(':')
         self._proto_add_servicer_to_server_module = a[0]
         self._proto_add_servicer_to_server_method = a[1]
-        a = self._config('grpc_servicer').split(':')
+        a = self._config('grpc_servicer')
+        if not a:
+            raise TokeoGrpcError('Missing mandatory grpc_servicer setting in config')
+        a = a.split(':')
         self._grpc_servicer_module = a[0]
         self._grpc_servicer_method = a[1]
+        # optional interceptor chain factory (module:method); skip when unset
+        a = self._config('grpc_interceptor')
+        if a:
+            a = a.split(':')
+            self._grpc_interceptor_module = a[0]
+            self._grpc_interceptor_method = a[1]
 
     def _config(self, key, **kwargs):
         """
@@ -164,6 +183,8 @@ class TokeoGrpc(MetaMixin):
             1. Dynamically imports the protocol buffer module containing the
                 add_servicer_to_server function
             1. Dynamically imports the servicer class module
+            1. Resolves the optional interceptor chain from grpc_interceptor
+                and passes it to the server at construction
             1. Registers the servicer with the server using the
                 add_servicer_to_server function
             1. Binds the listen url, either as a TLS secured port when
@@ -177,20 +198,32 @@ class TokeoGrpc(MetaMixin):
 
         """
         if self._server is None:
-            self._server = grpc.server(futures.ThreadPoolExecutor(max_workers=self._config('max_worker')))
+            # resolve the optional interceptor chain before the server is
+            # built, interceptors can only be passed at construction time
+            if self._grpc_interceptor_module:
+                grpc_interceptor_module = importlib.import_module(self._grpc_interceptor_module)
+                grpc_interceptor_method = getattr(grpc_interceptor_module, self._grpc_interceptor_method)
+                interceptors = grpc_interceptor_method()
+            else:
+                interceptors = None
             # get dynamic methods for proto and service
             proto_add_servicer_to_server_module = importlib.import_module(self._proto_add_servicer_to_server_module)
             proto_add_servicer_to_server_method = getattr(proto_add_servicer_to_server_module, self._proto_add_servicer_to_server_method)
             grpc_servicer_module = importlib.import_module(self._grpc_servicer_module)
             grpc_servicer_method = getattr(grpc_servicer_module, self._grpc_servicer_method)
-            # append services
-            proto_add_servicer_to_server_method(grpc_servicer_method(), self._server)
+            # create the server
+            self._server = grpc.server(
+                futures.ThreadPoolExecutor(max_workers=self._config('max_worker')),
+                interceptors=interceptors,
+            )
             # bind the listen port; tls is opt-in and only that branch pulls
             # in any tls machinery, so a plain server never touches tls code
             if self._config('tls_enabled'):
                 self._server.add_secure_port(self._config('url'), self._tls_server_credentials())
             else:
                 self._server.add_insecure_port(self._config('url'))
+            # append services
+            proto_add_servicer_to_server_method(grpc_servicer_method(), self._server)
 
         return self._server
 
@@ -200,7 +233,9 @@ class TokeoGrpc(MetaMixin):
 
         Two modes are selected by configuration: a custom certificate when
         both tls_certificate and tls_key point to PEM files, otherwise an
-        auto generated in-memory self signed certificate.
+        auto generated in-memory self signed certificate. When tls_client_ca
+        is set, mutual TLS is enabled on top and clients may get verified
+        against that ca.
 
         ### Returns:
 
@@ -212,8 +247,13 @@ class TokeoGrpc(MetaMixin):
 
         ### Notes:
 
-        : The custom cert files are the only thing read from disk; the auto
-            cert path keeps everything in memory
+        : The custom cert files (and the client ca, if any) are the only
+            things read from disk; the auto cert path keeps everything in
+            memory
+
+        : mTLS is opt-in via tls_client_ca; tls_require_client_cert decides
+            whether a client cert is mandatory, otherwise validation is left
+            to the interceptors
 
         """
         cert = self._config('tls_certificate')
@@ -229,6 +269,16 @@ class TokeoGrpc(MetaMixin):
         else:
             # auto cert: generate a self signed certificate in memory
             key_pem, cert_pem = self._generate_self_signed_cert()
+        # optional mtls: when a client ca is set, verify client certs too
+        ca = self._config('tls_client_ca')
+        if ca:
+            with open(ca, 'rb') as f:
+                ca_pem = f.read()
+            return grpc.ssl_server_credentials(
+                [(key_pem, cert_pem)],
+                root_certificates=ca_pem,
+                require_client_auth=bool(self._config('tls_require_client_cert')),
+            )
         return grpc.ssl_server_credentials([(key_pem, cert_pem)])
 
     def _generate_self_signed_cert(self):
