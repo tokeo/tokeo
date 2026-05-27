@@ -108,6 +108,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         ### Raises:
 
         - **AssertionError**: If dict_obj is not None and not a dictionary
+        - **ValueError**: If a top-level entry is not a dict (config section)
         - **ValueError**: If deep_merge encounters incompatible types
 
         ### Example:
@@ -138,6 +139,13 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
             preserving existing nested values while adding or updating specific
             keys. This is particularly useful for complex configuration structures.
 
+        : Merged values are stored by reference and nested dicts are deep
+            merged in place, so a later merge of the same key can mutate a
+            dict the caller passed earlier (including a shared class-level
+            config_defaults). This is intended: the configuration is mutable
+            by design. A caller that needs its source kept isolated should
+            pass a copy, e.g. app.config.merge(copy.deepcopy(my_config))
+
         """
         # Skip processing if dict_obj is None
         if dict_obj is None:
@@ -148,30 +156,37 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
         # Process each top-level section in the input dictionary
         for section in list(dict_obj.keys()):
-            # We only process dictionary sections (configuration sections)
-            if type(dict_obj[section]) is dict:
-                # Create section if it doesn't exist
-                if section not in self.get_sections():
-                    self.add_section(section)
+            # every top-level entry must be a config section (a dict); a
+            # non-dict here means malformed config, so fail loud instead
+            # of silently dropping it
+            if not isinstance(dict_obj[section], dict):
+                raise ValueError(
+                    f'config section "{section}" must be a dict, '
+                    f'got "{type(dict_obj[section]).__name__}"'
+                )
 
-                # Process each key in the section
-                for key in list(dict_obj[section].keys()):
-                    if override:
-                        b = dict_obj[section][key]
-                        if key in self.keys(section) and isinstance(b, dict):
-                            a = self.get(section, key)
-                            if isinstance(a, dict):
-                                b = deep_merge(a, b)
-                        self.set(section, key, b)
-                    else:
-                        # When not overriding, only set if key doesn't exist
-                        if key not in self.keys(section):
-                            self.set(section, key, dict_obj[section][key])
+            # Create section if it doesn't exist
+            if section not in self.get_sections():
+                self.add_section(section)
 
-                # Note: We don't fully support arbitrary nesting configuration
-                # blocks beyond the section.key level, so we don't process any
-                # deeper nesting here. However, our deep_merge functionality
-                # does handle nested dictionaries stored as values.
+            # Process each key in the section
+            for key in list(dict_obj[section].keys()):
+                if override:
+                    b = dict_obj[section][key]
+                    if key in self.keys(section) and isinstance(b, dict):
+                        a = self.get(section, key)
+                        if isinstance(a, dict):
+                            b = deep_merge(a, b)
+                    self.set(section, key, b)
+                else:
+                    # When not overriding, only set if key doesn't exist
+                    if key not in self.keys(section):
+                        self.set(section, key, dict_obj[section][key])
+
+            # Note: We don't fully support arbitrary nesting configuration
+            # blocks beyond the section.key level, so we don't process any
+            # deeper nesting here. However, our deep_merge functionality
+            # does handle nested dictionaries stored as values.
 
 
 def load(app):
