@@ -19,7 +19,6 @@ configuration options and improved template handling.
 from cement.ext.ext_jinja2 import Jinja2OutputHandler, Jinja2TemplateHandler
 from cement.core.output import OutputHandler
 from cement.core.template import TemplateHandler
-from jinja2 import Environment  # noqa: F401
 
 
 class TokeoJinja2OutputHandler(Jinja2OutputHandler):
@@ -36,7 +35,8 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
     - Inherits from Cement's Jinja2OutputHandler but uses Tokeo's template handler
     - Provides consistent template rendering experience across all output channels
     - Automatically configured when the extension is loaded
-    - Used for rendering output in various formats (json, yaml, etc.)
+    - Renders text from a Jinja2 template; the output format is whatever the
+        template produces
 
     """
 
@@ -59,10 +59,19 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
 
         - **app** (Application): The Cement application instance
 
+        ### Notes:
+
+        : Calls OutputHandler._setup directly to skip Jinja2OutputHandler._setup,
+            which would bind the templater to cement's 'jinja2' handler; tokeo
+            binds its own 'tokeo.jinja2' template handler instead
+
         """
-        super(Jinja2OutputHandler, self)._setup(app)
+        # call the base OutputHandler setup directly and deliberately skip
+        # Jinja2OutputHandler._setup, which would bind self.templater to
+        # cement's 'jinja2' template handler; tokeo uses 'tokeo.jinja2'
+        OutputHandler._setup(self, app)
         self.templater = self.app.handler.resolve(
-            # ftm: skip
+            # fmt: skip
             'template',
             'tokeo.jinja2',
             setup=True,
@@ -103,12 +112,6 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
             'keep_trailing_newline': True,
             'trim_blocks': True,
         }
-
-    def __init__(self, *args, **kw):
-        """
-        Initialize the template handler.
-        """
-        super(TokeoJinja2TemplateHandler, self).__init__(*args, **kw)
 
     def _setup(self, app):
         """
@@ -171,8 +174,9 @@ def tokeo_jinja2_config(app):
 
     ### Notes:
 
-    : This function addresses a limitation in Cement by ensuring the template
-        handler is properly initialized and has access to the application
+    : Resolves the template handler with setup=True so it has access to the
+        application and can read its own config; the handler instance is used
+        only to look up template_dirs
 
     : Adds template directories from the configuration if specified
 
@@ -182,11 +186,8 @@ def tokeo_jinja2_config(app):
         # fmt: skip
         'template',
         TokeoJinja2TemplateHandler.Meta.label,
+        setup=True,
     )
-
-    # as long as patch is missing from cement
-    # we need to make sure that the object has app
-    template_handler._setup(app)
 
     # add template dirs
     t_dirs = template_handler._config('template_dirs', fallback=None)
