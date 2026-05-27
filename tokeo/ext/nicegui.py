@@ -49,11 +49,10 @@ class TokeoNiceguiError(TokeoError):
 
     ### Notes:
 
-    1. Used for NiceGUI-specific error conditions like configuration issues,
-        file watching problems, or missing dependencies
-
-    1. Inherits from the base TokeoError class to maintain error handling
-        consistency across the framework
+    - Used for NiceGUI-specific error conditions like configuration issues,
+      file watching problems, or missing dependencies
+    - Inherits from the base TokeoError class to maintain error handling
+      consistency across the framework
 
     """
 
@@ -192,22 +191,24 @@ def guard_user_context():
 
         # check for shared global client ('id' points to 'shared')
         if client.id == 'shared' or getattr(client, 'is_shared', False):
+            # fmt: off
             raise TokeoNiceguiError(
-                # nofmt
                 'CRITICAL: Attempted to create an UI element in the global scope! '
                 'UI elements must only be created inside an active page route function.'
             )
+            # fmt: on
 
         # place the flag for next requests
         client._tokeo_ctx_guard_flag = True
 
     except RuntimeError:
         # NiceGUI throws a RuntimeError if no active context
+        # fmt: off
         raise TokeoNiceguiError(
-            # nofmt
             'CRITICAL: No active NiceGUI client context found. '
             'Are you trying to instantiate a UI element outside of a route?'
         )
+        # fmt: on
 
 
 class NiceguiElementHelper:
@@ -228,7 +229,7 @@ class NiceguiElementHelper:
 
     """
 
-    def __getattr__(self, tag, *args, **kwargs):
+    def __getattr__(self, tag):
         """
         Dynamically create element factory functions for NiceGUI.
 
@@ -238,8 +239,6 @@ class NiceguiElementHelper:
         ### Args:
 
         - **tag** (str): The HTML tag name for the element
-        - ***args**: Positional arguments (unused)
-        - ****kwargs**: Keyword arguments (unused)
 
         ### Returns:
 
@@ -247,11 +246,10 @@ class NiceguiElementHelper:
 
         ### Notes:
 
-        1. The returned function creates either an Element or a TextElement
-            depending on whether text content is provided
-
-        1. Usage example: app.nicegui.ux.article("My content") creates
-            a <article> element
+        - The returned function creates either an Element or a TextElement
+          depending on whether text content is provided
+        - Usage example: app.nicegui.ux.article("My content") creates
+          a <article> element
 
         """
 
@@ -494,14 +492,12 @@ class TokeoNicegui(MetaMixin):
                 # verify
                 if routes_handler is None:
                     raise TokeoNiceguiError(
-                        # fmt: skip
                         f'Route handler "{self._routes}" could not be found in module "{self._routes_module}"'
                     )
                 # initialize registered default route
                 routes_handler()
             else:
                 raise TokeoNiceguiError(
-                    # fmt: skip
                     f'Misconfiguration for route handler. Must be null or name of method, but is: [{str(type(self._routes))}]'
                 )
 
@@ -635,10 +631,7 @@ class TokeoNicegui(MetaMixin):
         - Only restarts if the _watchdog_hotload_requested flag is set
         - Performs a full process restart to ensure clean reloading
         - Called automatically by the post_close application hook
-
-        ### Output:
-
-        : Logs a message indicating that hotload is in progress
+        - Logs a message indicating that hotload is in progress
 
         """
         if self._watchdog_hotload_requested:
@@ -751,10 +744,10 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
 
     ### Notes:
 
-    1. Handles FastAPI route decorators (@app.nicegui.fastapi_app.get,
-        @app.nicegui.fastapi_app.post)
-    1. Handles NiceGUI page decorators (@app.nicegui.ui.page, @ui.page)
-    1. Extracts parameters values for better documentation
+    - Handles FastAPI route decorators (@app.nicegui.fastapi_app.get,
+      @app.nicegui.fastapi_app.post)
+    - Handles NiceGUI page decorators (@app.nicegui.ui.page, @ui.page)
+    - Extracts parameters values for better documentation
 
     """
     if decorator in ['@app.nicegui.fastapi_app.get', '@fastapi_app.get', '@fa.get']:
@@ -811,9 +804,9 @@ def tokeo_nicegui_extend_app(app):
 
     ### Notes:
 
-    1. This function is called during application setup
-    1. It creates the TokeoNicegui instance and attaches it to the app
-        as app.nicegui
+    - This function is called during application setup
+    - It creates the TokeoNicegui instance and attaches it to the app
+      as app.nicegui
 
     """
     app.extend('nicegui', TokeoNicegui(app))
@@ -832,8 +825,8 @@ def tokeo_nicegui_shutdown(app):
 
     ### Notes:
 
-    1. Called during application shutdown to properly close connections
-    1. Important for clean application termination without resource leaks
+    - Called during application shutdown to properly close connections
+    - Important for clean application termination without resource leaks
 
     """
     app.nicegui.shutdown()
@@ -853,9 +846,9 @@ def tokeo_nicegui_hotload(app):
 
     ### Notes:
 
-    1. Called after application shutdown to check if a restart is needed
-    1. Only triggers a restart if file changes were detected
-    1. Uses Python's execv to replace the current process with a new one
+    - Called after application shutdown to check if a restart is needed
+    - Only triggers a restart if file changes were detected
+    - Uses Python's execv to replace the current process with a new one
 
     """
     app.nicegui.hotload()
@@ -875,9 +868,9 @@ def load(app):
 
     ### Notes:
 
-    1. Registers the TokeoNiceguiController for CLI commands
-    1. Sets up hooks for application lifecycle integration
-    1. Integrates with pdoc for documentation generation
+    - Registers the TokeoNiceguiController for CLI commands
+    - Sets up hooks for application lifecycle integration
+    - Integrates with pdoc for documentation generation
 
     """
     app.handler.register(TokeoNiceguiController)
