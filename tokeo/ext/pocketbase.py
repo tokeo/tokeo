@@ -256,6 +256,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         ```
 
         """
+        # update immutable default arguments
         q = dict() if q is None else q
         # check query options
         cache_opt = dict() if cache else dict(cache='no-cache')
@@ -327,6 +328,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             various filter functions.
 
         """
+        # update immutable default arguments
         q = dict() if q is None else q
         # check query options
         cache_opt = dict() if cache else dict(cache='no-cache')
@@ -376,6 +378,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             as required by PocketBase.
 
         """
+        # update immutable default arguments
         create_fields = dict() if create_fields is None else create_fields
         q = dict() if q is None else q
         # run database create
@@ -426,6 +429,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             explicitly in the update_fields dictionary.
 
         """
+        # update immutable default arguments
         update_fields = dict() if update_fields is None else update_fields
         q = dict() if q is None else q
         # run database update
@@ -471,6 +475,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             permanently deleting records.
 
         """
+        # update immutable default arguments
         q = dict() if q is None else q
         # run database delete
         return self.collection(collection_id_or_name).delete(id_, query_params=q)
