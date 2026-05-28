@@ -929,7 +929,7 @@ class TokeoScheduler(MetaMixin):
             cmd = sub.add_parser('pause', help='pause the scheduler')
             cmd.set_defaults(func=self.handle_command_pause)
             # scheduler resume command
-            cmd = sub.add_parser('resume', help='start the scheduler')
+            cmd = sub.add_parser('resume', help='resume the scheduler')
             cmd.set_defaults(func=self.handle_command_resume)
             # scheduler reload command
             cmd = sub.add_parser('reload', help='reload the scheduling tasks from config')
