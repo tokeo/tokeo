@@ -11,14 +11,14 @@ of the task scheduler.
 
 ### Features:
 
-1. Cron-style scheduling with optional jitter and delay
-1. Task coalescing (latest, earliest, or all)
-1. Interactive command shell for task management
-1. Background or blocking scheduler modes
-1. Configuration-driven task setup
-1. Runtime task manipulation (pause, resume, remove, fire)
-1. Declarative task definition via application configuration
-1. Control over maximum concurrent job execution
+- Cron-style scheduling with optional jitter and delay
+- Task coalescing (latest, earliest, or all)
+- Interactive command shell for task management
+- Background or blocking scheduler modes
+- Configuration-driven task setup
+- Runtime task manipulation (pause, resume, remove, fire)
+- Declarative task definition via application configuration
+- Control over maximum concurrent job execution
 
 """
 
@@ -109,11 +109,11 @@ class TokeoCronAndFireTrigger(CronTrigger):
 
         : The cron parameters (year, month, etc.) support various formats including:
 
-            1. Single values: '5', 5
-            1. Ranges: '2-9', '0-23'
-            1. Multiple values: '1,3,5'
-            1. Step values: '*/2' (every 2 units)
-            1. Names for day_of_week: 'mon,wed,fri'
+            - Single values: '5', 5
+            - Ranges: '2-9', '0-23'
+            - Multiple values: '1,3,5'
+            - Step values: '*/2' (every 2 units)
+            - Names for day_of_week: 'mon,wed,fri'
 
         """
         super().__init__(year, month, day, week, day_of_week, hour, minute, second, start_date, end_date, timezone, jitter)
@@ -151,7 +151,7 @@ class TokeoCronAndFireTrigger(CronTrigger):
         """
         values = expr.split()
         if len(values) != 5:
-            raise ValueError('Wrong number of fields; got {}, expected 5'.format(len(values)))
+            raise ValueError(f'Wrong number of fields; got {len(values)}, expected 5')
 
         return cls(
             minute=values[0],
@@ -207,15 +207,6 @@ class TokeoScheduler(MetaMixin):
     applications, allowing for cron-style scheduled tasks and interactive
     management. It wraps the APScheduler library and extends it with additional
     features specific to the Tokeo framework.
-
-    ### Methods:
-
-    - **startup**: Initialize and start the scheduler
-    - **shutdown**: Stop the scheduler and clean up resources
-    - **launch**: Start the scheduler and optionally the interactive shell
-    - **shell**: Launch the interactive command shell
-    - **add_crontab_task**: Add a new cron-style task to the scheduler
-    - **init_tasks**: Initialize tasks from configuration
 
     ### Notes:
 
@@ -318,7 +309,7 @@ class TokeoScheduler(MetaMixin):
 
         ### Returns:
 
-        - Configuration value for the specified key
+        - **Any**: Configuration value for the specified key
 
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
@@ -375,15 +366,19 @@ class TokeoScheduler(MetaMixin):
         """
         try:
             executor = self.scheduler._lookup_executor(job.executor)
-        except BaseException:
+        except Exception:
             self.app.log.error(f'Executor lookup "{job.executor}" failed for job "{job}" -- removing it from the job store')
             job.remove()
+            # bail out: without an executor the submit below would hit an
+            # unbound name and the real error would be masked by the broad
+            # except in the second try
+            return
 
         try:
             executor.submit_job(job, [datetime.now(timezone.utc)])
         except MaxInstancesReachedError:
             self.app.log.warning(f'Execution of job "{job}" skipped: maximum number of running instances reached ({job.max_instances})')
-        except BaseException:
+        except Exception:
             self.app.log.error(f'Error submitting job "{job}" to executor "{job.executor}"')
 
     @property
@@ -489,8 +484,12 @@ class TokeoScheduler(MetaMixin):
             - crontab: Cron expression or list of expressions (required)
             - name: Human-readable name for the task
             - kwargs: Dictionary of keyword arguments to pass to the function
-            - coalesce: How to handle missed executions ('latest', 'earliest',
-                'all')
+            - coalesce: Missed-execution policy. 'latest' keeps the most
+                recent pending run, 'earliest' the oldest, 'all' runs every
+                missed run. Note: the current APScheduler exposes only a
+                boolean coalesce flag, so 'latest' and 'earliest' behave
+                identically (collapse to a single run) for now; they stay
+                distinct in anticipation of finer control in future releases.
             - misfire_grace_time: Seconds after scheduled time to still run
             - delay: Fixed seconds to delay execution
             - max_jitter: Random seconds to add to timing
@@ -503,10 +502,14 @@ class TokeoScheduler(MetaMixin):
         for key in self.tasks:
             # get params for task
             task = self.tasks[key]
-            # make crontab lways as list
+            # make crontab always as list
             crontab = task['crontab'] if isinstance(task['crontab'], list) else [task['crontab']]
             # get coalesce from string
             coalesce = task['coalesce'] if 'coalesce' in task else 'latest'
+            # latest and earliest are kept as distinct config options on
+            # purpose, but APScheduler currently only offers a boolean
+            # coalesce flag, so both collapse to True for now; the plan is
+            # to honour the difference once a future APScheduler supports it
             if coalesce == 'latest':
                 coalesce = True
             elif coalesce == 'earliest':
@@ -762,8 +765,8 @@ class TokeoScheduler(MetaMixin):
             self._scheduler.pause()
         # drop the job queue
         self._scheduler.remove_all_jobs()
-        # fill in from config again
-        # attention: config get's not reload
+        # fill in from config again (the in-memory config dict; the file
+        # on disk is not reread - the docstring documents this)
         self.init_tasks()
         # set scheduler to running if was running or forced
         if is_running or args.restart:
@@ -826,11 +829,11 @@ class TokeoScheduler(MetaMixin):
 
         : This method handles several task-specific commands:
 
-            1. **pause**: Pauses specific tasks without affecting the scheduler
-                as a whole
-            1. **resume**: Resumes specific tasks that have been paused
-            1. **remove**: Permanently removes tasks from the scheduler
-            1. **fire**: Executes tasks immediately, regardless of their schedule
+            - **pause**: Pauses specific tasks without affecting the scheduler
+              as a whole
+            - **resume**: Resumes specific tasks that have been paused
+            - **remove**: Permanently removes tasks from the scheduler
+            - **fire**: Executes tasks immediately, regardless of their schedule
 
         : Each command operates on one or more tasks specified by their IDs.
 
@@ -898,15 +901,15 @@ class TokeoScheduler(MetaMixin):
 
         : Available commands include:
 
-            1. **list**: Show active scheduler tasks
-            1. **pause**/**resume**: Control overall scheduler state
-            1. **reload**: Reload tasks from configuration
-            1. **restart**: Reload and restart the scheduler
-            1. **wakeup**: Force the scheduler to check for due jobs
-            1. **tasks**: Commands for managing individual tasks:
-                1. **pause**/**resume**: Control specific task state
-                1. **remove**: Delete a task
-                1. **fire**: Execute a task immediately
+            - **list**: Show active scheduler tasks
+            - **pause**/**resume**: Control overall scheduler state
+            - **reload**: Reload tasks from configuration
+            - **restart**: Reload and restart the scheduler
+            - **wakeup**: Force the scheduler to check for due jobs
+            - **tasks**: Commands for managing individual tasks:
+                - **pause**/**resume**: Control specific task state
+                - **remove**: Delete a task
+                - **fire**: Execute a task immediately
 
         """
         if self._command_parser is None:
@@ -925,7 +928,7 @@ class TokeoScheduler(MetaMixin):
             # scheduler pause command
             cmd = sub.add_parser('pause', help='pause the scheduler')
             cmd.set_defaults(func=self.handle_command_pause)
-            # scheduler pause command
+            # scheduler resume command
             cmd = sub.add_parser('resume', help='start the scheduler')
             cmd.set_defaults(func=self.handle_command_resume)
             # scheduler reload command
@@ -992,9 +995,9 @@ class TokeoScheduler(MetaMixin):
 
         : Special commands:
 
-            1. exit, quit: Raise EOFError to terminate the shell
-            1. Empty commands or commands that show help: Return True
-            1. Commands that fail to parse or execute: Return False
+            - exit, quit: Raise EOFError to terminate the shell
+            - Empty commands or commands that show help: Return True
+            - Commands that fail to parse or execute: Return False
 
         """
         # signal bye bye to interactive shell
@@ -1063,11 +1066,11 @@ class TokeoScheduler(MetaMixin):
         self.app.log.info('Welcome to scheduler interactive shell.')
         # build in-memory history for interactive shell
         history = self.shell_history()
-        # initilize the user_input
+        # initialize the user_input
         user_input = ''
         # get std.output and prevent ruining interface
         with patch_stdout(raw=True):
-            # loop interactove shell
+            # loop interactive shell
             while True:
                 # catch exceptions
                 try:
@@ -1096,7 +1099,7 @@ class TokeoScheduler(MetaMixin):
                     self.app.log.info('bye bye using scheduler...')
                     break
                 except CaughtSignal as err:
-                    # check for catched signals and allow shutdown by signals
+                    # check for caught signals and allow shutdown by signals
                     if err.signum in SIGNALS:
                         break
                 except Exception as err:
@@ -1114,11 +1117,6 @@ class TokeoSchedulerController(Controller):
     This controller provides CLI commands for starting and managing
     the scheduler. It integrates with the Cement framework's command-line
     interface to expose scheduler commands to the application's CLI.
-
-    ### Methods:
-
-    - **launch**: Start the scheduler service with optional interactive shell
-    - Several log_* methods for output formatting
 
     ### Notes:
 
@@ -1367,9 +1365,9 @@ class TokeoSchedulerController(Controller):
 
         : Command-line options:
 
-            1. --background: Start without interactive shell
-            1. --paused: Start in paused state
-            1. --no-colors: Use plain text output without ANSI colors
+            - --background: Start without interactive shell
+            - --paused: Start in paused state
+            - --no-colors: Use plain text output without ANSI colors
 
         """
         # rewrite the output log handler for interactive
@@ -1462,9 +1460,9 @@ def load(app):
 
     : This function performs three key actions:
 
-        1. Registers the TokeoSchedulerController for CLI integration
-        1. Registers a post_setup hook to initialize the scheduler
-        1. Registers a pre_close hook for proper cleanup
+        - Registers the TokeoSchedulerController for CLI integration
+        - Registers a post_setup hook to initialize the scheduler
+        - Registers a pre_close hook for proper cleanup
 
     : After loading this extension, the scheduler is available as
         app.scheduler and the 'scheduler' CLI command is added to the
