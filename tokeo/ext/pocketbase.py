@@ -6,18 +6,19 @@ lightweight database solution and backend services. PocketBase is a
 zero-config backend built on SQLite that provides REST API, authentication,
 and realtime subscriptions.
 
-The extension exposes PocketBase's functionality through a simple interface that
-can be accessed via app.db throughout your Tokeo application, enabling CRUD
-operations on collections, authentication, and file handling.
+The extension exposes a Cement-style database handler, reachable as app.db
+throughout your Tokeo application, that maps the usual CRUD methods onto
+PocketBase collections. Operations beyond that surface (such as auth flows)
+are reached through the raw SDK via the collection() escape hatch.
 
 ### Features:
 
 - Seamless integration with Tokeo applications
 - Simple CRUD operations for PocketBase collections
-- Authentication and user management
-- File uploads and handling
-- Automated connection management
-- Support for advanced querying, filtering, and sorting
+- Advanced querying, filtering, and sorting on lists
+- User and auth collections handled like any other via CRUD
+- Direct SDK access through the collection() escape hatch for anything
+  beyond the CRUD surface (auth flows, file fields, schema, etc.)
 
 ### Example:
 
@@ -57,28 +58,23 @@ class TokeoPocketBaseHandler(MetaMixin):
     """
     PocketBase integration handler for Tokeo applications.
 
-    This class provides a comprehensive interface to PocketBase's functionality,
-    allowing Tokeo applications to interact with PocketBase collections
-    for data storage, retrieval, authentication, and file handling.
-
-    ### Methods:
-
-    - **_setup**: Initialize the PocketBase client with configuration
-    - **_config**: Get configuration values with proper defaults
-    - **close**: Close the PocketBase connection properly
-    - **collection**: Get a reference to a PocketBase collection
-    - **get_one**: Retrieve a single record by ID
-    - **get_list**: Retrieve paginated records with filtering and sorting
-    - **create**: Create a new record
-    - **update**: Update an existing record
-    - **delete**: Delete a record
+    A Cement-style database handler that maps the usual CRUD methods
+    (get_one, get_list, create, update, delete) onto PocketBase
+    collections. For anything outside that surface, collection() hands
+    back the raw SDK collection object.
 
     ### Notes:
 
-    : The handler is registered as 'db' in the application and can be
-        accessed through app.db in your application code. It provides a
-        simplified interface to the PocketBase SDK, abstracting away some
-        of the complexity while still providing access to all functionality.
+    - The handler is registered as 'db' and is reached through app.db. It
+      is a thin convenience layer over the PocketBase SDK, not a wrapper
+      around its full surface.
+
+    - Authentication: the handler connects anonymously, so the mapped CRUD
+      calls run against whatever the PocketBase api rules permit for
+      unauthenticated requests. Auth and user management happen at the
+      application level - user records via plain CRUD on the auth
+      collection, login/token flows via collection().auth_with_password()
+      and friends. There is intentionally no handler-level login.
 
     """
 
@@ -149,8 +145,10 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         """
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
+        # connect anonymously by design: this handler is a thin CRUD mapping
+        # and runs against whatever the PocketBase api rules allow for
+        # unauthenticated requests; auth flows are the app's job via collection()
         self.pb = pocketbase.PocketBase(self._config('url'))
-        # [ ] TODO: Authentication is missing
 
     def _config(self, key, **kwargs):
         """
@@ -167,7 +165,7 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         ### Returns:
 
-        - Configuration value for the specified key
+        - **Any**: Configuration value for the specified key
 
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
@@ -176,15 +174,10 @@ class TokeoPocketBaseHandler(MetaMixin):
         """
         Close the PocketBase connection.
 
-        Performs any necessary cleanup when the application is shutting down.
-        This includes logging out the current user if authenticated and
-        releasing any resources held by the PocketBase client.
-
-        ### Notes:
-
-        : This method is called automatically when the application is shutting down
-            via the pre_close hook. It ensures proper cleanup of resources and
-            session data.
+        Lifecycle hook required by the database handler contract and wired
+        to the pre_close hook via pocketbase_close(). The handler connects
+        anonymously and holds no session or pooled connection, so there is
+        nothing to tear down and this method is a deliberate no-op.
 
         """
         pass
@@ -228,7 +221,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         # return a general collection
         return self.pb.collection(collection_id_or_name)
 
-    def get_one(self, collection_id_or_name, id, sort=None, cache=True, q=dict()):
+    def get_one(self, collection_id_or_name, id_, sort=None, cache=True, q=None):
         """
         Retrieve a single record from a collection by ID.
 
@@ -238,7 +231,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Args:
 
         - **collection_id_or_name** (str): The ID or name of the collection
-        - **id** (str): The ID of the record to retrieve
+        - **id_** (str): The ID of the record to retrieve
         - **sort** (str, optional): Sort expression for the query
             (format: `field,-field`)
         - **cache** (bool): Whether to use cached results if available
@@ -263,13 +256,14 @@ class TokeoPocketBaseHandler(MetaMixin):
         ```
 
         """
+        q = dict() if q is None else q
         # check query options
         cache_opt = dict() if cache else dict(cache='no-cache')
         sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
         # run database query for one element by id
-        return self.collection(collection_id_or_name).get_one(id, dict(**cache_opt, **sort_opt, **q))
+        return self.collection(collection_id_or_name).get_one(id_, dict(**cache_opt, **sort_opt, **q))
 
-    def get_list(self, collection_id_or_name, page=1, perPage=20, filter='', sort=None, cache=True, q=dict()):
+    def get_list(self, collection_id_or_name, page=1, perPage=20, filter='', sort=None, cache=True, q=None):
         """
         Retrieve a paginated list of records from a collection.
 
@@ -333,13 +327,14 @@ class TokeoPocketBaseHandler(MetaMixin):
             various filter functions.
 
         """
+        q = dict() if q is None else q
         # check query options
         cache_opt = dict() if cache else dict(cache='no-cache')
         sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
         # run database query for multiple elements
         return self.collection(collection_id_or_name).get_list(page, perPage, dict(filter=filter, **cache_opt, **sort_opt, **q))
 
-    def create(self, collection_id_or_name, create_fields=dict(), q=dict()):
+    def create(self, collection_id_or_name, create_fields=None, q=None):
         """
         Create a new record in a collection.
 
@@ -381,10 +376,12 @@ class TokeoPocketBaseHandler(MetaMixin):
             as required by PocketBase.
 
         """
+        create_fields = dict() if create_fields is None else create_fields
+        q = dict() if q is None else q
         # run database create
         return self.collection(collection_id_or_name).create(body_params=create_fields, query_params=q)
 
-    def update(self, collection_id_or_name, id, update_fields=dict(), q=dict()):
+    def update(self, collection_id_or_name, id_, update_fields=None, q=None):
         """
         Update an existing record in a collection.
 
@@ -394,7 +391,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Args:
 
         - **collection_id_or_name** (str): The ID or name of the collection
-        - **id** (str): The ID of the record to update
+        - **id_** (str): The ID of the record to update
         - **update_fields** (dict): The fields to update
         - **q** (dict): Additional query parameters to pass to PocketBase
 
@@ -429,10 +426,12 @@ class TokeoPocketBaseHandler(MetaMixin):
             explicitly in the update_fields dictionary.
 
         """
+        update_fields = dict() if update_fields is None else update_fields
+        q = dict() if q is None else q
         # run database update
-        return self.collection(collection_id_or_name).update(id, body_params=update_fields, query_params=q)
+        return self.collection(collection_id_or_name).update(id_, body_params=update_fields, query_params=q)
 
-    def delete(self, collection_id_or_name, id, q=dict()):
+    def delete(self, collection_id_or_name, id_, q=None):
         """
         Delete a record from a collection.
 
@@ -441,7 +440,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Args:
 
         - **collection_id_or_name** (str): The ID or name of the collection
-        - **id** (str): The ID of the record to delete
+        - **id_** (str): The ID of the record to delete
         - **q** (dict): Additional query parameters to pass to PocketBase
 
         ### Returns:
@@ -472,8 +471,9 @@ class TokeoPocketBaseHandler(MetaMixin):
             permanently deleting records.
 
         """
+        q = dict() if q is None else q
         # run database delete
-        return self.collection(collection_id_or_name).delete(id, query_params=q)
+        return self.collection(collection_id_or_name).delete(id_, query_params=q)
 
 
 def pocketbase_extend_app(app):
@@ -502,8 +502,7 @@ def pocketbase_close(app):
     """
     Handle application shutdown for PocketBase.
 
-    Properly cleans up PocketBase resources when the application is shutting down.
-    This function is registered as a pre_close hook to ensure proper cleanup.
+    Pre_close hook that delegates to the handler's close() method.
 
     ### Args:
 
@@ -511,9 +510,9 @@ def pocketbase_close(app):
 
     ### Notes:
 
-    : This function is called automatically during application's pre_close phase.
-        It ensures any open connections are closed, authentication data is cleared,
-        and resources are released properly before the application exits.
+    : Called automatically during the application's pre_close phase. It
+        invokes app.db.close(), which is a deliberate no-op (the handler
+        keeps no session or connection); see close() for the rationale.
 
     """
     app.db.close()
@@ -547,9 +546,9 @@ def load(app):
 
     : This function performs three key actions:
 
-        1. Sets the default database handler for the application
-        1. Registers a post_setup hook to initialize the PocketBase client
-        1. Registers a pre_close hook for proper cleanup
+        - Sets the default database handler for the application
+        - Registers a post_setup hook to initialize the PocketBase client
+        - Registers a pre_close hook for proper cleanup
 
     : After loading this extension, the PocketBase client is available
         through the app.db attribute in your application code.
