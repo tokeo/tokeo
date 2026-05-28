@@ -95,8 +95,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             'files': None,  # Attachments or inline images
             # Email encoding options
             'charset': 'utf-8',  # Character set for email
-            'header_encoding': None,  # Encoding for headers (None, 'base64', 'qp')
-            'body_encoding': None,  # Encoding for body (None, 'base64', 'qp')
+            'header_encoding': None,  # Encoding for headers (None, 'base64', 'qp', 'quoted-printable')
+            'body_encoding': None,  # Encoding for body (None, 'base64', 'qp', 'quoted-printable')
             # Message identification
             'date_enforce': True,  # Auto-add Date header if missing
             'msgid_enforce': True,  # Auto-add Message-ID if missing
@@ -253,8 +253,10 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         - **subject** (str): Email subject line
         - **subject_prefix** (str): Prefix for the subject line
         - **files** (list): List of file paths to attach to the message
-        - **header_encoding** (str): Encoding for email headers ('base64' or 'qp')
-        - **body_encoding** (str): Encoding for email body ('base64' or 'qp')
+        - **header_encoding** (str): Encoding for email headers
+            ('base64', 'qp', or 'quoted-printable')
+        - **body_encoding** (str): Encoding for email body
+            ('base64', 'qp', or 'quoted-printable')
         - **date** (str): Custom date for the Date header
         - **message_id** (str): Custom Message-ID header value
         - **return_path** (str): Return-Path header value
@@ -397,14 +399,14 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         cs_header = Charset(params['charset'])
         if params['header_encoding'] == 'base64':
             cs_header.header_encoding = BASE64
-        elif params['header_encoding'] == 'qp' or params['body_encoding'] == 'quoted-printable':
+        elif params['header_encoding'] in ('qp', 'quoted-printable'):
             cs_header.header_encoding = QP
 
         # Set up encoding for body parts
         cs_body = Charset(params['charset'])
         if params['body_encoding'] == 'base64':
             cs_body.body_encoding = BASE64
-        elif params['body_encoding'] == 'qp' or params['body_encoding'] == 'quoted-printable':
+        elif params['body_encoding'] in ('qp', 'quoted-printable'):
             cs_body.body_encoding = QP
 
         # Initialize body part containers
@@ -579,7 +581,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
                 encoders.encode_base64(part)
 
                 # embedded inline or attachment
-                if cid:
+                if cid and partHtml and rel:
                     # inline alt_name and id header
                     part.add_header(
                         'Content-Disposition',
