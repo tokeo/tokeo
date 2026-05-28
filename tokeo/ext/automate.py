@@ -63,14 +63,20 @@ from tokeo.core.utils import sanitize
 from tokeo.ext.argparse import Controller
 
 
-def _patched_invoke_command_timeout_str(self):
-    command = getprop(self.result, 'command', fallback=None)
-    template = 'Command: {!r} timed out and did not complete within {} seconds!'
-    return template.format(command, self.timeout)
+class TokeoCommandTimedOut(invoke.CommandTimedOut):
+    """
+    invoke.CommandTimedOut with a clearer timeout message.
 
+    Subclassed instead of monkey-patching invoke.CommandTimedOut.__str__
+    process-wide; 'except invoke.CommandTimedOut' still catches it because
+    this is a subclass.
 
-# monkey patch invoke class CommandTimedOut Exception
-invoke.CommandTimedOut.__str__ = _patched_invoke_command_timeout_str
+    """
+
+    def __str__(self):
+        command = getprop(self.result, 'command', fallback=None)
+        template = 'Command: {!r} timed out and did not complete within {} seconds!'
+        return template.format(command, self.timeout)
 
 
 class TokeoAutomateError(TokeoError):
@@ -96,6 +102,17 @@ class TokeoInvokeLocalContext(invoke.Context):
     """
 
     def __init__(self, config=None, task_ref=None):
+        """
+        Initialize the local context from a task reference.
+
+        ### Args:
+
+        - **config** (invoke.Config, optional): Config for the invoke base
+            context
+        - **task_ref** (dict): Task definition; its 'kwprotected' and
+            'kwargs' drive the protect/sanitize handling on each run
+
+        """
         super().__init__(config=config)
         self.task_ref = task_ref
         self.task_kwprotected = task_ref['kwprotected']
@@ -141,10 +158,34 @@ class TokeoInvokeLocalContext(invoke.Context):
         kwargs['encoding'] = encoding
 
     def run(self, command, **kwargs):
+        """
+        Run a command through invoke's local runner.
+
+        Applies the task's protect/sanitize rules to kwargs first, then
+        delegates to the invoke base runner.
+
+        ### Args:
+
+        - **command** (str): The command line to execute
+        - **kwargs**: Invoke runner kwargs (pty, env, timeout, encoding, ...)
+
+        ### Returns:
+
+        - **invoke.runners.Result**: The invoke run result
+
+        ### Raises:
+
+        - **TokeoCommandTimedOut**: If the command exceeds the timeout
+
+        """
         # take care of kwargs
         TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs)
         # call the normal invoke runner
-        return super().run(command, **kwargs)
+        try:
+            return super().run(command, **kwargs)
+        except invoke.CommandTimedOut as e:
+            # surface the same clearer message for local timeouts
+            raise TokeoCommandTimedOut(e.result, e.timeout) from e
 
 
 class TokeoInvokeRemoteContext(invoke.Context):
@@ -166,6 +207,29 @@ class TokeoInvokeRemoteContext(invoke.Context):
         connect_kwargs=None,
         task_ref=None,
     ):
+        """
+        Initialize the remote context; the SSH connection is opened lazily.
+
+        ### Args:
+
+        - **host** (str): Target hostname or IP
+        - **user** (str): SSH username
+        - **port** (int): SSH port
+        - **config** (invoke.Config, optional): Config for the invoke base
+            context; also read for sudo.password
+        - **host_keys** (paramiko.HostKeys, optional): Known host keys; when
+            given, unknown hosts are rejected, otherwise auto-added
+        - **forward_agent** (bool, optional): Whether to forward the SSH agent
+        - **connect_kwargs** (dict, optional): Extra kwargs for paramiko's
+            connect() (e.g. password, key_filename)
+        - **task_ref** (dict): Task definition driving protect/sanitize
+
+        ### Notes:
+
+        : Nothing connects here; _connect() opens the Paramiko session on the
+            first run().
+
+        """
         super().__init__(config=config)
         self.host = host
         self.user = user
@@ -182,7 +246,16 @@ class TokeoInvokeRemoteContext(invoke.Context):
         self.client = None
 
     def _connect(self):
-        # Lazily establish the SSH connection if it not established yet.
+        """
+        Lazily establish the SSH connection if not yet connected.
+
+        ### Notes:
+
+        : Creates the Paramiko client on first use. With host_keys set,
+            unknown hosts are rejected (RejectPolicy); without, any host is
+            accepted (AutoAddPolicy).
+
+        """
         if self.client is None:
             self.client = paramiko.SSHClient()
             # update connections
@@ -203,7 +276,37 @@ class TokeoInvokeRemoteContext(invoke.Context):
             )
 
     def run(self, command, **kwargs):
-        # Execute a command, supporting basic Invoke kwargs and sudo injection.
+        """
+        Execute a command over SSH through Paramiko.
+
+        Mirrors the invoke runner interface: applies the task's
+        protect/sanitize rules, exports env vars into the remote shell,
+        streams stdout/stderr, enforces the timeout and injects the sudo
+        password when a prompt is detected.
+
+        ### Args:
+
+        - **command** (str): The command line to execute remotely
+        - **kwargs**: Invoke-style kwargs (hide, pty, env, timeout,
+            encoding, ...)
+
+        ### Returns:
+
+        - **invoke.runners.Result**: Result with stdout, stderr and exit code
+
+        ### Raises:
+
+        - **TokeoCommandTimedOut**: If the command exceeds the timeout
+
+        ### Notes:
+
+        : env vars are exported into the remote shell verbatim, without
+            shell-quoting here (unlike invoke). Escaping is delegated to the
+            task's sanitize setting: with sanitize enabled the env values are
+            passed through sanitize.keyword_dict(); with it disabled they are
+            exported as-is, so the caller is responsible for safe values.
+
+        """
         self._connect()
 
         # Extract common invoke kwargs
@@ -238,8 +341,8 @@ class TokeoInvokeRemoteContext(invoke.Context):
         # create the export string to survive env while on ssh
         env = kwargs.get('env', {})
         if env:
-            # explicitely do not quote here anything
-            # quoteing can be configure by sanitize
+            # explicitly do not quote here anything
+            # quoting can be configured by sanitize
             # but not here like in invoke
             env_exports = 'export ' + ' '.join(f'{k}={str(v)}' for k, v in env.items()) + ' ; '
         else:
@@ -258,7 +361,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
             # 1. Enforce the Timeout
             if timeout and (time.time() - start_time) > timeout:
                 channel.close()
-                raise invoke.CommandTimedOut(
+                raise TokeoCommandTimedOut(
                     invoke.runners.Result(stdout='', stderr='CommandTimeOut', exited=-1, command=command), timeout
                 )
 
@@ -306,7 +409,10 @@ class TokeoInvokeRemoteContext(invoke.Context):
         return invoke.runners.Result(stdout=out, stderr=err, exited=exited, command=command)
 
     def close(self):
-        # Safely close the underlying Paramiko SSH connection if exist.
+        """
+        Close the underlying Paramiko SSH connection if one is open.
+
+        """
         if getattr(self, 'client', None) is not None:
             self.client.close()
             self.client = None
@@ -1426,7 +1532,6 @@ class TokeoAutomate(MetaMixin):
                     if return_results:
                         results.append(
                             TokeoAutomateResult(
-                                # fmt: skip
                                 task_id,
                                 None,
                                 None,
@@ -1563,7 +1668,6 @@ class TokeoAutomate(MetaMixin):
                     if return_results:
                         results.append(
                             TokeoAutomateResult(
-                                # fmt: skip
                                 task_id,
                                 None,
                                 None,
@@ -1612,7 +1716,6 @@ class TokeoAutomate(MetaMixin):
                     if return_results:
                         results.append(
                             TokeoAutomateResult(
-                                # fmt: skip
                                 task_id,
                                 None,
                                 None,
@@ -1699,7 +1802,6 @@ class TokeoAutomateShell:
                     tasks_host_completion.append(f'{task_id}:{host_id["id"]}')
             # create completer
             wordlist_show = WordCompleter(
-                # fmt: skip
                 sorted(set(tasks_completion))
             )
             wordlist_run = WordCompleter(
@@ -1879,14 +1981,14 @@ class TokeoAutomateShell:
             # prepare for sub-commands
             sub = self._command_parser.add_subparsers(metavar='')
             # tasks list command
-            cmd = sub.add_parser('list', help='show active scheduler tasks')
+            cmd = sub.add_parser('list', help='show the configured tasks')
             cmd.set_defaults(func=self.handle_command_list)
-            # scheduler pause command
-            cmd = sub.add_parser('show', help='pause the scheduler')
+            # tasks show command
+            cmd = sub.add_parser('show', help='show task details')
             cmd.add_argument('task', nargs='+', help='task_id(s) to show')
             cmd.set_defaults(func=self.handle_command_show)
-            # scheduler pause command
-            cmd = sub.add_parser('run', help='start the scheduler')
+            # tasks run command
+            cmd = sub.add_parser('run', help='run task(s)')
             cmd.add_argument('task', nargs='+', help='task_id(s)[:host] to run')
             cmd.add_argument('--verbose', action='store_true', help='show output from command execution')
             cmd.add_argument('--as-json', action='store_true', help='show results as json')
@@ -2234,6 +2336,14 @@ class TokeoAutomateController(Controller):
         - Supports both color and monochrome output modes
 
         """
+        # on '--shell' every log call is intentionally redirected to terse
+        # colored print() so the whole session is interactive: this is an
+        # explicit choice, not a side effect. it is safe because '--shell'
+        # runs as its own process that ends when the shell exits, so there
+        # is nothing to restore afterwards. note: while in the shell the
+        # output goes to the console only (print), so a configured file:
+        # log target does not receive these shell messages.
+
         # use colored output?
         if self.app.pargs.no_colors:
             self.app.log.info = self._log_info_bw
