@@ -49,8 +49,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
     ### See Also:
 
-    1. Python smtplib documentation: https://docs.python.org/library/smtplib.html
-    1. Email composition guide: https://mailtrap.io/blog/python-send-html-email/
+    - Python smtplib documentation: https://docs.python.org/library/smtplib.html
+    - Email composition guide: https://mailtrap.io/blog/python-send-html-email/
 
     """
 
@@ -137,7 +137,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         ### Returns:
 
-        - Configuration value for the specified key
+        - **Any**: Configuration value for the specified key
 
         ### Example:
 
@@ -217,7 +217,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         ]:
             value = kw.get(item, None)
             if value is not None and str.strip(f'{value}') != '':
-                params[item] = kw.get(item, config_item)
+                params[item] = value
 
         # Process all X-headers from keyword arguments
         for item in kw.keys():
@@ -328,10 +328,10 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # For smtplib this would be "senderrs" (dict), but for backward compat
         # we need to return bool
         # https://github.com/python/cpython/blob/3.13/Lib/smtplib.py#L899
-        self.app.log.error(f'SMTPHandler Errors: {res}')
         if len(res) > 0:
             # this will be difficult to test with Mailpit
             # as it accepts everything... no cover
+            self.app.log.error(f'SMTPHandler Errors: {res}')  # pragma: nocover
             return False  # pragma: nocover
         else:
             return True
@@ -386,11 +386,11 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             setting proper encodings, and handling attachments. The message
             structure will vary depending on the content:
 
-            1. text/plain: For text-only emails
-            1. text/html: For HTML-only emails
-            1. multipart/alternative: For emails with both text and HTML versions
-            1. multipart/mixed: For emails with attachments
-            1. multipart/related: For HTML emails with inline images
+            - text/plain: For text-only emails
+            - text/html: For HTML-only emails
+            - multipart/alternative: For emails with both text and HTML versions
+            - multipart/mixed: For emails with attachments
+            - multipart/related: For HTML emails with inline images
 
         """
         # Set up encoding for header parts
@@ -471,7 +471,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         if params['bcc']:
             msg['Bcc'] = ', '.join(params['bcc'])
         if params['subject_prefix'] not in [None, '']:
-            msg['Subject'] = self._header(f'{params['subject_prefix']} {params['subject']}', _charset=cs_header, **params)
+            msg['Subject'] = self._header(f'{params["subject_prefix"]} {params["subject"]}', _charset=cs_header, **params)
         else:
             msg['Subject'] = self._header(params['subject'], _charset=cs_header, **params)
         # check for date
@@ -597,7 +597,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         return msg
 
-    def send_by_template(self, template, data={}, **kw):
+    def send_by_template(self, template, data=None, **kw):
         """
         Send an email using a template for content generation.
 
@@ -620,9 +620,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         : The method looks for the following template files:
 
-            1. `{template}.title.jinja2`: For subject line (optional)
-            1. `{template}.plain.jinja2`: For plain text body (optional)
-            1. `{template}.html.jinja2`: For HTML body (optional)
+            - `{template}.title.jinja2`: For subject line (optional)
+            - `{template}.plain.jinja2`: For plain text body (optional)
+            - `{template}.html.jinja2`: For HTML body (optional)
 
         : At least one of plain text or HTML templates should exist.
             The mail_params context variable is provided to templates
@@ -680,6 +680,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             return result
 
         # Prepare email params
+        data = dict() if data is None else data
         params = dict(**kw)
 
         # Check if we need to render the subject from template
@@ -696,7 +697,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         if _template_exists(f'{template}.html.jinja2'):
             body['html'] = self.app.render(dict(**data, mail_params=params), f'{template}.html.jinja2', out=None)
         # send the message
-        self.send(body=body, **params)
+        return self.send(body=body, **params)
 
 
 def load(app):
