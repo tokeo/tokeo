@@ -679,8 +679,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             self._template_exists_cache[template] = result
             return result
 
-        # Prepare email params
+        # update immutable default arguments
         data = dict() if data is None else data
+        # Prepare email params
         params = dict(**kw)
 
         # Check if we need to render the subject from template
