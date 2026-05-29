@@ -550,65 +550,67 @@
     padding: 0 0.5em;
   }
 
-.admonition {
-    padding: 0.5em 1em;
-    margin: 1em 0;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-}
-.admonition-title {
-    font-weight: bold;
-    margin-top: 0;
-    margin-bottom: 0.4em;
-}
-.admonition-title::before {
-    margin-right: 0.5em;
-}
+  .admonition {
+      padding: 0.5em 1em;
+      margin: 1em 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+  }
 
-.admonition.note,
-.admonition.info,
-.admonition.important {
-    background: #e7f3fd;
-    border-color: #8fbde5;
-}
-.admonition.note > .admonition-title::before,
-.admonition.info > .admonition-title::before { content: 'ℹ️'; }
-.admonition.important > .admonition-title::before { content: '❗'; }
+  .admonition-title {
+      font-weight: bold;
+      margin-top: 0;
+      margin-bottom: 0.4em;
+  }
 
-.admonition.tip,
-.admonition.hint,
-.admonition.todo,
-.admonition.versionadded {
-    background: #e8f5e9;
-    border-color: #9ccc9f;
-}
-.admonition.tip > .admonition-title::before,
-.admonition.hint > .admonition-title::before { content: '💡'; }
+  .admonition-title::before {
+      margin-right: 0.5em;
+  }
 
-.admonition.success {
-    background: #dcedc8;
-    border-color: #66bb6a;
-}
-.admonition.success > .admonition-title::before { content: '✅'; }
+  .admonition.note,
+  .admonition.info,
+  .admonition.important {
+      background: #e7f3fd;
+      border-color: #8fbde5;
+  }
 
-.admonition.warning,
-.admonition.versionchanged,
-.admonition.deprecated {
-    background: #fff8e1;
-    border-color: #e0b94e;
-}
-.admonition.warning > .admonition-title::before,
-.admonition.caution > .admonition-title::before { content: '⚠️'; }
+  .admonition.tip,
+  .admonition.hint,
+  .admonition.todo,
+  .admonition.versionadded {
+      background: #e8f5e9;
+      border-color: #9ccc9f;
+  }
 
-.admonition.error,
-.admonition.danger,
-.admonition.caution {
-    background: #fde7e7;
-    border-color: #d98989;
-}
-.admonition.error > .admonition-title::before { content: '❌'; }
-.admonition.danger > .admonition-title::before { content: '🔥'; }
-.admonition.caution > .admonition-title::before { content: '☠️'; }
+  .admonition.success {
+      background: #dcedc8;
+      border-color: #66bb6a;
+  }
+
+  .admonition.warning,
+  .admonition.versionchanged,
+  .admonition.deprecated {
+      background: #fff8e1;
+      border-color: #e0b94e;
+  }
+
+  .admonition.error,
+  .admonition.danger,
+  .admonition.caution {
+      background: #fde7e7;
+      border-color: #d98989;
+  }
+
+  .admonition.note > .admonition-title::before { content: 'ℹ️'; }
+  .admonition.info > .admonition-title::before { content: 'ℹ️'; }
+  .admonition.important > .admonition-title::before { content: '❗'; }
+  .admonition.tip > .admonition-title::before { content: '💡'; }
+  .admonition.hint > .admonition-title::before { content: '💡'; }
+  .admonition.success > .admonition-title::before { content: '✅'; }
+  .admonition.warning > .admonition-title::before { content: '⚠️'; }
+  .admonition.error > .admonition-title::before { content: '❌'; }
+  .admonition.danger > .admonition-title::before { content: '🔥'; }
+  .admonition.caution > .admonition-title::before { content: '☠️'; }
 </%def>
 
 <%def name="desktop()" filter="minify_css">
