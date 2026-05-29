@@ -313,7 +313,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             server = smtplib.SMTP(params['host'], params['port'], params['timeout'])
             self.app.log.debug(f'{self._meta.label} : initiating smtp')
 
-        try:
+        # use server context manager instead try finally to get all original exceptions
+        with server:
             if self.app.debug is True:
                 server.set_debuglevel(9)
 
@@ -326,8 +327,6 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
             msg = self._make_message(body, **params)
             res = server.send_message(msg)
-        finally:
-            server.quit()
 
         # Deprecation: bool return will change to senderrs dict
         # https://github.com/python/cpython/blob/3.13/Lib/smtplib.py#L899
