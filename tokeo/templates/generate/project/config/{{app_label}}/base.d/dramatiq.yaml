@@ -37,7 +37,11 @@ dramatiq:
   ### broker to use for backend
   broker: rabbitmq
   ### connection url to rabbitmq server
-  rabbitmq_url: amqp://guest:guest@localhost:5672/
+  rabbitmq_url: amqp://none:nonet@localhost:5672/
+  ### connection username or identity for rabbitmq server (overrule url)
+  rabbitmq_auth_identity: guest
+  ### connection password for rabbitmq server (overrule url)
+  rabbitmq_auth_password: guest
   ### mark lock keys by tag
   locks_tag: dramatiq_locks
   ### mark lock keys with prefix

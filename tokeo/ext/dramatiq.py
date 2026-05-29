@@ -54,6 +54,7 @@ import dramatiq
 from dramatiq import middleware, cli, actor as dramatiq_actor
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from tokeo.core.exc import TokeoError
+from tokeo.core.utils.url import overload_with_auth as url_overload_with_auth
 from tokeo.ext.argparse import Controller
 
 
@@ -83,8 +84,37 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
         for example: 'my_ordered_tasks_unparalleled'
     - Implementation based on solution from the Dramatiq users group:
         https://groups.io/g/dramatiq-users/topic/77913723
+    - Also accepts auth_identity/auth_password and merges them into the
+        connection url, since RabbitmqBroker cannot take a url and separate
+        pika credentials at the same time
 
     """
+
+    def __init__(self, *, url=None, auth_identity=None, auth_password=None, **kwargs):
+        """
+        Initialize the broker, applying configured credentials to the url.
+
+        Accepts the standard RabbitmqBroker keyword arguments plus auth_identity
+        and auth_password. When a url is given, the credentials are merged into
+        its userinfo (see overload_with_auth) before the url is handed to the
+        parent, since RabbitmqBroker cannot take a url and pika credentials
+        together.
+
+        ### Args
+
+        - **url** (str, optional): The amqp connection url
+        - **auth_identity** (str, optional): Username/identity to force into
+            the url userinfo, overriding any user the url carries
+        - **auth_password** (str, optional): Password to force into the url
+            userinfo, overriding any password the url carries
+        - **kwargs**: Remaining RabbitmqBroker arguments (e.g. middleware,
+            confirm_delivery, max_priority, parameters)
+
+        """
+        super().__init__(
+            url=url_overload_with_auth(url, auth_identity, auth_password),
+            **kwargs,
+        )
 
     def _build_queue_arguments(self, queue_name):
         """
@@ -160,6 +190,10 @@ class TokeoDramatiq(MetaMixin):
             broker='rabbitmq',
             # RabbitMQ connection URL
             rabbitmq_url='amqp://guest:guest@localhost:5672/',
+            # RabbitMQ connection username or identity
+            rabbitmq_auth_identity=None,
+            # RabbitMQ connection password
+            rabbitmq_auth_password=None,
             # Tag for dramatiq locks in the cache
             locks_tag='dramatiq_locks',
             # Prefix for dramatiq lock keys
@@ -250,9 +284,12 @@ class TokeoDramatiq(MetaMixin):
                 middleware.CurrentMessage,
             ]
         ]
-        # create the broker to RabbitMQ based on config
+        # create the broker to RabbitMQ based on config; configured
+        # credentials may override any userinfo carried by the url
         rabbitmq_broker = ExtendedRabbitmqBroker(
             url=self._config('rabbitmq_url'),
+            auth_identity=self._config('rabbitmq_auth_identity'),
+            auth_password=self._config('rabbitmq_auth_password'),
             middleware=use_middleware,
         )
         # globally set the broker on dramatiq
