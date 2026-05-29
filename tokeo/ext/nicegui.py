@@ -276,11 +276,11 @@ class TokeoNicegui(MetaMixin):
 
     ### Notes
 
-    - Provides direct access to NiceGUI components via `ui` and `fastapi_app`
+    - Provides direct access to NiceGUI components via ``ui`` and ``fastapi_app``
       attributes
     - Manages file monitoring for hot-reloading during development
     - Handles application configuration and startup/shutdown lifecycle
-    - Exposes a custom element helper `ux` for creating arbitrary HTML elements
+    - Exposes a custom element helper ``ux`` for creating arbitrary HTML elements
 
     """
 

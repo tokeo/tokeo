@@ -3,7 +3,7 @@ Dramatiq integration for asynchronous task processing in Tokeo applications.
 
 Wraps Dramatiq behind a Tokeo extension: a RabbitMQ broker subclass with a
 queue-naming convention for single-active-consumer queues, a Cement
-controller that drives `dramatiq` workers from the application config, and
+controller that drives ``dramatiq`` workers from the application config, and
 optional integration with the diskcache locks for cross-worker rate limiting.
 
 ### Features
@@ -190,7 +190,7 @@ class TokeoDramatiq(MetaMixin):
             except AttributeError as e:
                 self.app.log.debug(f'dramatiq locks unavailable on cache_handler: {e}')
         # alias dramatiq.actor on the instance: pdoc_pre_render swaps the
-        # symbol on both `dramatiq.actor` and `app.dramatiq.actor` so the
+        # symbol on both ``dramatiq.actor`` and ``app.dramatiq.actor`` so the
         # generated docs can render decorators that target either path
         self.actor = dramatiq_actor
         # dramatiq register
@@ -320,9 +320,9 @@ class TokeoDramatiqController(Controller):
     """
     Cement controller that drives Dramatiq workers and locks via CLI.
 
-    Two commands: `serve` spawns the configured worker pool (process +
+    Two commands: ``serve`` spawns the configured worker pool (process +
     thread counts, optional --watch path for actor reload during dev) and
-    `locks` inspects or purges the distributed locks held in diskcache.
+    ``locks`` inspects or purges the distributed locks held in diskcache.
 
     """
 

@@ -35,7 +35,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
     This class implements the Cement framework's mail interface and extends it with
     additional features for comprehensive email communication. The implementation
-    is based on the Python standard library's `smtplib` module.
+    is based on the Python standard library's ``smtplib`` module.
 
     The handler supports various email types including plain text, HTML,
     multipart messages with attachments, and inline images. It also provides
@@ -265,7 +265,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         ### Returns
 
-        - **bool**: `True` if message is sent successfully, `False` otherwise
+        - **bool**: ``True`` if message is sent successfully, ``False`` otherwise
 
         ### Raises
 
