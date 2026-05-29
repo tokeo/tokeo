@@ -43,7 +43,7 @@ def controller_log_info_help(controller):
 
     ### Output
 
-    :  Log the controller's `Meta`.`help` to the application info logger
+    :  Log the controller's ``Meta.help`` to the application info logger
 
     """
     controller.app.log.info(subcmdmeta(controller).parser_options['help'])

@@ -1,6 +1,6 @@
 The actor decorator runs this function asynchronously as a background task.
 
-Actors can also be scheduled and priorized by using `send_with_options`.
+Actors can also be scheduled and priorized by using ``send_with_options``.
 
 ### Actor Configuration
 

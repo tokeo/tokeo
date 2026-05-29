@@ -23,11 +23,11 @@
 ### Where `[environment]` can be one of:
 ### </p>
 ###
-### - `development` - Used during development
-### - `testing` - Used for testing environments
-### - `production` - Used in production deployments
+### - ``development`` - Used during development
+### - ``testing`` - Used for testing environments
+### - ``production`` - Used in production deployments
 ###
-### - `base` - Used for Standard on directory based configurations
+### - ``base`` - Used for Standard on directory based configurations
 ###
 ### ### Overloading Configuration:
 ###
@@ -49,9 +49,9 @@
 ### ### Extende Local Configuration Files:
 ###
 ### <p>
-### Local configuration files (ending with `.local.yaml`) are used for environment-specific
+### Local configuration files (ending with ``.local.yaml``) are used for environment-specific
 ### secrets and settings that should not be checked into source control. These files should
-### be left added to `.gitignore`.
+### be left added to ``.gitignore``.
 ### </p>
 ---
 

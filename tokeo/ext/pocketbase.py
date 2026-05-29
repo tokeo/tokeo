@@ -140,7 +140,7 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         : This method merges the default configuration with any user-provided
             configuration and initializes the PocketBase client. The client is
-            stored in the `pb` attribute and is used by all other methods to
+            stored in the ``pb`` attribute and is used by all other methods to
             interact with the PocketBase server.
 
         """
@@ -374,8 +374,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes
 
         : When creating users or other records with passwords, be sure to include
-            both the `password` and `passwordConfirm` fields with identical values
-            as required by PocketBase.
+            both the ``password`` and ``passwordConfirm`` fields with identical
+            values as required by PocketBase.
 
         """
         # update immutable default arguments
