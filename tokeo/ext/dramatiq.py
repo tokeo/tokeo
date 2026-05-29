@@ -1,18 +1,24 @@
 """
 Dramatiq integration for asynchronous task processing in Tokeo applications.
 
-This module provides integration between the Dramatiq message processing library
-and Tokeo/Cement applications. It offers a complete solution for distributing
-and processing asynchronous tasks across multiple workers using a message broker.
+Wraps Dramatiq behind a Tokeo extension: a RabbitMQ broker subclass with a
+queue-naming convention for single-active-consumer queues, a Cement
+controller that drives `dramatiq` workers from the application config, and
+optional integration with the diskcache locks for cross-worker rate limiting.
 
 ### Features:
 
-- **RabbitMQ broker integration** with extended functionality
-- **Distributed task processing** with configurable worker settings
-- **Dynamic actor reloading** for development workflows
-- **Command-line interface** for worker management
-- **Single-active-consumer queues** through '_unparalleled' naming convention
-- **Integration with diskcache** for distributed locks and rate limiting
+- Single-active-consumer queues via the '_unparalleled' name suffix
+    (RabbitMQ x-single-active-consumer flag set on declare)
+
+- Distributed locks and rate limiting on actors when the diskcache
+    extension is loaded (best-effort: missing without diskcache)
+
+- `dramatiq serve` controller with worker process/thread counts and
+    optional --watch path for actor hot-reload during development
+
+- pdoc render hooks that swap the runtime decorator for a doc-friendly
+    stub so generated docs show `@dramatiq.actor` signatures cleanly
 
 ### Example:
 
@@ -47,10 +53,22 @@ from cement import ex
 import dramatiq
 from dramatiq import middleware, cli, actor as dramatiq_actor
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
+from tokeo.core.exc import TokeoError
 from tokeo.ext.argparse import Controller
 
 
-class ExtendedRabbitmqBrocker(RabbitmqBroker):
+class TokeoDramatiqError(TokeoError):
+    """
+    Exception class for Dramatiq-extension-related errors.
+
+    Used for errors specific to this extension.
+
+    """
+
+    pass
+
+
+class ExtendedRabbitmqBroker(RabbitmqBroker):
     """
     Extended RabbitMQ broker with support for single-active-consumer queues.
 
@@ -61,10 +79,9 @@ class ExtendedRabbitmqBrocker(RabbitmqBroker):
 
     ### Notes:
 
-    : To use this feature, simply include '_unparalleled' in your queue name.
-        For example: 'my_ordered_tasks_unparalleled'
-
-    : Implementation based on solution from the Dramatiq users group:
+    - To use this feature, simply include '_unparalleled' in your queue name,
+        for example: 'my_ordered_tasks_unparalleled'
+    - Implementation based on solution from the Dramatiq users group:
         https://groups.io/g/dramatiq-users/topic/77913723
 
     """
@@ -87,7 +104,7 @@ class ExtendedRabbitmqBrocker(RabbitmqBroker):
         """
         arguments = super()._build_queue_arguments(queue_name)
 
-        if queue_name.strip().lower().find('_unparalleled') >= 0:
+        if '_unparalleled' in queue_name.lower():
             arguments['x-single-active-consumer'] = True
 
         return arguments
@@ -150,22 +167,31 @@ class TokeoDramatiq(MetaMixin):
         )
 
     def _setup(self, app):
+        """
+        Cement post-setup hook: bind to app, merge config defaults, attach
+        the locks handler if diskcache is loaded, register the broker.
+
+        """
         # save pointer to app
         self.app = app
         # prepare the config
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
         # initialize locks handler
         self._locks = None
-        # create a key/value store for locks if diskcache enabled
+        # only attach locks when diskcache provides locks_handler; other
+        # cache backends (memcached, etc.) don't expose that method, so
+        # we skip silently and rely on the locks property to raise on use
         if getattr(self.app._meta, 'cache_handler', None):
             try:
                 self._locks = self.app.cache.locks_handler(
                     self._config('locks_tag'),
                     self._config('locks_key_prefix'),
                 )
-            except Exception:
-                pass
-        # safe references to dramtiq lib
+            except AttributeError as e:
+                self.app.log.debug(f'dramatiq locks unavailable on cache_handler: {e}')
+        # alias dramatiq.actor on the instance: pdoc_pre_render swaps the
+        # symbol on both `dramatiq.actor` and `app.dramatiq.actor` so the
+        # generated docs can render decorators that target either path
         self.actor = dramatiq_actor
         # dramatiq register
         self.register()
@@ -206,11 +232,11 @@ class TokeoDramatiq(MetaMixin):
             TimeLimit, ShutdownNotifications, Callbacks, Pipelines, Retries, and
             CurrentMessage
 
-        : Creates an ExtendedRabbitmqBrocker instance with the configured URL
+        : Creates an ExtendedRabbitmqBroker instance with the configured URL
             and registers it as the global Dramatiq broker
 
         """
-        self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBrocker ...')
+        self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')
         # re-build set of middlewares to use
         use_middleware = [
             m()
@@ -225,13 +251,13 @@ class TokeoDramatiq(MetaMixin):
             ]
         ]
         # create the broker to RabbitMQ based on config
-        rabbitmq_broker = ExtendedRabbitmqBrocker(
+        rabbitmq_broker = ExtendedRabbitmqBroker(
             url=self._config('rabbitmq_url'),
             middleware=use_middleware,
         )
-        # globally set the broker to dramtiq
+        # globally set the broker on dramatiq
         dramatiq.set_broker(rabbitmq_broker)
-        self.app.log.debug('ExtendedRabbitmqBrocker is registered as dramatiq broker')
+        self.app.log.debug('ExtendedRabbitmqBroker is registered as dramatiq broker')
 
     def close(self):
         """
@@ -242,7 +268,7 @@ class TokeoDramatiq(MetaMixin):
 
         ### Notes:
 
-        - Only closes the broker if it's an instance of ExtendedRabbitmqBrocker
+        - Only closes the broker if it's an instance of ExtendedRabbitmqBroker
         - Logs diagnostic messages about the broker closure process
 
         """
@@ -250,12 +276,12 @@ class TokeoDramatiq(MetaMixin):
         # get the current registered broker
         broker = dramatiq.get_broker()
         # check that is equal to the registered one
-        if isinstance(broker, ExtendedRabbitmqBrocker):
+        if isinstance(broker, ExtendedRabbitmqBroker):
             # shutdown the connections
             broker.close()
-            self.app.log.debug('Closed registered ExtendedRabbitmqBrocker')
+            self.app.log.debug('Closed registered ExtendedRabbitmqBroker')
         else:
-            self.app.log.debug('Dramatiq broker instance is not a ExtendedRabbitmqBrocker')
+            self.app.log.debug('Dramatiq broker instance is not a ExtendedRabbitmqBroker')
 
     @property
     def locks(self):
@@ -272,7 +298,7 @@ class TokeoDramatiq(MetaMixin):
 
         ### Raises:
 
-        - **AttributeError**: If the diskcache extension is not enabled
+        - **TokeoDramatiqError**: If the diskcache extension is not enabled
 
         ### Example:
 
@@ -287,23 +313,17 @@ class TokeoDramatiq(MetaMixin):
         if self._locks:
             return self._locks
         else:
-            raise AttributeError('Enable tokeo diskcache extension to allow locks')
+            raise TokeoDramatiqError('Enable tokeo diskcache extension to allow locks')
 
 
 class TokeoDramatiqController(Controller):
     """
-    A Cement controller for managing Dramatiq service workers.
+    Cement controller that drives Dramatiq workers and locks via CLI.
 
-    This controller extends Cement's Controller class, offering
-    functionalities specific to handling Dramatiq workers, including
-    starting workers with configurable settings and reloading actors
-    on file changes.
+    Two commands: `serve` spawns the configured worker pool (process +
+    thread counts, optional --watch path for actor reload during dev) and
+    `locks` inspects or purges the distributed locks held in diskcache.
 
-    ### Notes:
-
-    - Provides CLI commands for managing Dramatiq workers and locks
-
-    - Command-line arguments enable customizing worker behavior at runtime
     """
 
     class Meta:
@@ -318,6 +338,7 @@ class TokeoDramatiqController(Controller):
         epilog = f'Example: {basename(sys.argv[0])} dramatiq serve --skip-logging'
 
     def _setup(self, app):
+        """Cement controller setup hook; delegates to the parent."""
         super(TokeoDramatiqController, self)._setup(app)
 
     # --------------------------------------------------------------------------------------
@@ -346,14 +367,9 @@ class TokeoDramatiqController(Controller):
 
         ### Notes:
 
-        - The `--purge` flag removes all locks from the cache, which can be useful
-            when locks need to be reset after system failures
-
-        - Without arguments, displays information about the lock configuration
-
-        ### Output:
-
-        : Prints lock configuration information or confirmation of purge operation
+        - With --purge: drops all locks from the cache; useful to reset
+            after a worker crash that left a stale acquire behind
+        - Without arguments: prints the cache tag the locks live under
 
         """
         # check if parameter for locks cache
@@ -412,22 +428,23 @@ class TokeoDramatiqController(Controller):
 
         - Worker configuration includes process count, thread count, shutdown
             timeout, restart delay, and queue prefetch settings
+        - With --watch, the command monitors the given directory for changes
+            and reloads actors when files change
 
-        - When using --watch, the command will monitor the specified directory for
-            changes and automatically reload actors when files change
+        - Worker processes log to the console; the call blocks until they
+            terminate (signal, error or shutdown via the management hooks)
 
-        - The command configures Dramatiq CLI arguments and environment variables
-            before delegating to Dramatiq's main function
-
-        ### Output:
-
-        1. Worker processes log their activity to the console
-        1. The command blocks until workers are terminated
+        - At service start the diskcache locks are purged best-effort: a
+            previous worker generation may have left stale acquires behind
+            that would block actors after restart
 
         """
         self.app.log.info('Spin up the dramatiq service workers')
-        # prepare a sys.argv array to contorl the dramatiq main instance
-        # initialize with "this" script (should by the running app)
+        # build a synthetic sys.argv that dramatiq's own argparser will
+        # consume: cli.make_argument_parser().parse_args() reads from
+        # sys.argv directly, so we override it here, then restore the
+        # caller's argv afterwards so internal dramatiq restarts (which
+        # re-exec the python process) see the original command line
         sys.argv = [sys.argv[0]]
         # append some worker settings
         sys.argv.extend(
@@ -439,7 +456,8 @@ class TokeoDramatiqController(Controller):
         sys.argv.extend(
             ['--worker-shutdown-timeout', str(self.app.dramatiq.config('worker_shutdown_timeout'))],
         )
-        # some features ar set by environ
+        # restart_delay and prefetch are env-only on dramatiq's side, no
+        # cli flags exist, so pass them via the environment
         os.environ['dramatiq_restart_delay'] = str(self.app.dramatiq.config('restart_delay'))
         os.environ['dramatiq_queue_prefetch'] = str(self.app.dramatiq.config('queue_prefetch'))
         os.environ['dramatiq_delay_queue_prefetch'] = str(self.app.dramatiq.config('delay_queue_prefetch'))
@@ -462,11 +480,13 @@ class TokeoDramatiqController(Controller):
                 self.app.dramatiq.config('actors'),
             ],
         )
-        # parse sys.argv as dramatiq command line options
+        # parse the synthetic argv we just assembled
         args = cli.make_argument_parser().parse_args()
-        # restore sys.argv for later restart etc. from inside dramatiq
+        # restore sys.argv: dramatiq forks workers and may re-exec on
+        # restart, those processes pick the current sys.argv up again
         sys.argv = [sys.argv[0]] + self.app.argv
-        # initialize locks on service start but ignore if missing
+        # clear stale locks from a previously crashed worker generation;
+        # best-effort since the diskcache extension may not be loaded
         try:
             self.app.dramatiq.locks.purge()
         except Exception:
@@ -474,14 +494,13 @@ class TokeoDramatiqController(Controller):
         # signal hook
         for res in self.app.hook.run('tokeo_dramatiq_pre_start', self.app):
             pass
-        # go and run dramatiq workers with the parsed args
+        # go and run dramatiq workers with the parsed args (blocks)
         result = cli.main(args)
         # signal hook
         for res in self.app.hook.run('tokeo_dramatiq_post_end', self.app):
             pass
         # signal result as exit code
         self.app.exit_code = result
-        return
 
 
 def tokeo_dramatiq_pdoc_pre_render(app):
@@ -620,11 +639,9 @@ def load(app):
 
     ### Notes:
 
-    1. Registers the TokeoDramatiqController for CLI commands
-
-    1. Defines extension-specific hooks that can be used by other extensions
-
-    1. Sets up integration with pdoc for documentation generation
+    - Registers the TokeoDramatiqController for CLI commands
+    - Defines extension-specific hooks that can be used by other extensions
+    - Sets up integration with pdoc for documentation generation
 
     """
     # Define hooks that can be used by other extensions
