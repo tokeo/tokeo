@@ -232,8 +232,10 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         - **collection_id_or_name** (str): The ID or name of the collection
         - **id_** (str): The ID of the record to retrieve
-        - **sort** (str, optional): Sort expression for the query
-            (format: `field,-field`)
+        - **sort** (str, optional): Sort expression passed through to the
+            SDK (format: ``field,-field``). Has no practical effect when
+            fetching a single record by id; kept for SDK passthrough and
+            symmetry with get_list
         - **cache** (bool): Whether to use cached results if available
         - **q** (dict): Additional query parameters to pass to PocketBase
 

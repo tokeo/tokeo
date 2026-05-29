@@ -4,10 +4,10 @@ Disk-based caching system with advanced locking, throttling, and rate limiting.
 This module extends the standard diskcache library to provide a robust caching
 system with additional features including:
 
-1. Distributed locks for synchronization across processes
-1. Rate limiting decorators for API calls and resource management
-1. Concurrency control for resource-intensive operations
-1. Command-line interface for cache inspection and management
+- Distributed locks for synchronization across processes
+- Rate limiting decorators for API calls and resource management
+- Concurrency control for resource-intensive operations
+- Command-line interface for cache inspection and management
 
 The module implements two main rate-control mechanisms:
 - throttle: Limits the rate of function calls over time (token bucket algorithm)
@@ -41,9 +41,11 @@ Example:
 import sys
 from os.path import basename
 from tokeo.ext.argparse import Controller
+from tokeo.core.exc import TokeoError
 from cement import ex
 from cement.core import cache
 from contextlib import contextmanager
+import ast
 import inspect
 import functools
 import diskcache
@@ -51,12 +53,17 @@ import time
 import re
 
 
-class LockError(Exception):
+class TokeoDiskCacheLockError(TokeoError):
     """
     Exception raised for errors during lock operations.
 
     This exception is raised when lock acquisition, release, or other
     lock-related operations fail in the distributed locking system.
+
+    ### Notes
+
+    : Inherits from TokeoError to keep error handling consistent across
+        the framework's extensions
 
     """
 
@@ -167,7 +174,7 @@ class TokeoDiskCacheLocksHandler:
 
         ### Raises
 
-        - **LockError**: If the lock cannot be released
+        - **TokeoDiskCacheLockError**: If the lock cannot be released
 
         """
         lock = diskcache.Lock(self._cache, self._key_prefix + key, tag=self._tag)
@@ -209,7 +216,7 @@ class TokeoDiskCacheLocksHandler:
 
         ### Raises
 
-        - **LockError**: If the lock cannot be acquired or released
+        - **TokeoDiskCacheLockError**: If the lock cannot be acquired or released
 
         ### Example
 
@@ -252,9 +259,9 @@ class TokeoDiskCacheLocksHandler:
         applications.
 
         When the rate limit is exceeded, the decorator will either:
-        1. Block and sleep until enough tokens are available to call the
+        - Block and sleep until enough tokens are available to call the
             function
-        1. Call an alternative callback function if cb_on_locked is
+        - Call an alternative callback function if cb_on_locked is
             provided
 
         ### Args
@@ -984,10 +991,10 @@ class TokeoDiskCacheController(Controller):
         Verify and maintain the cache database.
 
         Performs a series of maintenance operations:
-        1. Checks and fixes database integrity
-        1. Reports cache usage statistics
-        1. Removes expired items
-        1. Counts current cache entries
+        - Checks and fixes database integrity
+        - Reports cache usage statistics
+        - Removes expired items
+        - Counts current cache entries
 
         This command is useful for regular maintenance and troubleshooting.
 
@@ -1206,8 +1213,8 @@ class TokeoDiskCacheController(Controller):
         Remove items from the cache.
 
         Provides two modes of operation:
-        1. Tag-based purging: Removes all items with a specific tag
-        1. Complete purging: Removes all items from the cache
+        - Tag-based purging: Removes all items with a specific tag
+        - Complete purging: Removes all items from the cache
 
         This command requires either --tag or --all options to prevent
         accidental deletion of cache items.
@@ -1367,13 +1374,14 @@ class TokeoDiskCacheController(Controller):
         - int: Integer value
         - float: Floating-point value
         - bool: Boolean value
-        - eval: Python expression to evaluate (use with caution)
+        - eval: parses data literals safely without executing code
 
         ### Notes
 
         - The --value parameter is required
         - Type conversion errors are reported with details
-        - The eval type should be used carefully as it executes Python code
+        - Safe Python literal eval (number, str, list, dict, tuple,
+            bool, None) parsed via ast.literal_eval (use with caution)
 
         """
         key = self.app.pargs.key[0]
@@ -1385,7 +1393,8 @@ class TokeoDiskCacheController(Controller):
         typed_value = None
         try:
             if value_type == 'eval':
-                typed_value = eval(value)
+                # safe: only parses python literals, never executes code
+                typed_value = ast.literal_eval(value)
             elif value_type == 'int':
                 typed_value = int(value)
             elif value_type == 'float':
@@ -1512,9 +1521,9 @@ def load(app):
 
     This function is called by Cement when loading extensions. It:
 
-    1. Sets the default cache handler to TokeoDiskCacheCacheHandler
-    1. Registers the cache handler with the application
-    1. Registers the command-line controller for cache management
+    - Sets the default cache handler to TokeoDiskCacheCacheHandler
+    - Registers the cache handler with the application
+    - Registers the command-line controller for cache management
 
     ### Args
 
