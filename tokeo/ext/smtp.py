@@ -313,7 +313,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             server = smtplib.SMTP(params['host'], params['port'], params['timeout'])
             self.app.log.debug(f'{self._meta.label} : initiating smtp')
 
-        # use server context manager instead try finally to get all original exceptions
+        # use context manager instead try finally to keep all original exceptions
         with server:
             if self.app.debug is True:
                 server.set_debuglevel(9)
@@ -333,7 +333,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         deprecate('3.0.16-1')
 
         if len(res) > 0:  # pragma: nocover  # defensive: unreachable - Mailpit accepts everything
-            self.app.log.error(f"SMTPHandler Errors: {res}")
+            self.app.log.error(f'SMTPHandler Errors: {res}')
             return False
         else:
             return True
