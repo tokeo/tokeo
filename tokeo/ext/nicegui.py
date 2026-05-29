@@ -18,7 +18,7 @@ polling mechanism.
   and custom OpenAPI docs
 - **File watching**: Hot-reloading support during development via Watchdog
 - **Element helper**: Custom HTML elements not directly exposed by NiceGUI via
-  `app.nicegui.ux`
+  ``app.nicegui.ux``
 - **Extensive configuration**: Sensible defaults for most use cases
 - **Complete lifecycle management**: Integrated tightly with Tokeo application
   hooks
