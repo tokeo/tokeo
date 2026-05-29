@@ -2052,7 +2052,7 @@ class TokeoAutomateShell:
         run_args['return_results'] = args.as_json
         run_args['return_outputs'] = not args.without_output
         # run command line wit args
-        if args.threads >= 1:
+        if args.threads > 1:
             res = self.app.automate.run_threaded(args.threads, args.task, **run_args)
         else:
             res = self.app.automate.run_sequential(args.task, **run_args)
@@ -2441,7 +2441,7 @@ class TokeoAutomateController(Controller):
                 kwargs['with_connection'] = self.app.pargs.with_connection
 
         # use the internal processings
-        if self.app.pargs.threads > 0:
+        if self.app.pargs.threads > 1:
             res = self.app.automate.run_threaded(self.app.pargs.threads, self.app.pargs.task, **kwargs)
         else:
             res = self.app.automate.run_sequential(self.app.pargs.task, continue_on_error=self.app.pargs.continue_run, **kwargs)
