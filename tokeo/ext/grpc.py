@@ -25,6 +25,7 @@ from os.path import basename
 from tokeo.ext.argparse import Controller
 from tokeo.core.exc import TokeoError
 from cement.core.meta import MetaMixin
+from cement.core.exc import CaughtSignal
 from cement import ex
 from concurrent import futures
 import grpc
@@ -360,6 +361,12 @@ class TokeoGrpc(MetaMixin):
             except ValueError:
                 sans.append(x509.DNSName(entry))
 
+        # parse validity as int, mirroring the tls_key_size handling above
+        try:
+            valid_days = int(str(self._config('tls_valid_days') or 90))
+        except ValueError:
+            raise TokeoGrpcError('tls_valid_days is not a valid number')
+
         now = datetime.now(timezone.utc)
         cert = (
             x509.CertificateBuilder()
@@ -368,7 +375,7 @@ class TokeoGrpc(MetaMixin):
             .public_key(key.public_key())
             .serial_number(x509.random_serial_number())
             .not_valid_before(now)
-            .not_valid_after(now + timedelta(days=self._config('tls_valid_days')))
+            .not_valid_after(now + timedelta(days=valid_days))
             .add_extension(x509.SubjectAlternativeName(sans), critical=False)
             .sign(key, hashes.SHA256())
         )
@@ -413,14 +420,15 @@ class TokeoGrpc(MetaMixin):
         Start the gRPC server and block until interrupted.
 
         This method starts the server, logs a message indicating the server
-        is listening, and then blocks until a keyboard interrupt is received,
-        at which point it shuts down the server cleanly.
+        is listening, and then blocks until interrupted by a signal, at which
+        point it shuts down the server cleanly.
 
         ### Notes
 
-        1. This method is blocking and is typically called from a CLI command
-
-        1. The server URL is determined from the configuration
+        - This method is blocking and is typically called from a CLI command
+        - The server URL is determined from the configuration
+        - A running cement app converts SIGINT/SIGTERM into CaughtSignal, so
+            both that and a plain KeyboardInterrupt are caught to stop cleanly
 
         ### Output
 
@@ -431,7 +439,10 @@ class TokeoGrpc(MetaMixin):
         self.app.log.info('Grpc server started, listening on ' + self._config('url'))
         try:
             self.server.wait_for_termination()
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, CaughtSignal):
+            # cement turns SIGINT/SIGTERM into CaughtSignal, so a plain
+            # KeyboardInterrupt rarely reaches here; catch both so the server
+            # is always stopped cleanly on interruption
             self.shutdown()
 
 

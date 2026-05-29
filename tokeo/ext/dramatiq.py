@@ -14,11 +14,11 @@ optional integration with the diskcache locks for cross-worker rate limiting.
 - Distributed locks and rate limiting on actors when the diskcache
     extension is loaded (best-effort: missing without diskcache)
 
-- `dramatiq serve` controller with worker process/thread counts and
+- ``dramatiq serve`` controller with worker process/thread counts and
     optional --watch path for actor hot-reload during development
 
 - pdoc render hooks that swap the runtime decorator for a doc-friendly
-    stub so generated docs show `@dramatiq.actor` signatures cleanly
+    stub so generated docs show ``@dramatiq.actor`` signatures cleanly
 
 ### Example
 

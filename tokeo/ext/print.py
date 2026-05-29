@@ -11,9 +11,9 @@ rendering templates.
 
 ### Features
 
-1. **app.print()** - A framework-aware replacement for Python's built-in print()
-1. **app.inspect()** - A detailed inspection utility for examining objects
-1. **Output handlers** - Specialized handlers for different rendering styles:
+- **app.print()** - A framework-aware replacement for Python's built-in print()
+- **app.inspect()** - A detailed inspection utility for examining objects
+- **Output handlers** - Specialized handlers for different rendering styles:
     - Print - Basic text output with hooks
     - Print Dict - Key-value pair rendering for dictionaries
     - Inspect - Detailed object introspection with type information
@@ -70,7 +70,7 @@ def register_tokeo_print(app: App) -> None:
 
     """
 
-    def _print(*args: any, name=None, sep=' ', end='\n', divider=None) -> None:
+    def _print(*args: Any, name=None, sep=' ', end='\n', divider=None) -> None:
         """
         Print output using the application's print handler.
 
@@ -92,7 +92,7 @@ def register_tokeo_print(app: App) -> None:
     app.extend('print', _print)
 
     def _inspect(
-        *args: any,
+        *args: Any,
         name=None,
         system=False,
         methods=False,
@@ -551,13 +551,13 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             self.app.log.debug(f'rendering inspect via {self.__module__}{name}')
             out = self._inspect(
                 data['args'],
-                name=data['name'],
-                system=data['system'],
-                methods=data['methods'],
-                attributes=data['attributes'],
-                values=data['values'],
-                types=data['types'],
-                divider=data['divider'],
+                name=data.get('name'),
+                system=data.get('system', False),
+                methods=data.get('methods', False),
+                attributes=data.get('attributes', False),
+                values=data.get('values', True),
+                types=data.get('types', True),
+                divider=data.get('divider'),
             )
             if 'debug' in data.keys() and data['debug'] is not None and data['debug']:
                 self.app.log.debug(f'>>>\n{out}')

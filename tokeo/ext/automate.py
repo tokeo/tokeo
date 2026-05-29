@@ -325,6 +325,14 @@ class TokeoInvokeRemoteContext(invoke.Context):
             unknown hosts are rejected (RejectPolicy); without, any host is
             accepted (AutoAddPolicy).
 
+        ### Reminders
+
+        .. warning::
+            Without host_keys the client uses AutoAddPolicy and accepts any
+            host key on first contact, which leaves the connection open to
+            man-in-the-middle attacks. Provide host_keys for production or
+            any untrusted network so unknown hosts are rejected.
+
         """
         if self.client is None:
             self.client = paramiko.SSHClient()

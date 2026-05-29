@@ -12,16 +12,13 @@ polling mechanism.
 
 ### Features
 
-- **Isolated UI Contexts**: Enforces multi-user safety by orchestrating routes
-  programmatically
-- **FastAPI integration**: Advanced web functionality, headless REST endpoints,
-  and custom OpenAPI docs
-- **File watching**: Hot-reloading support during development via Watchdog
-- **Element helper**: Custom HTML elements not directly exposed by NiceGUI via
-  ``app.nicegui.ux``
-- **Extensive configuration**: Sensible defaults for most use cases
-- **Complete lifecycle management**: Integrated tightly with Tokeo application
-  hooks
+- Enforces multi-user safety by orchestrating routes programmatically
+  (no global UI elements, per NiceGUI 3.x)
+- Integrates FastAPI for headless REST endpoints and custom OpenAPI docs
+- Hot-reloads during development via Watchdog file watching
+- Exposes a helper for arbitrary HTML elements via ``app.nicegui.ux``
+- Ships sensible configuration defaults for most use cases
+- Manages the full server lifecycle through Tokeo application hooks
 
 """
 
@@ -281,6 +278,13 @@ class TokeoNicegui(MetaMixin):
     - Manages file monitoring for hot-reloading during development
     - Handles application configuration and startup/shutdown lifecycle
     - Exposes a custom element helper ``ux`` for creating arbitrary HTML elements
+
+    ### Reminders
+
+    .. warning::
+        Set a non-empty ``storage_secret`` in production. Without it the
+        signed session and per-user storage is not protected and tampering
+        becomes possible. Leave it unset only for local development.
 
     """
 
@@ -720,6 +724,29 @@ class TokeoNiceguiController(Controller):
         )
 
 
+def _nicegui_decorator_path_param(args):
+    """
+    Read the first positional decorator argument as a display string.
+
+    ### Args
+
+    - **args** (list|None): AST argument nodes of the decorator call
+
+    ### Returns
+
+    - **str|None**: The first argument as a quoted or plain value,
+        '...path...' when it cannot be read, or None when args is None
+
+    """
+    if args is None:
+        return None
+    try:
+        value = args[0].value
+        return f'"{value}"' if isinstance(value, str) else f'{value}'
+    except Exception:
+        return '...path...'
+
+
 def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
     """
     Handle docstrings for nicegui decorators in pdoc.
@@ -748,45 +775,27 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
     - Extracts parameters values for better documentation
 
     """
-    if decorator in ['@app.nicegui.fastapi_app.get', '@fastapi_app.get', '@fa.get']:
-        params = None
-        if args is not None:
-            try:
-                value = args[0].value
-                params = f'"{value}"' if isinstance(value, str) else f'{value}'
-            except Exception:
-                params = '...path...'
-        return dict(
-            decorator=decorator,
-            params=params,
-            docstring=app.pdoc.docstrings('decorator', 'fastapi.get'),
-        )
-    elif decorator in ['@app.nicegui.fastapi_app.post', '@fastapi_app.post', '@fa.post']:
-        params = None
-        if args is not None:
-            try:
-                value = args[0].value
-                params = f'"{value}"' if isinstance(value, str) else f'{value}'
-            except Exception:
-                params = '...path...'
-        return dict(
-            decorator=decorator,
-            params=params,
-            docstring=app.pdoc.docstrings('decorator', 'fastapi.post'),
-        )
-    elif decorator in ['@app.nicegui.ui.page', '@nicegui.ui.page', '@ui.page']:
-        params = None
-        if args is not None:
-            try:
-                value = args[0].value
-                params = f'"{value}"' if isinstance(value, str) else f'{value}'
-            except Exception:
-                params = '...path...'
-        return dict(
-            decorator=decorator,
-            params=params,
-            docstring=app.pdoc.docstrings('decorator', 'nicegui.page'),
-        )
+    # map every accepted decorator alias to its docstring key; all share the
+    # same path-param extraction, so only the docstring key differs
+    docstring_keys = {
+        '@app.nicegui.fastapi_app.get': 'fastapi.get',
+        '@fastapi_app.get': 'fastapi.get',
+        '@fa.get': 'fastapi.get',
+        '@app.nicegui.fastapi_app.post': 'fastapi.post',
+        '@fastapi_app.post': 'fastapi.post',
+        '@fa.post': 'fastapi.post',
+        '@app.nicegui.ui.page': 'nicegui.page',
+        '@nicegui.ui.page': 'nicegui.page',
+        '@ui.page': 'nicegui.page',
+    }
+    key = docstring_keys.get(decorator)
+    if key is None:
+        return None
+    return dict(
+        decorator=decorator,
+        params=_nicegui_decorator_path_param(args),
+        docstring=app.pdoc.docstrings('decorator', key),
+    )
 
 
 def tokeo_nicegui_extend_app(app):

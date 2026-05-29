@@ -7,12 +7,11 @@ configuration options and improved template handling.
 
 ### Features
 
-- **Enhanced environment configuration** with custom options like trim_blocks
-- **Improved template directory** handling and discovery
-- **Configurable through application settings** with sensible defaults
-- **Automatic registration** as the default output and template handlers
-- **Proper inheritance** from Cement's handlers with Tokeo-specific enhancements
-- **Consistent rendering** across all output channels
+- Configures the Jinja2 environment (trim_blocks, keep_trailing_newline)
+    from the 'jinja2' config section
+- Resolves and registers template directories from configuration
+- Registers as the application's default output and template handler
+- Binds tokeo's own 'tokeo.jinja2' template handler for all rendering
 
 """
 
@@ -125,8 +124,15 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
 
         - **app** (Application): The Cement application instance
 
+        ### Notes
+
+        : super()._setup is skipped deliberately; self.env is created in the
+            parent's __init__ (not in _setup), and the base Handler._setup
+            only assigns self.app and defaults config_section when it is None,
+            both of which this method already covers
+
         """
-        # save pointer to app
+        # super()._setup intentionally not called (see Notes above)
         self.app = app
 
         # prepare the config
@@ -210,9 +216,9 @@ def load(app):
 
     ### Notes
 
-    1. Registers the post_setup hook to configure Jinja2
-    1. Registers both the output and template handlers
-    1. Sets the Tokeo Jinja2 handlers as the application defaults
+    - Registers the post_setup hook to configure Jinja2
+    - Registers both the output and template handlers
+    - Sets the Tokeo Jinja2 handlers as the application defaults
 
     """
     app.hook.register('post_setup', tokeo_jinja2_config)
