@@ -90,8 +90,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             'ssl': False,  # Use SSL/TLS connection
             'tls': False,  # Use STARTTLS command
             'auth': False,  # Use SMTP authentication
-            'username': None,  # SMTP username
-            'password': None,  # SMTP password
+            'auth_identity': None,  # SMTP username or identity
+            'auth_password': None,  # SMTP password
             # Email content
             'files': None,  # Attachments or inline images
             # Email encoding options
@@ -204,7 +204,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # Connection parameters always come from configuration
         for item in [
             # fmt: off
-            'ssl', 'tls', 'host', 'port', 'auth', 'username', 'password',
+            'ssl', 'tls', 'host', 'port', 'auth', 'auth_identity', 'auth_password',
             'timeout', 'msgid_domain'
             # fmt: on
         ]:
@@ -323,7 +323,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
                 server.starttls()
 
             if is_true(params['auth']):
-                server.login(params['username'], params['password'])
+                server.login(params['auth_identity'], params['auth_password'])
 
             msg = self._make_message(body, **params)
             res = server.send_message(msg)
@@ -636,7 +636,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         app.mail.send_by_template(
             'emails/welcome',
-            {'username': 'john', 'account_info': account_data},
+            {'user': 'john', 'account_info': account_data},
             to=['john@example.com'],
             files=['/path/to/terms.pdf']
         )
