@@ -12,8 +12,8 @@ This package strictly adheres to a stateless, multi-user safe architecture:
   instantiated in the global scope of any file
 - **Isolated Contexts**: All pages and structural components are defined as
   pure functions and only execute when a user routes to them
-- **Programmatic Routing**: Routes are mapped dynamically in `routes.py` rather
-  than relying on scattered decorators
+- **Programmatic Routing**: Routes are mapped dynamically in module
+  `{{ app_label }}.site.routes` rather than by scattered decorators
 
 ### Package Structure:
 
