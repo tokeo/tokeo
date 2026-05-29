@@ -622,9 +622,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         : The method looks for the following template files:
 
-            - `{template}.title.jinja2`: For subject line (optional)
-            - `{template}.plain.jinja2`: For plain text body (optional)
-            - `{template}.html.jinja2`: For HTML body (optional)
+            - ``{template}.title.jinja2``: For subject line (optional)
+            - ``{template}.plain.jinja2``: For plain text body (optional)
+            - ``{template}.html.jinja2``: For HTML body (optional)
 
         : At least one of plain text or HTML templates should exist.
             The mail_params context variable is provided to templates

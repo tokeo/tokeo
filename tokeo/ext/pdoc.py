@@ -11,7 +11,7 @@ browse the generated HTML during development.
 - Module list resolution from config or the conventional triple
     (app label, tests, tokeo) when modules is unset
 - External docstring source: markdown files under templates/pdoc/docstrings
-    keyed by `{group}/{identifier}` so decorator and extension docs can
+    keyed by ``{group}/{identifier}`` so decorator and extension docs can
     live outside the source they describe
 - Warning filter that drops the noisy PEP-224 variable-docstring warning
     and lifts pdoc 'Error: ...' warnings to a visible ❗ line
