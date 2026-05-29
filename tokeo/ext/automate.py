@@ -476,8 +476,8 @@ class TokeoInvokeRemoteContext(invoke.Context):
 
             # detect the configured sudo match in either stream (one-shot)
             if sudo_pass and (
-                (re.search(sudo_match, stdout_buffer[-sudo_tail:].decode(encoding, errors='replace')) is not None) or
-                (re.search(sudo_match, stderr_buffer[-sudo_tail:].decode(encoding, errors='replace')) is not None)
+                (re.search(sudo_match, stdout_buffer[-sudo_tail:].decode(encoding, errors='replace')) is not None)
+                or (re.search(sudo_match, stderr_buffer[-sudo_tail:].decode(encoding, errors='replace')) is not None)
             ):
                 channel.sendall(sudo_pass.encode(encoding) + b'\n')
                 sudo_pass = None
@@ -1951,13 +1951,10 @@ class TokeoAutomateShell:
                 for host_id in self.app.automate.tasks[task_id]['connection']['hosts']:
                     tasks_host_completion.append(f'{task_id}:{host_id["id"]}')
             # create completer
-            wordlist_show = WordCompleter(
-                sorted(set(tasks_completion))
-            )
+            wordlist_show = WordCompleter(sorted(set(tasks_completion)))
             wordlist_run = WordCompleter(
                 sorted(set(tasks_completion + tasks_host_completion))
-                + ['--with-hosts', '--with-connection', '--continue',
-                   '--verbose', '--as-json', '--without-output', '--threads']
+                + ['--with-hosts', '--with-connection', '--continue', '--verbose', '--as-json', '--without-output', '--threads']
             )
             self._shell_completion = NestedCompleter.from_nested_dict(
                 {
@@ -2062,11 +2059,15 @@ class TokeoAutomateShell:
         # run command line with args
         if args.threads > 1:
             res = self.app.automate.run_threaded(
-                args.threads, args.task, **run_args,
+                args.threads,
+                args.task,
+                **run_args,
             )
         else:
             res = self.app.automate.run_sequential(
-                args.task, continue_on_error=args.continue_run, **run_args,
+                args.task,
+                continue_on_error=args.continue_run,
+                **run_args,
             )
         if args.as_json:
             self.app.print(

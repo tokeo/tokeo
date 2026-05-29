@@ -339,9 +339,7 @@ class TokeoPdoc(MetaMixin):
                 except Exception as e:
                     # drop the module but make the loss debuggable;
                     # bare except would also swallow KeyboardInterrupt
-                    self.app.log.debug(
-                        f'pdoc.Module("{mod}") raised, skipping: {e}'
-                    )
+                    self.app.log.debug(f'pdoc.Module("{mod}") raised, skipping: {e}')
             pdoc.link_inheritance(context)
 
             def recursive_htmls(mod):
@@ -402,7 +400,8 @@ class TokeoPdoc(MetaMixin):
                 configdict = dict()
                 for env in ('base', *ENVIRONMENTS):
                     file_list = self.app.env.get_config_files(
-                        app_env=env, app_config_file_suffix=suffix,
+                        app_env=env,
+                        app_config_file_suffix=suffix,
                     )
                     if env != 'base':
                         local_top = fs.join(config_dir, f'{env}.local{suffix}')
@@ -417,7 +416,7 @@ class TokeoPdoc(MetaMixin):
                             continue
                         section = relpath(filename, config_dir)
                         if section.endswith(suffix):
-                            section = section[:-len(suffix)]
+                            section = section[: -len(suffix)]
                         try:
                             with open(filename, 'r') as f:
                                 configcontent = f.read()

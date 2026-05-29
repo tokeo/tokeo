@@ -108,7 +108,7 @@ class TokeoAppEnv:
             # resolve and align to "<app>" instead of "<app>_test".
             # Otherwise it would be necessary to have a different testing
             # config dir and files when running tests by cements test app.
-            app._meta.label = self.APP_LABEL[:-len('_test')]
+            app._meta.label = self.APP_LABEL[: -len('_test')]
             self.APP_LABEL = app._meta.label
             self.APP_ENV_VAR_NAME = self.APP_LABEL.upper() + '_ENV'
             self.APP_ENV_VAR_VALUE = 'test'

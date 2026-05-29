@@ -231,10 +231,12 @@ def test_temper_process_concurrency_cap(tmp):
     workers = 6
     ctx = spawn_context()
     result_queue = ctx.Queue()
+    # fmt: off
     procs = [
         ctx.Process(target=temper_worker, args=(tmp.dir, count, 0.4, result_queue))
         for _ in range(workers)
     ]
+    # fmt: on
     for proc in procs:
         proc.start()
     results = collect_results(result_queue, workers, total_timeout=60)

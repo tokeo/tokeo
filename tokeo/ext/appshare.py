@@ -75,7 +75,7 @@ class App:
         # the shared app is only set once load() ran; surface that as the
         # real reason instead of a misleading "no attribute" error
         if self._app is None:
-            raise AttributeError(f"shared app not set yet; call appshare.load() first (accessing '{key}')")
+            raise AttributeError(f'shared app not set yet; call appshare.load() first (accessing "{key}")')
         # delegate to the shared app
         return getattr(self._app, key)
 
