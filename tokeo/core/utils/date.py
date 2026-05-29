@@ -15,7 +15,11 @@ def utc_now():
 
 def to_utc(date):
     """
-    Convert a datetime to UTC timezone.
+    Convert a datetime to UTC by recomputing the instant.
+
+    Uses astimezone(), so the source timezone is respected and the wall
+    clock time is shifted accordingly; a naive datetime is assumed to be
+    in the local timezone.
 
     ### Args
 
@@ -23,7 +27,12 @@ def to_utc(date):
 
     ### Returns
 
-    - **datetime**: The datetime converted to UTC timezone
+    - **datetime**: The same instant expressed in UTC
+
+    ### Notes
+
+    : Use this to convert across timezones. To merely label a datetime as
+        UTC without shifting it, use as_utc() instead
 
     """
     return date.astimezone(tz=timezone.utc)
@@ -83,10 +92,10 @@ def parse_timestring_as_utc(date_str):
 
     ### Raises
 
-    - **ValueError**: If the input string is empty
+    - **ValueError**: If the input string is empty or None
 
     """
-    if date_str.strip() == '':
+    if date_str is None or date_str.strip() == '':
         raise ValueError('Can not parse empty string as utc timestring.')
     else:
         return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
@@ -94,19 +103,29 @@ def parse_timestring_as_utc(date_str):
 
 def as_utc(date):
     """
-    Convert a string or datetime to a UTC datetime.
+    Label a string or datetime as UTC without shifting the clock time.
+
+    For a datetime this uses replace(tzinfo=utc), so the wall clock time
+    is kept as-is and only the tzinfo is set. An aware datetime in another
+    timezone is therefore relabelled, not converted. A string is parsed
+    via parse_timestring_as_utc().
 
     ### Args
 
-    - **date** (str|datetime): The date to convert
+    - **date** (str|datetime): The value to interpret as UTC
 
     ### Returns
 
-    - **datetime**: The date converted to UTC timezone
+    - **datetime**: The value carrying UTC tzinfo, same wall clock time
 
     ### Raises
 
     - **ValueError**: If the input type is neither str nor datetime
+
+    ### Notes
+
+    : This assumes the value already represents UTC. To convert a datetime
+        from another timezone into UTC, use to_utc() instead
 
     """
     if isinstance(date, str):

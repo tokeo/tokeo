@@ -1,3 +1,4 @@
+import os
 import types
 import importlib
 from cement.utils.fs import abspath
@@ -17,8 +18,10 @@ def get_module_path(module):
 
     ### Returns
 
-    - **str|None**: Absolute path to the module directory, or None if the module
-      doesn't have a path
+    - **str|None**: Absolute directory path of the module; for a package
+      that is its ``__path__`` directory, for a plain module the directory
+      that contains its file. None when neither is available (e.g. a
+      namespace package or a builtin without a file)
 
     ### Raises
 
@@ -36,5 +39,14 @@ def get_module_path(module):
         obj = importlib.import_module(module)
     else:
         raise TokeoError(f"Can't use {module} as module to get the path")
-    # get the path of the module
-    return abspath(obj.__path__[0]) if (len(obj.__path__) > 0) else None
+    # packages expose __path__ (a list of directories); use the first entry
+    path = getattr(obj, '__path__', None)
+    if path:
+        return abspath(path[0]) if (len(path[0]) > 0) else None
+    # plain modules have no __path__ but a __file__; fall back to the
+    # directory that contains the module file so both kinds resolve alike
+    file = getattr(obj, '__file__', None)
+    if file:
+        return abspath(os.path.dirname(file))
+    # neither path nor file: nothing sensible to return
+    return None

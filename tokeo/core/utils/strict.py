@@ -1,8 +1,8 @@
 """
-The strict  module to ensure that some warnings identified
-as exceptions for security reasons.
+The strict module ensures that certain warnings are treated as
+exceptions for safety reasons.
 
-Just import to the main stage
+Just import it early during application startup.
 
 """
 
