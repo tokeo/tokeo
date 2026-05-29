@@ -25,6 +25,7 @@ from email.mime.image import MIMEImage
 from email import encoders
 from email.utils import format_datetime, make_msgid
 from cement.core import mail
+from cement.core.deprecations import deprecate
 from cement.utils import fs
 from cement.utils.misc import is_true
 
@@ -47,7 +48,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         configuration. The configuration can be overridden per message via keyword
         arguments when sending emails.
 
-    ### See Also
+    ### References
 
     - Python smtplib documentation: https://docs.python.org/library/smtplib.html
     - Email composition guide: https://mailtrap.io/blog/python-send-html-email/
@@ -224,7 +225,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             if len(item) > 2 and item.startswith(('x-', 'X-', 'x_', 'X_')):
                 value = kw.get(item, None)
                 if value is not None:
-                    params[f'X-{item[2:]}'] = value
+                    header_name = f'X-{item[2:].replace("_", "-")}'
+                    params[header_name] = value
 
         return params
 
@@ -311,30 +313,29 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             server = smtplib.SMTP(params['host'], params['port'], params['timeout'])
             self.app.log.debug(f'{self._meta.label} : initiating smtp')
 
-        if self.app.debug is True:
-            server.set_debuglevel(9)
+        try:
+            if self.app.debug is True:
+                server.set_debuglevel(9)
 
-        if is_true(params['tls']):
-            self.app.log.debug(f'{self._meta.label} : initiating tls')
-            server.starttls()
+            if is_true(params['tls']):
+                self.app.log.debug(f'{self._meta.label} : initiating tls')
+                server.starttls()
 
-        if is_true(params['auth']):
-            server.login(params['username'], params['password'])
+            if is_true(params['auth']):
+                server.login(params['username'], params['password'])
 
-        msg = self._make_message(body, **params)
-        res = server.send_message(msg)
+            msg = self._make_message(body, **params)
+            res = server.send_message(msg)
+        finally:
+            server.quit()
 
-        server.quit()
-
-        # FIXME: should deprecate for 3.0 and change in 3.2
-        # For smtplib this would be "senderrs" (dict), but for backward compat
-        # we need to return bool
+        # Deprecation: bool return will change to senderrs dict
         # https://github.com/python/cpython/blob/3.13/Lib/smtplib.py#L899
-        if len(res) > 0:
-            # this will be difficult to test with Mailpit
-            # as it accepts everything... no cover
-            self.app.log.error(f'SMTPHandler Errors: {res}')  # pragma: nocover
-            return False  # pragma: nocover
+        deprecate('3.0.16-1')
+
+        if len(res) > 0:  # pragma: nocover  # defensive: unreachable - Mailpit accepts everything
+            self.app.log.error(f"SMTPHandler Errors: {res}")
+            return False
         else:
             return True
 
@@ -413,17 +414,6 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         partText = None
         partHtml = None
 
-        # Validate and process the body argument
-        if type(body) not in [str, tuple, dict]:
-            error_msg = (
-                # fmt: off
-                "Message body must be string, tuple "
-                "('<text>', '<html>') or dict "
-                "{'text': '<text>', 'html': '<html>'}"
-                # fmt: on
-            )
-            raise TypeError(error_msg)
-
         # Extract text and HTML parts from the body argument
         if isinstance(body, str):
             # String body = plain text only
@@ -444,6 +434,14 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             # Process HTML part if provided
             if 'html' in body and str.strip(body['html']) != '':
                 partHtml = MIMEText(str.strip(body['html']), 'html', _charset=cs_body)
+        else:
+            raise TypeError(
+                # fmt: off
+                "Message body must be string, "
+                "tuple ('<text>', '<html>') or "
+                "dict {'text': '<text>', 'html': '<html>'}"
+                # fmt: on
+            )
 
         # To define the correct message content-type
         # we need to indentify the content of this mail.
