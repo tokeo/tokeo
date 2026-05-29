@@ -4,9 +4,3 @@
 
 
 
-test_ext_smtp:
-  ### define non secret testing set
-  port: 225
-  timeout: 30
-  tls: true
-  auth: true
