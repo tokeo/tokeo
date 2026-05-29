@@ -1955,7 +1955,9 @@ class TokeoAutomateShell:
                 sorted(set(tasks_completion))
             )
             wordlist_run = WordCompleter(
-                sorted(set(tasks_completion + tasks_host_completion)) + ['--verbose', '--as-json', '--without-output', '--threads']
+                sorted(set(tasks_completion + tasks_host_completion))
+                + ['--with-hosts', '--with-connection', '--continue',
+                   '--verbose', '--as-json', '--without-output', '--threads']
             )
             self._shell_completion = NestedCompleter.from_nested_dict(
                 {
@@ -2051,11 +2053,21 @@ class TokeoAutomateShell:
         run_args['verbose'] = args.verbose
         run_args['return_results'] = args.as_json
         run_args['return_outputs'] = not args.without_output
-        # run command line wit args
+        # only set host/connection overrides if explicitly provided so the task's
+        # configured connection is used by default
+        if args.with_hosts:
+            run_args['with_hosts'] = args.with_hosts
+        if args.with_connection:
+            run_args['with_connection'] = args.with_connection
+        # run command line with args
         if args.threads > 1:
-            res = self.app.automate.run_threaded(args.threads, args.task, **run_args)
+            res = self.app.automate.run_threaded(
+                args.threads, args.task, **run_args,
+            )
         else:
-            res = self.app.automate.run_sequential(args.task, **run_args)
+            res = self.app.automate.run_sequential(
+                args.task, continue_on_error=args.continue_run, **run_args,
+            )
         if args.as_json:
             self.app.print(
                 jsonDump(
@@ -2140,6 +2152,9 @@ class TokeoAutomateShell:
             # tasks run command
             cmd = sub.add_parser('run', help='run task(s)')
             cmd.add_argument('task', nargs='+', help='task_id(s)[:host] to run')
+            cmd.add_argument('--with-hosts', type=str, default=None, help='override hosts by id or user[:password]@host[:port] string')
+            cmd.add_argument('--with-connection', type=str, default=None, help='override connection by id')
+            cmd.add_argument('--continue', dest='continue_run', action='store_true', help='continue with next task(s) also having errors')
             cmd.add_argument('--verbose', action='store_true', help='show output from command execution')
             cmd.add_argument('--as-json', action='store_true', help='show results as json')
             cmd.add_argument('--without-output', action='store_true', help='hide outputs from stdout and stderr')
