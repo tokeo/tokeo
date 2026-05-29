@@ -95,9 +95,9 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
 
     """
 
-    def __init__(self, *, url=None, auth_identity=None, auth_password=None,
-                 tls_verify_hostname=True, tls_verify_cert=True, tls_ca=None,
-                 **kwargs):
+    def __init__(
+        self, *, url=None, auth_identity=None, auth_password=None, tls_verify_hostname=True, tls_verify_cert=True, tls_ca=None, **kwargs
+    ):
         """
         Initialize the broker, applying credentials and tls to the connection.
 
@@ -131,7 +131,9 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
         context = server_hostname = None
         if url and url.lower().startswith('amqps'):
             context, server_hostname = tls_create_ssl_context(
-                tls_verify_hostname, tls_verify_cert, tls_ca,
+                tls_verify_hostname,
+                tls_verify_cert,
+                tls_ca,
             )
         if context is None:
             # plain amqp, or amqps with secure defaults where pika builds its
@@ -143,13 +145,15 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
             # ConnectionParameters carrying our ssl_options instead
             params = pika.URLParameters(url)
             super().__init__(
-                parameters=[dict(
-                    host=params.host,
-                    port=params.port,
-                    virtual_host=params.virtual_host,
-                    credentials=params.credentials,
-                    ssl_options=pika.SSLOptions(context, server_hostname),
-                )],
+                parameters=[
+                    dict(
+                        host=params.host,
+                        port=params.port,
+                        virtual_host=params.virtual_host,
+                        credentials=params.credentials,
+                        ssl_options=pika.SSLOptions(context, server_hostname),
+                    )
+                ],
                 **kwargs,
             )
 
