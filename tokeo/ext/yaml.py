@@ -156,10 +156,15 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
         # Process each top-level section in the input dictionary
         for section in list(dict_obj.keys()):
+            # special debug value in foundation gets ignored
+            if section == 'debug':
+                continue
+            # get the content for section
+            section_content = dict_obj.get(section, None)
             # every top-level entry must be a config section (a dict); a
             # non-dict here means malformed config, so fail loud instead
             # of silently dropping it
-            if not isinstance(dict_obj[section], dict):
+            if section_content is not None and not isinstance(section_content, dict):
                 raise ValueError(
                     f'config section "{section}" must be a dict, '
                     f'got "{type(dict_obj[section]).__name__}"'
@@ -168,6 +173,10 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
             # Create section if it doesn't exist
             if section not in self.get_sections():
                 self.add_section(section)
+
+            # skip None section
+            if section_content is None:
+                continue
 
             # Process each key in the section
             for key in list(dict_obj[section].keys()):
