@@ -5,13 +5,13 @@ This module acts as the central registry for all web pages and API endpoints.
 It imports isolated page and API functions and binds them to specific URL
 paths using NiceGUI and FastAPI's programmatic routers.
 
-### Route Structure:
+### Route Structure
 
 Routes are defined as pure, stateless functions in the `pages/` and `apis/`
 directories, and are mapped to URL paths in this file via dictionaries or
 direct programmatic calls.
 
-### Usage:
+### Usage
 
 To add a new page or API endpoint to your application:
 
@@ -19,7 +19,7 @@ To add a new page or API endpoint to your application:
 2. Import it into this module.
 3. Add it to the `pages` mapping dictionary or API registry.
 
-### Example of adding a new page dynamically:
+### Example of adding a new page dynamically
 
 ```python
 from .pages import page_catalog
@@ -34,13 +34,13 @@ def pages_map():
         ui.page(path, title=f'Tokeo - {path[2:]}')(method)
 ```
 
-### Notes:
+### Notes
 
 - `ui.page()` and `fastapi_app.get()` are used as programmatic wrappers in a loop,
   not as decorators
 - The `routes()` function is invoked by the `TokeoNicegui` engine during startup
 
-### Attention:
+### Attention
 
 .. danger::
     **(NiceGUI 3.x Architecture):** Absolutely no UI elements (`ui.label`,

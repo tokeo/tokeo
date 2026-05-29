@@ -6,7 +6,7 @@ Implements the service defined in the .proto file. The generated
 and stub classes; {{ app_class_name }}Servicer subclasses the generated
 servicer base and fills in the actual rpc methods.
 
-### Notes:
+### Notes
 
 - The running app is reached through the shared instance from
     tokeo.ext.appshare, so the servicer needs no app reference passed in

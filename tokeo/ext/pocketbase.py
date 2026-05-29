@@ -11,7 +11,7 @@ throughout your Tokeo application, that maps the usual CRUD methods onto
 PocketBase collections. Operations beyond that surface (such as auth flows)
 are reached through the raw SDK via the collection() escape hatch.
 
-### Features:
+### Features
 
 - Seamless integration with Tokeo applications
 - Simple CRUD operations for PocketBase collections
@@ -20,7 +20,7 @@ are reached through the raw SDK via the collection() escape hatch.
 - Direct SDK access through the collection() escape hatch for anything
   beyond the CRUD surface (auth flows, file fields, schema, etc.)
 
-### Example:
+### Example
 
 ```python
     # Get data from a collection with filtering and sorting
@@ -63,7 +63,7 @@ class TokeoPocketBaseHandler(MetaMixin):
     collections. For anything outside that surface, collection() hands
     back the raw SDK collection object.
 
-    ### Notes:
+    ### Notes
 
     - The handler is registered as 'db' and is reached through app.db. It
       is a thin convenience layer over the PocketBase SDK, not a wrapper
@@ -82,7 +82,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         """
         Handler meta-data configuration.
 
-        ### Notes:
+        ### Notes
 
         : This class defines the configuration section, default values,
             and unique identifier required by the Cement framework for
@@ -108,13 +108,13 @@ class TokeoPocketBaseHandler(MetaMixin):
         Sets up the handler and prepares it for use with the Tokeo application.
         The actual PocketBase client initialization happens in the _setup method.
 
-        ### Args:
+        ### Args
 
         - **app**: The Tokeo application instance
         - ***args**: Variable length argument list passed to parent initializer
         - ****kw**: Arbitrary keyword arguments passed to parent initializer
 
-        ### Notes:
+        ### Notes
 
         : This constructor only stores the application reference. The actual
             PocketBase client initialization is deferred until the _setup method
@@ -132,11 +132,11 @@ class TokeoPocketBaseHandler(MetaMixin):
         This method is called by the framework after all configuration
         has been loaded.
 
-        ### Args:
+        ### Args
 
         - **app**: The Tokeo application instance
 
-        ### Notes:
+        ### Notes
 
         : This method merges the default configuration with any user-provided
             configuration and initializes the PocketBase client. The client is
@@ -157,13 +157,13 @@ class TokeoPocketBaseHandler(MetaMixin):
         This is a simple wrapper around the application's config.get method
         that automatically uses the correct configuration section.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Configuration key to retrieve
         - **kwargs**: Additional arguments passed to config.get(), such as
             default values
 
-        ### Returns:
+        ### Returns
 
         - **Any**: Configuration value for the specified key
 
@@ -190,15 +190,15 @@ class TokeoPocketBaseHandler(MetaMixin):
         directly with the PocketBase SDK. This provides access to all
         native SDK functionality not specifically wrapped by the handler's methods.
 
-        ### Args:
+        ### Args
 
         - **collection_id_or_name** (str): The ID or name of the collection
 
-        ### Returns:
+        ### Returns
 
         - **Collection**: A PocketBase collection object, provides direct SDK access
 
-        ### Example:
+        ### Example
 
         ```python
         # Get direct access to a collection
@@ -211,7 +211,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         schema = users_collection.get_schema()
         ```
 
-        ### Notes:
+        ### Notes
 
         : While most common operations are available through the handler's
             higher-level methods, this method provides access to the underlying
@@ -228,7 +228,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         Fetches a record by its unique ID from the specified collection,
         with options for caching, sorting, and additional query parameters.
 
-        ### Args:
+        ### Args
 
         - **collection_id_or_name** (str): The ID or name of the collection
         - **id_** (str): The ID of the record to retrieve
@@ -237,15 +237,15 @@ class TokeoPocketBaseHandler(MetaMixin):
         - **cache** (bool): Whether to use cached results if available
         - **q** (dict): Additional query parameters to pass to PocketBase
 
-        ### Returns:
+        ### Returns
 
         - **Record**: The requested record data with all its fields
 
-        ### Raises:
+        ### Raises
 
         - **Exception**: If record retrieval fails (e.g., record not found)
 
-        ### Example:
+        ### Example
 
         ```python
         # Get a single user record
@@ -271,7 +271,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         Fetches multiple records from the specified collection with support for
         pagination, filtering, sorting, and additional query parameters.
 
-        ### Args:
+        ### Args
 
         - **collection_id_or_name** (str): The ID or name of the collection
         - **page** (int): The page number to retrieve (1-based)
@@ -281,7 +281,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         - **cache** (bool): Whether to use cached results if available
         - **q** (dict): Additional query parameters to pass to PocketBase
 
-        ### Returns:
+        ### Returns
 
         - **ResultList**: Paginated result object with the following attributes:
 
@@ -291,11 +291,11 @@ class TokeoPocketBaseHandler(MetaMixin):
             - **totalItems**: Total number of items across all pages
             - **totalPages**: Total number of pages
 
-        ### Raises:
+        ### Raises
 
         - **Exception**: If the query fails
 
-        ### Example:
+        ### Example
 
         ```python
         # Get a basic list of users
@@ -320,7 +320,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             next_page = app.db.get_list('posts', page=posts.page+1)
         ```
 
-        ### Notes:
+        ### Notes
 
         : The filter parameter uses PocketBase's filter syntax, which is similar to
             JavaScript expressions. You can use logical operators (&&, ||),
@@ -342,21 +342,21 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         Creates a new record with the specified fields in the given collection.
 
-        ### Args:
+        ### Args
 
         - **collection_id_or_name** (str): The ID or name of the collection
         - **create_fields** (dict): The fields for the new record
         - **q** (dict): Additional query parameters to pass to PocketBase
 
-        ### Returns:
+        ### Returns
 
         - **Record**: The newly created record with all its fields
 
-        ### Raises:
+        ### Raises
 
         - **Exception**: If record creation fails
 
-        ### Example:
+        ### Example
 
         ```python
         # Create a basic record
@@ -371,7 +371,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         print(f"Created record with ID: {new_product.id}")
         ```
 
-        ### Notes:
+        ### Notes
 
         : When creating users or other records with passwords, be sure to include
             both the `password` and `passwordConfirm` fields with identical values
@@ -391,22 +391,22 @@ class TokeoPocketBaseHandler(MetaMixin):
         Updates an existing record with new field values. Only specified fields
         will be updated; others remain unchanged.
 
-        ### Args:
+        ### Args
 
         - **collection_id_or_name** (str): The ID or name of the collection
         - **id_** (str): The ID of the record to update
         - **update_fields** (dict): The fields to update
         - **q** (dict): Additional query parameters to pass to PocketBase
 
-        ### Returns:
+        ### Returns
 
         - **Record**: The updated record with all its fields
 
-        ### Raises:
+        ### Raises
 
         - **Exception**: If record update fails (e.g., record not found)
 
-        ### Example:
+        ### Example
 
         ```python
         # Update basic fields
@@ -422,7 +422,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         })
         ```
 
-        ### Notes:
+        ### Notes
 
         : Updates are partial by default, meaning only the fields specified in
             update_fields will be modified. To remove a field value, set it to null
@@ -441,22 +441,22 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         Permanently removes a record from the specified collection.
 
-        ### Args:
+        ### Args
 
         - **collection_id_or_name** (str): The ID or name of the collection
         - **id_** (str): The ID of the record to delete
         - **q** (dict): Additional query parameters to pass to PocketBase
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the deletion was successful
 
-        ### Raises:
+        ### Raises
 
         - **Exception**: If record deletion fails (e.g., record not found
             or unauthorized)
 
-        ### Example:
+        ### Example
 
         ```python
         try:
@@ -468,7 +468,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             print(f"Failed to delete record: {str(e)}")
         ```
 
-        ### Notes:
+        ### Notes
 
         : Deletion is permanent and cannot be undone. For sensitive data, consider
             implementing soft deletes by updating a status field instead of
@@ -488,11 +488,11 @@ def pocketbase_extend_app(app):
     This function adds the PocketBase handler to the application and
     initializes it, making it available as app.db throughout the application.
 
-    ### Args:
+    ### Args
 
     - **app**: The Tokeo application instance
 
-    ### Notes:
+    ### Notes
 
     : This function is called automatically during the application's post_setup
         phase. It creates an instance of TokeoPocketBaseHandler, configures it,
@@ -509,11 +509,11 @@ def pocketbase_close(app):
 
     Pre_close hook that delegates to the handler's close() method.
 
-    ### Args:
+    ### Args
 
     - **app**: The Tokeo application instance
 
-    ### Notes:
+    ### Notes
 
     : Called automatically during the application's pre_close phase. It
         invokes app.db.close(), which is a deliberate no-op (the handler
@@ -531,11 +531,11 @@ def load(app):
     integration with the Tokeo application framework. It's called automatically
     when the extension is loaded.
 
-    ### Args:
+    ### Args
 
     - **app**: The Tokeo application instance
 
-    ### Example:
+    ### Example
 
     ```python
     # In your application configuration:
@@ -547,7 +547,7 @@ def load(app):
             ]
     ```
 
-    ### Notes:
+    ### Notes
 
     : This function performs three key actions:
 

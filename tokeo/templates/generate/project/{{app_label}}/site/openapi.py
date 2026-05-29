@@ -13,7 +13,7 @@ NiceGUI UI engine entirely and are registered programmatically. The default
 pathes are `/_/openapi/info` for Swagger UI and `/_/openapi/docs` for ReDoc
 documentation pages. The OpenAPI schema is at `/_/openapi/openapi.json`.
 
-### Notes:
+### Notes
 
 - The OpenAPI schema is generated using FastAPI's built-in utilities
 - Custom branding is applied including favicon integration
@@ -75,12 +75,12 @@ def get_openapi_custom():
     title, description, version, contact info, and license details. The schema
     is cached in the FastAPI application instance for subsequent requests.
 
-    ### Returns:
+    ### Returns
 
     - **dict**: Complete OpenAPI schema dictionary with all application routes
       and custom metadata
 
-    ### Notes:
+    ### Notes
 
     : The function implements a caching mechanism. If the schema is already
       generated and stored in app.nicegui.fastapi_app.openapi_schema, it will
@@ -132,11 +132,11 @@ async def custom_swagger_ui_html():
     API documentation. The endpoint is mounted programmatically by the
     NiceGUI extension orchestrator.
 
-    ### Returns:
+    ### Returns
 
     - **HTMLResponse**: Rendered Swagger UI HTML documentation page
 
-    ### Notes:
+    ### Notes
 
     : This endpoint is excluded from the API schema itself via the
       include_in_schema=False parameter to avoid recursive documentation.
@@ -162,11 +162,11 @@ async def custom_redoc_html():
     with an alternative UI to Swagger. The endpoint is mounted programmatically
     by the NiceGUI extension orchestrator.
 
-    ### Returns:
+    ### Returns
 
     - **HTMLResponse**: Rendered ReDoc HTML documentation page
 
-    ### Notes:
+    ### Notes
 
     : This endpoint is excluded from the API schema itself via the
       include_in_schema=False parameter to avoid recursive documentation.

@@ -79,12 +79,6 @@ variables:
     case: "upper"
     default: "Y"
 
-  - name: feature_nicegui
-    prompt: "Enable nicegui [(Y)es/(N)o]"
-    validate: "^[YN]$"
-    case: "upper"
-    default: "Y"
-
   - name: feature_pocketbase
     prompt: "Enable pocketbase [(Y)es/(N)o]"
     validate: "^[YN]$"
@@ -96,3 +90,14 @@ variables:
     validate: "^[YN]$"
     case: "upper"
     default: "Y"
+
+features:
+  - name: feature_nicegui
+    prompt: "Enable nicegui [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    options:
+      - value: "N"
+        ignore:
+          - '.*/{{app_label}}/site($|.*)'

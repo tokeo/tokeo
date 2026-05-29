@@ -6,7 +6,7 @@ modules, applies a Tokeo-specific config.mako, plugs in custom decorator
 docstrings via external markdown files, and an HTTP server controller to
 browse the generated HTML during development.
 
-### Features:
+### Features
 
 - Module list resolution from config or the conventional triple
     (app label, tests, tokeo) when modules is unset
@@ -56,7 +56,7 @@ class TokeoPdocError(TokeoError):
     This class is used to raise and catch exceptions that are specific to
     the Tokeo Pdoc extension functionality.
 
-    ### Notes:
+    ### Notes
 
     - Inherits from TokeoError to maintain consistent error handling
     - Used to indicate configuration or documentation generation issues
@@ -74,7 +74,7 @@ class TokeoPdoc(MetaMixin):
     Python source code docstrings using the pdoc library. It supports custom
     templates, docstring loading from external files, and a built-in web server.
 
-    ### Notes:
+    ### Notes
 
     - Automatically generates documentation for the application module,
         tests, and tokeo
@@ -88,7 +88,7 @@ class TokeoPdoc(MetaMixin):
         """
         Extension meta-data and configuration defaults.
 
-        ### Notes:
+        ### Notes
 
         - The config section is 'pdoc' in the application configuration
         - Default configuration provides reasonable starting values
@@ -119,7 +119,7 @@ class TokeoPdoc(MetaMixin):
 
         Sets up the docstring cache and loads the default docstring templates.
 
-        ### Args:
+        ### Args
 
         - ***args**: Positional arguments passed to the parent class
         - ****kw**: Keyword arguments passed to the parent class
@@ -140,15 +140,15 @@ class TokeoPdoc(MetaMixin):
         Initializes the extension with application configuration settings
         and determines which modules to document.
 
-        ### Args:
+        ### Args
 
         - **app** (Application): The Cement application instance
 
-        ### Returns:
+        ### Returns
 
         - **TokeoPdoc**: Self reference for method chaining
 
-        ### Raises:
+        ### Raises
 
         - **TokeoPdocError**: If the modules configuration is invalid
 
@@ -187,12 +187,12 @@ class TokeoPdoc(MetaMixin):
         This is a convenient wrapper around the application's config.get method,
         accessing values from the extension's config section.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Configuration key to retrieve
         - **kwargs**: Additional arguments passed to config.get()
 
-        ### Returns:
+        ### Returns
 
         - **Any**: The configuration value for the specified key
 
@@ -207,16 +207,16 @@ class TokeoPdoc(MetaMixin):
         Results are cached for repeated access. This allows for maintaining complex
         docstrings in dedicated files rather than embedding them in code.
 
-        ### Args:
+        ### Args
 
         - **group** (str): The group category for the docstring (e.g., 'decorator')
         - **identifier** (str): The specific identifier within the group
 
-        ### Returns:
+        ### Returns
 
         - **str|None**: The docstring content if found, or None if not found
 
-        ### Notes:
+        ### Notes
 
         - Searches in all registered docstrings directories for a matching file
             with the path pattern `{dir}/{group}/{identifier}.md`
@@ -250,13 +250,13 @@ class TokeoPdoc(MetaMixin):
         Filters out common noisy warnings during the documentation generation
         process while still displaying important warnings to the user.
 
-        ### Args:
+        ### Args
 
         - **message** (str): The warning message
         - ***args**: Additional warning information
         - ****kwargs**: Keyword arguments for the warning handler
 
-        ### Notes:
+        ### Notes
 
         - Silently ignores PEP-224 variable docstring warnings
         - Lifts pdoc 'Error: ...' warnings to a visible ❗ line; other
@@ -284,7 +284,7 @@ class TokeoPdoc(MetaMixin):
         1. Creates an index.html file
         1. Runs post-render hooks for cleanup
 
-        ### Notes:
+        ### Notes
 
         - Heals modules that lack __file__ or a docstring before rendering
             so pdoc.html() does not crash downstream
@@ -479,13 +479,13 @@ class TokeoPdoc(MetaMixin):
         documentation. This method is non-blocking - the server runs in
         a separate thread.
 
-        ### Notes:
+        ### Notes
 
         - This method only starts the server but doesn't block execution
         - Use the serve() method to start the server and block until interrupted
         - The server serves files from the configured output directory
 
-        ### Raises:
+        ### Raises
 
         - **TokeoPdocError**: If the server cannot be started
 
@@ -530,7 +530,7 @@ class TokeoPdoc(MetaMixin):
         Stops the HTTP server immediately without waiting for ongoing
         connections to complete.
 
-        ### Notes:
+        ### Notes
 
         - Safely handles the case where the server was never started
         - Cleans up server resources to prevent resource leaks
@@ -554,7 +554,7 @@ class TokeoPdoc(MetaMixin):
         1. Blocks until a keyboard interrupt (Ctrl+C) is received
         1. Shuts down the server cleanly
 
-        ### Notes:
+        ### Notes
 
         - This method is blocking and is typically called from a CLI command
         - The server URL is determined from the host and port configuration
@@ -587,7 +587,7 @@ class TokeoPdocController(Controller):
     This controller provides command-line commands for generating and serving
     documentation using the pdoc extension.
 
-    ### Notes:
+    ### Notes
 
     : Provides commands for both static documentation generation and
         serving documentation via a web server
@@ -615,7 +615,7 @@ class TokeoPdocController(Controller):
         """
         Set up the controller with the application.
 
-        ### Args:
+        ### Args
 
         - **app** (Application): The Cement application instance
 
@@ -671,7 +671,7 @@ class TokeoPdocController(Controller):
         This command starts an HTTP server that serves the generated
         documentation, making it accessible through a web browser.
 
-        ### Notes:
+        ### Notes
 
         - The server host and port are configurable in the application config
         - The configs can also be set by env vars like MYAPP_PDOC_PORT
@@ -691,7 +691,7 @@ def tokeo_pdoc_render_decorator(app, func, decorator, args, kwargs):
     during pdoc documentation rendering. It extracts information from
     the decorator and retrieves appropriate docstrings.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
     - **func** (function): The function being decorated
@@ -699,11 +699,11 @@ def tokeo_pdoc_render_decorator(app, func, decorator, args, kwargs):
     - **args** (list): Positional arguments to the decorator
     - **kwargs** (dict): Keyword arguments to the decorator
 
-    ### Returns:
+    ### Returns
 
     - **dict|None**: Dictionary with decorator information or None if not handled
 
-    ### Notes:
+    ### Notes
 
     - Currently handles the @contextmanager and @ex/@expose decorators
     - For supported decorators, returns information about the decorator
@@ -732,11 +732,11 @@ def tokeo_pdoc_extend_app(app):
     This function creates a TokeoPdoc instance and attaches it to the
     application, making it available as app.pdoc.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     - This function is called during application setup
     - It creates the TokeoPdoc instance and attaches it to the app
@@ -756,11 +756,11 @@ def load(app):
     the controller, defines hooks, and sets up initialization handlers for
     pdoc integration.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     - Registers the TokeoPdocController for CLI commands
     - Defines extension-specific hooks for pre/post rendering

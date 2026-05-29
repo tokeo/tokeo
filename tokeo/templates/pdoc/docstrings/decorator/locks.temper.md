@@ -15,7 +15,7 @@ When the concurrent limit is reached, the decorator will either:
 The decorator maintains a counter of available slots. Each call decrements
 the counter. When the function completes, the counter is incremented again.
 
-### Args:
+### Args
 
 - **count** (int): Maximum number of concurrent calls allowed
 - **name** (str, optional): Custom cache key name for this temper instance
@@ -25,11 +25,11 @@ the counter. When the function completes, the counter is incremented again.
 - **cb_on_locked** (callable, optional): Function to call on limit instead of waiting
 - **verbose** (bool, optional): Whether to log tempering information. Defaults to True.
 
-### Returns:
+### Returns
 
 - **callable**: The decorated function with concurrency control applied
 
-### Example:
+### Example
 
 ```python
 @app.cache.locks.temper(count=3)
@@ -39,7 +39,7 @@ def resource_intensive_operation(data):
     return process_large_dataset(data)
 ```
 
-### Notes:
+### Notes
 
 - The temper state persists in the cache based on the function
     name or custom name/name_f parameter

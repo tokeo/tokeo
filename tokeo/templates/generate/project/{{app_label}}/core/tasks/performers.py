@@ -7,7 +7,7 @@ Performers act as intermediaries between controllers and asynchronous workers,
 handling database interactions, business logic, and initiating asynchronous
 processing via dramatiq actors.
 
-### Features:
+### Features
 
 - **Controller-invoked workflows** for handling business requests
 - **Database interaction** with PocketBase collections
@@ -15,7 +15,7 @@ processing via dramatiq actors.
 - **Asynchronous processing** through dramatiq actors
 - **Reusable business operations** for consistent implementation
 
-### Usage:
+### Usage
 
 Define performer functions that orchestrate complex operations:
 
@@ -67,7 +67,7 @@ def process(self):
         self.app.log.error(f"Order processing failed: {result['reason']}")
 ```
 
-### Notes:
+### Notes
 
 - Performers act as the bridge between synchronous requests and asynchronous
     processing

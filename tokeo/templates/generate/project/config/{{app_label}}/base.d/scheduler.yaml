@@ -10,12 +10,12 @@
 ###
 ### <p>
 ### <br/>
-### Crontab schema:
+### Crontab schema
 ### </p>
 ### : Min, Hour, Day (Month), Month, Day (Week)
 ###
 ### <p>
-### Examples:
+### Examples
 ### </p>
 ###
 ### - '*'    means 'every'

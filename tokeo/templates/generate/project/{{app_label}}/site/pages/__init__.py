@@ -5,7 +5,7 @@ This module explicitly defines the available page functions using the __all__
 list. This allows the programmatic router in site/routes.py to import and
 index them cleanly without triggering linter warnings for unused imports.
 
-### Notes:
+### Notes
 
 - Every new page function created in this directory should be imported
   here and added to the __all__ list

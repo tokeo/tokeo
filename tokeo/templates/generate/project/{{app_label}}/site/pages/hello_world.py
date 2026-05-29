@@ -21,7 +21,7 @@ def page_hello_world():
     This function is executed dynamically by the Tokeo router. It demonstrates
     adding custom styled content within the shared layout block.
 
-    ### Notes:
+    ### Notes
 
     - Uses the standard page layout for UI consistency
     - Demonstrates adding custom styled content to a page

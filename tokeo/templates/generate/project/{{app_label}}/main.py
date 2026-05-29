@@ -33,7 +33,7 @@ class {{ app_class_name }}(App):
     Cement framework for command-line parsing, configuration management,
     logging, and more.
 
-    ### Notes:
+    ### Notes
 
     - The application includes several extensions by default:
         colorlog, generate, pdoc, print, jinja2, yaml and others
@@ -117,7 +117,7 @@ class {{ app_class_name }}Test(TestApp, {{ app_class_name }}):
     for {{ app_class_name }} applications. It modifies various settings to be more
     suitable for automated testing.
 
-    ### Usage:
+    ### Usage
 
     ```python
     # Basic test setup
@@ -129,7 +129,7 @@ class {{ app_class_name }}Test(TestApp, {{ app_class_name }}):
 
     ```
 
-    ### Notes:
+    ### Notes
 
     - Uses standard logging instead of colorlog for cleaner test output
     - Includes a smaller set of extensions to reduce test complexity
@@ -152,13 +152,13 @@ def dramatiq():
     It sets up the necessary environment without running the full
     CLI application stack.
 
-    ### Used by {{ app_name }} CLI for the dramatiq workers:
+    ### Used by {{ app_name }} CLI for the dramatiq workers
 
     ```bash
     {{ app_label }} dramatiq serve
     ```
 
-    ### Notes:
+    ### Notes
 
     - Initializes the application without command processing
     - Disables signal handling as Dramatiq manages its own signals
@@ -185,11 +185,11 @@ def main():
     the primary entry point when running {{ app_name }} as
     a command-line application.
 
-    ### Returns:
+    ### Returns
 
     - **int**: Exit code indicating success (0) or failure (non-zero)
 
-    ### Raises:
+    ### Raises
 
     - **AssertionError**: When an assertion fails during application execution
     - **{{ app_class_name }}Error**: When a {{ app_class_name }}-specific

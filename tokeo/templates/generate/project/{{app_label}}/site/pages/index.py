@@ -23,7 +23,7 @@ def page_root():
     navigates to the root path. It initializes local UI elements specific to
     the active user session. In addition add hompage-specific
 
-    ### Notes:
+    ### Notes
 
     - Creates a dashboard view with introductory content
     - Uses the standard page layout from the `blocks` module

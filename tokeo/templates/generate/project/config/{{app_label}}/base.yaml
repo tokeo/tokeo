@@ -9,7 +9,7 @@
 ###
 ### <p>
 ### The configuration is loaded in the following order, with each file overriding
-### settings from the previous ones:
+### settings from the previous ones
 ### </p>
 ###
 ### 1. Base configuration: `config/{{ app_label }}.yaml`
@@ -20,7 +20,7 @@
 ### 1. Directory splitted environment-specific configuration: `config/{{ app_label }}/development.d/function.yaml`
 ###
 ### <p>
-### Where `[environment]` can be one of:
+### Where `[environment]` can be one of
 ### </p>
 ###
 ### - `development` - Used during development
@@ -38,7 +38,7 @@
 ### </p>
 ###
 ### <p>
-### Example:
+### Example
 ### </p>
 ###
 ### - Base config.yaml defines ```smtp.host: localhost```

@@ -11,12 +11,12 @@ def pdoc_replace_decorator(*args, **kwargs):
     without changing its behavior, allowing pdoc to properly document
     decorated functions.
 
-    ### Args:
+    ### Args
 
     - ***args**: Positional arguments to pass to the decorator
     - ****kwargs**: Keyword arguments to pass to the decorator
 
-    ### Returns:
+    ### Returns
 
     - **callable**: A decorator function that preserves function metadata
 
@@ -46,7 +46,7 @@ class DecoratedFunction:
         """
         Initialize a DecoratedFunction instance.
 
-        ### Args:
+        ### Args
 
         - **app** (object): The application instance
         - **func** (object): The function object to analyze
@@ -69,11 +69,11 @@ class DecoratedFunction:
         """
         Delegate attribute access to the wrapped function.
 
-        ### Args:
+        ### Args
 
         - **attr** (str): The attribute name to access
 
-        ### Returns:
+        ### Returns
 
         - **any**: The requested attribute value
 
@@ -88,7 +88,7 @@ class DecoratedFunction:
         """
         Check if the function has any decorators.
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the function has decorators, False otherwise
 
@@ -103,7 +103,7 @@ class DecoratedFunction:
         Uses AST parsing to identify decorators and their parameters, and
         processes them through hooks to generate documentation.
 
-        ### Returns:
+        ### Returns
 
         - **bool|None**: True if decorators were successfully parsed, False
             or None otherwise
@@ -199,14 +199,14 @@ class DecoratedFunction:
         """
         Update the function's docstring with documentation from its decorators.
 
-        ### Args:
+        ### Args
 
         - **prepend_docstrings** (str, optional): Text to prepend to each
             decorator's docstring
         - **append_docstrings** (str, optional): Text to append to each
             decorator's docstring
 
-        ### Notes:
+        ### Notes
 
         : This method appends unique decorator docstrings to the function's
             existing docstring, avoiding duplicates from the same decorator type.

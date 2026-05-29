@@ -5,20 +5,20 @@ This module provides isolated API functions for Tokeo applications using
 FastAPI integration. It contains REST API routes that expose application
 functionality to clients, connecting web interfaces with core business logic.
 
-### Features:
+### Features
 
 - **Isolated endpoint functions**: Prevents global state pollution
 - **Business logic integration**: Seamless connection with `core.tasks`
 - **JSON data exchange**: For frontend/backend interaction
 - **API documentation** through automatically generated OpenAPI specs
 
-### API Structure:
+### API Structure
 
 Endpoints are defined as pure asynchronous functions. Instead of using
 decorators directly in this file, these functions are imported and mapped
 programmatically inside `site/routes.py`.
 
-### Usage:
+### Usage
 
 Define a new API endpoint as a pure function:
 
@@ -55,14 +55,14 @@ async def search_products(request: ProductRequest):
     return products
 ```
 
-##### register it in `site/routes.py`:
+##### register it in `site/routes.py`
 
 ```python
 def apis_map():
     fa.post('/_/api/products/search')(search_products)
 ```
 
-### Integration Points:
+### Integration Points
 
 The APIs module can interact with various parts of the application:
 
@@ -72,7 +72,7 @@ The APIs module can interact with various parts of the application:
 - **models**: For data access and persistence
 - **services**: For external service integration
 
-### Notes:
+### Notes
 
 - Keep business logic in `core.*` modules, not in the API handlers
 - Use FastAPI's typing system for request/response validation
@@ -91,11 +91,11 @@ async def api_example():
     API routes in the application. It returns a basic message
     to verify the API is functioning.
 
-    ### Returns:
+    ### Returns
 
     - JSON response with a message field
 
-    ### Example Response:
+    ### Example Response
 
     ```json
     {

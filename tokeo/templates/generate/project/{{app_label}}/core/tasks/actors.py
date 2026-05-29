@@ -5,14 +5,14 @@ This module provides a centralized location for defining business-specific
 Dramatiq actors in Tokeo and Cement applications. Actors are distributed
 task processors that can handle asynchronous workloads through message passing.
 
-### Features:
+### Features
 
 - **Centralized actor definitions** for maintainable code organization
 - **Queue-based processing** with configurable timeouts and retries
 - **Rate limiting** through the app.dramatiq.locks interface
 - **Integration with application context** via app-specific business logic
 
-### Usage:
+### Usage
 
 Register actors with the @app.dramatiq.actor decorator:
 
@@ -35,7 +35,7 @@ def process_business_data(item_id):
     pass
 ```
 
-### Notes:
+### Notes
 
 - Tasks defined here will be discovered automatically when dramatiq workers
     are started via the 'dramatiq serve' command
@@ -57,7 +57,7 @@ def count_words(url):
     This example implements the delegated word counting in an asynchronous
     worker using Dramatiq.
 
-    ### Args:
+    ### Args
 
     - **url** (str, optional): URL of the webpage to analyze.
         Argument is given by the worker from RabbitMQ on start.

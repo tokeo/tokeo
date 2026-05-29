@@ -11,7 +11,7 @@ When the rate limit is exceeded, the decorator will either:
 1. Block and sleep until enough tokens are available to call the function
 1. Call an alternative callback function if cb_on_locked is provided
 
-### Args:
+### Args
 
 - **count** (int): Number of calls allowed in the specified time period
 - **per_seconds** (float): Time period in seconds over which to limit calls
@@ -23,11 +23,11 @@ When the rate limit is exceeded, the decorator will either:
 - **cb_on_locked** (callable, optional): Function to call when rate limited instead of waiting
 - **verbose** (bool, optional): Whether to log throttling information. Defaults to True.
 
-### Returns:
+### Returns
 
 - **callable**: The decorated function with rate limiting applied
 
-### Example:
+### Example
 
 ```python
 @app.cache.locks.throttle(count=5, per_seconds=60)
@@ -36,7 +36,7 @@ def limited_api_call(resource_id):
     return make_external_api_request(resource_id)
 ```
 
-### Notes:
+### Notes
 
 - The throttle state persists in the cache based on the function name
     or custom name/name_f parameter

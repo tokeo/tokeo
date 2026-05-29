@@ -4,7 +4,7 @@ Web interface and routing package for the Tokeo application.
 This package contains the complete NiceGUI web frontend, including dynamic
 routing, isolated page rendering, REST API endpoints, and shared UI components.
 
-### Architecture (NiceGUI 3.x):
+### Architecture (NiceGUI 3.x)
 
 This package strictly adheres to a stateless, multi-user safe architecture:
 
@@ -15,7 +15,7 @@ This package strictly adheres to a stateless, multi-user safe architecture:
 - **Programmatic Routing**: Routes are mapped dynamically in module
   `{{ app_label }}.site.routes` rather than by scattered decorators
 
-### Package Structure:
+### Package Structure
 
 - **apis/**: Headless REST API endpoints (FastAPI integration)
 - **components/**: Shared structural UI blocks (layouts, navbars, footers)

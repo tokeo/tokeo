@@ -5,7 +5,7 @@ def utc_now():
     """
     Get the current UTC datetime.
 
-    ### Returns:
+    ### Returns
 
     - **datetime**: Current datetime with UTC timezone
 
@@ -17,11 +17,11 @@ def to_utc(date):
     """
     Convert a datetime to UTC timezone.
 
-    ### Args:
+    ### Args
 
     - **date** (datetime): The datetime to convert
 
-    ### Returns:
+    ### Returns
 
     - **datetime**: The datetime converted to UTC timezone
 
@@ -35,11 +35,11 @@ def to_utc_timestring(date):
 
     Format: 'YYYY-MM-DD HH:MM:SS.MMMZ'
 
-    ### Args:
+    ### Args
 
     - **date** (datetime): The datetime to convert
 
-    ### Returns:
+    ### Returns
 
     - **str**: Formatted UTC timestring
 
@@ -54,11 +54,11 @@ def to_utc_datestring(date):
 
     Format: 'YYYY-MM-DD'
 
-    ### Args:
+    ### Args
 
     - **date** (datetime): The datetime to convert
 
-    ### Returns:
+    ### Returns
 
     - **str**: UTC date string (YYYY-MM-DD)
 
@@ -73,15 +73,15 @@ def parse_timestring_as_utc(date_str):
 
     Expects format: 'YYYY-MM-DD HH:MM:SS.MMMZ'
 
-    ### Args:
+    ### Args
 
     - **date_str** (str): The timestring to parse
 
-    ### Returns:
+    ### Returns
 
     - **datetime**: Parsed datetime with UTC timezone
 
-    ### Raises:
+    ### Raises
 
     - **ValueError**: If the input string is empty
 
@@ -96,15 +96,15 @@ def as_utc(date):
     """
     Convert a string or datetime to a UTC datetime.
 
-    ### Args:
+    ### Args
 
     - **date** (str|datetime): The date to convert
 
-    ### Returns:
+    ### Returns
 
     - **datetime**: The date converted to UTC timezone
 
-    ### Raises:
+    ### Raises
 
     - **ValueError**: If the input type is neither str nor datetime
 

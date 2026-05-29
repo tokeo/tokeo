@@ -8,7 +8,7 @@ services and templates for generating client/server implementations.
 The extension handles server lifecycle management, dynamic loading of servicers,
 and configuration management.
 
-### Features:
+### Features
 
 - **Dynamic loading** of servicers and protocol buffer implementations
     based on configuration
@@ -38,7 +38,7 @@ class TokeoGrpcError(TokeoError):
     This class is used to raise and catch exceptions that are specific to
     the Tokeo gRPC extension functionality.
 
-    ### Notes:
+    ### Notes
 
     : Inherits from TokeoError to maintain consistent error handling
 
@@ -58,7 +58,7 @@ class TokeoGrpc(MetaMixin):
     based on configuration, providing a seamless integration between
     Tokeo applications and gRPC services.
 
-    ### Notes:
+    ### Notes
 
     - The server is lazily initialized when first accessed through
         the `server` property
@@ -149,12 +149,12 @@ class TokeoGrpc(MetaMixin):
         This is a convenient wrapper around the application's config.get method,
         accessing values from the extension's config section.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Configuration key to retrieve
         - **kwargs**: Additional arguments passed to config.get()
 
-        ### Returns:
+        ### Returns
 
         - **Any**: The configuration value for the specified key
 
@@ -170,11 +170,11 @@ class TokeoGrpc(MetaMixin):
         The initialization dynamically imports the required modules and registers
         the configured servicer with the gRPC server.
 
-        ### Returns:
+        ### Returns
 
         - **grpc.Server**: The configured gRPC server instance
 
-        ### Notes:
+        ### Notes
 
         : The initialization process follows these steps:
 
@@ -237,15 +237,15 @@ class TokeoGrpc(MetaMixin):
         is set, mutual TLS is enabled on top and clients may get verified
         against that ca.
 
-        ### Returns:
+        ### Returns
 
         - **grpc.ServerCredentials**: Credentials to pass to add_secure_port
 
-        ### Raises:
+        ### Raises
 
         - **TokeoGrpcError**: If only one of tls_certificate / tls_key is set
 
-        ### Notes:
+        ### Notes
 
         : The custom cert files (and the client ca, if any) are the only
             things read from disk; the auto cert path keeps everything in
@@ -289,16 +289,16 @@ class TokeoGrpc(MetaMixin):
         to disk; both PEM blobs only live in memory for the server lifetime.
         Key, subject and SANs are driven by the tls_* auto cert config.
 
-        ### Returns:
+        ### Returns
 
         - **tuple**: A (key_pem, cert_pem) pair of PEM encoded bytes
 
-        ### Raises:
+        ### Raises
 
         - **TokeoGrpcError**: On an unsupported tls_key_type or an ec
             tls_key_size that is not one of 256, 384, 521
 
-        ### Notes:
+        ### Notes
 
         : The cryptography package is imported lazily here, so it stays out
             of the non-tls and custom-cert code paths entirely
@@ -398,7 +398,7 @@ class TokeoGrpc(MetaMixin):
         which means it will stop immediately without waiting for ongoing
         operations to complete.
 
-        ### Notes:
+        ### Notes
 
         : Uses a grace period of 0 seconds for immediate shutdown
 
@@ -416,13 +416,13 @@ class TokeoGrpc(MetaMixin):
         is listening, and then blocks until a keyboard interrupt is received,
         at which point it shuts down the server cleanly.
 
-        ### Notes:
+        ### Notes
 
         1. This method is blocking and is typically called from a CLI command
 
         1. The server URL is determined from the configuration
 
-        ### Output:
+        ### Output
 
         : Logs the server URL to the application log
 
@@ -480,11 +480,11 @@ def tokeo_grpc_extend_app(app):
     This function adds the gRPC handler to the application and initializes it,
     making it available as app.grpc.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     - This function is called during application setup
 
