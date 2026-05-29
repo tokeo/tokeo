@@ -1284,15 +1284,13 @@ class TokeoAutomate(MetaMixin):
                     self._imported_modules[module] = importlib.import_module(module)
                 except ModuleNotFoundError:
                     raise TokeoAutomateError(f'A module "{module}" could not be imported')
-                except Exception:
-                    raise
+                # non ModuleNotFoundError exceptions will raise hereafter
             # get the function from imported modules cache
             try:
                 func = getattr(self._imported_modules[module], key)
             except AttributeError:
                 func = __unknown_function(module, key)
-            except Exception:
-                raise
+            # non AttributeError exceptions will raise hereafter
             # create protected dict
             task_protect = _config_task.get('protect', _default_task_protect)
             if task_protect not in [None, 'strict', 'append']:
