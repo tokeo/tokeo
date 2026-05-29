@@ -47,13 +47,13 @@ from datetime import datetime, timezone, timedelta
 
 class TokeoCronAndFireTrigger(CronTrigger):
     """
-    Enhanced CronTrigger that allows manually to fire a timer.
-    supports an additional delay after trigger time.
+    Enhanced CronTrigger that can be fired manually and supports an
+    additional delay after the trigger time.
 
     This trigger extends the standard APScheduler CronTrigger with the ability
     to add a configurable delay after the scheduled time. This can be useful
-    for staggering task execution or preventing resource contention and allows
-    to manually fire a timer.
+    for staggering task execution or preventing resource contention, and it
+    can also be fired manually on demand.
 
     ### Notes
 
@@ -184,10 +184,13 @@ class TokeoCronAndFireTrigger(CronTrigger):
 
         ### Notes
 
-        : This method first determines the next fire time using the standard cron
-            calculation, then adds the configured delay (if any) to the result.
-            The jitter is applied by the parent class and affects the time before
-            the delay is added.
+        - This method first determines the next fire time using the standard
+            cron calculation, then adds the configured delay (if any) to the
+            result; jitter is applied by the parent class and affects the time
+            before the delay is added
+        - A delay greater than or equal to the cron interval pushes the fire
+            time past the next slot, so individual fires can be skipped; keep
+            delay smaller than the schedule interval to fire on every slot
 
         """
         # check cron based trigger
@@ -409,7 +412,7 @@ class TokeoScheduler(MetaMixin):
         delay=None,
         max_jitter=None,
         max_running_jobs=None,
-        kwargs={},
+        kwargs=None,
         title='',
     ):
         """
@@ -436,7 +439,8 @@ class TokeoScheduler(MetaMixin):
             the schedule
         - **max_running_jobs** (int, optional): Maximum number of concurrently
             running instances of this job
-        - **kwargs** (dict): Keyword arguments to pass to the function
+        - **kwargs** (dict, optional): Keyword arguments to pass to the
+            function. Defaults to an empty dict.
         - **title** (str): Human-readable title for the task
 
         ### Notes
@@ -451,6 +455,7 @@ class TokeoScheduler(MetaMixin):
             title = func
         self._taskid += 1
 
+        kwargs = {} if kwargs is None else kwargs
         self.scheduler.add_job(
             f'{module}:{func}',
             kwargs=kwargs,
