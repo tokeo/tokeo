@@ -6,7 +6,7 @@ the `__all__` list. This allows the programmatic router in `site/routes.py`
 to import and bind them cleanly without triggering linter warnings for
 unused imports.
 
-### Notes:
+### Notes
 
 : Every new API endpoint function created in this directory should be imported
   here and added to the `__all__` list

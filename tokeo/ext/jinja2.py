@@ -5,7 +5,7 @@ This extension provides enhanced Jinja2 templating capabilities to Tokeo
 applications. It extends the base Cement Jinja2 functionality with additional
 configuration options and improved template handling.
 
-### Features:
+### Features
 
 - **Enhanced environment configuration** with custom options like trim_blocks
 - **Improved template directory** handling and discovery
@@ -30,7 +30,7 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
     It ensures that the application uses the Tokeo Jinja2 template handler for
     all rendering operations.
 
-    ### Notes:
+    ### Notes
 
     - Inherits from Cement's Jinja2OutputHandler but uses Tokeo's template handler
     - Provides consistent template rendering experience across all output channels
@@ -55,11 +55,11 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
         for rendering templates. This override ensures proper integration
         with the Tokeo Jinja2 template handler.
 
-        ### Args:
+        ### Args
 
         - **app** (Application): The Cement application instance
 
-        ### Notes:
+        ### Notes
 
         : Calls OutputHandler._setup directly to skip Jinja2OutputHandler._setup,
             which would bind the templater to cement's 'jinja2' handler; tokeo
@@ -87,7 +87,7 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
     Tokeo applications. It provides a configurable Jinja2 environment
     with settings controlled through the application's configuration.
 
-    ### Notes:
+    ### Notes
 
     - Provides additional configuration options for template processing
     - Supports proper template directory resolution and management
@@ -121,7 +121,7 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
         from configuration, applying options like keep_trailing_newline and
         trim_blocks to the environment.
 
-        ### Args:
+        ### Args
 
         - **app** (Application): The Cement application instance
 
@@ -147,12 +147,12 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
         This is a convenient wrapper around the application's config.get method,
         accessing values from the extension's config section.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Configuration key to retrieve
         - **kwargs**: Additional arguments passed to config.get()
 
-        ### Returns:
+        ### Returns
 
         - **Any**: The configuration value for the specified key
 
@@ -168,11 +168,11 @@ def tokeo_jinja2_config(app):
     initialization of the template handler. This function runs during
     the post_setup application hook.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     : Resolves the template handler with setup=True so it has access to the
         application and can read its own config; the handler instance is used
@@ -204,11 +204,11 @@ def load(app):
     Sets this extension's handlers as the application's default output
     and template handlers.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     1. Registers the post_setup hook to configure Jinja2
     1. Registers both the output and template handlers

@@ -10,7 +10,7 @@ The extension provides file monitoring capabilities for hot reloading during
 development, with both watchdog-based monitoring (preferred) and a fallback
 polling mechanism.
 
-### Features:
+### Features
 
 - **Isolated UI Contexts**: Enforces multi-user safety by orchestrating routes
   programmatically
@@ -47,7 +47,7 @@ class TokeoNiceguiError(TokeoError):
     This exception class is raised when the NiceGUI extension encounters
     errors during setup, configuration, or operation.
 
-    ### Notes:
+    ### Notes
 
     - Used for NiceGUI-specific error conditions like configuration issues,
       file watching problems, or missing dependencies
@@ -71,7 +71,7 @@ try:
         events detected by watchdog. When file changes are detected that match
         the configured patterns, it triggers the reload callback.
 
-        ### Notes:
+        ### Notes
 
         - Used for hot-reloading functionality during development
         - Monitors file changes based on configured patterns
@@ -84,7 +84,7 @@ try:
             """
             Initialize the watchdog event handler.
 
-            ### Args:
+            ### Args
 
             - **patterns** (list): List of file patterns to watch for changes
             - **ignore_patterns** (list): List of file patterns to ignore
@@ -92,7 +92,7 @@ try:
             - **case_sensitive** (bool): Whether patterns are case sensitive
             - **callback** (callable): Function to call when changes are detected
 
-            ### Notes:
+            ### Notes
 
             - The patterns use glob syntax (e.g., *.py for all Python files)
 
@@ -109,11 +109,11 @@ try:
             """
             Handle any file system event by calling the callback.
 
-            ### Args:
+            ### Args
 
             - **event** (FileSystemEvent): The file system event that was detected
 
-            ### Notes:
+            ### Notes
 
             - Called automatically by watchdog on a matching file system event
 
@@ -132,7 +132,7 @@ except ImportError:
         This class provides a placeholder implementation that raises an error
         when instantiated, indicating that the watchdog library is missing.
 
-        ### Notes:
+        ### Notes
 
         - Used when the watchdog package is not installed
 
@@ -143,7 +143,7 @@ except ImportError:
             """
             Raise an error indicating watchdog is not available.
 
-            ### Args:
+            ### Args
 
             - **patterns** (list): List of file patterns to watch for changes
             - **ignore_patterns** (list): List of file patterns to ignore
@@ -151,7 +151,7 @@ except ImportError:
             - **case_sensitive** (bool): Whether patterns are case sensitive
             - **callback** (callable): Function to call when changes are detected
 
-            ### Raises:
+            ### Raises
 
             - **TokeoNiceguiError**: Always raised to indicate watchdog is missing
 
@@ -162,11 +162,11 @@ except ImportError:
             """
             Placeholder method for handling file system events.
 
-            ### Args:
+            ### Args
 
             - **event** (FileSystemEvent): The file system event that was detected
 
-            ### Notes:
+            ### Notes
 
             : This method is never called as initialization always raises an error
 
@@ -220,7 +220,7 @@ class NiceguiElementHelper:
     It expands NiceGUI's capabilities by allowing access to HTML elements that
     aren't directly exposed by the NiceGUI API.
 
-    ### Notes:
+    ### Notes
 
     - Accessible via app.nicegui.ux in Tokeo applications
     - Creates HTML elements dynamically based on attribute access
@@ -236,15 +236,15 @@ class NiceguiElementHelper:
         This method is called when an attribute is accessed that doesn't exist,
         and returns a function that creates NiceGUI elements with the given tag.
 
-        ### Args:
+        ### Args
 
         - **tag** (str): The HTML tag name for the element
 
-        ### Returns:
+        ### Returns
 
         - **callable**: A function that creates NiceGUI elements
 
-        ### Notes:
+        ### Notes
 
         - The returned function creates either an Element or a TextElement
           depending on whether text content is provided
@@ -274,7 +274,7 @@ class TokeoNicegui(MetaMixin):
     application and the NiceGUI library, ensuring that dynamic routes and
     APIs are mapped before the server binds to the port.
 
-    ### Notes:
+    ### Notes
 
     - Provides direct access to NiceGUI components via `ui` and `fastapi_app`
       attributes
@@ -337,7 +337,7 @@ class TokeoNicegui(MetaMixin):
         This method is called during application startup to prepare the NiceGUI
         extension for use.
 
-        ### Args:
+        ### Args
 
         - **app** (Application): The Cement application instance
 
@@ -377,16 +377,16 @@ class TokeoNicegui(MetaMixin):
         This is a convenient wrapper around the application's config.get method,
         accessing values from the extension's config section.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Configuration key to retrieve
         - **kwargs**: Additional arguments passed to config.get()
 
-        ### Returns:
+        ### Returns
 
         - **Any**: The configuration value for the specified key
 
-        ### Notes:
+        ### Notes
 
         - Uses the handler's config_section as defined in Meta
 
@@ -402,7 +402,7 @@ class TokeoNicegui(MetaMixin):
         Configures and starts the watchdog observer to monitor specified
         directories for file changes that should trigger a hot reload.
 
-        ### Notes:
+        ### Notes
 
         - Uses configuration settings to determine which files to watch
         - Sets up a callback that will trigger a hotload when changes are detected
@@ -438,7 +438,7 @@ class TokeoNicegui(MetaMixin):
         Periodically checks for file changes detected by watchdog and
         initiates application shutdown when changes are detected.
 
-        ### Notes:
+        ### Notes
 
         - Runs as an asynchronous task in the FastAPI event loop
         - Checks the _watchdog_hotload_requested flag every 2 seconds
@@ -463,16 +463,16 @@ class TokeoNicegui(MetaMixin):
         and starts the NiceGUI server. This is the main entry point for running
         the NiceGUI web application.
 
-        ### Args:
+        ### Args
 
         - **hotload_dir** (str, optional): Directory to monitor for file changes
         - **hotload** (bool): Whether to enable hot reloading functionality
 
-        ### Raises:
+        ### Raises
 
         - **TokeoNiceguiError**: If the default route handler cannot be found
 
-        ### Notes:
+        ### Notes
 
         - Dynamically imports API and route modules based on configuration
         - Sets up the default route handler if specified
@@ -606,7 +606,7 @@ class TokeoNicegui(MetaMixin):
         This method is called during application shutdown to ensure proper
         cleanup of NiceGUI resources.
 
-        ### Notes:
+        ### Notes
 
         - Only stops the watchdog observer if it's running
         - Uses a timeout to prevent hanging during shutdown
@@ -626,7 +626,7 @@ class TokeoNicegui(MetaMixin):
         application process to apply the changes. This enables the hot-reloading
         functionality during development.
 
-        ### Notes:
+        ### Notes
 
         - Only restarts if the _watchdog_hotload_requested flag is set
         - Performs a full process restart to ensure clean reloading
@@ -668,7 +668,7 @@ class TokeoNiceguiController(Controller):
         """
         Set up the controller with the application.
 
-        ### Args:
+        ### Args
 
         - **app** (Application): The Cement application instance
 
@@ -703,12 +703,12 @@ class TokeoNiceguiController(Controller):
         This command initializes and starts the NiceGUI web server with
         the configured options, including optional hot reloading.
 
-        ### Args:
+        ### Args
 
         - **--hotload** (flag): Enable hot-reloading for development
         - **--hotload-dir** (str): Directory to monitor for file changes
 
-        ### Notes:
+        ### Notes
 
         - Delegates to the app.nicegui.startup() method
         - Passes command-line arguments to control hot-reloading behavior
@@ -730,7 +730,7 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
     documentation generation with pdoc. It extracts path parameters from
     decorators and loads appropriate docstrings.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
     - **func** (function): The function being decorated
@@ -738,11 +738,11 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
     - **args** (list): Positional arguments to the decorator
     - **kwargs** (dict): Keyword arguments to the decorator
 
-    ### Returns:
+    ### Returns
 
     - **dict|None**: Dictionary with decorator information or None if not handled
 
-    ### Notes:
+    ### Notes
 
     - Handles FastAPI route decorators (@app.nicegui.fastapi_app.get,
       @app.nicegui.fastapi_app.post)
@@ -798,11 +798,11 @@ def tokeo_nicegui_extend_app(app):
     This function adds the NiceGUI extension to the application and
     initializes it, making it available as app.nicegui.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     - This function is called during application setup
     - It creates the TokeoNicegui instance and attaches it to the app
@@ -819,11 +819,11 @@ def tokeo_nicegui_shutdown(app):
 
     Properly cleans up NiceGUI resources when the application is shutting down.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     - Called during application shutdown to properly close connections
     - Important for clean application termination without resource leaks
@@ -840,11 +840,11 @@ def tokeo_nicegui_hotload(app):
     This function is called after the application has closed to implement
     the hot-reload functionality.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     - Called after application shutdown to check if a restart is needed
     - Only triggers a restart if file changes were detected
@@ -862,11 +862,11 @@ def load(app):
     This function is the main entry point for the extension, called by Cement
     during the application initialization process.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     - Registers the TokeoNiceguiController for CLI commands
     - Sets up hooks for application lifecycle integration

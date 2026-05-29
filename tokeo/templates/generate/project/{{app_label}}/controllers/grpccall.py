@@ -5,7 +5,7 @@ GrpcCallController exposes the remote gRPC methods as nested CLI commands
 (stacked on the base controller). Each command parses its arguments, opens
 a channel to the configured grpc url and calls the matching stub method.
 
-### Notes:
+### Notes
 
 - The channel target is read from the grpc config section (grpc.url), the
     same url the server binds to
@@ -124,11 +124,11 @@ class GrpcCallController(Controller):
         CA comes from grpc.tls_certificate; --insecure or a null
         tls_certificate falls back to a TOFU probe via ssl.
 
-        ### Returns:
+        ### Returns
 
         - **grpc.Channel**: A context-manager-style channel; use in `with`
 
-        ### Raises:
+        ### Raises
 
         - **{{ app_class_name }}Error**: When only one of --cert/--key is set
 
@@ -188,11 +188,11 @@ class GrpcCallController(Controller):
         Returns None when --user is not given so callers can pass
         `metadata=self._grpc_metadata()` unconditionally.
 
-        ### Returns:
+        ### Returns
 
         - **tuple|None**: Metadata tuple for the stub call, or None
 
-        ### Raises:
+        ### Raises
 
         - **{{ app_class_name }}Error**: When --password is given without --user
 

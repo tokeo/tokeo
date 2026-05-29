@@ -2,7 +2,7 @@ The actor decorator runs this function asynchronously as a background task.
 
 Actors can also be scheduled and priorized by using `send_with_options`.
 
-### Actor Configuration:
+### Actor Configuration
 
 - **queue_name** (str): The queue where the task is placed
 - **actor_name** (str): A unique name for the actor
@@ -14,7 +14,7 @@ Actors can also be scheduled and priorized by using `send_with_options`.
 - **max_age** (int): Maximum time in seconds before the task expires (_3600 s_)
 - **time_limit** (int): Maximum execution time in milliseconds (_5000 ms_)
 
-### Usage:
+### Usage
 
 1. **Normal execution**:
 
@@ -34,7 +34,7 @@ Actors can also be scheduled and priorized by using `send_with_options`.
     func.send_with_options(args=(42,), priority=10)  # Higher priority
     ```
 
-### Raises:
+### Raises
 
 - **Exception**:
 

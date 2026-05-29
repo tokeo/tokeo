@@ -25,7 +25,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     structures. It enables loading and parsing YAML configuration files with
     proper handling of nested configuration sections.
 
-    ### Methods:
+    ### Methods
 
     - **merge**: Merges a dictionary into the current configuration with support
         for deep merging
@@ -38,13 +38,13 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         - **add_section**: Add a new section
         - **parse_file**: Parse a YAML config file
 
-    ### Notes:
+    ### Notes
 
     : The handler preserves nested dictionary structures during merges using
         a deep merge algorithm, which allows for more complex configuration
         structures than the standard Cement config handlers support.
 
-    ### Example:
+    ### Example
 
     ```python
     # In your application:
@@ -64,7 +64,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     })
     ```
 
-    ### See Also:
+    ### See Also
 
     - Cement YamlConfigHandler: The parent class in the Cement framework
     - deep_merge: Utility function used to merge nested dictionaries
@@ -75,7 +75,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         """
         Handler meta-data for configuration and identification.
 
-        ### Notes:
+        ### Notes
 
         : This class defines metadata required by the Cement framework
             for proper handler registration and operation.
@@ -94,24 +94,24 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         dictionaries, it preserves the nested structure and handles complex
         data types appropriately.
 
-        ### Args:
+        ### Args
 
         - **dict_obj** (dict): Dictionary of configuration keys/values to merge
             into the existing configuration
 
-        ### Keyword Args:
+        ### Keyword Args
 
         - **override** (bool): Whether to override existing values in the
             configuration. If True, existing values are replaced or deep-merged
             if they are dictionaries. If False, only new keys are added.
 
-        ### Raises:
+        ### Raises
 
         - **AssertionError**: If dict_obj is not None and not a dictionary
         - **ValueError**: If a top-level entry is not a dict (config section)
         - **ValueError**: If deep_merge encounters incompatible types
 
-        ### Example:
+        ### Example
 
         ```python
         # Simple merge
@@ -133,7 +133,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         })
         ```
 
-        ### Notes:
+        ### Notes
 
         : For nested dictionaries, a deep merge is performed, allowing for
             preserving existing nested values while adding or updating specific
@@ -206,11 +206,11 @@ def load(app):
     is loaded. It registers the YAML config handler and sets it as the
     default configuration handler for the application.
 
-    ### Args:
+    ### Args
 
     - **app**: The application instance
 
-    ### Example:
+    ### Example
 
     ```python
     # In your application configuration:
@@ -227,7 +227,7 @@ def load(app):
             # The config handler will be automatically set by the extension
     ```
 
-    ### Notes:
+    ### Notes
 
     : This function performs two actions:
 

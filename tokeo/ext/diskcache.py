@@ -79,7 +79,7 @@ class TokeoDiskCacheLocksHandler:
     All operations are distributed and work across multiple processes,
     making them suitable for web applications and microservices.
 
-    ### Attributes:
+    ### Attributes
 
     - **app** (Application): The Cement application instance
     - **_cache** (diskcache.Cache): The diskcache.Cache instance used for storage
@@ -92,7 +92,7 @@ class TokeoDiskCacheLocksHandler:
         """
         Initialize the locks handler.
 
-        ### Args:
+        ### Args
 
         - **app** (Application): The Cement application instance
         - **cache** (diskcache.Cache): The diskcache.Cache instance to use
@@ -113,7 +113,7 @@ class TokeoDiskCacheLocksHandler:
 
         Removes all cache entries tagged with this handler's tag.
 
-        ### Returns:
+        ### Returns
 
         - **int**: Number of locks purged from the cache
 
@@ -127,12 +127,12 @@ class TokeoDiskCacheLocksHandler:
         """
         Delete a specific lock by key.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The lock key to delete
         - ****kw**: Additional keyword arguments passed to cache.delete
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the lock was deleted, False otherwise
 
@@ -143,13 +143,13 @@ class TokeoDiskCacheLocksHandler:
         """
         Acquire a lock with the given key.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The lock key to acquire
         - **expire** (float, optional): Time in seconds after which the lock
             automatically expires. Defaults to None.
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the lock was acquired, False otherwise
 
@@ -161,11 +161,11 @@ class TokeoDiskCacheLocksHandler:
         """
         Release a previously acquired lock.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The lock key to release
 
-        ### Raises:
+        ### Raises
 
         - **LockError**: If the lock cannot be released
 
@@ -177,11 +177,11 @@ class TokeoDiskCacheLocksHandler:
         """
         Check if a lock is currently held.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The lock key to check
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the lock is held, False otherwise
 
@@ -197,21 +197,21 @@ class TokeoDiskCacheLocksHandler:
         Provides a convenient way to use locks in a with statement.
         The lock is automatically released when exiting the context.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The lock key to acquire
         - **expire** (float, optional): Time in seconds after which the lock
             automatically expires. Defaults to None.
 
-        ### Yields:
+        ### Yields
 
         - **None**: Control is yielded to the block inside the with statement
 
-        ### Raises:
+        ### Raises
 
         - **LockError**: If the lock cannot be acquired or released
 
-        ### Example:
+        ### Example
 
         ```python
         with app.cache.locks.lock('critical-section'):
@@ -257,7 +257,7 @@ class TokeoDiskCacheLocksHandler:
         1. Call an alternative callback function if cb_on_locked is
             provided
 
-        ### Args:
+        ### Args
 
         - **count** (int): Number of calls allowed in the time period.
             Defaults to 1.
@@ -281,11 +281,11 @@ class TokeoDiskCacheLocksHandler:
         - **verbose** (bool, optional): Whether to log throttling
             information. Defaults to True.
 
-        ### Returns:
+        ### Returns
 
         - **callable**: The decorated function with rate limiting applied.
 
-        ### Example:
+        ### Example
 
         ```python
         @app.cache.locks.throttle(count=5, per_seconds=60)
@@ -294,7 +294,7 @@ class TokeoDiskCacheLocksHandler:
             return make_external_api_request(resource_id)
         ```
 
-        ### Notes:
+        ### Notes
 
         - The throttle state persists in the cache under the key derived
             from name, name_f or the function full name.
@@ -435,7 +435,7 @@ class TokeoDiskCacheLocksHandler:
         retries or, if cb_on_locked is set, runs that callback instead of
         the wrapped function.
 
-        ### Args:
+        ### Args
 
         - **count** (int): Maximum number of concurrent calls allowed.
             Defaults to 1.
@@ -458,12 +458,12 @@ class TokeoDiskCacheLocksHandler:
         - **verbose** (bool, optional): Whether to log tempering
             information. Defaults to True.
 
-        ### Returns:
+        ### Returns
 
         - **callable**: The decorated function with concurrency control
             applied.
 
-        ### Example:
+        ### Example
 
         ```python
         @app.cache.locks.temper(count=3)
@@ -473,7 +473,7 @@ class TokeoDiskCacheLocksHandler:
             return process_large_dataset(data)
         ```
 
-        ### Notes:
+        ### Notes
 
         - The temper state persists in the cache under the key derived
             from name, name_f or the function full name.
@@ -601,7 +601,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
     and advanced features through the locks attribute, which gives access to
     throttling and tempering decorators.
 
-    ### Attributes:
+    ### Attributes
 
     - **locks** (TokeoDiskCacheLocksHandler): Handler for locks and rate limiting
     - **_cache** (diskcache.Cache): Underlying diskcache instance
@@ -642,7 +642,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         Called by Cement during handler initialization. Sets up the disk cache
         and the locks handler based on configuration.
 
-        ### Args:
+        ### Args
 
         - ***args**: Positional arguments passed to the parent class
         - ****kw**: Keyword arguments passed to the parent class
@@ -666,12 +666,12 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         This is a simple wrapper around the application's config.get method.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Configuration key to retrieve
         - ****kwargs**: Additional arguments passed to config.get()
 
-        ### Returns:
+        ### Returns
 
         - **any**: The configuration value for the specified key
 
@@ -685,12 +685,12 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         Creates a TokeoDiskCacheLocksHandler that provides distributed locking
         and rate limiting functionality.
 
-        ### Args:
+        ### Args
 
         - **tag** (str): Tag to identify locks in the cache
         - **locks_key_prefix** (str): Prefix for lock keys
 
-        ### Returns:
+        ### Returns
 
         - **TokeoDiskCacheLocksHandler**: The locks handler instance
 
@@ -701,7 +701,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Get a value from the cache.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The key of the item in the cache to get
         - **default** (any, optional): The value to return if the item is not found.
@@ -710,7 +710,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
             - **read** (bool): Whether to read without updating cache statistics
             - **retry** (bool): Whether to retry if the database is locked
 
-        ### Returns:
+        ### Returns
 
         - **any**: The value of the item in the cache, or the default value
 
@@ -723,7 +723,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Set a value in the cache for the given key.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The key of the item in the cache to set
         - **value** (any): The value of the item to set
@@ -733,7 +733,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
             - **read** (bool): Whether to read without updating cache statistics
             - **retry** (bool): Whether to retry if the database is locked
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the item was set successfully
 
@@ -749,13 +749,13 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Delete an item from the cache for the given key.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The key to delete from the cache
         - ****kw**: Additional keyword arguments
             - **retry** (bool): Whether to retry if the database is locked
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the item was deleted successfully
 
@@ -767,12 +767,12 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Purge the entire cache, removing all keys and values.
 
-        ### Args:
+        ### Args
 
         - ****kw**: Additional keyword arguments
             - **retry** (bool): Whether to retry if the database is locked
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the cache was successfully purged
 
@@ -788,14 +788,14 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         Verifies integrity and optionally fixes any corruption in the database.
 
-        ### Args:
+        ### Args
 
         - **fix** (bool, optional): Whether to fix any corruption found.
             Defaults to False.
         - **retry** (bool, optional): Whether to retry if the database is locked.
             Defaults to False.
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Information about database integrity status
 
@@ -809,13 +809,13 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Remove all items with the specified tag.
 
-        ### Args:
+        ### Args
 
         - **tag** (str): Tag that identifies items to evict
         - **retry** (bool, optional): Whether to retry if the database
             is locked. Defaults to False.
 
-        ### Returns:
+        ### Returns
 
         - **int**: Number of items evicted from the cache
 
@@ -829,14 +829,14 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Remove all expired items from the cache.
 
-        ### Args:
+        ### Args
 
         - **now** (float, optional): Current time to use for expiration check.
             Defaults to None (uses current time).
         - **retry** (bool, optional): Whether to retry if the database is locked.
             Defaults to False.
 
-        ### Returns:
+        ### Returns
 
         - **int**: Number of expired items removed from the cache
 
@@ -855,7 +855,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Add a key-value item to the cache only if the key doesn't exist.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The key to add to the cache
         - **value** (any): The value to add to the cache
@@ -868,7 +868,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         - **retry** (bool, optional): Whether to retry if the database
             is locked. Defaults to False.
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the item was added successfully,
             False if the key already exists
@@ -880,7 +880,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Update the expiration time on an existing key.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The key to update
         - **expire** (float, optional): New expiration time in seconds.
@@ -888,7 +888,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         - **retry** (bool, optional): Whether to retry if the database is locked.
             Defaults to False.
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the expiration time was updated
 
@@ -899,12 +899,12 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Create a transaction context manager for atomic operations.
 
-        ### Args:
+        ### Args
 
         - **retry** (bool, optional): Whether to retry if the database is locked.
           Defaults to False.
 
-        ### Returns:
+        ### Returns
 
         - **context manager**: Transaction context for atomic cache operations
 
@@ -915,12 +915,12 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Get cache statistics.
 
-        ### Args:
+        ### Args
 
         - **reset** (bool, optional): Whether to reset statistics after reading.
           Defaults to False.
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Dictionary with cache statistics
 
@@ -931,7 +931,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Get total size of cache on disk.
 
-        ### Returns:
+        ### Returns
 
         - **int**: Size of the cache in bytes
 
@@ -987,7 +987,7 @@ class TokeoDiskCacheController(Controller):
 
         This command is useful for regular maintenance and troubleshooting.
 
-        ### Notes:
+        ### Notes
 
         : All operations are performed with database locking retry enabled
             to ensure reliability even when the cache is under heavy use.
@@ -1069,7 +1069,7 @@ class TokeoDiskCacheController(Controller):
         Entries can be filtered by regular expression patterns against keys
         or by tag.
 
-        ### Notes:
+        ### Notes
 
         - Expired entries are automatically removed before listing
         - When no filters are provided, all cache entries are shown
@@ -1153,7 +1153,7 @@ class TokeoDiskCacheController(Controller):
         This command is particularly useful for troubleshooting stuck locks
         or deadlocks in the rate limiting and concurrency control systems.
 
-        ### Notes:
+        ### Notes
 
         - Lock entries are identified by the lock tag configured in the application
         - Purging locks can resolve deadlocks but may disrupt running operations
@@ -1208,7 +1208,7 @@ class TokeoDiskCacheController(Controller):
         This command requires either --tag or --all options to prevent
         accidental deletion of cache items.
 
-        ### Notes:
+        ### Notes
 
         - The --tag and --all options are mutually exclusive
         - Tag-based purging is safer as it only removes a subset of items
@@ -1274,7 +1274,7 @@ class TokeoDiskCacheController(Controller):
         Each matching key is displayed as it's deleted, with a total count
         of deleted items shown at the end.
 
-        ### Notes:
+        ### Notes
 
         - Regular expressions are applied against the full key name
         - Multiple patterns can be provided to match different key formats
@@ -1365,7 +1365,7 @@ class TokeoDiskCacheController(Controller):
         - bool: Boolean value
         - eval: Python expression to evaluate (use with caution)
 
-        ### Notes:
+        ### Notes
 
         - The --value parameter is required
         - Type conversion errors are reported with details
@@ -1436,7 +1436,7 @@ class TokeoDiskCacheController(Controller):
         The value is displayed in the format "key = value" if it exists or
         if a default value was provided.
 
-        ### Notes:
+        ### Notes
 
         - No output is produced if the key doesn't exist and no default is specified
         - Database locking retry is enabled for reliable reads
@@ -1512,7 +1512,7 @@ def load(app):
     1. Registers the cache handler with the application
     1. Registers the command-line controller for cache management
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
@@ -1532,16 +1532,16 @@ def unpack_func_args(func, *args):
     used internally by the throttle and temper decorators to process
     function arguments.
 
-    ### Args:
+    ### Args
 
     - **func** (callable): The function whose arguments are being unpacked
     - ***args**: The positional arguments passed to the function
 
-    ### Returns:
+    ### Returns
 
     - **dict**: A dictionary mapping parameter names to their values
 
-    ### Notes:
+    ### Notes
 
     - Only handles positional arguments, not keyword arguments
     - If a parameter has a default value and no argument is provided,

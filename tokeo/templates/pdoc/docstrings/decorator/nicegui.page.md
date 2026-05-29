@@ -3,7 +3,7 @@ The page decorator marks this function to be a page builder.
 Each user accessing the given route will see a new instance of the page.
 This means it is private to the user and not shared with others (as it is done when placing elements outside of a page decorator).
 
-### Notes:
+### Notes
 
 - The name of the decorated function is unused and can be anything.
 - The page route is determined by the path argument and registered globally.
@@ -12,7 +12,7 @@ This means it is private to the user and not shared with others (as it is done w
     which the router cannot associate. See the nicegui modularization
     example for strategies to structure your code.
 
-### Page Configuration:
+### Page Configuration
 
 - **path** (str):	route of the new page (path must start with '/')
 - **title** (str):	optional page title

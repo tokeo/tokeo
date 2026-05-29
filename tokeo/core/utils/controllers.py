@@ -2,11 +2,11 @@ def subcmdmeta(controller):
     """
     Access the \\_\\_cement_meta\\_\\_ information of subcommand within the command.
 
-    ### Args:
+    ### Args
 
     - **controller** (Controller): The controller instance
 
-    ### Returns:
+    ### Returns
 
     - **\\_\\_cement_meta\\_\\_** (Meta): object ref to Meta information of the
         subcommand
@@ -20,11 +20,11 @@ def defaultmeta(controller):
     Access the \\_\\_cement_meta\\_\\_ information of default subcommand within the
     command.
 
-    ### Args:
+    ### Args
 
     - **controller** (Controller): The controller instance
 
-    ### Returns:
+    ### Returns
 
     - **\\_\\_cement_meta\\_\\_** (Meta): object ref to Meta information of the
       _default_ subcommand
@@ -37,11 +37,11 @@ def controller_log_info_help(controller):
     """
     Log the help (dry) from subcmd's \\_\\_cement_meta\\_\\_.
 
-    ### Args:
+    ### Args
 
     - **controller** (Controller): The controller instance
 
-    ### Output:
+    ### Output
 
     :  Log the controller's `Meta`.`help` to the application info logger
 

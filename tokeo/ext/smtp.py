@@ -41,13 +41,13 @@ class TokeoSMTPMailHandler(mail.MailHandler):
     multipart messages with attachments, and inline images. It also provides
     template-based email generation using Tokeo's and Jinja's templating system.
 
-    ### Notes:
+    ### Notes
 
     : This handler requires proper SMTP server configuration in the application
         configuration. The configuration can be overridden per message via keyword
         arguments when sending emails.
 
-    ### See Also:
+    ### See Also
 
     - Python smtplib documentation: https://docs.python.org/library/smtplib.html
     - Email composition guide: https://mailtrap.io/blog/python-send-html-email/
@@ -58,7 +58,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         """
         Handler meta-data defining configuration and behavior.
 
-        ### Notes:
+        ### Notes
 
         : This class defines the configuration section, default values,
             and other metadata required by the Cement framework for
@@ -110,11 +110,11 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         Sets up the handler and initializes the template cache.
 
-        ### Args:
+        ### Args
 
         - **kw**: Keyword arguments passed to the parent handler
 
-        ### Notes:
+        ### Notes
 
         : Initializes an internal cache to optimize template existence checks
             during template-based email generation.
@@ -130,16 +130,16 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         This is a simple wrapper around the application's config.get method
         that automatically uses the correct configuration section.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Configuration key to retrieve
         - **kwargs**: Additional arguments passed to config.get()
 
-        ### Returns:
+        ### Returns
 
         - **Any**: Configuration value for the specified key
 
-        ### Example:
+        ### Example
 
         ```python
         # Get the SMTP host from config
@@ -160,22 +160,22 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         per-message overrides specified in keyword arguments. It also
         processes special parameters like X-headers.
 
-        ### Args:
+        ### Args
 
         - **kw**: Keyword arguments for message-specific parameter overrides
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Merged parameters for email creation
 
-        ### Notes:
+        ### Notes
 
         : Parameter merging follows specific rules: message parameters like 'to'
             and 'subject' can be overridden by keyword arguments, while connection
             parameters like 'host' and 'port' are always taken from configuration.
             Special headers like Date and X-headers receive special handling.
 
-        ### Example:
+        ### Example
 
         ```python
         # Get parameters with some overrides
@@ -236,7 +236,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         and other email features. The method handles various email body formats
         and establishes the appropriate SMTP connection based on configuration.
 
-        ### Args:
+        ### Args
 
         - **body** (str|tuple|dict): The message body content to send. Can be:
 
@@ -244,7 +244,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             - A tuple of (text, html) for multipart emails
             - A dict with 'text' and/or 'html' keys
 
-        ### Keyword Args:
+        ### Keyword Args
 
         - **to** (list): List of primary recipient email addresses
         - **from_addr** (str): Email address of the sender
@@ -263,16 +263,16 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         - **reply_to** (str): Reply-To header value
         - **x_***: Any parameter starting with 'x_' will be added as an X-header
 
-        ### Returns:
+        ### Returns
 
         - **bool**: `True` if message is sent successfully, `False` otherwise
 
-        ### Raises:
+        ### Raises
 
         - **TypeError**: If the body parameter is not a string, tuple, or dict
         - **smtplib.SMTPException**: If SMTP server connection or sending fails
 
-        ### Example:
+        ### Example
 
         ```python
         # Basic text email with configuration defaults
@@ -342,17 +342,17 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         """
         Create an email header value with proper encoding if needed.
 
-        ### Args:
+        ### Args
 
         - **value** (str): The header value to encode
         - **_charset** (Charset): Character set for encoding
         - **params**: Parameter dictionary containing encoding settings
 
-        ### Returns:
+        ### Returns
 
         - **str|Header**: Encoded Header object or plain string
 
-        ### Notes:
+        ### Notes
 
         : Returns a Header object with proper encoding if header_encoding is
             specified in the params, otherwise returns the value as-is.
@@ -368,21 +368,21 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         encodings, body parts, attachments, and headers based on the provided
         parameters.
 
-        ### Args:
+        ### Args
 
         - **body** (str|tuple|dict): The message body content in one of
             supported formats
         - **params**: Dictionary of email parameters from _get_params()
 
-        ### Returns:
+        ### Returns
 
         - **MIMEBase**: Complete email message ready for sending
 
-        ### Raises:
+        ### Raises
 
         - **TypeError**: If body has an unsupported type
 
-        ### Notes:
+        ### Notes
 
         : This method handles all the complexity of creating multipart messages,
             setting proper encodings, and handling attachments. The message
@@ -608,17 +608,17 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         naming conventions to generate the subject, plain text, and HTML parts
         of the email.
 
-        ### Args:
+        ### Args
 
         - **template** (str): Base template path/name without extension
         - **data** (dict): Data context for template rendering
         - **kw**: Additional email parameters passed to send()
 
-        ### Returns:
+        ### Returns
 
         - **bool**: Result from the send() method
 
-        ### Notes:
+        ### Notes
 
         : The method looks for the following template files:
 
@@ -630,7 +630,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             The mail_params context variable is provided to templates
             containing the email parameters.
 
-        ### Example:
+        ### Example
 
         ```python
         # Assuming templates/emails/welcome.plain.jinja2,
@@ -655,11 +655,11 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             Attempts to load the template and caches the result to avoid
             repeated file system or module lookups for the same template.
 
-            ### Args:
+            ### Args
 
             - **template** (str): Template path to check
 
-            ### Returns:
+            ### Returns
 
             - **bool**: True if template exists and can be loaded
 
@@ -711,11 +711,11 @@ def load(app):
     is loaded. It registers the mail handler and sets it as the default
     mail handler for the application.
 
-    ### Args:
+    ### Args
 
     - **app**: The application instance
 
-    ### Example:
+    ### Example
 
     ```python
     # In your application configuration:

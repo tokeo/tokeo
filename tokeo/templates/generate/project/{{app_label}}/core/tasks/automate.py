@@ -7,7 +7,7 @@ functions that can be executed via CLI commands in Tokeo and Cement applications
 Automation functions typically handle local or remote task execution and are
 primarily triggered by direct CLI invocation.
 
-### Features:
+### Features
 
 - **Command-line automation** functions with standardized interfaces
 - **Local and remote execution** via SSH or local shells
@@ -15,7 +15,7 @@ primarily triggered by direct CLI invocation.
 - **Integration with application context** via the app parameter
 - **Bridging to asynchronous processing** by triggering dramatiq actors
 
-### Usage:
+### Usage
 
 Define automation functions with the standard interface pattern:
 
@@ -29,7 +29,7 @@ def process_report(runner, verbose=False, report_type='summary', **kwargs):
     This automation function connects to the target system and executes
     report generation commands, capturing and returning the results.
 
-    ### Args:
+    ### Args
 
     - **runner** (from invoke): SSH or local shell connection
         to execute commands
@@ -40,7 +40,7 @@ def process_report(runner, verbose=False, report_type='summary', **kwargs):
     - **kwargs** (dict, kwargs): Additional arguments for task and runner.
         Standards are 'pty', 'env', 'encoding', 'timeout' and others.
 
-    ### Returns:
+    ### Returns
 
     - **Result**: Command execution result with stdout/stderr and exit code
 
@@ -73,7 +73,7 @@ Execute the automation via CLI:
 myapp automate run process_report
 ```
 
-### Notes:
+### Notes
 
 - All automation functions must accept the runner parameter
 - runner() provides executing commands on the target system
@@ -95,7 +95,7 @@ def count_words(runner, verbose=False, **kwargs):
     creates a search URL with the result, and delegates word counting
     to an asynchronous actor.
 
-    ### Args:
+    ### Args
 
     - **runner** (from invoke): SSH or local shell connection
         to execute commands
@@ -104,7 +104,7 @@ def count_words(runner, verbose=False, **kwargs):
     - **kwargs** (dict, kwargs): Additional arguments for task and runner.
         Standards are 'pty', 'env', 'encoding', 'timeout' and others.
 
-    ### Returns:
+    ### Returns
 
     - **bool**: True if the automation completed successfully
 
@@ -124,7 +124,7 @@ def uname(runner, verbose=False, flags=None, **kwargs):
     This automation function demonstrates running a simple system command
     with configurable parameters on the target system.
 
-    ### Args:
+    ### Args
 
     - **runner** (from invoke): SSH or local shell connection
         to execute commands
@@ -135,7 +135,7 @@ def uname(runner, verbose=False, flags=None, **kwargs):
     - **kwargs** (dict, kwargs): Additional arguments for task and runner.
         Standards are 'pty', 'env', 'encoding', 'timeout' and others.
 
-    ### Returns:
+    ### Returns
 
     - **Result**: Command execution result with stdout/stderr and exit code
 

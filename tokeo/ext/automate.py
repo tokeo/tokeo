@@ -130,7 +130,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         """
         Initialize the local context from a task reference.
 
-        ### Args:
+        ### Args
 
         - **config** (invoke.Config, optional): Config for the invoke base
             context
@@ -194,20 +194,20 @@ class TokeoInvokeLocalContext(invoke.Context):
         Applies the task's protect/sanitize rules to kwargs first, then
         delegates to the invoke base runner.
 
-        ### Args:
+        ### Args
 
         - **command** (str): The command line to execute
         - **kwargs**: Invoke runner kwargs (pty, env, timeout, encoding, ...)
 
-        ### Returns:
+        ### Returns
 
         - **invoke.runners.Result**: The invoke run result
 
-        ### Raises:
+        ### Raises
 
         - **TokeoAutomateCommandTimedOut**: If the command exceeds the timeout
 
-        ### Notes:
+        ### Notes
 
         - env vars are exported into the shell verbatim, without
           shell-quoting here. Escaping is delegated to the
@@ -280,7 +280,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         """
         Initialize the remote context; the SSH connection is opened lazily.
 
-        ### Args:
+        ### Args
 
         - **host** (str): Target hostname or IP
         - **user** (str): SSH username
@@ -294,7 +294,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
             connect() (e.g. password, key_filename)
         - **task_ref** (dict): Task definition driving protect/sanitize
 
-        ### Notes:
+        ### Notes
 
         : Nothing connects here; _connect() opens the Paramiko session on the
             first run().
@@ -319,7 +319,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         """
         Lazily establish the SSH connection if not yet connected.
 
-        ### Notes:
+        ### Notes
 
         : Creates the Paramiko client on first use. With host_keys set,
             unknown hosts are rejected (RejectPolicy); without, any host is
@@ -354,21 +354,21 @@ class TokeoInvokeRemoteContext(invoke.Context):
         streams stdout/stderr, enforces the timeout and injects the sudo
         password when a prompt is detected.
 
-        ### Args:
+        ### Args
 
         - **command** (str): The command line to execute remotely
         - **kwargs**: Invoke-style kwargs (hide, pty, env, timeout,
             encoding, ...)
 
-        ### Returns:
+        ### Returns
 
         - **invoke.runners.Result**: Result with stdout, stderr and exit code
 
-        ### Raises:
+        ### Raises
 
         - **TokeoAutomateCommandTimedOut**: If the command exceeds the timeout
 
-        ### Notes:
+        ### Notes
 
         - env vars are exported into the remote shell verbatim, without
           shell-quoting here (unlike invoke). Escaping is delegated to the
@@ -520,11 +520,11 @@ def jsonTokeoAutomateEncoder(obj):
 
     Converts TokeoAutomateResult objects to dictionaries for JSON serialization.
 
-    ### Args:
+    ### Args
 
     - **obj** (any): The object to encode
 
-    ### Returns:
+    ### Returns
 
     - **any**: A serializable representation of the object
 
@@ -543,7 +543,7 @@ class TokeoAutomateResult:
     Stores the output and status of a task execution, including stdout,
     stderr, exit code, and any additional values returned by the task.
 
-    ### Attributes:
+    ### Attributes
 
     - **task_id** (str): Identifier of the executed task
     - **connection_id** (str): Identifier of the connection used
@@ -560,7 +560,7 @@ class TokeoAutomateResult:
         """
         Initialize a task execution result.
 
-        ### Args:
+        ### Args
 
         - **task_id** (str): Identifier of the executed task
         - **connection_id** (str): Identifier of the connection used
@@ -588,7 +588,7 @@ class TokeoAutomateResult:
         """
         Generate string representation of the result.
 
-        ### Returns:
+        ### Returns
 
         - **str**: A string representation of all result properties
 
@@ -604,7 +604,7 @@ class TokeoAutomate(MetaMixin):
     multiple hosts using SSH or local execution. Supports host definitions,
     host groups, connections, and task configuration.
 
-    ### Attributes:
+    ### Attributes
 
     - **app** (Application): The Cement application instance
     - **_tasks** (dict): Cached dictionary of configured tasks
@@ -680,12 +680,12 @@ class TokeoAutomate(MetaMixin):
 
         This is a simple wrapper around the application's config.get method.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Configuration key to retrieve
         - ****kwargs**: Additional arguments passed to config.get()
 
-        ### Returns:
+        ### Returns
 
         - **any**: The configuration value for the specified key
 
@@ -696,11 +696,11 @@ class TokeoAutomate(MetaMixin):
         """
         Normalize fields inside a host or connection dict in place.
 
-        ### Args:
+        ### Args
 
         - **entry** (dict): A host or connection dict to validate
 
-        ### Returns:
+        ### Returns
 
         - **dict**: The same entry (mutated in place; returned for chaining)
 
@@ -716,11 +716,11 @@ class TokeoAutomate(MetaMixin):
         Accepts either a scalar (taken as the password, other keys default)
         or a dict that is merged onto the defaults.
 
-        ### Args:
+        ### Args
 
         - **entry** (dict): A configured host or connection dict
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Standardized sudo configuration dictionary
 
@@ -753,16 +753,16 @@ class TokeoAutomate(MetaMixin):
         Processes host definitions to create standardized host dictionaries.
         Handles various formats including host:port, user@host, etc.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Host identifier/key (may be None)
         - **entry** (dict): Host configuration entry
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Standardized host configuration dictionary
 
-        ### Raises:
+        ### Raises
 
         - **TokeoAutomateError**: If the host entry doesn't have required fields
 
@@ -799,20 +799,20 @@ class TokeoAutomate(MetaMixin):
         Processes a connection string in format "user:password@host.domain:port"
         into a standardized host dictionary.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Host identifier/key (may be None)
         - **host_str** (str): Host connection string to parse
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Standardized host configuration dictionary
 
-        ### Raises:
+        ### Raises
 
         - **TokeoAutomateError**: If the host string is invalid
 
-        ### Notes:
+        ### Notes
 
         - Supported formats:
 
@@ -852,16 +852,16 @@ class TokeoAutomate(MetaMixin):
         Takes a base host dictionary and applies specific overrides from a second
         dictionary, following rules for which fields can be overridden.
 
-        ### Args:
+        ### Args
 
         - **base** (dict): Base host configuration dictionary
         - **overrule** (dict): Dictionary with values to override base settings
 
-        ### Returns:
+        ### Returns
 
         - **dict**: New host dictionary with applied overrides
 
-        ### Notes:
+        ### Notes
 
         : Only specific fields can be overruled: id, name, host, port, user,
             password, sudo, identity, host_key, shell and encoding.
@@ -892,16 +892,16 @@ class TokeoAutomate(MetaMixin):
         Processes connection entry definitions into standardized connection
         dictionaries with proper defaults and valid fields.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Connection identifier/key
         - **entry** (dict): Connection configuration entry
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Standardized connection configuration dictionary
 
-        ### Notes:
+        ### Notes
 
         : Fields set in this dictionary will never be overwritten by later merges.
             For example, if password should be set by connection, the password field
@@ -973,17 +973,17 @@ class TokeoAutomate(MetaMixin):
             - Converts host configurations to a standardized format
             - Creates a tuple of fully-resolved host configurations
 
-        ### Args:
+        ### Args
 
         - **connection** (dict): A connection configuration dictionary which may
             be partial and reference other connections via 'use'
 
-        ### Returns:
+        ### Returns
 
         - **dict**: A fully resolved connection dictionary with all settings
             merged according to precedence rules and all hosts fully resolved
 
-        ### Raises:
+        ### Raises
 
         - **TokeoAutomateError**: If host configurations are invalid
 
@@ -1054,7 +1054,7 @@ class TokeoAutomate(MetaMixin):
         application configuration. Each host entry includes connection details
         like hostname, port, username, and authentication information.
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Dictionary mapping host IDs to host configuration dictionaries.
 
@@ -1108,7 +1108,7 @@ class TokeoAutomate(MetaMixin):
         1. Second lookup the ID in already defined hostgroups
         1. As a fallback, create a new host entry from the string
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Dictionary mapping group names to lists of
             host configuration dictionaries.
@@ -1156,7 +1156,7 @@ class TokeoAutomate(MetaMixin):
         The connection config includes a default connection and can be extended
         with additional named connections.
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Dictionary containing the default connection and a
             nested dictionary of named connections.
@@ -1227,7 +1227,7 @@ class TokeoAutomate(MetaMixin):
         to determine where tasks should be executed, with proper fallback to
         local execution if no remote hosts are specified.
 
-        ### Raises:
+        ### Raises
 
         - **TokeoAutomateError**: If task module is missing, invalid, or cannot
             be imported, or for other configuration errors.
@@ -1362,7 +1362,7 @@ class TokeoAutomate(MetaMixin):
         to execute, the hosts or connections to use, and any additional
         parameters.
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Dictionary mapping task IDs to task configuration dictionaries.
 
@@ -1477,7 +1477,7 @@ class TokeoAutomate(MetaMixin):
         optionally filtering to specific hosts. Collects the results from each
         execution.
 
-        ### Args:
+        ### Args
 
         - **task** (dict): Task configuration dictionary
         - **filter_host_ids** (tuple, optional): Optional tuple of host IDs
@@ -1485,7 +1485,7 @@ class TokeoAutomate(MetaMixin):
         - **verbose** (bool, optional): Whether to enable verbose execution output.
             Defaults to False.
 
-        ### Returns:
+        ### Returns
 
         - **tuple**: Tuple of TokeoAutomateResult objects, one
             for each host execution
@@ -1534,13 +1534,13 @@ class TokeoAutomate(MetaMixin):
         Creates a new thread to run the specified task, allowing asynchronous
         execution.
 
-        ### Args:
+        ### Args
 
         - **task** (dict): Task configuration dictionary
         - **verbose** (bool, optional): Whether to enable verbose execution output.
             Defaults to False.
 
-        ### Returns:
+        ### Returns
 
         - **Thread**: The started thread object
 
@@ -1566,7 +1566,7 @@ class TokeoAutomate(MetaMixin):
         even if some tasks fail. Tasks can be overridden to use specific
         hosts or connections.
 
-        ### Args:
+        ### Args
 
         - **task_ids** (str|list|tuple): String or sequence of task IDs to
             execute
@@ -1583,13 +1583,13 @@ class TokeoAutomate(MetaMixin):
         - **return_outputs** (bool, optional): Whether to include stdout/stderr
             in results. Defaults to True.
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Dictionary with execution results containing:
             - **all_exited_code** (int): 0 for success, non-zero for errors
             - **results** (list): List of task results if return_results is True
 
-        ### Notes:
+        ### Notes
 
         : Tasks can be specified in the format "task_id:host_id" to run a specific
             task on a specific host.
@@ -1715,7 +1715,7 @@ class TokeoAutomate(MetaMixin):
         maximum number of worker threads. Tasks can be overridden to use specific
         hosts or connections.
 
-        ### Args:
+        ### Args
 
         - **max_workers** (int): Maximum number of concurrent worker threads
         - **task_ids** (str|list|tuple): String or sequence of task IDs to
@@ -1731,13 +1731,13 @@ class TokeoAutomate(MetaMixin):
         - **return_outputs** (bool, optional): Whether to include stdout/stderr in
             results. Defaults to True.
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Dictionary with execution results containing:
             - **all_exited_code** (int): 0 for success, non-zero for errors
             - **results** (list): List of task results if return_results is True
 
-        ### Notes:
+        ### Notes
 
         : Tasks can be specified in the format "task_id:host_id" to run a specific
             task on a specific host. All tasks are submitted to the thread pool at
@@ -1891,7 +1891,7 @@ class TokeoAutomateShell:
     with interactive features like command history, tab completion, and
     suggestions.
 
-    ### Attributes:
+    ### Attributes
 
     - **app** (Application): The Cement application instance
     - **_command_parser** (ArgumentParser): Command parser for shell commands
@@ -1911,7 +1911,7 @@ class TokeoAutomateShell:
         """
         Perform cleanup when shutting down the shell.
 
-        ### Args:
+        ### Args
 
         - **signum** (int, optional): Signal number that triggered shutdown
         - **frame** (frame, optional): Current stack frame
@@ -1937,7 +1937,7 @@ class TokeoAutomateShell:
         Creates and caches a nested completer for task names, host names,
         and command options to provide autocompletion in the interactive shell.
 
-        ### Returns:
+        ### Returns
 
         - **NestedCompleter**: Completion handler for shell commands
 
@@ -1987,7 +1987,7 @@ class TokeoAutomateShell:
         Initializes the shell history with default commands to help
         users get started.
 
-        ### Returns:
+        ### Returns
 
         - **InMemoryHistory**: History handler with initial commands
 
@@ -2005,7 +2005,7 @@ class TokeoAutomateShell:
 
         Lists all configured tasks with their identifiers and names.
 
-        ### Args:
+        ### Args
 
         - **args** (Namespace): Command arguments from ArgumentParser
 
@@ -2024,7 +2024,7 @@ class TokeoAutomateShell:
 
         Shows the configuration details of specified tasks.
 
-        ### Args:
+        ### Args
 
         - **args** (Namespace): Command arguments from ArgumentParser
 
@@ -2043,7 +2043,7 @@ class TokeoAutomateShell:
         Executes the specified tasks either sequentially or in parallel
         based on command options.
 
-        ### Args:
+        ### Args
 
         - **args** (Namespace): Command arguments from ArgumentParser
 
@@ -2084,7 +2084,7 @@ class TokeoAutomateShell:
         Processes subcommands to list hosts, host groups, and connection
         configurations.
 
-        ### Args:
+        ### Args
 
         - **args** (Namespace): Command arguments from ArgumentParser
 
@@ -2112,7 +2112,7 @@ class TokeoAutomateShell:
 
         Displays help information for a specific subcommand.
 
-        ### Args:
+        ### Args
 
         - **args** (Namespace): Command arguments from ArgumentParser
 
@@ -2127,7 +2127,7 @@ class TokeoAutomateShell:
         Lazily builds and caches a command parser with all available
         commands and subcommands for the interactive shell.
 
-        ### Returns:
+        ### Returns
 
         - **ArgumentParser**: Parser for shell commands
 
@@ -2192,15 +2192,15 @@ class TokeoAutomateShell:
 
         Parses and executes a command entered in the interactive shell.
 
-        ### Args:
+        ### Args
 
         - **cmd** (str, optional): Command string to execute. Defaults to ''.
 
-        ### Returns:
+        ### Returns
 
         - **bool**: True if the command was valid and can be added to history
 
-        ### Raises:
+        ### Raises
 
         - **EOFError**: If the command is 'exit' or 'quit'
 
@@ -2237,7 +2237,7 @@ class TokeoAutomateShell:
         Starts an interactive loop that processes user commands until
         the user exits or a signal is caught.
 
-        ### Notes:
+        ### Notes
 
         - Uses prompt_toolkit for interactive command input
         - Handles keyboard interrupts, EOF signals, and exceptions
@@ -2429,7 +2429,7 @@ class TokeoAutomateController(Controller):
         Execute configured tasks sequentially or in parallel threads.
         Tasks can be run with custom host or connection configurations.
 
-        ### Notes:
+        ### Notes
 
         - Tasks can be specified in the format "task_id:host_id" to target
             specific hosts
@@ -2494,7 +2494,7 @@ class TokeoAutomateController(Controller):
         Launches an interactive shell for running automation tasks,
         listing configurations, and managing automation.
 
-        ### Notes:
+        ### Notes
 
         - Configures console output colors based on command options
         - Provides command history and tab completion
@@ -2506,7 +2506,7 @@ class TokeoAutomateController(Controller):
         # explicit choice, not a side effect. it is safe because '--shell'
         # runs as its own process that ends when the shell exits, so there
         # is nothing to restore afterwards. note: while in the shell the
-        # output goes to the console only (print), so a configured file:
+        # output goes to the console only (print), so a configured file
         # log target does not receive these shell messages.
 
         # use colored output?
@@ -2530,7 +2530,7 @@ def tokeo_automate_extend_app(app):
     """
     Initialize and register the automate extension with the application.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
@@ -2543,7 +2543,7 @@ def tokeo_automate_shutdown(app):
     """
     Perform any cleanup needed when shutting down the automate extension.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
@@ -2558,7 +2558,7 @@ def load(app):
     This function is called by Cement when loading extensions. It registers
     the controller, and hooks for initialization and cleanup.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 

@@ -15,7 +15,7 @@ class Tokeo(App):
     CLI application framework. Tokeo applications use the Cement framework
     for command-line parsing, configuration management, logging, and more.
 
-    ### Notes:
+    ### Notes
 
     - The application includes several extensions by default:
         colorlog, generate, pdoc, print, jinja2, and yaml
@@ -69,7 +69,7 @@ class TokeoTest(TestApp, Tokeo):
     application class to provide a testing environment for Tokeo applications.
     It modifies various settings to be more suitable for automated testing.
 
-    ### Usage:
+    ### Usage
 
     ```python
     # Basic test setup
@@ -81,7 +81,7 @@ class TokeoTest(TestApp, Tokeo):
 
     ```
 
-    ### Notes:
+    ### Notes
 
     - Uses standard logging instead of colorlog for cleaner test output
     - Includes a smaller set of extensions to reduce test complexity
@@ -110,11 +110,11 @@ def main():
     that may occur during execution. This function serves as the primary entry
     point when running Tokeo as a command-line application.
 
-    ### Returns:
+    ### Returns
 
     - **int**: Exit code indicating success (0) or failure (non-zero)
 
-    ### Raises:
+    ### Raises
 
     - **AssertionError**: When an assertion fails during application execution
     - **TokeoError**: When a Tokeo-specific error occurs

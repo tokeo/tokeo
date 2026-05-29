@@ -7,7 +7,7 @@ The tokeo grpc extension wires them in via the grpc_interceptors config
 (module:method), which is resolved to the {{ app_label }}_interceptor
 factory below.
 
-### Notes:
+### Notes
 
 - This shipped version is a pass-through stub that allows every call; fill in
     the real checks where the TODO marks it
@@ -29,7 +29,7 @@ class AuthInterceptor(grpc.ServerInterceptor):
     enforce authentication, inspect the request metadata or the peer identity
     and abort unauthorized calls instead of continuing.
 
-    ### Notes:
+    ### Notes
 
     : To allow a call, return continuation(handler_call_details); to reject
         one, return an rpc handler that aborts with an UNAUTHENTICATED or
@@ -44,18 +44,18 @@ class AuthInterceptor(grpc.ServerInterceptor):
         """
         Intercept an incoming rpc and decide whether it proceeds.
 
-        ### Args:
+        ### Args
 
         - **continuation** (callable): Calls the next interceptor or the
             actual rpc handler; invoke it to let the call proceed
         - **handler_call_details** (grpc.HandlerCallDetails): The invoked
             method name and the request invocation_metadata
 
-        ### Returns:
+        ### Returns
 
         - **grpc.RpcMethodHandler**: The handler that will serve the call
 
-        ### Notes:
+        ### Notes
 
         : The default stub forwards every call unchanged; real checks read
             handler_call_details.invocation_metadata and reject when needed
@@ -75,11 +75,11 @@ def {{ app_label }}_interceptor():
     while the server is built. Return the interceptors in the order they should
     run; the first one wraps the outermost layer.
 
-    ### Returns:
+    ### Returns
 
     - **list**: The grpc.ServerInterceptor instances to install, in order
 
-    ### Notes:
+    ### Notes
 
     : The tokeo grpc extension also accepts a single interceptor here, but a
         list keeps the order explicit and lets the chain grow

@@ -8,7 +8,7 @@ used to maintain design consistency across the application.
 modules must only be invoked from inside an actively routed page function.
 Do not instantiate these UI blocks in the global scope.
 
-### Notes:
+### Notes
 
 - This module needs not explicitly defines the inner component modules
 

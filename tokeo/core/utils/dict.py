@@ -8,21 +8,21 @@ def deep_merge(a, b):
     - Lists: elements from b are appended to a
     - Dicts: recursively merge keys from b into a
 
-    ### Args:
+    ### Args
 
     - **a** (any): The target data structure that will be modified
     - **b** (any): The source data structure to merge into a
 
-    ### Returns:
+    ### Returns
 
     - **any**: The merged data structure (same object as a, modified in-place)
 
-    ### Raises:
+    ### Raises
 
     - **ValueError**: If trying to merge incompatible types or unsupported types
     - **ValueError**: If a TypeError occurs during merging (with context details)
 
-    ### Notes:
+    ### Notes
 
     : **IMPORTANT**: Tuples and arbitrary objects are not handled as
         their merge behavior would be ambiguous.
@@ -83,18 +83,18 @@ def redact_data(data, replace_value='***'):
     useful for logging or displaying sensitive data without exposing
     the actual values.
 
-    ### Args:
+    ### Args
 
     - **data** (dict|list|any): The data structure containing values to be redacted
     - **replace_value** (str, optional): The placeholder to use for redacted values.
         Defaults to '***'
 
-    ### Returns:
+    ### Returns
 
     - **dict|list|str**: A new data structure with the same shape as the input,
         but with all scalar values replaced by the redaction placeholder
 
-    ### Notes:
+    ### Notes
 
     - Dictionary keys are preserved as-is, only values are redacted
     - The function creates a new data structure and does not modify the original

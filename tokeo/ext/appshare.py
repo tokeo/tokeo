@@ -5,7 +5,7 @@ This module allows external modules to interact with the Cement app without
 explicitly passing the app object around. It implements a proxy pattern to
 make the app accessible through a singleton.
 
-### Example:
+### Example
 
 ```python
 # Use the imported app object
@@ -26,11 +26,11 @@ class App:
     attribute and method access (app.foo, app.foo()) is forwarded to the
     underlying app object.
 
-    ### Attributes:
+    ### Attributes
 
     - **_app** (Application): The actual Cement app object
 
-    ### Notes:
+    ### Notes
 
     : Only regular attribute and method access is proxied. Item access
         (app[...]) and implicitly invoked dunder methods (e.g. __enter__,
@@ -53,15 +53,15 @@ class App:
         This magic method enables transparent access to all properties and methods
         of the underlying Cement application instance.
 
-        ### Args:
+        ### Args
 
         - **key** (str): The attribute name to access from the app object
 
-        ### Returns:
+        ### Returns
 
         - **any**: The attribute of the app object if it exists
 
-        ### Raises:
+        ### Raises
 
         - **AttributeError**: If the app object is not set or the attribute
             does not exist
@@ -91,11 +91,11 @@ def load(app_to_share):
     the Cement app object that will be accessible through the global `app`
     instance.
 
-    ### Args:
+    ### Args
 
     - **app_to_share** (Application): The Cement app object to be shared globally
 
-    ### Notes:
+    ### Notes
 
     : This function is called automatically by the Cement framework when
         the appshare extension is loaded, making the app globally accessible.

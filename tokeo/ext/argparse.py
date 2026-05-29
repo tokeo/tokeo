@@ -30,11 +30,11 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
         """
         Iterate over subactions with proper indentation and sorting.
 
-        ### Args:
+        ### Args
 
         - **action** (Action): The argparse action containing subactions
 
-        ### Yields:
+        ### Yields
 
         - **Action**: Sorted subactions from the given action
 
@@ -57,13 +57,13 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
         """
         Fill text with consistent indentation.
 
-        ### Args:
+        ### Args
 
         - **text** (str): The text to format
         - **width** (int): The width to fill to
         - **indent** (str): The indentation string
 
-        ### Returns:
+        ### Returns
 
         - **str**: Formatted text with proper indentation
 
@@ -77,11 +77,11 @@ class TokeoHelpFormatter(argparse.HelpFormatter):
         """
         Format an action's help text with improved subcommand display.
 
-        ### Args:
+        ### Args
 
         - **action** (Action): The argparse action to format
 
-        ### Returns:
+        ### Returns
 
         - **str**: Formatted help string for the action
 
@@ -113,7 +113,7 @@ class Controller(ArgparseController):
     Extends Cement's ArgparseController with an improved help formatter and
     default behavior for commands.
 
-    ### Attributes:
+    ### Attributes
 
     - **Meta** (class): Configuration class for the controller
 

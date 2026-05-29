@@ -7,7 +7,7 @@ application built with Tokeo and Cement. Operators focus on system health,
 data maintenance, monitoring, configuration management, and other operational
 concerns rather than business logic.
 
-### Features:
+### Features
 
 - **System maintenance** operations for database cleanup and optimization
 - **Health checks** to monitor application components and dependencies
@@ -15,7 +15,7 @@ concerns rather than business logic.
 - **Configuration management** for runtime application settings
 - **Operational metrics** collection and reporting
 
-### Usage:
+### Usage
 
 Operators can be imported and used in various contexts throughout the application:
 
@@ -38,7 +38,7 @@ def scheduled_maintenance():
     operators.verify_data_integrity()
 ```
 
-### Notes:
+### Notes
 
 - Operators should focus on operational concerns, not business logic
 - Design operators to be idempotent when possible (safe to run multiple times)

@@ -7,7 +7,7 @@ Cement applications. Steps are modular, composable functions that implement
 individual parts of larger business processes, such as PDF generation, data
 transformation, or external service integration.
 
-### Features:
+### Features
 
 - **Atomic business operations** for use across multiple workflows
 - **Highly reusable components** with focused responsibility
@@ -15,7 +15,7 @@ transformation, or external service integration.
 - **Standardized interfaces** for consistency and maintainability
 - **Cross-module utility** for both synchronous and asynchronous contexts
 
-### Usage:
+### Usage
 
 Define step functions that implement specific business operations:
 
@@ -71,7 +71,7 @@ def generate_pdf_from_html(html_content, output_path, options=None):
         }
 ```
 
-### Notes:
+### Notes
 
 - Steps should have a single, well-defined responsibility
 - Keep steps stateless and focused on a specific task

@@ -9,7 +9,7 @@ When the appenv extension is used, the normal cement config file behavior
 is replaced by tokeo's environment based configuration. A cement
 runtime configuration is built from base plus a detected environment.
 
-### Example:
+### Example
 
 A detected environment is also easily usable in own conditions like:
 
@@ -49,7 +49,7 @@ class TokeoAppEnv:
     Loads configuration files and provides environment flags for different
     runtime contexts.
 
-    ### Attributes:
+    ### Attributes
 
     - **APP_LABEL** (str): The lowercase application label
     - **APP_ENV_VAR_NAME** (str): The environment variable name for app environment
@@ -70,11 +70,11 @@ class TokeoAppEnv:
         """
         Initialize the environment manager.
 
-        ### Args:
+        ### Args
 
         - **app** (Application): The Cement application instance
 
-        ### Notes:
+        ### Notes
 
         - Detects environment from environment variables or app name suffix
         - Configures application paths and directories
@@ -145,12 +145,12 @@ class TokeoAppEnv:
         respected). .local files are appended last and are skipped entirely
         for the base environment.
 
-        ### Args:
+        ### Args
 
         - **app_env** (str): The id of the selected environment (base or other)
         - **app_config_file_suffix** (str): The suffix for the config files.
 
-        ### Returns:
+        ### Returns
 
         - **list**: List of configuration file paths, with the base and
             environment config files first, followed by any .local config files
@@ -193,11 +193,11 @@ def load(app):
     This function is called by the Cement framework when loading extensions.
     Extends the application with environment detection and configuration.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     : Creates a new TokeoAppEnv instance and attaches it to the application
         as `app.env`, making environment information available throughout the app.

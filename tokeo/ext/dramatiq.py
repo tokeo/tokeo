@@ -6,7 +6,7 @@ queue-naming convention for single-active-consumer queues, a Cement
 controller that drives `dramatiq` workers from the application config, and
 optional integration with the diskcache locks for cross-worker rate limiting.
 
-### Features:
+### Features
 
 - Single-active-consumer queues via the '_unparalleled' name suffix
     (RabbitMQ x-single-active-consumer flag set on declare)
@@ -20,7 +20,7 @@ optional integration with the diskcache locks for cross-worker rate limiting.
 - pdoc render hooks that swap the runtime decorator for a doc-friendly
     stub so generated docs show `@dramatiq.actor` signatures cleanly
 
-### Example:
+### Example
 
 ```python
 from tokeo.ext.appshare import app
@@ -77,7 +77,7 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
     one consumer processes messages from a queue at a time, which is useful for
     tasks that require strict ordering or exclusive access to resources.
 
-    ### Notes:
+    ### Notes
 
     - To use this feature, simply include '_unparalleled' in your queue name,
         for example: 'my_ordered_tasks_unparalleled'
@@ -93,11 +93,11 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
         Extends the standard queue arguments by adding the x-single-active-consumer
         flag for queues with '_unparalleled' in their name.
 
-        ### Args:
+        ### Args
 
         - **queue_name** (str): The name of the queue being created or declared
 
-        ### Returns:
+        ### Returns
 
         - **dict**: Queue arguments for RabbitMQ
 
@@ -121,7 +121,7 @@ class TokeoDramatiq(MetaMixin):
     The class is instantiated and attached to the app as 'app.dramatiq' during
     application startup.
 
-    ### Notes:
+    ### Notes
 
     - Configuration is read from the 'dramatiq' section in the application config
     - The diskcache extension is required for the locks and rate limiting
@@ -203,12 +203,12 @@ class TokeoDramatiq(MetaMixin):
         This is a convenient wrapper around the application's config.get method,
         accessing values from the extension's config section.
 
-        ### Args:
+        ### Args
 
         - **key** (str): Configuration key to retrieve
         - **kwargs**: Additional arguments passed to config.get()
 
-        ### Returns:
+        ### Returns
 
         - **Any**: The configuration value for the specified key
 
@@ -226,7 +226,7 @@ class TokeoDramatiq(MetaMixin):
         instance with the configured settings. This method is called during
         initialization and configures Dramatiq for use within the application.
 
-        ### Notes:
+        ### Notes
 
         : Configures a standard set of middleware components including AgeLimit,
             TimeLimit, ShutdownNotifications, Callbacks, Pipelines, Retries, and
@@ -266,7 +266,7 @@ class TokeoDramatiq(MetaMixin):
         Called during application shutdown to properly close the connection
         to the RabbitMQ broker, ensuring clean resource release.
 
-        ### Notes:
+        ### Notes
 
         - Only closes the broker if it's an instance of ExtendedRabbitmqBroker
         - Logs diagnostic messages about the broker closure process
@@ -292,15 +292,15 @@ class TokeoDramatiq(MetaMixin):
         diskcache extension, which can be used to apply rate limiting and
         concurrency control to Dramatiq actors.
 
-        ### Returns:
+        ### Returns
 
         - **TokeoDiskCacheLocksHandler**: The locks handler for rate limiting
 
-        ### Raises:
+        ### Raises
 
         - **TokeoDramatiqError**: If the diskcache extension is not enabled
 
-        ### Example:
+        ### Example
 
         ```python
         @dramatiq.actor
@@ -365,7 +365,7 @@ class TokeoDramatiqController(Controller):
         diskcache. It can display information about the locks configuration or
         purge all locks from the cache when needed.
 
-        ### Notes:
+        ### Notes
 
         - With --purge: drops all locks from the cache; useful to reset
             after a worker crash that left a stale acquire behind
@@ -419,12 +419,12 @@ class TokeoDramatiqController(Controller):
         message queues. It applies configuration from the application config while
         allowing CLI arguments to override specific settings.
 
-        ### Args:
+        ### Args
 
         - **--skip-logging** (flag): Skip Dramatiq's default logging configuration
         - **--watch** (str): Path to watch for file changes to reload actors
 
-        ### Notes:
+        ### Notes
 
         - Worker configuration includes process count, thread count, shutdown
             timeout, restart delay, and queue prefetch settings
@@ -507,11 +507,11 @@ def tokeo_dramatiq_pdoc_pre_render(app):
     """
     Replace the dramatiq decorator with a simple one for pdoc rendering.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     : This function replaces the complex Dramatiq actor decorator
         with a simpler version that pdoc can handle
@@ -528,11 +528,11 @@ def tokeo_dramatiq_pdoc_post_render(app):
     """
     Restore the original dramatiq decorator after pdoc rendering.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     : This function restores the original Dramatiq actor decorator functionality
 
@@ -549,7 +549,7 @@ def tokeo_dramatiq_pdoc_render_decorator(app, func, decorator, args, kwargs):
     This function provides custom handling for Dramatiq actor decorators
     during pdoc documentation rendering.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
     - **func** (function): The function being decorated
@@ -557,11 +557,11 @@ def tokeo_dramatiq_pdoc_render_decorator(app, func, decorator, args, kwargs):
     - **args** (list): Positional arguments to the decorator
     - **kwargs** (dict): Keyword arguments to the decorator
 
-    ### Returns:
+    ### Returns
 
     - **dict|None**: Dictionary with decorator information or None if not handled
 
-    ### Notes:
+    ### Notes
 
     - This function extracts queue_name parameters from decorators to
         provide meaningful documentation
@@ -588,11 +588,11 @@ def tokeo_dramatiq_extend_app(app):
     """
     Initialize and register the Dramatiq extension with the application.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     - This function is called during application setup
 
@@ -611,11 +611,11 @@ def tokeo_dramatiq_shutdown(app):
     This function closes broker connections and performs other cleanup tasks
     when the application is shutting down.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     - Called during application shutdown to properly close connections
 
@@ -633,11 +633,11 @@ def load(app):
     for application integration, registers the controller for command-line access,
     and sets up initialization and shutdown hooks.
 
-    ### Args:
+    ### Args
 
     - **app** (Application): The Cement application instance
 
-    ### Notes:
+    ### Notes
 
     - Registers the TokeoDramatiqController for CLI commands
     - Defines extension-specific hooks that can be used by other extensions
