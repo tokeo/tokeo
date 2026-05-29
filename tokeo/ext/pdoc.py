@@ -1,28 +1,32 @@
 """
 Tokeo Pdoc Extension Module.
 
-This extension integrates the pdoc documentation generator with Tokeo
-applications, providing a way to generate API documentation directly
-from Python docstrings. It supports rendering documentation as HTML and
-serving it via a built-in web server.
-
-The extension handles custom docstring formatting, template customization, and
-provides hooks for extensions to modify documentation rendering behavior.
+Wraps pdoc behind a Tokeo extension: a renderer that walks configured
+modules, applies a Tokeo-specific config.mako, plugs in custom decorator
+docstrings via external markdown files, and an HTTP server controller to
+browse the generated HTML during development.
 
 ### Features:
 
-- **Automatic documentation** generation from module docstrings
-- **Custom template** support for controlling documentation appearance
-- **External docstring** handling for complex documentation needs
-- **Warning filtering** to reduce noise during documentation generation
-- **Web server** for browsing generated documentation
-- **Inheritance linking** for proper class hierarchy documentation
-- **Documentation hooks** for extending functionality in other modules
+- Module list resolution from config or the conventional triple
+    (app label, tests, tokeo) when modules is unset
+- External docstring source: markdown files under templates/pdoc/docstrings
+    keyed by `{group}/{identifier}` so decorator and extension docs can
+    live outside the source they describe
+- Warning filter that drops the noisy PEP-224 variable-docstring warning
+    and lifts pdoc 'Error: ...' warnings to a visible ❗ line
+- Healing pass for modules that pdoc imported with skip_errors=True: a
+    missing __file__ or empty docstring would crash mod.html() later, so
+    a stub is filled in and reported as ⚠️
+- Config-files rendering: walks base + each ENVIRONMENT (with optional
+    .local suffix) and renders them into the docs as a config index
+- pdoc render hooks (pre/post + per-decorator) so other extensions can
+    inject their own decorator documentation without editing this module
 
 """
 
 from sys import argv
-from os.path import basename, isdir, isfile
+from os.path import basename, isdir, isfile, relpath
 import shutil
 import warnings
 import pdoc
@@ -54,9 +58,8 @@ class TokeoPdocError(TokeoError):
 
     ### Notes:
 
-    : Inherits from TokeoError to maintain consistent error handling
-
-    : Used to indicate configuration or documentation generation issues
+    - Inherits from TokeoError to maintain consistent error handling
+    - Used to indicate configuration or documentation generation issues
 
     """
 
@@ -232,7 +235,9 @@ class TokeoPdoc(MetaMixin):
                     docstring = f.read()
                     self._docstrings_cache[f'{group}/{identifier}'] = docstring
                     return docstring
-            except Exception:
+            except (FileNotFoundError, IsADirectoryError, NotADirectoryError):
+                # file not in this dir, try the next one; other I/O errors
+                # (permissions, decode failures) propagate as real bugs
                 pass
 
         # not found
@@ -254,15 +259,14 @@ class TokeoPdoc(MetaMixin):
         ### Notes:
 
         - Silently ignores PEP-224 variable docstring warnings
-        - Displays other warnings to the user with a warning emoji prefix
-
-        ### Output:
-
-        : Prints warnings to the application's output with an emoji prefix
+        - Lifts pdoc 'Error: ...' warnings to a visible ❗ line; other
+            warnings get a ⚠️ prefix
 
         """
         if re.match(r'Couldn\'t read PEP-224 variable docstrings', f'{message}', re.IGNORECASE):
             pass
+        elif re.match(r'Error', f'{message}', re.IGNORECASE):
+            self.app.print(f'❗{message}')
         else:
             self.app.print(f'⚠️ {message}')
 
@@ -282,18 +286,13 @@ class TokeoPdoc(MetaMixin):
 
         ### Notes:
 
-        - Automatically creates empty docstrings for modules that lack them
-        - Generates both module documentation and a main index page
-        - The output is written to the directory specified in configuration
-
-        ### Output:
-
-        1. Generates HTML files in the configured output directory
-        1. Each module gets its own HTML file with proper directory structure
+        - Heals modules that lack __file__ or a docstring before rendering
+            so pdoc.html() does not crash downstream
+        - Generates both per-module pages and a main index.html
+        - The output is written to the directory configured under
+            pdoc.output_dir; --clean removes the dir before rendering
 
         """
-        # when running pdoc do not catch signals
-        self.app._meta.catch_signals = None
         # save original show method
         warnings_showwarning = warnings.showwarning
         try:
@@ -326,10 +325,37 @@ class TokeoPdoc(MetaMixin):
 
             # loop modules to generate documentation
             context = pdoc.Context()
-            modules = [pdoc.Module(mod, context=context) for mod in self._modules]
+            # skip_errors=True lets pdoc tolerate failures *inside* a
+            # module's traversal (broken submodules, syntax errors in
+            # imports etc.), but the Module constructor itself can still
+            # raise (ModuleNotFoundError on the top-level name); the outer
+            # try/except handles that and drops the entire module, the
+            # remaining ones are still rendered
+            modules = []
+            for mod in self._modules:
+                try:
+                    pmod = pdoc.Module(mod, context=context, skip_errors=True)
+                    modules.append(pmod)
+                except Exception as e:
+                    # drop the module but make the loss debuggable;
+                    # bare except would also swallow KeyboardInterrupt
+                    self.app.log.debug(
+                        f'pdoc.Module("{mod}") raised, skipping: {e}'
+                    )
             pdoc.link_inheritance(context)
 
             def recursive_htmls(mod):
+                # pdoc imports with skip_errors=True can leave a module
+                # without __file__ on its obj (e.g. when the import raised
+                # but pdoc kept the shell); mod.html() would crash on that,
+                # so we synthesize __file__ and a docstring to keep the
+                # render going. The user sees ⚠️ markers per module so the
+                # gap in real docs is visible
+                if not hasattr(mod.obj, '__file__'):
+                    self.app.print(f'⚠️ Warning: Healing import error for "{mod.name}"')
+                    mod.docstring = f'.. error:: Module "{mod.name}" had errors when processed by pdoc'
+                    mod.obj.__file__ = mod.name
+
                 if mod.docstring is None or mod.docstring == '':
                     self.app.print(f'⚠️ Warning: Healing empty docstring for "{mod.name}"')
                     mod.docstring = f'Documentation of module "{mod.name}"'
@@ -357,24 +383,52 @@ class TokeoPdoc(MetaMixin):
 
             # Create the config documentation
             if hasattr(self.app, 'env') and pdoc_config['show_config']:
+                # use appenv's resolver so the documented file list is
+                # exactly what cement loads at boot: top-level <env>
+                # config, then <env>.d/** sorted by lex+num, then .local
+                # overrides appended. For non-base envs we additionally
+                # splice in the top-level {env}.local{suffix} which
+                # appenv currently does not pick up (it globs .local
+                # only inside {env}.d/), but tokeo convention also has
+                # standalone local overrides next to the env file
+                #
+                # section key is the path relative to APP_CONFIG_DIR
+                # without the config_file_suffix, which preserves the
+                # historic short names ('base', 'development',
+                # 'development.local') and extends them naturally for
+                # .d/ partials ('base.d/cache', 'development.d/db.local')
+                suffix = self.app._meta.config_file_suffix
+                config_dir = self.app.env.APP_CONFIG_DIR
                 configdict = dict()
-                for configfile in (
-                    f'{self.app.env.APP_LABEL}',
-                    *(f'{self.app.env.APP_LABEL}.{env}{suffix}' for env in ENVIRONMENTS for suffix in ('', '.local')),
-                ):
-                    try:
-                        filename = f'{self.app.env.APP_CONFIG_DIR}/{configfile}{self.app._meta.config_file_suffix}'
-                        if isfile(filename):
+                for env in ('base', *ENVIRONMENTS):
+                    file_list = self.app.env.get_config_files(
+                        app_env=env, app_config_file_suffix=suffix,
+                    )
+                    if env != 'base':
+                        local_top = fs.join(config_dir, f'{env}.local{suffix}')
+                        if isfile(local_top) and local_top not in file_list:
+                            # right after the env top-level entry
+                            # (always index 0 from get_config_files)
+                            file_list.insert(1, local_top)
+                    for filename in file_list:
+                        # top-level file is appended unconditionally by
+                        # get_config_files; skip what really isn't there
+                        if not isfile(filename):
+                            continue
+                        section = relpath(filename, config_dir)
+                        if section.endswith(suffix):
+                            section = section[:-len(suffix)]
+                        try:
                             with open(filename, 'r') as f:
                                 configcontent = f.read()
                                 configyaml = yaml.safe_load(configcontent)
-                                configdict[configfile] = dict(
+                                configdict[section] = dict(
                                     content=configcontent.split('\n'),
                                     yaml=configyaml,
                                 )
 
-                    except Exception as err:
-                        self.app.error(f'⚠️ Error: Processing config file "{configfile}": {err}')
+                        except Exception as err:
+                            self.app.print(f'❗Error: Processing config file "{section}": {err}')
 
                 # Create a single base `config/index.html`
                 fs.ensure_dir_exists(fs.join(self._output_dir, 'config'))
@@ -401,7 +455,13 @@ class TokeoPdoc(MetaMixin):
 
     def _run_http_server(self):
         """
-        Helper method to run the server.
+        Thread target that runs the HTTP server's blocking loop.
+
+        Lives in its own method because serve_forever() blocks; startup()
+        spawns it on a daemon thread so the main flow stays responsive.
+        A KeyboardInterrupt in this thread is swallowed (the signal goes
+        to the main thread which calls shutdown), other exceptions are
+        logged as errors.
 
         """
         try:
@@ -421,17 +481,15 @@ class TokeoPdoc(MetaMixin):
 
         ### Notes:
 
-        1. This method only starts the server but doesn't block execution
-        1. Use the serve() method to start the server and block until interrupted
-        1. The server serves files from the configured output directory
+        - This method only starts the server but doesn't block execution
+        - Use the serve() method to start the server and block until interrupted
+        - The server serves files from the configured output directory
 
         ### Raises:
 
         - **TokeoPdocError**: If the server cannot be started
 
         """
-
-        """Start serving the HTML documentation."""
         if self._http_server_running:
             self.app.log.warning('Tokeo pdoc server is already running')
             return
@@ -474,8 +532,8 @@ class TokeoPdoc(MetaMixin):
 
         ### Notes:
 
-        1. Safely handles the case where the server was never started
-        1. Cleans up server resources to prevent resource leaks
+        - Safely handles the case where the server was never started
+        - Cleans up server resources to prevent resource leaks
 
         """
         if self._http_server_running and self._http_server:
@@ -508,9 +566,15 @@ class TokeoPdoc(MetaMixin):
             while True:
                 time.sleep(2.5)
         except KeyboardInterrupt:
+            # defensive: with Cement's default catch_signals SIGINT is
+            # turned into CaughtSignal before it surfaces as a Python
+            # KeyboardInterrupt, so this branch should not trigger in
+            # practice; kept as a safety net against future signal-
+            # handling changes (in cement or in tokeo)
             pass
         except CaughtSignal as err:
-            # check for catched signals and allow shutdown by signals
+            # normal Ctrl+C / SIGTERM / SIGHUP path; release the listener
+            # socket and emit the shutdown log line
             self.app.print()
             if err.signum in SIGNALS:
                 self.shutdown()
@@ -610,16 +674,9 @@ class TokeoPdocController(Controller):
         ### Notes:
 
         - The server host and port are configurable in the application config
-
         - The configs can also be set by env vars like MYAPP_PDOC_PORT
-
         - The command blocks until interrupted with Ctrl+C
-
-        ### Output:
-
-        1. Logs the server URL when it starts
-
-        1. Serves the documentation files via HTTP
+        - Logs the server URL once the listener is up
 
         """
         # Start the server
@@ -648,12 +705,10 @@ def tokeo_pdoc_render_decorator(app, func, decorator, args, kwargs):
 
     ### Notes:
 
-    1. Currently handles the @contextmanager and @ex/@expose decorators
-
-    1. For supported decorators, returns information about the decorator
-      including its docstring loaded from external files
-
-    1. Returns None for decorators that are not specifically handled
+    - Currently handles the @contextmanager and @ex/@expose decorators
+    - For supported decorators, returns information about the decorator
+        including its docstring loaded from external files
+    - Returns None for decorators that are not specifically handled
 
     """
     if decorator == '@contextmanager':
@@ -683,12 +738,10 @@ def tokeo_pdoc_extend_app(app):
 
     ### Notes:
 
-    1. This function is called during application setup
-
-    1. It creates the TokeoPdoc instance and attaches it to the app
-      as app.pdoc
-
-    1. Called by the post_setup hook registered in the load function
+    - This function is called during application setup
+    - It creates the TokeoPdoc instance and attaches it to the app
+        as app.pdoc
+    - Called by the post_setup hook registered in the load function
 
     """
     app.extend('pdoc', TokeoPdoc(app))
@@ -709,11 +762,9 @@ def load(app):
 
     ### Notes:
 
-    1. Registers the TokeoPdocController for CLI commands
-
-    1. Defines extension-specific hooks for pre/post rendering
-
-    1. Sets up decorator handling for improved documentation
+    - Registers the TokeoPdocController for CLI commands
+    - Defines extension-specific hooks for pre/post rendering
+    - Sets up decorator handling for improved documentation
 
     """
     app.handler.register(TokeoPdocController)
@@ -726,7 +777,7 @@ def load(app):
 
 def _get_config(**kwargs):
     """
-    This is a overload function from original pdoc.__init__.py (_get_config).
+    This is an overload function from original pdoc.__init__.py (_get_config).
 
     The DEFAULT_CONFIG is not changeable by API and the pdoc.tpl_lookup.get_template
     function will only returns the first other config.mako. So instead of repeating
