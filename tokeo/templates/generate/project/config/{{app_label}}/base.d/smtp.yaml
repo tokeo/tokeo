@@ -33,10 +33,10 @@ smtp:
   tls: true
   ### enable authentication for service
   # auth: false
-  ### auth username
-  # username: null
+  ### auth username or identity
+  # auth_identity: null
   ### auth password
-  # password: null
+  # auth_password: null
   ### attach one or more files by default to the messages
   # files: null
   ### define the characterset for message
