@@ -3,10 +3,10 @@ Low-level layout primitives, styling configurations, and the theme engine.
 
 This module serves as the foundational design system for the application.
 It defines core responsive breakpoints (aligned with Tailwind CSS), color
-palettes (`COLORS` dictionary), base CSS injections, and the lowest-level
+palettes (``COLORS`` dictionary), base CSS injections, and the lowest-level
 HTML wrappers.
 
-While `blocks.py` provides high-level composition, this module dictates
+While ``blocks.py`` provides high-level composition, this module dictates
 *how* those blocks look and behave. To re-theme the application or adjust
 global padding, routing behavior, and typography, modify the configurations
 in this file.
@@ -14,15 +14,15 @@ in this file.
 ### ⚠️ CRITICAL: Multi-User Safety Architecture
 
 This framework adheres to a strict stateless, multi-user architecture.
-Instantiating NiceGUI elements (`ui.button`, `ui.label`, etc.) in the
+Instantiating NiceGUI elements (``ui.button``, ``ui.label``, etc.) in the
 global scope of any module will cause severe memory leaks and cross-user
 state contamination (attaching elements to NiceGUI's background shared client).
 
-### 🛡️ The `guard_user_context()` Tripwire
+### 🛡️ The ``guard_user_context()`` Tripwire
 
 To protect the framework, **ALL** newly created layout functions, root-level
-context managers, or wrappers that execute native NiceGUI `ui.*` commands must
-trigger the security guard before rendering.
+context managers, or wrappers that execute native NiceGUI ``ui.*`` commands
+must trigger the security guard before rendering.
 
 The guard verifies that the function is being called from safely inside an
 active user's page route.
@@ -41,7 +41,7 @@ def my_new_layout_block():
 ```
 
 If a guarded function is accidentally called at the global/import level,
-the guard will instantly raise a `TokeoNiceguiError` and crash the app on
+the guard will instantly raise a ``TokeoNiceguiError`` and crash the app on
 startup, intentionally preventing the memory leak from ever reaching production.
 
 """
