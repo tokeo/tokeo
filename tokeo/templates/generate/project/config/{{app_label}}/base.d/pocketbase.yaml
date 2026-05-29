@@ -10,3 +10,10 @@
 pocketbase:
   ### connection string to database
   url: http://127.0.0.1:8090
+  ### verify the certificate hostname (https only); False skips
+  ### the check (chain still checked)
+  tls_verify_hostname: true
+  ### verify the certificate chain (https only); False disables it
+  tls_verify_cert: true
+  ### path to a CA bundle to trust instead of the system store
+  tls_ca: null
