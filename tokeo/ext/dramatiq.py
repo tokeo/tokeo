@@ -53,8 +53,10 @@ from cement import ex
 import dramatiq
 from dramatiq import middleware, cli, actor as dramatiq_actor
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
+import pika
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.url import overload_with_auth as url_overload_with_auth
+from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
 from tokeo.ext.argparse import Controller
 
 
@@ -87,34 +89,69 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
     - Also accepts auth_identity/auth_password and merges them into the
         connection url, since RabbitmqBroker cannot take a url and separate
         pika credentials at the same time
+    - For amqps urls it accepts tls_verify_hostname/tls_verify_cert/tls_ca to
+        customize the ssl context; a custom context forces the pika
+        parameters path, since RabbitmqBroker cannot mix url and parameters
 
     """
 
-    def __init__(self, *, url=None, auth_identity=None, auth_password=None, **kwargs):
+    def __init__(self, *, url=None, auth_identity=None, auth_password=None,
+                 tls_verify_hostname=True, tls_verify_cert=True, tls_ca=None,
+                 **kwargs):
         """
-        Initialize the broker, applying configured credentials to the url.
+        Initialize the broker, applying credentials and tls to the connection.
 
-        Accepts the standard RabbitmqBroker keyword arguments plus auth_identity
-        and auth_password. When a url is given, the credentials are merged into
-        its userinfo (see overload_with_auth) before the url is handed to the
-        parent, since RabbitmqBroker cannot take a url and pika credentials
-        together.
+        Accepts the standard RabbitmqBroker keyword arguments plus the auth and
+        tls options below. Credentials are merged into the url userinfo (see
+        overload_with_auth). For an amqps url the tls options build an ssl
+        context (see create_ssl_context); when one is needed the url is
+        decomposed and handed to the parent as pika parameters, since
+        RabbitmqBroker cannot take a url and pika parameters together.
 
         ### Args
 
-        - **url** (str, optional): The amqp connection url
+        - **url** (str, optional): The amqp(s) connection url
         - **auth_identity** (str, optional): Username/identity to force into
             the url userinfo, overriding any user the url carries
         - **auth_password** (str, optional): Password to force into the url
             userinfo, overriding any password the url carries
+        - **tls_verify_hostname** (bool|str): Verify the certificate hostname;
+            a string pins the expected name, False skips the hostname check
+        - **tls_verify_cert** (bool): Verify the certificate chain; False
+            disables verification (CERT_NONE)
+        - **tls_ca** (str, optional): Path to a CA bundle to trust instead of
+            the system store
         - **kwargs**: Remaining RabbitmqBroker arguments (e.g. middleware,
             confirm_delivery, max_priority, parameters)
 
         """
-        super().__init__(
-            url=url_overload_with_auth(url, auth_identity, auth_password),
-            **kwargs,
-        )
+        url = url_overload_with_auth(url, auth_identity, auth_password)
+        # tls is driven by the amqps scheme; the tls_* options only customize
+        # it, so a plain amqp url ignores them
+        context = server_hostname = None
+        if url and url.lower().startswith('amqps'):
+            context, server_hostname = tls_create_ssl_context(
+                tls_verify_hostname, tls_verify_cert, tls_ca,
+            )
+        if context is None:
+            # plain amqp, or amqps with secure defaults where pika builds its
+            # own context from the url
+            super().__init__(url=url, **kwargs)
+        else:
+            # a custom ssl context cannot ride inside the url, and the parent
+            # forbids url + parameters, so decompose the url and hand pika
+            # ConnectionParameters carrying our ssl_options instead
+            params = pika.URLParameters(url)
+            super().__init__(
+                parameters=[dict(
+                    host=params.host,
+                    port=params.port,
+                    virtual_host=params.virtual_host,
+                    credentials=params.credentials,
+                    ssl_options=pika.SSLOptions(context, server_hostname),
+                )],
+                **kwargs,
+            )
 
     def _build_queue_arguments(self, queue_name):
         """
@@ -188,12 +225,23 @@ class TokeoDramatiq(MetaMixin):
             delay_queue_prefetch=0,
             # Broker type (currently only rabbitmq supported)
             broker='rabbitmq',
-            # RabbitMQ connection URL
-            rabbitmq_url='amqp://guest:guest@localhost:5672/',
-            # RabbitMQ connection username or identity
-            rabbitmq_auth_identity=None,
-            # RabbitMQ connection password
-            rabbitmq_auth_password=None,
+            # RabbitMQ connection settings
+            rabbitmq=dict(
+                # connection url; use amqps:// to enable tls, verified against
+                # the system ca store by default (the secure option)
+                url='amqp://localhost:5672/',
+                # username/identity, overrides any user in the url
+                auth_identity=None,
+                # password, overrides any password in the url
+                auth_password=None,
+                # verify the certificate hostname (amqps only); a string pins
+                # the expected name, False skips the check (chain still checked)
+                tls_verify_hostname=True,
+                # verify the certificate chain (amqps only); False disables it
+                tls_verify_cert=True,
+                # path to a CA bundle to trust instead of the system store
+                tls_ca=None,
+            ),
             # Tag for dramatiq locks in the cache
             locks_tag='dramatiq_locks',
             # Prefix for dramatiq lock keys
@@ -286,10 +334,14 @@ class TokeoDramatiq(MetaMixin):
         ]
         # create the broker to RabbitMQ based on config; configured
         # credentials may override any userinfo carried by the url
+        rabbitmq_config = self._config.get('rabbitmq', {})
         rabbitmq_broker = ExtendedRabbitmqBroker(
-            url=self._config('rabbitmq_url'),
-            auth_identity=self._config('rabbitmq_auth_identity'),
-            auth_password=self._config('rabbitmq_auth_password'),
+            url=rabbitmq_config['url'],
+            auth_identity=rabbitmq_config['auth_identity'],
+            auth_password=rabbitmq_config['auth_password'],
+            tls_verify_hostname=rabbitmq_config['tls_verify_hostname'],
+            tls_verify_cert=rabbitmq_config['tls_verify_cert'],
+            tls_ca=rabbitmq_config['tls_ca'],
             middleware=use_middleware,
         )
         # globally set the broker on dramatiq

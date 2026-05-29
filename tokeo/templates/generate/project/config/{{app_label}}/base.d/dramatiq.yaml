@@ -36,12 +36,21 @@ dramatiq:
 
   ### broker to use for backend
   broker: rabbitmq
-  ### connection url to rabbitmq server
-  rabbitmq_url: amqp://none:nonet@localhost:5672/
-  ### connection username or identity for rabbitmq server (overrule url)
-  rabbitmq_auth_identity: guest
-  ### connection password for rabbitmq server (overrule url)
-  rabbitmq_auth_password: guest
+  ### connection settings for rabbitmw
+  rabbitmq:
+    ### connection url to rabbitmq server
+    url: amqp://none:nonet@localhost:5672/
+    ### connection username or identity for rabbitmq server (overrule url)
+    auth_identity: guest
+    ### connection password for rabbitmq server (overrule url)
+    auth_password: guest
+    ### verify the certificate hostname (amqps only); a string pins
+    ### the expected name, False skips the check (chain still checked)
+    tls_verify_hostname: true
+    ### verify the certificate chain (amqps only); False disables it
+    tls_verify_cert: true
+    ### path to a CA bundle to trust instead of the system store
+    tls_ca: null
   ### mark lock keys by tag
   locks_tag: dramatiq_locks
   ### mark lock keys with prefix
