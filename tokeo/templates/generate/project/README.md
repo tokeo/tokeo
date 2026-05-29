@@ -218,7 +218,7 @@ Your project is organized into a clean, modular structure:
 - `{{ app_label }}/core/grpc/` - gRPC service definitions and implementations
 {% endif %}
 {% if feature_nicegui == "Y" %}
-- `{{ app_label }}/core/pages/` - Web interface pages and apis
+- `{{ app_label }}/site/` - Web interface pages and apis
 {% endif %}
 - `{{ app_label }}/core/tasks/` - Implementations of actors, agents, automations, operations, performers etc.
 - `{{ app_label }}/core/utils/` - A place to put your overall tools and helper functions
