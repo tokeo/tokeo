@@ -6,8 +6,15 @@ package {{ app_label }};
 
 // The grpc service on Tokeo
 service {{ app_class_name }} {
-  // Sends a greeting
+  // Lightweight liveness probe. Returns 'pong' immediately
+  rpc Ping (google.protobuf.Empty) returns (PingResponse) {}
+  // Sends a job to CountWords in dramatiq queue
   rpc CountWords (CountWordsRequest) returns (google.protobuf.Empty) {}
+}
+
+// Liveness probe response.
+message PingResponse {
+  string message = 1;
 }
 
 // The request message containing the url.
