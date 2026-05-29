@@ -93,11 +93,9 @@ def hasprops(obj, names):
     for name in names:
         if not hasattr(obj, name):
             return False
-        # all props exist
-        return True
-
-    # default miss
-    return False
+    # all names checked and present; an empty names list is vacuously true,
+    # which matches the dict/container branch above
+    return True
 
 
 def anyprop(obj, names):
