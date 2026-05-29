@@ -342,9 +342,12 @@ class TokeoDiskCacheLocksHandler:
                         values = self._cache.get(key)
                         # accept only a valid (number, number) bucket tuple;
                         # time_func may return int or float, so check both
-                        if (type(values) is tuple and len(values) == 2
-                                and isinstance(values[0], (int, float))
-                                and isinstance(values[1], (int, float))):
+                        if (
+                            type(values) is tuple
+                            and len(values) == 2
+                            and isinstance(values[0], (int, float))
+                            and isinstance(values[1], (int, float))
+                        ):
                             # unpack the cached bucket state
                             last, tally = values
                             # drop only truly broken states; an empty bucket
@@ -384,7 +387,8 @@ class TokeoDiskCacheLocksHandler:
                     # signal a non available slot and set a sleep time
                     delay = (1 - tally) / rate
 
-                    # no token free: check for hand over to the callback outside lock
+                    # no token free: check for hand over to the callback
+                    # outside lock
                     if cb_on_locked:
                         break
 

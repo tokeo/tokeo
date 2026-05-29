@@ -165,10 +165,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
             # non-dict here means malformed config, so fail loud instead
             # of silently dropping it
             if section_content is not None and not isinstance(section_content, dict):
-                raise ValueError(
-                    f'config section "{section}" must be a dict, '
-                    f'got "{type(dict_obj[section]).__name__}"'
-                )
+                raise ValueError(f'config section "{section}" must be a dict, got "{type(dict_obj[section]).__name__}"')
 
             # Create section if it doesn't exist
             if section not in self.get_sections():

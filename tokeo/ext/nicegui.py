@@ -491,9 +491,7 @@ class TokeoNicegui(MetaMixin):
                 routes_handler = getattr(routes_module, self._routes, None)
                 # verify
                 if routes_handler is None:
-                    raise TokeoNiceguiError(
-                        f'Route handler "{self._routes}" could not be found in module "{self._routes_module}"'
-                    )
+                    raise TokeoNiceguiError(f'Route handler "{self._routes}" could not be found in module "{self._routes_module}"')
                 # initialize registered default route
                 routes_handler()
             else:
