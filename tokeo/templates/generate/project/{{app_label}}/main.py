@@ -121,7 +121,7 @@ class {{ app_class_name }}Test(TestApp, {{ app_class_name }}):
 
     ```python
     # Basic test setup
-    from {{ all_label }}.main import {{ app_class_name }}Test
+    from {{ app_label }}.main import {{ app_class_name }}Test
 
     with {{ app_class_name }}Test() as app:
         app.run()
