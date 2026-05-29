@@ -14,7 +14,7 @@ authors = [
 urls = {"Homepage" = "{{ project_url }}"}
 requires-python = ">=3.10"  # Adjust based on your needs
 dependencies = [
-    "tokeo==1.1.8",
+    "tokeo==1.2.2",
     "cement==3.0.14",
     "cement[jinja2]",
     "jinja2",
@@ -46,7 +46,7 @@ dependencies = [
     "requests",
 {% endif -%}
 {% if feature_nicegui == "Y" %}
-    "nicegui>=3.8.0",
+    "nicegui>=3.12.1",
     "fastapi",
     "starlette",
     "email-validator",
