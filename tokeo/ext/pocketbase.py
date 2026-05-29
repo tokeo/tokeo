@@ -51,6 +51,7 @@ are reached through the raw SDK via the collection() escape hatch.
 """
 
 from cement.core.meta import MetaMixin
+from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
 import pocketbase
 
 
@@ -97,8 +98,16 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         # Default configuration settings
         config_defaults = dict(
-            # URL for the PocketBase server
+            # URL for the PocketBase server; use https:// to enable tls,
+            # verified against the system ca store by default (the secure option)
             url='http://127.0.0.1:8090',
+            # verify the certificate hostname (https only, bool); False skips
+            # the hostname check while still verifying the chain
+            tls_verify_hostname=True,
+            # verify the certificate chain (https only); False disables it
+            tls_verify_cert=True,
+            # path to a CA bundle to trust instead of the system store
+            tls_ca=None,
         )
 
     def __init__(self, app, *args, **kw):
@@ -138,17 +147,36 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         ### Notes
 
-        : This method merges the default configuration with any user-provided
-            configuration and initializes the PocketBase client. The client is
-            stored in the ``pb`` attribute and is used by all other methods to
-            interact with the PocketBase server.
+        - Merges the default configuration with any user-provided configuration
+            and initializes the PocketBase client, stored in the ``pb``
+            attribute and used by all other methods
+        - A https url enables tls, verified against the system ca store by
+            default; the tls options build a custom ssl context that is
+            passed to the underlying httpx client
 
         """
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
+        url = self._config('url')
+        # tls is driven by the https scheme; the tls_* options only customize
+        # it, so a plain http url ignores them
+        context = None
+        if url and url.lower().startswith('https'):
+            context, _ = tls_create_ssl_context(
+                self._config('tls_verify_hostname'),
+                self._config('tls_verify_cert'),
+                self._config('tls_ca'),
+            )
         # connect anonymously by design: this handler is a thin CRUD mapping
         # and runs against whatever the PocketBase api rules allow for
         # unauthenticated requests; auth flows are the app's job via collection()
-        self.pb = pocketbase.PocketBase(self._config('url'))
+        if context is None:
+            # plain http, or https with secure defaults where httpx verifies
+            # against the system ca store
+            self.pb = pocketbase.PocketBase(url)
+        else:
+            # a custom context (custom ca or relaxed verification) goes to the
+            # httpx client the sdk builds from **kwargs
+            self.pb = pocketbase.PocketBase(url, verify=context)
 
     def _config(self, key, **kwargs):
         """
