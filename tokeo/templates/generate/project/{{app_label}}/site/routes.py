@@ -5,11 +5,6 @@ This module acts as the central registry for all web pages and API endpoints.
 It imports isolated page and API functions and binds them to specific URL
 paths using NiceGUI and FastAPI's programmatic routers.
 
-**CRITICAL (NiceGUI 3.x Architecture):** Absolutely no UI elements (`ui.label`,
-`ui.button`, etc.) may be instantiated in the global scope of this file.
-All UI construction must happen strictly inside the registered page functions
-to prevent memory leaks and cross-session state contamination.
-
 ### Route Structure:
 
 Routes are defined as pure, stateless functions in the `pages/` and `apis/`
@@ -44,6 +39,14 @@ def pages_map():
 - `ui.page()` and `fastapi_app.get()` are used as programmatic wrappers in a loop,
   not as decorators
 - The `routes()` function is invoked by the `TokeoNicegui` engine during startup
+
+### Attention:
+
+.. danger::
+    **(NiceGUI 3.x Architecture):** Absolutely no UI elements (`ui.label`,
+    `ui.button`, etc.) may be instantiated in the global scope of this file.
+    All UI construction must happen strictly inside the registered page functions
+    to prevent memory leaks and cross-session state contamination.
 
 """
 
