@@ -36,12 +36,15 @@ from sys import argv
 from os.path import basename
 from datetime import datetime, timezone
 import time
+import re
+import secrets
 import yaml
 import copy
 from threading import Thread
 from concurrent import futures as concurrent_futures
 import importlib
 import invoke
+import invoke.watchers
 import paramiko
 import paramiko.agent
 from paramiko.hostkeys import HostKeys, HostKeyEntry
@@ -63,7 +66,19 @@ from tokeo.core.utils import sanitize
 from tokeo.ext.argparse import Controller
 
 
-class TokeoCommandTimedOut(invoke.CommandTimedOut):
+class TokeoAutomateError(TokeoError):
+    """
+    Exception class for automation-related errors.
+
+    Used for errors specific to the automation system, such as
+    configuration problems, connection issues, or task execution failures.
+
+    """
+
+    pass
+
+
+class TokeoAutomateCommandTimedOut(invoke.CommandTimedOut):
     """
     invoke.CommandTimedOut with a clearer timeout message.
 
@@ -79,16 +94,26 @@ class TokeoCommandTimedOut(invoke.CommandTimedOut):
         return template.format(command, self.timeout)
 
 
-class TokeoAutomateError(TokeoError):
+class TokeoInvokeSudoResponder(invoke.watchers.Responder):
     """
-    Exception class for automation-related errors.
+    Invoke responder that answers the first prompt match exactly once.
 
-    Used for errors specific to the automation system, such as
-    configuration problems, connection issues, or task execution failures.
+    Used for local sudo so the behavior matches the remote path, which
+    injects the password a single time and never again.
 
     """
 
-    pass
+    def __init__(self, pattern, response):
+        super().__init__(pattern=pattern, response=response)
+        self._fired = False
+
+    def submit(self, stream):
+        if self._fired:
+            return
+        for response in super().submit(stream):
+            self._fired = True
+            yield response
+            break
 
 
 class TokeoInvokeLocalContext(invoke.Context):
@@ -121,6 +146,11 @@ class TokeoInvokeLocalContext(invoke.Context):
         self.sanitize = self.task_kwprotected['sanitize']
 
     @staticmethod
+    def generate_sudo_env_match_token(self):
+        # a unique, shell-safe SUDO_PROMPT we set and match 1:1 in env mode
+        return f'__tokeo_automate_sudo_{secrets.token_hex(14)}__'
+
+    @staticmethod
     def protect_kwargs_inplace(self, kwargs):
         """
         Apply task-configured protect/sanitize rules to a kwargs dict in place.
@@ -147,7 +177,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         # if the task should be sanitized then check the envs
         if env and self.sanitize:
             env = sanitize.keyword_dict(env)
-        # if strict protected, remove all kwargs, except ssave once
+        # if strict protected, remove all kwargs, except safe ones
         if self.protect == 'strict':
             for k in kwargs.keys() - {'hide', 'warn'}:
                 del kwargs[k]
@@ -175,17 +205,57 @@ class TokeoInvokeLocalContext(invoke.Context):
 
         ### Raises:
 
-        - **TokeoCommandTimedOut**: If the command exceeds the timeout
+        - **TokeoAutomateCommandTimedOut**: If the command exceeds the timeout
+
+        ### Notes:
+
+        - env vars are exported into the shell verbatim, without
+          shell-quoting here. Escaping is delegated to the
+          task's sanitize setting; with sanitize enabled the values pass
+          through sanitize.keyword_dict(), otherwise they are exported as-is.
+        - a sudo password (sudo.password) is injected reactively when the
+          configured prompt is seen in the last tail chars of stdout or
+          stderr: sudo.mode 'eq' matches the literal sudo.match, 'regex'
+          matches it as a pattern, 'env' sets a unique SUDO_PROMPT and matches
+          that. Injection happens at most once. If sudo is None the support
+          is disabled completely.
 
         """
         # take care of kwargs
         TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs)
+
+        # check for sudo config and settings
+        sudo_config = self.config.get('sudo')
+        sudo_pass = sudo_config.get('password') if sudo_config else None
+
+        # additional sudo actions
+        if sudo_pass:
+            # sudo almost always requires a PTY to prompt properly over SSH
+            kwargs['pty'] = True
+            # local proxy values for sudo config settings
+            sudo_mode = sudo_config.get('mode')
+            if sudo_mode == 'env':
+                sudo_match = TokeoInvokeLocalContext.generate_sudo_env_match_token(self)
+                kwargs['env']['SUDO_PROMPT'] = sudo_match
+            else:
+                sudo_match = sudo_config.get('match')
+            # check for regex or escape
+            if sudo_mode != 'regex':
+                sudo_match = re.escape(sudo_match)
+
+            # sudo prints its prompt on the tty
+            _responder = TokeoInvokeSudoResponder(pattern=sudo_match, response=sudo_pass + '\n')
+            if kwargs.get('watchers'):
+                kwargs['watchers'].insert(0, _responder)
+            else:
+                kwargs['watchers'] = [_responder]
+
         # call the normal invoke runner
         try:
             return super().run(command, **kwargs)
         except invoke.CommandTimedOut as e:
             # surface the same clearer message for local timeouts
-            raise TokeoCommandTimedOut(e.result, e.timeout) from e
+            raise TokeoAutomateCommandTimedOut(e.result, e.timeout) from e
 
 
 class TokeoInvokeRemoteContext(invoke.Context):
@@ -296,15 +366,20 @@ class TokeoInvokeRemoteContext(invoke.Context):
 
         ### Raises:
 
-        - **TokeoCommandTimedOut**: If the command exceeds the timeout
+        - **TokeoAutomateCommandTimedOut**: If the command exceeds the timeout
 
         ### Notes:
 
-        : env vars are exported into the remote shell verbatim, without
-            shell-quoting here (unlike invoke). Escaping is delegated to the
-            task's sanitize setting: with sanitize enabled the env values are
-            passed through sanitize.keyword_dict(); with it disabled they are
-            exported as-is, so the caller is responsible for safe values.
+        - env vars are exported into the remote shell verbatim, without
+          shell-quoting here (unlike invoke). Escaping is delegated to the
+          task's sanitize setting; with sanitize enabled the values pass
+          through sanitize.keyword_dict(), otherwise they are exported as-is.
+        - a sudo password (sudo.password) is injected reactively when the
+          configured prompt is seen in the last tail chars of stdout or
+          stderr: sudo.mode 'eq' matches the literal sudo.match, 'regex'
+          matches it as a pattern, 'env' sets a unique SUDO_PROMPT and matches
+          that. Injection happens at most once. If sudo is None the support
+          is disabled completely.
 
         """
         self._connect()
@@ -320,13 +395,29 @@ class TokeoInvokeRemoteContext(invoke.Context):
         # get encoding
         encoding = kwargs.get('encoding', None)
 
-        # Safely extract the sudo password from the invoke.Config if it exists
-        sudo_config = self.config.get('sudo', {})
-        sudo_pass = sudo_config.get('password')
+        # check for sudo config and settings
+        sudo_config = self.config.get('sudo')
+        sudo_pass = sudo_config.get('password') if sudo_config else None
 
-        # Sudo almost always requires a PTY to prompt properly over SSH
+        # additional sudo actions
         if sudo_pass:
+            # sudo almost always requires a PTY to prompt properly over SSH
             kwargs['pty'] = True
+            # local proxy values for sudo config settings
+            sudo_mode = sudo_config.get('mode')
+            sudo_tail = sudo_config.get('tail')
+            if sudo_mode == 'env':
+                sudo_match = TokeoInvokeLocalContext.generate_sudo_env_match_token(self)
+                sudo_prompt = sudo_match
+            else:
+                sudo_match = sudo_config.get('match')
+            # check for regex or escape
+            if sudo_mode != 'regex':
+                # validate tail only for equal tests
+                if len(sudo_match) + 25 >= sudo_tail:
+                    sudo_tail = len(sudo_match) + 25
+                # escape the match to search for equality
+                sudo_match = re.escape(sudo_match)
 
         # Open the channel (session)
         transport = self.client.get_transport()
@@ -348,6 +439,10 @@ class TokeoInvokeRemoteContext(invoke.Context):
         else:
             env_exports = ''
 
+        # set token based sudo password prompt to match against
+        if sudo_pass and sudo_mode == 'env':
+            env_exports += f'export SUDO_PROMPT={sudo_prompt} ; '
+
         # Start the clock and execute the command
         timeout = kwargs.get('timeout', None)
         start_time = time.time()
@@ -361,7 +456,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
             # 1. Enforce the Timeout
             if timeout and (time.time() - start_time) > timeout:
                 channel.close()
-                raise TokeoCommandTimedOut(
+                raise TokeoAutomateCommandTimedOut(
                     invoke.runners.Result(stdout='', stderr='CommandTimeOut', exited=-1, command=command), timeout
                 )
 
@@ -372,19 +467,20 @@ class TokeoInvokeRemoteContext(invoke.Context):
                 if not hide_out:
                     print(chunk.decode(encoding, errors='replace'), end='', flush=True)
 
-                # Detect sudo prompt in the tail of the buffer
-                if sudo_pass and b'password' in stdout_buffer.lower()[-50:]:
-                    # Inject the password with a newline
-                    channel.sendall(sudo_pass.encode(encoding) + b'\n')
-                    # Set to None so we don't accidentally inject it again
-                    sudo_pass = None
-
             # 3. Read standard error
             if channel.recv_stderr_ready():
                 chunk = channel.recv_stderr(4096)
                 stderr_buffer += chunk
                 if not hide_err:
                     print(chunk.decode(encoding, errors='replace'), end='', flush=True)
+
+            # detect the configured sudo match in either stream (one-shot)
+            if sudo_pass and (
+                (re.search(sudo_match, stdout_buffer[-sudo_tail:].decode(encoding, errors='replace')) is not None) or
+                (re.search(sudo_match, stderr_buffer[-sudo_tail:].decode(encoding, errors='replace')) is not None)
+            ):
+                channel.sendall(sudo_pass.encode(encoding) + b'\n')
+                sudo_pass = None
 
             # 4. Sleep briefly to prevent pinning the CPU at 100%
             time.sleep(0.01)
@@ -596,6 +692,60 @@ class TokeoAutomate(MetaMixin):
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
+    def _validate_host_or_connection_entry(self, entry):
+        """
+        Normalize fields inside a host or connection dict in place.
+
+        ### Args:
+
+        - **entry** (dict): A host or connection dict to validate
+
+        ### Returns:
+
+        - **dict**: The same entry (mutated in place; returned for chaining)
+
+        """
+        if 'sudo' in entry:
+            entry['sudo'] = self._get_sudo_dict(entry)
+        return entry
+
+    def _get_sudo_dict(self, entry):
+        """
+        Create a sudo configuration dictionary from a definition.
+
+        Accepts either a scalar (taken as the password, other keys default)
+        or a dict that is merged onto the defaults.
+
+        ### Args:
+
+        - **entry** (dict): A configured host or connection dict
+
+        ### Returns:
+
+        - **dict**: Standardized sudo configuration dictionary
+
+        """
+        if not isinstance(entry, dict):
+            raise TokeoAutomateError('To define a sudo entry there must be at least a dict')
+        # get sudo from entry
+        sudo = entry.get('sudo', None)
+        # if nothing set, than disable sudo support completely
+        if sudo is None:
+            return None
+        # test for supported entries
+        if not isinstance(sudo, str) and not isinstance(sudo, dict):
+            raise TokeoAutomateError('To define a sudo there must be at least a str or dict')
+        # setup the dict
+        _sudo = dict(password=None, mode='eq', match='password:', tail=100)
+        if isinstance(sudo, str):
+            _sudo['password'] = sudo
+            return _sudo
+        for field in ('password', 'mode', 'match', 'tail'):
+            if field in sudo:
+                _sudo[field] = sudo[field]
+        # return the record
+        return _sudo
+
     def _get_host_dict(self, key, entry):
         """
         Create a host configuration dictionary from a definition.
@@ -639,8 +789,8 @@ class TokeoAutomate(MetaMixin):
         for field in ('port', 'user', 'password', 'sudo', 'identity', 'host_key', 'shell', 'encoding'):
             if field in entry:
                 _host[field] = entry[field]
-        # return the record
-        return _host
+        # return the validated record
+        return self._validate_host_or_connection_entry(_host)
 
     def _get_host_dict_from_str(self, key, host_str):
         """
@@ -732,8 +882,8 @@ class TokeoAutomate(MetaMixin):
         for field in ('id', 'name', 'host', 'port', 'user', 'password', 'sudo', 'identity', 'host_key', 'shell', 'encoding'):
             if field in overrule:
                 _host[field] = overrule[field]
-        # return the record
-        return _host
+        # return the validated record
+        return self._validate_host_or_connection_entry(_host)
 
     def _get_connection_dict(self, key, entry):
         """
@@ -784,8 +934,8 @@ class TokeoAutomate(MetaMixin):
         ):
             if field in entry:
                 _connection[field] = entry[field]
-        # return the record
-        return _connection
+        # return the validated record
+        return self._validate_host_or_connection_entry(_connection)
 
     def _setup_connection(self, connection):
         """
@@ -880,7 +1030,7 @@ class TokeoAutomate(MetaMixin):
                 hosts_list.extend(self.hostgroups[host])
             else:
                 if isinstance(entry, dict):
-                    hosts_list.append(entry)
+                    hosts_list.append(self._validate_host_or_connection_entry(entry))
                 elif isinstance(entry, str):
                     hosts_list.append(self._get_host_dict_from_str(None, host))
                 else:
@@ -1232,9 +1382,9 @@ class TokeoAutomate(MetaMixin):
             connect_args = {}
             connect_kwargs = {}
             connect_config = {}
-            # add sudo only if sudo password is given
+            # add sudo only if a sudo dict is given
             if 'sudo' in _host and _host['sudo'] or 'sudo' in connection and connection['sudo']:
-                connect_config['sudo'] = dict(password=_host['sudo'] if 'sudo' in _host and _host['sudo'] else connection['sudo'])
+                connect_config['sudo'] = _host['sudo'] if 'sudo' in _host and _host['sudo'] else connection['sudo']
             if 'shell' in _host and _host['shell'] or 'shell' in connection and connection['shell']:
                 connect_config['run'] = dict(shell=_host['shell'] if 'shell' in _host and _host['shell'] else connection['shell'])
             # set encoding per task based on host or connection
