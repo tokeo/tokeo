@@ -12,6 +12,9 @@ def subcmdmeta(controller):
         subcommand
 
     """
+    # cement stores the dispatch target as "<controller>.<method>"; take the
+    # method part to resolve the bound subcommand and read its cement meta.
+    # this relies on that dotted format staying "controller.method"
     return getattr(controller, controller.app.pargs.__dispatch__.split('.')[1]).__cement_meta__
 
 

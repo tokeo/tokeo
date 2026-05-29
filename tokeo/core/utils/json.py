@@ -23,7 +23,6 @@ def jsonTokeoEncoder(obj):
 
     - datetime objects are checked first and converted via
         date.to_utc_timestring() to 'YYYY-MM-DD HH:MM:SS.MMMZ' format
-
     - date objects are converted to 'YYYY-MM-DD' format
     - returns None for other types, signaling to the JSON encoder to use
         the default encoding

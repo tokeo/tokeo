@@ -27,6 +27,13 @@ def deep_merge(a, b):
     : **IMPORTANT**: Tuples and arbitrary objects are not handled as
         their merge behavior would be ambiguous.
 
+    : Lists are always appended, never replaced or de-duplicated. Merging
+        the same b into a more than once (or re-merging an already merged
+        result) therefore grows the list with duplicate entries each time.
+        Callers needing replace-or-dedupe semantics should clear or
+        post-process the list themselves, or a future variant could take an
+        explicit list strategy (append vs. replace).
+
     : a is merged in place and is also returned, so the original a is
         modified by the call and should not be assumed to stay untouched.
 
