@@ -21,19 +21,22 @@ def jsonTokeoEncoder(obj):
 
     ### Notes
 
-    1. date objects are converted to 'YYYY-MM-DD' format in UTC
-    1. datetime objects are converted using date.to_utc_timestring()
-        to 'YYYY-MM-DD HH:MM:SS.MMMZ' format
-    1. Returns None for other types, signaling to the JSON encoder to use
+    - datetime objects are checked first and converted via
+        date.to_utc_timestring() to 'YYYY-MM-DD HH:MM:SS.MMMZ' format
+
+    - date objects are converted to 'YYYY-MM-DD' format
+    - returns None for other types, signaling to the JSON encoder to use
         the default encoding
 
     """
-    # prepare a date as string representation
-    if isinstance(obj, (datetime.date)):
-        return date.as_utc(obj).strftime('%Y-%m-%d')
-    # prepare a datetime as string representation
-    if isinstance(obj, (datetime.datetime)):
+    # check datetime before date: datetime is a subclass of date, so a
+    # date-first test would also catch datetimes and drop their time part
+    if isinstance(obj, datetime.datetime):
         return date.to_utc_timestring(obj)
+    # a plain date carries no time or tzinfo, so format it directly; routing
+    # it through as_utc() would raise since as_utc only accepts str/datetime
+    if isinstance(obj, datetime.date):
+        return obj.strftime('%Y-%m-%d')
     # return None to flag that the Encoder could
     # not handle the object
     return None
@@ -50,7 +53,7 @@ def jsonDump(obj, default=jsonTokeoEncoder, encoding=None):
 
     - **obj** (any): The object to serialize to JSON
     - **default** (callable, optional): A function that gets called for
-        bjects that can't be serialized. Defaults to jsonTokeoEncoder.
+        objects that can't be serialized. Defaults to jsonTokeoEncoder.
     - **encoding** (str, optional): If provided, the resulting JSON string
         will be encoded to bytes using this encoding (e.g., 'utf-8')
 
