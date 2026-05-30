@@ -17,6 +17,8 @@ are reached through the raw SDK via the collection() escape hatch.
 - Simple CRUD operations for PocketBase collections
 - Advanced querying, filtering, and sorting on lists
 - User and auth collections handled like any other via CRUD
+- Optional lazy service-account login (auto-refreshed, thread-safe) via the
+  auth_identity/auth_password settings
 - Direct SDK access through the collection() escape hatch for anything
   beyond the CRUD surface (auth flows, file fields, schema, etc.)
 
@@ -51,8 +53,26 @@ are reached through the raw SDK via the collection() escape hatch.
 """
 
 from cement.core.meta import MetaMixin
+from tokeo.core.exc import TokeoError
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
 import pocketbase
+from pocketbase.utils import is_token_expired
+import httpx
+import threading
+
+
+class TokeoPocketBaseError(TokeoError):
+    """Generic error raised by the Tokeo PocketBase handler."""
+
+
+class TokeoPocketBaseAuthError(TokeoPocketBaseError):
+    """Raised when authenticating the configured service identity fails."""
+
+
+# collections tried in order on the first login: a regular auth collection
+# first, then the superuser collection as a fallback; the one that succeeds
+# is remembered and reused for refresh and re-login
+_AUTH_COLLECTIONS = ('users', '_superusers')
 
 
 class TokeoPocketBaseHandler(MetaMixin):
@@ -101,11 +121,23 @@ class TokeoPocketBaseHandler(MetaMixin):
             # URL for the PocketBase server; use https:// to enable tls,
             # verified against the system ca store by default (the secure option)
             url='http://127.0.0.1:8090',
+            # username/identity for the service login; unset keeps the handler
+            # anonymous (authentication is opt-in)
+            auth_identity=None,
+            # password for the service login
+            auth_password=None,
+            # refresh the token once fewer than this many seconds of validity
+            # remain
+            auth_token_min_valid_seconds=60,
+            # cap on concurrent http connections per process (passed to httpx
+            # as max_connections); unset uses the httpx default and excess
+            # requests wait for a free connection
+            concurrent_connections=None,
+            # verify the certificate chain (https only); False disables it
+            tls_verify_cert=True,
             # verify the certificate hostname (https only, bool); False skips
             # the hostname check while still verifying the chain
             tls_verify_hostname=True,
-            # verify the certificate chain (https only); False disables it
-            tls_verify_cert=True,
             # path to a CA bundle to trust instead of the system store
             tls_ca=None,
         )
@@ -153,6 +185,10 @@ class TokeoPocketBaseHandler(MetaMixin):
         - A https url enables tls, verified against the system ca store by
             default; the tls options build a custom ssl context that is
             passed to the underlying httpx client
+        - concurrent_connections caps concurrent http connections per process
+            via httpx; it is not a request-rate limit and does not span
+            processes, so apply any rate or cross-process throttling in your
+            application (e.g. the diskcache throttle recipe)
 
         """
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
@@ -166,17 +202,28 @@ class TokeoPocketBaseHandler(MetaMixin):
                 self._config('tls_verify_cert'),
                 self._config('tls_ca'),
             )
-        # connect anonymously by design: this handler is a thin CRUD mapping
-        # and runs against whatever the PocketBase api rules allow for
-        # unauthenticated requests; auth flows are the app's job via collection()
-        if context is None:
-            # plain http, or https with secure defaults where httpx verifies
-            # against the system ca store
-            self.pb = pocketbase.PocketBase(url)
-        else:
-            # a custom context (custom ca or relaxed verification) goes to the
-            # httpx client the sdk builds from **kwargs
-            self.pb = pocketbase.PocketBase(url, verify=context)
+        # build the httpx client kwargs the sdk forwards: a custom tls context
+        # (custom ca or relaxed verification) and an optional concurrency cap
+        client_kwargs = {}
+        if context is not None:
+            client_kwargs['verify'] = context
+        concurrent_connections = self._config('concurrent_connections')
+        if concurrent_connections:
+            client_kwargs['limits'] = httpx.Limits(max_connections=concurrent_connections)
+        # connect anonymously by design: this handler is a thin CRUD mapping and
+        # runs against whatever the PocketBase api rules allow for unauthenticated
+        # requests until a service identity is configured
+        self.pb = pocketbase.PocketBase(url, **client_kwargs)
+        # cache the auth config once: the per-request guard must not hit
+        # self._config on every call
+        self._auth_identity = self._config('auth_identity')
+        self._auth_min_valid = self._config('auth_token_min_valid_seconds')
+        # guards lazy login and token refresh against concurrent access, since
+        # the shared client's auth_store has no locking of its own
+        self._auth_lock = threading.Lock()
+        # the collection a successful login used; reused for refresh and
+        # re-login, set on the first successful authentication
+        self._auth_collection = None
 
     def _config(self, key, **kwargs):
         """
@@ -198,17 +245,98 @@ class TokeoPocketBaseHandler(MetaMixin):
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
+    def _login(self):
+        """
+        Authenticate the service identity and remember the collection used.
+
+        Must be called with the auth lock held. On a reconnect it reuses the
+        remembered collection; otherwise it tries the collections in
+        _AUTH_COLLECTIONS (the users collection first, then the _superusers
+        admin collection), then stores whichever succeeded for later refresh
+        and re-login.
+
+        ### Raises
+
+        - **TokeoPocketBaseAuthError**: If no candidate collection accepts the
+            credentials
+
+        """
+        # reuse the remembered collection on reconnect, else run discovery
+        if self._auth_collection:
+            candidates = [self._auth_collection]
+        else:
+            candidates = _AUTH_COLLECTIONS
+        last_error = None
+        for name in candidates:
+            try:
+                self.pb.collection(name).auth_with_password(
+                    self._auth_identity, self._config('auth_password')
+                )
+                self._auth_collection = name
+                return
+            except Exception as error:
+                last_error = error
+        raise TokeoPocketBaseAuthError(
+            f'PocketBase authentication failed for identity {self._auth_identity!r}'
+        ) from last_error
+
+    def ensure_auth(self):
+        """
+        Ensure a valid auth token before a request, when credentials are set.
+
+        Called at the start of every CRUD method. When auth_identity and
+        auth_password are configured this lazily logs in on first use and,
+        on later calls, refreshes the token before it expires. With no
+        credentials configured the handler stays anonymous and this is a
+        no-op.
+
+        ### Notes
+
+        - The whole check-and-refresh runs under a lock, because the shared
+            client's auth_store is mutable global state with no locking; this
+            prevents concurrent workers from racing on refresh or re-login
+        - A token with more than auth_token_min_valid_seconds of life left is
+            used as is; one near expiry is refreshed on its collection, and a
+            failed refresh falls through to a full re-login
+
+        ### Raises
+
+        - **TokeoPocketBaseAuthError**: If authentication ultimately fails
+
+        """
+        # nothing to do unless a service identity is configured
+        if not self._auth_identity:
+            return
+        with self._auth_lock:
+            token = self.pb.auth_store.token
+            # a token with more than the minimum valid window left is good
+            if token and not is_token_expired(token, self._auth_min_valid):
+                return
+            # a still-valid token near expiry can be refreshed on its collection
+            if token and self._auth_collection and self.pb.auth_store.is_valid:
+                try:
+                    self.pb.collection(self._auth_collection).auth_refresh()
+                    return
+                except Exception:
+                    # refresh rejected (e.g. revoked): fall back to a full login
+                    pass
+            self._login()
+
     def close(self):
         """
         Close the PocketBase connection.
 
         Lifecycle hook required by the database handler contract and wired
-        to the pre_close hook via pocketbase_close(). The handler connects
-        anonymously and holds no session or pooled connection, so there is
-        nothing to tear down and this method is a deliberate no-op.
+        to the pre_close hook via pocketbase_close(). The handler holds no
+        session or pooled connection to tear down, but it clears any stored
+        auth token so the identity does not outlive the handler.
 
         """
-        pass
+        # destroy the token so a logged-in identity does not linger
+        if self._auth_collection:
+            with self._auth_lock:
+                self.pb.auth_store.clear()
+                self._auth_collection = None
 
     def collection(self, collection_id_or_name):
         """
@@ -292,6 +420,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         cache_opt = dict() if cache else dict(cache='no-cache')
         sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
         # run database query for one element by id
+        self.ensure_auth()
         return self.collection(collection_id_or_name).get_one(id_, dict(**cache_opt, **sort_opt, **q))
 
     def get_list(self, collection_id_or_name, page=1, perPage=20, filter='', sort=None, cache=True, q=None):
@@ -364,6 +493,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         cache_opt = dict() if cache else dict(cache='no-cache')
         sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
         # run database query for multiple elements
+        self.ensure_auth()
         return self.collection(collection_id_or_name).get_list(page, perPage, dict(filter=filter, **cache_opt, **sort_opt, **q))
 
     def create(self, collection_id_or_name, create_fields=None, q=None):
@@ -412,6 +542,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         create_fields = dict() if create_fields is None else create_fields
         q = dict() if q is None else q
         # run database create
+        self.ensure_auth()
         return self.collection(collection_id_or_name).create(body_params=create_fields, query_params=q)
 
     def update(self, collection_id_or_name, id_, update_fields=None, q=None):
@@ -463,6 +594,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         update_fields = dict() if update_fields is None else update_fields
         q = dict() if q is None else q
         # run database update
+        self.ensure_auth()
         return self.collection(collection_id_or_name).update(id_, body_params=update_fields, query_params=q)
 
     def delete(self, collection_id_or_name, id_, q=None):
@@ -508,6 +640,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         # update immutable default arguments
         q = dict() if q is None else q
         # run database delete
+        self.ensure_auth()
         return self.collection(collection_id_or_name).delete(id_, query_params=q)
 
 

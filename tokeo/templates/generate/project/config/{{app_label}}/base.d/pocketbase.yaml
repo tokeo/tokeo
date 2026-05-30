@@ -10,10 +10,22 @@
 pocketbase:
   ### connection string to database
   url: http://127.0.0.1:8090
+  # username/identity for the service login; unset keeps the handler
+  # anonymous (authentication is opt-in)
+  auth_identity: null
+  # password for the service login
+  auth_password: null
+  # refresh the token once fewer than this many seconds of validity
+  # remain
+  auth_token_min_valid_seconds: 60
+  # cap on concurrent http connections per process (passed to httpx
+  # as max_connections); unset uses the httpx default and excess
+  # requests wait for a free connection
+  concurrent_connections: null
+  ### verify the certificate chain (https only); False disables it
+  tls_verify_cert: true
   ### verify the certificate hostname (https only); False skips
   ### the check (chain still checked)
   tls_verify_hostname: true
-  ### verify the certificate chain (https only); False disables it
-  tls_verify_cert: true
   ### path to a CA bundle to trust instead of the system store
   tls_ca: null
