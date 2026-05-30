@@ -269,16 +269,12 @@ class TokeoPocketBaseHandler(MetaMixin):
         last_error = None
         for name in candidates:
             try:
-                self.pb.collection(name).auth_with_password(
-                    self._auth_identity, self._config('auth_password')
-                )
+                self.pb.collection(name).auth_with_password(self._auth_identity, self._config('auth_password'))
                 self._auth_collection = name
                 return
             except Exception as error:
                 last_error = error
-        raise TokeoPocketBaseAuthError(
-            f'PocketBase authentication failed for identity {self._auth_identity!r}'
-        ) from last_error
+        raise TokeoPocketBaseAuthError(f'PocketBase authentication failed for identity {self._auth_identity!r}') from last_error
 
     def ensure_auth(self):
         """
