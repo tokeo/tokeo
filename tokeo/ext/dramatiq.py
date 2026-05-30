@@ -338,7 +338,7 @@ class TokeoDramatiq(MetaMixin):
         ]
         # create the broker to RabbitMQ based on config; configured
         # credentials may override any userinfo carried by the url
-        rabbitmq_config = self._config.get('rabbitmq', {})
+        rabbitmq_config = self._config('rabbitmq')
         rabbitmq_broker = ExtendedRabbitmqBroker(
             url=rabbitmq_config['url'],
             auth_identity=rabbitmq_config['auth_identity'],
