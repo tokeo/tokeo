@@ -20,6 +20,12 @@ VERSION_BANNER = f"""
 
 
 class BaseController(Controller):
+    """
+    Root CLI controller for the Tokeo application.
+
+    Defines the base command namespace: the description and epilog shown in
+    help output and the --version banner.
+    """
 
     class Meta:
         label = 'base'

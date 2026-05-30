@@ -9,11 +9,11 @@ processing via dramatiq actors.
 
 ### Features
 
-- **Controller-invoked workflows** for handling business requests
-- **Database interaction** with PocketBase collections
-- **Business logic orchestration** connecting different application components
-- **Asynchronous processing** through dramatiq actors
-- **Reusable business operations** for consistent implementation
+- Runs controller-invoked workflows that handle business requests
+- Reads and writes PocketBase collections
+- Orchestrates business logic across application components
+- Dispatches asynchronous processing to dramatiq actors
+- Provides reusable business operations for consistent implementation
 
 ### Usage
 

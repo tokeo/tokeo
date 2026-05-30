@@ -9,11 +9,11 @@ transformation, or external service integration.
 
 ### Features
 
-- **Atomic business operations** for use across multiple workflows
-- **Highly reusable components** with focused responsibility
-- **External tool integration** (like document generation, image processing)
-- **Standardized interfaces** for consistency and maintainability
-- **Cross-module utility** for both synchronous and asynchronous contexts
+- Provides atomic business operations for use across multiple workflows
+- Keeps components small and reusable with a focused responsibility
+- Integrates external tools such as document generation or image processing
+- Exposes standardized interfaces for consistency and maintainability
+- Usable from both synchronous and asynchronous contexts
 
 ### Usage
 

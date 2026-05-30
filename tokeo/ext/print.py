@@ -11,12 +11,13 @@ rendering templates.
 
 ### Features
 
-- **app.print()** - A framework-aware replacement for Python's built-in print()
-- **app.inspect()** - A detailed inspection utility for examining objects
-- **Output handlers** - Specialized handlers for different rendering styles:
-    - Print - Basic text output with hooks
-    - Print Dict - Key-value pair rendering for dictionaries
-    - Inspect - Detailed object introspection with type information
+- ``app.print()`` replaces Python's built-in print with a framework-aware
+    version that routes through the output handler
+- ``app.inspect()`` renders a detailed inspection of objects
+- output handlers for different rendering styles:
+    - Print - basic text output with hooks
+    - Print Dict - key-value rendering for dictionaries
+    - Inspect - detailed object introspection with type information
 
 ### Example
 
@@ -585,9 +586,9 @@ def load(app: App) -> None:
     : This function is called automatically by the Cement framework when the
         extension is loaded. It registers three output handlers:
 
-        1. TokeoInspectOutputHandler - For detailed object inspection
-        1. TokeoPrintDictOutputHandler - For dictionary formatting
-        1. TokeoPrintOutputHandler - For standard printing
+        - TokeoInspectOutputHandler - For detailed object inspection
+        - TokeoPrintDictOutputHandler - For dictionary formatting
+        - TokeoPrintOutputHandler - For standard printing
 
     : It also extends the application with app.print() and app.inspect() methods
         via the register_tokeo_print function.
