@@ -9,11 +9,11 @@ concerns rather than business logic.
 
 ### Features
 
-- **System maintenance** operations for database cleanup and optimization
-- **Health checks** to monitor application components and dependencies
-- **Data integrity** verification and repair procedures
-- **Configuration management** for runtime application settings
-- **Operational metrics** collection and reporting
+- Performs system maintenance such as database cleanup and optimization
+- Runs health checks on application components and dependencies
+- Verifies and repairs data integrity
+- Manages runtime application configuration
+- Collects and reports operational metrics
 
 ### Usage
 

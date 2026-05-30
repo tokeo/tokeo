@@ -9,11 +9,11 @@ primarily triggered by direct CLI invocation.
 
 ### Features
 
-- **Command-line automation** functions with standardized interfaces
-- **Local and remote execution** via SSH or local shells
-- **Host-based configuration** for consistent deployment across environments
-- **Integration with application context** via the app parameter
-- **Bridging to asynchronous processing** by triggering dramatiq actors
+- Defines command-line automation functions with a standardized interface
+- Runs commands locally or remotely over SSH
+- Uses host-based configuration for consistent deployment across environments
+- Accesses the application context through the app parameter
+- Bridges to asynchronous processing by triggering dramatiq actors
 
 ### Usage
 

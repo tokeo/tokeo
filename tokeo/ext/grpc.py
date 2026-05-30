@@ -10,13 +10,13 @@ and configuration management.
 
 ### Features
 
-- **Dynamic loading** of servicers and protocol buffer implementations
-    based on configuration
-- **Server lifecycle management** with clean startup and shutdown
-- **CLI commands** for managing the gRPC server
-- **Integration** with the application's logging system
-- **Customization** through comprehensive configuration settings
-- **Template generation** for new Tokeo projects
+- Dynamically loads servicers and protocol buffer implementations from the
+    configured module and class paths
+- Manages the server lifecycle with clean startup and shutdown
+- Adds CLI commands to run and control the gRPC server
+- Logs through the application's logging system
+- Reads workers, TLS, and interceptor settings from the extension config
+- Generates gRPC scaffolding for new Tokeo projects
 
 """
 
@@ -179,16 +179,16 @@ class TokeoGrpc(MetaMixin):
 
         : The initialization process follows these steps:
 
-            1. Creates a server with ThreadPoolExecutor using configured
+            - Creates a server with ThreadPoolExecutor using configured
                 max_worker count
-            1. Dynamically imports the protocol buffer module containing the
+            - Dynamically imports the protocol buffer module containing the
                 add_servicer_to_server function
-            1. Dynamically imports the servicer class module
-            1. Resolves the optional interceptor chain from grpc_interceptor
+            - Dynamically imports the servicer class module
+            - Resolves the optional interceptor chain from grpc_interceptor
                 and passes it to the server at construction
-            1. Registers the servicer with the server using the
+            - Registers the servicer with the server using the
                 add_servicer_to_server function
-            1. Binds the listen url, either as a TLS secured port when
+            - Binds the listen url, either as a TLS secured port when
                 tls_enabled is set or as a plain insecure port otherwise
 
         : TLS is fully opt-in. With tls_enabled false the server never imports

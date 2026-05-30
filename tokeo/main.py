@@ -1,4 +1,5 @@
 import os
+import signal
 import tokeo.core.utils.strict  # noqa: F401
 from cement import App, TestApp
 from cement.core.exc import CaughtSignal
@@ -110,15 +111,12 @@ def main():
     that may occur during execution. This function serves as the primary entry
     point when running Tokeo as a command-line application.
 
-    ### Returns
+    ### Notes
 
-    - **int**: Exit code indicating success (0) or failure (non-zero)
-
-    ### Raises
-
-    - **AssertionError**: When an assertion fails during application execution
-    - **TokeoError**: When a Tokeo-specific error occurs
-    - **CaughtSignal**: When a signal (e.g., SIGINT, SIGTERM) is caught
+    - Returns nothing; the process exit code is set on ``app.exit_code`` and
+        applied on close via the app's exit_on_close behavior
+    - AssertionError and TokeoError are caught and reported with exit code 1;
+        a CaughtSignal (SIGINT/SIGTERM) is caught and exits with code 0
 
     """
     with Tokeo() as app:
@@ -144,10 +142,10 @@ def main():
                 traceback.print_exc()
 
         except CaughtSignal as e:
-            # Default Cement signals are SIGINT and SIGTERM, exit 0 (non-error)
-            if e.signum == 2:
+            # cement turns SIGINT and SIGTERM into CaughtSignal; exit 0 (non-error)
+            if e.signum == signal.SIGINT:
                 print('\nstopped by Ctrl-C')
-            elif e.signum == 15:
+            elif e.signum == signal.SIGTERM:
                 print('\nterminated by SIGTERM')
             else:
                 print(f'\n{e}')

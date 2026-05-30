@@ -7,10 +7,10 @@ task processors that can handle asynchronous workloads through message passing.
 
 ### Features
 
-- **Centralized actor definitions** for maintainable code organization
-- **Queue-based processing** with configurable timeouts and retries
-- **Rate limiting** through the app.dramatiq.locks interface
-- **Integration with application context** via app-specific business logic
+- Keeps actor definitions in one place for maintainable organization
+- Processes work from queues with configurable timeouts and retries
+- Rate-limits via the ``app.dramatiq.locks`` interface
+- Calls app-specific business logic through the application context
 
 ### Usage
 

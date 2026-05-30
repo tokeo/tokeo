@@ -8,11 +8,11 @@ workers for complex tasks.
 
 ### Features
 
-- **Scheduled task execution** using cron-style expressions
-- **Timer-based operations** with configurable jitter and delay
-- **Centralized agent definitions** for maintainable code organization
-- **Integration with application context** via app-specific business logic
-- **Delegation to asynchronous workers** for complex processing
+- Schedules task execution with cron-style expressions
+- Runs timer-based operations with configurable jitter and delay
+- Keeps agent definitions in one place for maintainable organization
+- Calls app-specific business logic through the application context
+- Delegates complex processing to asynchronous workers
 
 ### Usage
 
