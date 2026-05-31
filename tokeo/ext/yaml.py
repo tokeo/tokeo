@@ -12,9 +12,38 @@ than the standard Cement config handlers support.
 
 """
 
+import os
+import re
+import yaml
 from configparser import RawConfigParser
 from cement.ext.ext_yaml import YamlConfigHandler
+from tokeo.core.exc import TokeoError
 from tokeo.core.utils.dict import deep_merge
+
+
+class TokeoYamlConfigError(TokeoError):
+    """
+    Exception raised for invalid yaml configuration input.
+
+    This exception is raised when a configuration value cannot be handled by
+    the yaml config handler, for example when an environment override carries
+    a yaml tag, which is not allowed because env overrides are plain values.
+
+    """
+
+
+def _coerce_env_value(raw, env_var=None):
+    # an env override is a plain value, coerced like a yaml scalar so true/42/
+    # null get their proper types. a yaml tag (a leading "!") is rejected here:
+    # env injects plain values only and never a typed/constructed node such as
+    # an encrypted secret; quoting the value forces a plain string, as in yaml
+    if raw.lstrip().startswith('!'):
+        where = f' {env_var}' if env_var else ''
+        raise TokeoYamlConfigError(f'a yaml tag is not allowed in the environment override{where}')
+    try:
+        return yaml.safe_load(raw)
+    except yaml.YAMLError:
+        return raw
 
 
 class TokeoYamlConfigHandler(YamlConfigHandler):
@@ -85,6 +114,138 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
         label = 'tokeo.yaml'
         """The unique string identifier of this handler in the application."""
+
+    def _env_var_for_path(self, path):
+        """
+        Build the environment variable name overriding a config path.
+
+        Generalises cement's section/key scheme to an arbitrary depth, so a
+        nested value can be overridden too. The name is the application's
+        config_section followed by the path, joined with underscores,
+        uppercased, with every other character replaced by an underscore. A
+        leading path element equal to the config_section is not repeated.
+
+        ### Args
+
+        - **path** (list): The config path, e.g. ``['dramatiq', 'rabbitmq',
+            'auth_password']``
+
+        ### Returns
+
+        - **str**: The environment variable name for that path
+
+        """
+        prefix = self.app._meta.config_section
+        # the app's own section is not repeated, matching cement's 2-level rule
+        parts = path[1:] if path and path[0] == prefix else path
+        name = '_'.join([prefix] + [str(p) for p in parts]).upper()
+        return re.sub('[^0-9a-zA-Z_]+', '_', name)
+
+    def _get_env_var(self, section, key):
+        # keep cement's section/key entry point, routed through the path form
+        return self._env_var_for_path([section, key])
+
+    def _resolve_leaf(self, value, path):
+        # hook for subclasses to transform a scalar leaf (for example the
+        # vault handler decrypts a VaultRef); the base returns it unchanged
+        return value
+
+    def _resolve_value(self, value, path):
+        """
+        Resolve a config value for reading, applying environment overrides.
+
+        Walks dictionaries and lists so any leaf, at any depth, can be
+        overridden by an environment variable. A container is rebuilt only
+        when a descendant actually changes; otherwise the original object is
+        returned, so a plain read keeps its object identity and behaves as
+        before. Each scalar leaf is passed through ``_resolve_leaf``, which
+        subclasses may override to transform it further.
+
+        ### Args
+
+        - **value**: The stored config value (scalar, dict, or list)
+        - **path** (list|None): The config path to this value, or None inside
+            a list where no env name can be formed
+
+        ### Returns
+
+        - The original value when nothing changes, otherwise a rebuilt copy
+            with environment overrides applied
+
+        """
+        if isinstance(value, dict):
+            changed = False
+            result = {}
+            for k, v in value.items():
+                rv = self._resolve_value(v, (path + [k]) if path is not None else None)
+                result[k] = rv
+                changed = changed or rv is not v
+            # keep the stored object when nothing changed, so a plain read is
+            # identical to before (same reference, no copy)
+            return result if changed else value
+        if isinstance(value, list):
+            changed = False
+            result = []
+            for v in value:
+                rv = self._resolve_value(v, None)
+                result.append(rv)
+                changed = changed or rv is not v
+            return result if changed else value
+        # scalar leaf: an env override wins, else hand it to the leaf hook
+        if path is not None:
+            env_var = self._env_var_for_path(path)
+            if env_var in os.environ:
+                return _coerce_env_value(os.environ[env_var], env_var)
+        return self._resolve_leaf(value, path)
+
+    def get(self, section, key, **kwargs):
+        """
+        Get a configuration value, applying environment overrides at any depth.
+
+        Extends cement's section/key override so a nested value can be
+        overridden too, by an environment variable whose name follows the full
+        path (for example ``<CONFIG_SECTION>_DRAMATIQ_RABBITMQ_AUTH_PASSWORD``).
+        Overrides arrive as raw strings and are coerced like a yaml scalar (via
+        ``yaml.safe_load``), so ``true``, ``42`` or ``null`` become their proper
+        types; values from a file are already typed by the yaml parser.
+        Resolution is applied on a rebuilt copy only where a value actually
+        changes, so a plain read returns the same object as before.
+
+        ### Args
+
+        - **section** (str): The configuration section
+        - **key** (str): The configuration key within the section
+
+        ### Keyword Args
+
+        - **kwargs**: Forwarded to the parser get (for example ``fallback``)
+
+        ### Returns
+
+        - The value, with environment overrides applied
+
+        ### Raises
+
+        - **TokeoYamlConfigError**: If an environment override carries a yaml
+            tag (a leading ``!``); env overrides are plain values only
+
+        ### Notes
+
+        - Quoting forces a string, exactly as in yaml: an env value of
+            ``"true"`` (with quotes) stays the string ``true`` while ``true``
+            becomes a bool; the yaml "Norway" rule also makes
+            ``yes``/``no``/``on``/``off`` booleans
+        - Subclasses can transform individual leaves through ``_resolve_leaf``
+            (the vault handler uses this to decrypt secrets)
+
+        """
+        # an env override at section/key level wins even if the key is absent
+        # from the config file, so check it before reading the stored value
+        env_var = self._get_env_var(section, key)
+        if env_var in os.environ:
+            return _coerce_env_value(os.environ[env_var], env_var)
+        value = RawConfigParser.get(self, section, key, **kwargs)
+        return self._resolve_value(value, [section, key])
 
     def merge(self, dict_obj, override=True):
         """
