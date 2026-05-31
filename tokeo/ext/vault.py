@@ -251,8 +251,10 @@ class TokeoVaultController(Controller):
         Decrypt and print a secret, by config reference or by payload.
 
         With ``--config`` a dotted path (``section.key`` or deeper) is read
-        from the configuration and shown decrypted. Otherwise the positional
-        payload is decrypted with the given ``--profile``.
+        from the configuration and shown decrypted; the profile is taken from
+        the value's ``!vault`` tag, so ``--profile`` is not used here.
+        Otherwise the positional payload is decrypted with the given
+        ``--profile``.
 
         ### Output
 
@@ -260,12 +262,17 @@ class TokeoVaultController(Controller):
 
         ### Raises
 
-        - **TokeoVaultError**: If no input is given, the reference is not
-            found, a profile is missing, or the secret cannot be decrypted
+        - **TokeoVaultError**: If no input is given, ``--config`` is combined
+            with ``--profile``, the reference is not found, a profile is
+            missing, or the secret cannot be decrypted
 
         """
         ref = self.app.pargs.config_ref
         if ref:
+            # the profile comes from the !vault tag of the referenced value,
+            # so a --profile here would be ignored; reject it as a clear error
+            if self.app.pargs.profile is not None:
+                raise TokeoVaultError('--profile is not used with --config; the profile comes from the referenced config value')
             parts = ref.split('.')
             if len(parts) < 2:
                 raise TokeoVaultError('a config reference needs at least section.key')
