@@ -48,7 +48,7 @@ class ScryptVault(EncVault):
     # scrypt cost defaults when a profile omits them; cost=2**14 needs ~16 MB
     # per derivation, which resists parallel guessing. cost is scrypt's N (a
     # power of two), block_size is r, parallelization is p
-    _default_cost = 2 ** 14
+    _default_cost = 2**14
     _default_block_size = 8
     _default_parallelization = 1
 
