@@ -133,7 +133,12 @@ def main():
                 traceback.print_exc()
 
         except TokeoError as e:
-            print(f'TokeoError > {e.args[0]}')
+            if app and app.log and app.log.error:
+                app.log.error(type(e).__name__)
+                app.log.error(e.args[0] if e.args else str(e))
+            else:
+                print(type(e).__name__)
+                print(e.args[0] if e.args else str(e))
             app.exit_code = 1
 
             if app.debug is True:

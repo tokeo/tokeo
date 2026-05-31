@@ -14,6 +14,7 @@ import tokeo.core.utils.strict  # noqa: F401
 from cement import App, TestApp
 from cement.utils import fs
 from cement.core.exc import CaughtSignal
+from tokeo.core.exc import TokeoError
 from .core.exc import {{ app_class_name }}Error
 from .controllers.base import BaseController
 {% if feature_dramatiq == "Y" %}
@@ -210,8 +211,13 @@ def main():
 
                 traceback.print_exc()
 
-        except {{ app_class_name }}Error as e:
-            print(f'{{ app_class_name }}Error > {e.args[0]}')
+        except (TokeoError, {{ app_class_name }}Error) as e:
+            if app and app.log and app.log.error:
+                app.log.error(type(e).__name__)
+                app.log.error(e.args[0] if e.args else str(e))
+            else:
+                print(type(e).__name__)
+                print(e.args[0] if e.args else str(e))
             app.exit_code = 1
 
             if app.debug is True:
