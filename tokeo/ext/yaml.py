@@ -12,6 +12,7 @@ than the standard Cement config handlers support.
 
 """
 
+from configparser import RawConfigParser
 from cement.ext.ext_yaml import YamlConfigHandler
 from tokeo.core.utils.dict import deep_merge
 
@@ -180,7 +181,10 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
                 if override:
                     b = dict_obj[section][key]
                     if key in self.keys(section) and isinstance(b, dict):
-                        a = self.get(section, key)
+                        # read the stored value raw, so merging combines stored
+                        # structures and is not affected by a subclass get that
+                        # resolves or transforms values on read
+                        a = RawConfigParser.get(self, section, key)
                         if isinstance(a, dict):
                             b = deep_merge(a, b)
                     self.set(section, key, b)
