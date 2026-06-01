@@ -14,25 +14,27 @@
 ### "{{ app_label }} vault create --type <type> <name>" and encrypt a value
 ### with "{{ app_label }} vault encrypt --profile <name> <value>".
 vault:
-  ### profile encrypting directly with a ready Fernet key from the environment
-  easy:
-    ### handler type; "enc" encrypts and decrypts with a Fernet key
-    type: enc
-    ### name of the environment variable holding the Fernet key
-    env: VAULT_ENC_MASTER
+  ### named encryption profiles; each binds a handler type to its key material
+  profiles:
+    ### profile encrypting directly with a ready Fernet key from the environment
+    easy:
+      ### handler type; "enc" encrypts and decrypts with a Fernet key
+      type: enc
+      ### name of the environment variable holding the Fernet key
+      env: VAULT_ENC_MASTER
 
-  ### profile deriving the key from a passphrase via scrypt, so a memorable
-  ### passphrase can protect the secrets
-  human:
-    ### handler type; "scrypt" derives the Fernet key from a passphrase
-    type: scrypt
-    ### name of the environment variable holding the passphrase
-    env: VAULT_HUMAN_PASSPHRASE
-    ### public random salt (base64); not secret, commit it with the config
-    salt: RxO2vJ30JzLGy2Cd0af/+g==
-    ### scrypt cost factor N (a power of two); higher is slower and safer
-    cost: 16384
-    ### scrypt block size r
-    block_size: 8
-    ### scrypt parallelization factor p
-    parallelization: 1
+    ### profile deriving the key from a passphrase via scrypt, so a memorable
+    ### passphrase can protect the secrets
+    human:
+      ### handler type; "scrypt" derives the Fernet key from a passphrase
+      type: scrypt
+      ### name of the environment variable holding the passphrase
+      env: VAULT_HUMAN_PASSPHRASE
+      ### public random salt (base64); not secret, commit it with the config
+      salt: RxO2vJ30JzLGy2Cd0af/+g==
+      ### scrypt cost factor N (a power of two); higher is slower and safer
+      cost: 16384
+      ### scrypt block size r
+      block_size: 8
+      ### scrypt parallelization factor p
+      parallelization: 1

@@ -180,6 +180,33 @@ def get_handler(name):
         raise TokeoVaultError(f'no vault handler registered for type {name!r}')
 
 
+def get_profile(app, name):
+    """
+    Read a named profile from the ``vault.profiles`` configuration section.
+
+    ### Args
+
+    - **app**: The application instance
+    - **name** (str): The profile name under ``vault.profiles``
+
+    ### Returns
+
+    - **dict**: The profile fields (``type`` and handler-specific keys)
+
+    ### Raises
+
+    - **TokeoVaultError**: If the profile is unknown or has no ``type``
+
+    """
+    try:
+        profile = app.config.get('vault', 'profiles')[name]
+    except Exception:
+        raise TokeoVaultError(f'unknown vault profile {name!r}')
+    if not isinstance(profile, dict) or 'type' not in profile:
+        raise TokeoVaultError(f'vault profile {name!r} is missing a type')
+    return profile
+
+
 def resolve(app, value):
     """
     Resolve a value to plaintext, decrypting it if it is a ``VaultRef``.
@@ -206,12 +233,7 @@ def resolve(app, value):
     """
     if not isinstance(value, VaultRef):
         return value
-    try:
-        profile = app.config.get('vault', value.profile)
-    except Exception:
-        raise TokeoVaultError(f'unknown vault profile {value.profile!r}')
-    if not isinstance(profile, dict) or 'type' not in profile:
-        raise TokeoVaultError(f'vault profile {value.profile!r} is missing a type')
+    profile = get_profile(app, value.profile)
     return get_handler(profile['type']).decrypt(profile, value.ciphertext)
 
 

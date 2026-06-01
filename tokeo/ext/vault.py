@@ -36,6 +36,7 @@ from tokeo.core.vaults import (
     register_handler,
     register_yaml_tag,
     get_handler as vault_get_handler,
+    get_profile as vault_get_profile,
     resolve as vault_resolve,
 )
 from tokeo.core.vaults.enc import EncVault
@@ -135,15 +136,9 @@ class TokeoVaultController(Controller):
         epilog = f'Example: {basename(sys.argv[0])} vault command --options'
 
     def _profile(self, name):
-        # read a vault profile, turning a missing section/key or a malformed
-        # entry into a clean vault error instead of a parser traceback
-        try:
-            profile = self.app.config.get('vault', name)
-        except Exception:
-            raise TokeoVaultError(f'unknown vault profile {name!r}')
-        if not isinstance(profile, dict) or 'type' not in profile:
-            raise TokeoVaultError(f'vault profile {name!r} is missing a "type"')
-        return profile
+        # read a vault profile via the shared lookup, turning a missing or
+        # malformed entry into a clean vault error instead of a traceback
+        return vault_get_profile(self.app, name)
 
     @ex(
         help='create a profile scaffold with generated key material',
@@ -182,9 +177,10 @@ class TokeoVaultController(Controller):
         name = self.app.pargs.name
         scaffold = vault_get_handler(self.app.pargs.type).create(name)
         self.app.print('vault:')
-        self.app.print(f'  {name}:')
+        self.app.print('  profiles:')
+        self.app.print(f'    {name}:')
         for field, value in scaffold['profile'].items():
-            self.app.print(f'    {field}: {value}')
+            self.app.print(f'      {field}: {value}')
         self.app.print('')
         for secret in scaffold['secrets']:
             value = f'"{secret["value"]}"' if secret.get('quote') else secret['value']
@@ -299,6 +295,25 @@ class TokeoVaultController(Controller):
         self.app.print(vault_get_handler(profile['type']).decrypt(profile, value))
 
 
+def tokeo_vault_extend_app(app):
+    """
+    Cement post-setup hook to register externally provided vault handlers.
+
+    Runs the ``tokeo_vault_register_handlers`` hook once every extension and
+    plugin has been loaded, so a third party can add its own handler type
+    from the outside, without this extension having to know about it. A
+    handler is registered by hooking ``tokeo_vault_register_handlers`` and
+    calling ``register_handler(name, instance)`` from there.
+
+    ### Args
+
+    - **app**: The application instance
+
+    """
+    for res in app.hook.run('tokeo_vault_register_handlers', app):
+        pass
+
+
 def load(app):
     """
     Load the vault extension and register it with the application.
@@ -314,8 +329,10 @@ def load(app):
 
     ### Notes
 
-    : The vault config handler subclasses the Tokeo YAML handler, so this
-        extension replaces the YAML config handler when both are enabled.
+    - The vault config handler subclasses the Tokeo YAML handler, so this
+        extension replaces the YAML config handler when both are enabled
+    - Defines the ``tokeo_vault_register_handlers`` hook, so other extensions
+        or plugins can register their own vault handlers from the outside
 
     """
     # register the vault tag before any config is parsed, and the built-in
@@ -323,6 +340,11 @@ def load(app):
     register_yaml_tag()
     register_handler('enc', EncVault())
     register_handler('scrypt', ScryptVault())
+    # open extension point: an extension or plugin can register its own vault
+    # handler from the outside by hooking 'tokeo_vault_register_handlers'; it
+    # runs at post_setup, once every extension has been loaded
+    app.hook.define('tokeo_vault_register_handlers')
+    app.hook.register('post_setup', tokeo_vault_extend_app)
     app.handler.register(TokeoVaultConfigHandler)
     app.handler.register(TokeoVaultController)
     app._meta.config_handler = TokeoVaultConfigHandler.Meta.label
