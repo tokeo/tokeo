@@ -1,0 +1,35 @@
+### ### {{ app_name }} AI / Fundi configuration
+###
+### Named profiles for chat-completion models. {{ app_name }} talks to an
+### OpenAI-compatible endpoint that you run yourself (Ollama, llama.cpp, vLLM,
+### MLX); the built-in fundi model needs no server and is handy for tests and
+### demos. A profile is selected by name, or by a field such as model or
+### purpose; a profile with "enabled: false" is hidden for the session.
+ai:
+  ### profile used when a command (for example "fundi ask") names none
+  default: mock
+
+  ### named profiles; each binds a provider type to its connection details
+  profiles:
+    ### the built-in local model; deterministic, no server, no network
+    mock:
+      ### provider type; "mock" is the application's own local model
+      type: mock
+      ### model version; mock is the deterministic stand-in
+      model: mock
+      ### optional free-form selector, usable via "fundi ask --purpose"
+      purpose: mocking
+
+    ### a local, OpenAI-compatible server you run yourself
+    # assistant:
+    #   ### provider type; "openai" speaks the OpenAI-compatible chat api
+    #   type: openai
+    #   ### model name as your local server exposes it
+    #   model: qwen2.5
+    #   ### base url of the running server (ollama 11434, vllm 8000, mlx 8080)
+    #   base_url: http://localhost:11434/v1
+    #   ### optional api key; local servers usually ignore it, vault-backed
+    #   ### with a !vault:<profile> tag when a real key is needed
+    #   # key: not-needed
+    #   ### optional free-form selector, usable via "fundi ask --purpose"
+    #   purpose: general
