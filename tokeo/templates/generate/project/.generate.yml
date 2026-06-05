@@ -1,7 +1,7 @@
 ---
 
 exclude:
-  - '^(.*)[\/\\\\]project[\/\\\\]{{ app_label }}[\/\\\\]templates[\/\\\\](.*)$'
+  - '^(.*)[\/\\\\]project[\/\\\\]{{app_label}}[\/\\\\]templates[\/\\\\](.*)$'
   - '^.*\.(jpg|png|ico)$'
 
 ignore:
@@ -55,6 +55,12 @@ variables:
     case: "upper"
     default: "Y"
 
+  - name: feature_vault
+    prompt: "Enable Vault [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+
   - name: feature_diskcache
     prompt: "Enable diskcache [(Y)es/(N)o]"
     validate: "^[YN]$"
@@ -84,6 +90,13 @@ variables:
     validate: "^[YN]$"
     case: "upper"
     default: "Y"
+    requires:
+      feature_apscheduler: "N"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/{{app_label}}/site$'
+          - '^(.*)/{{app_label}}/site/(.*)$'
 
   - name: feature_pocketbase
     prompt: "Enable pocketbase [(Y)es/(N)o]"
@@ -93,6 +106,12 @@ variables:
 
   - name: feature_automate
     prompt: "Enable automate [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+
+  - name: feature_ai
+    prompt: "Enable AI [(Y)es/(N)o]"
     validate: "^[YN]$"
     case: "upper"
     default: "Y"

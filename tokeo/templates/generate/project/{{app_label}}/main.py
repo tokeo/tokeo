@@ -68,6 +68,9 @@ class {{ app_class_name }}(App):
             'tokeo.ext.jinja2',
             'tokeo.ext.appshare',
             'tokeo.ext.smtp',
+{% if feature_vault == "Y" %}
+            'tokeo.ext.vault',
+{% endif -%}
 {% if feature_diskcache == "Y" or feature_dramatiq == "Y" or feature_apscheduler == "Y" %}
             'tokeo.ext.diskcache',
 {% endif -%}
@@ -88,6 +91,9 @@ class {{ app_class_name }}(App):
 {% endif -%}
 {% if feature_automate == "Y" %}
             'tokeo.ext.automate',
+{% endif %}
+{% if feature_dramatiq == "Y" %}
+            'tokeo.ext.ai',
 {% endif %}
         ]
 
