@@ -55,7 +55,7 @@ variables:
     default: "Y"
 
   - name: feature_vault
-    prompt: "Enable Vault [(Y)es/(N)o]"
+    prompt: "Enable vault [(Y)es/(N)o]"
     validate: "^[YN]$"
     case: "upper"
     default: "Y"
@@ -110,7 +110,7 @@ variables:
     default: "Y"
 
   - name: feature_ai
-    prompt: "Enable AI [(Y)es/(N)o]"
+    prompt: "Enable ai [(Y)es/(N)o]"
     validate: "^[YN]$"
     case: "upper"
     default: "Y"

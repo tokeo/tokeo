@@ -91,8 +91,8 @@ class {{ app_class_name }}(App):
 {% endif -%}
 {% if feature_automate == "Y" %}
             'tokeo.ext.automate',
-{% endif %}
-{% if feature_dramatiq == "Y" %}
+{% endif -%}
+{% if feature_ai == "Y" %}
             'tokeo.ext.ai',
 {% endif %}
         ]
