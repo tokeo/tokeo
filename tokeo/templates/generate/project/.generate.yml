@@ -1,7 +1,6 @@
 ---
 
 exclude:
-  - '^(.*)[\/\\\\]project[\/\\\\]{{app_label}}[\/\\\\]templates[\/\\\\](.*)$'
   - '^.*\.(jpg|png|ico)$'
 
 ignore:
