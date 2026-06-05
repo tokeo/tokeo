@@ -9,10 +9,10 @@ and an agent can be explained clearly. Later a small trained model
 the profile's ``model`` field.
 """
 
-from tokeo.core.ai import Provider, ChatResult, Usage
+from tokeo.core.ai import TokeoAiProvider, ChatResult, Usage
 
 
-class FundiProvider(Provider):
+class TokeoAiFundiProvider(TokeoAiProvider):
     """
     Built-in local model provider, deterministic at version ``fundi0.0``.
 

@@ -6,8 +6,18 @@
 ### demos. A profile is selected by name, or by a field such as model or
 ### purpose; a profile with "enabled: false" is hidden for the session.
 ai:
-  ### profile used when a command (for example "fundi ask") names none
+  ### profile used when a command (for example "ai ask") names none
   default: mock
+
+  ### the configured toolset: list registered tools and form named groups,
+  ### so a profile can activate a single tool or a whole group at once. a
+  ### group is a name with its members (members may be tools or other groups)
+  tools:
+    ### an individual tool, registered by this project (core/ai/tools/calc.py)
+    - calc
+    ### a named group that bundles math-related tools
+    - mathematics:
+        - calc
 
   ### named profiles; each binds a provider type to its connection details
   profiles:
@@ -17,8 +27,13 @@ ai:
       type: mock
       ### model version; mock is the deterministic stand-in
       model: mock
-      ### optional free-form selector, usable via "fundi ask --purpose"
+      ### optional free-form selector, usable via "ai ask --purpose"
       purpose: mocking
+      ### tools this profile may use; each entry is an individual tool or a
+      ### group from ai.tools above. the "mathematics" group activates calc,
+      ### so "ai ask calc 2 + 3" works
+      tools:
+        - mathematics
 
     ### a local, OpenAI-compatible server you run yourself
     # assistant:
@@ -31,5 +46,5 @@ ai:
     #   ### optional api key; local servers usually ignore it, vault-backed
     #   ### with a !vault:<profile> tag when a real key is needed
     #   # key: not-needed
-    #   ### optional free-form selector, usable via "fundi ask --purpose"
+    #   ### optional free-form selector, usable via "ai ask --purpose"
     #   purpose: general
