@@ -6,7 +6,7 @@ The ``fundi`` provider stands for the application's own local model. Version
 so an agentic flow can be exercised out of the box and the workings of a model
 and an agent can be explained clearly. Later a small trained model
 (``fundi1.0``) can take its place behind the same provider, selected through
-the profile's ``model`` field.
+the profile's ``options.model``.
 """
 
 from tokeo.core.ai import TokeoAiProvider, ChatResult, Usage
@@ -19,8 +19,8 @@ class TokeoAiFundiProvider(TokeoAiProvider):
     ### Notes
 
     : The reply is derived only from the input and is labelled with the
-        profile's ``model``, so the same messages always produce the same
-        result and it stays obvious which fundi version answered.
+        profile's ``options.model``, so the same messages always produce the
+        same result and it stays obvious which fundi version answered.
 
     """
 
@@ -30,7 +30,8 @@ class TokeoAiFundiProvider(TokeoAiProvider):
 
         ### Args
 
-        - **profile** (dict): The resolved profile; ``model`` labels the reply
+        - **profile** (dict): The resolved profile; ``options.model`` labels
+            the reply
         - **messages** (list): Chat messages as plain OpenAI-style dicts
         - **tools** (list | None): Accepted but not acted upon
 
@@ -39,9 +40,9 @@ class TokeoAiFundiProvider(TokeoAiProvider):
         - **ChatResult**: The faked, deterministic response
 
         """
-        # the model from the profile labels the reply, so the fundi version is
-        # always visible in the output and in the raw payload
-        model = (profile or {}).get('model') or 'fundi0.0'
+        # the model from the profile options labels the reply, so the fundi
+        # version is always visible in the output and in the raw payload
+        model = ((profile or {}).get('options') or {}).get('model') or 'fundi0.0'
         prompt = ''
         for message in messages or []:
             if isinstance(message, dict) and message.get('role') == 'user':

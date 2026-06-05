@@ -14,10 +14,11 @@ the built-in local model.
 ```yaml
 ai:
   default: mock
+  tools:
+    calc: { type: myapp.core.ai.tools.calc.TokeoAiCalcTool }
   profiles:
     mock:
       type: mock
-      model: mock
       purpose: mocking
       tools:
         - calc
@@ -35,16 +36,15 @@ from cement import ex
 from cement.core.meta import MetaMixin
 
 import json
+import importlib
+from copy import deepcopy
 from dataclasses import asdict
 
 from tokeo.ext.argparse import Controller
 from tokeo.core.ai import (
     TokeoAiError,
     ToolResult,
-    register_provider,
-    get_provider,
     find_profile,
-    get_tool,
 )
 from tokeo.core.ai.mock import TokeoAiMockProvider
 from tokeo.core.ai.fundi import TokeoAiFundiProvider
@@ -110,8 +110,12 @@ class TokeoAi(MetaMixin):
         """
         super(TokeoAi, self).__init__(*args, **kw)
         self.app = app
-        # the registries hold classes; the handler instantiates them with the
-        # application on first use and caches the (stateless) instances here
+        # the ai component registry lives on the handler: kind -> {name: cls}.
+        # built-ins register here at post_setup; a project or third-party class
+        # is named by a dotted ``type`` in the config and imported on demand.
+        self._registry = {}
+        # the handler instantiates resolved classes with the application on
+        # first use and caches the (stateless) instances here
         self._provider_objs = {}
         self._tool_objs = {}
 
@@ -149,6 +153,77 @@ class TokeoAi(MetaMixin):
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
+    def register(self, kind, name, cls):
+        """
+        Register a class under a short name within a kind.
+
+        ### Args
+
+        - **kind** (str): The component kind, e.g. ``provider`` or ``tool``
+        - **name** (str): The short ``type`` name that selects this class
+        - **cls** (type): The class; the handler instantiates it with the app
+
+        """
+        self._registry.setdefault(kind, {})[name] = cls
+
+    def resolve(self, kind, type_value):
+        """
+        Resolve a config ``type`` to a class.
+
+        A dotted ``type`` (one containing a ``.``) is imported on demand, so a
+        project or third-party class needs no registration; a bare short name
+        is looked up in the kind's registry (the built-ins tokeo ships).
+
+        ### Args
+
+        - **kind** (str): The component kind, e.g. ``provider`` or ``tool``
+        - **type_value** (str): A short name or a dotted ``module.Class`` path
+
+        ### Returns
+
+        - **type**: The resolved class
+
+        ### Raises
+
+        - **TokeoAiError**: If a short name is unknown, or a dotted path cannot
+            be imported
+
+        """
+        if '.' in type_value:
+            module_path, _, attr = type_value.rpartition('.')
+            if not module_path:
+                raise TokeoAiError(f'ai {kind} type {type_value!r} is not a dotted path')
+            try:
+                return getattr(importlib.import_module(module_path), attr)
+            except (ImportError, AttributeError) as err:
+                raise TokeoAiError(f'cannot import ai {kind} type {type_value!r}: {err}')
+        try:
+            return self._registry[kind][type_value]
+        except KeyError:
+            known = ', '.join(sorted(self._registry.get(kind, {}))) or '(none)'
+            raise TokeoAiError(f'unknown ai {kind} type {type_value!r}; known: {known}')
+
+    def registry(self, kind=None):
+        """
+        Inspect the ai component registry through ``app.ai``.
+
+        ### Args
+
+        - **kind** (str | None): A single kind (``provider``, ``tool`` ...),
+            or ``None`` for the whole registry
+
+        ### Returns
+
+        - **dict**: A deep copy; ``{name: class}`` for one kind, or
+            ``{kind: {name: class}}`` for all kinds, so callers cannot mutate
+            the registry (classes are atomic to ``deepcopy``, values stay
+            shared)
+
+        """
+        if kind is None:
+            return deepcopy(self._registry)
+        return deepcopy(self._registry.get(kind, {}))
+
     def _resolve(self, profile=None, model=None, purpose=None):
         # at most one selector may be given; with none, use the configured
         # default (the built-in mock profile via the Meta config_defaults);
@@ -173,42 +248,49 @@ class TokeoAi(MetaMixin):
         # harmless and needs no lock
         obj = self._provider_objs.get(provider_type)
         if obj is None:
-            obj = get_provider(provider_type)(self.app)
+            obj = self.resolve('provider', provider_type)(self.app)
             obj._setup(self.app)
             self._provider_objs[provider_type] = obj
         return obj
 
     def _tool(self, name):
-        # instantiate the registered tool class with the application once and
-        # reuse it; the same statelessness argument as for providers applies
+        # instantiate the tool configured under ``ai.tools[name]`` once and
+        # reuse it; its ``type`` (a built-in short name or a full dotted path)
+        # resolves to a class. the same statelessness argument as for
+        # providers applies
         obj = self._tool_objs.get(name)
         if obj is None:
-            obj = get_tool(name)(self.app)
+            items, _ = self._tools_config()
+            item = items.get(name)
+            if not item or not item.get('type'):
+                raise TokeoAiError(f'ai tool {name!r} is not configured under ai.tools')
+            obj = self.resolve('tool', item['type'])(self.app)
             obj._setup(self.app)
             self._tool_objs[name] = obj
         return obj
 
-    def _toolset_groups(self):
-        # read ``ai.tools``: a list whose entries are either a plain tool name
-        # (an individual tool) or a single-key mapping (a named group ->
-        # members). only the groups need resolving, so return that map
+    def _tools_config(self):
+        # read the ``ai.tools`` map in the uniform config form: a value that
+        # is a dict is an item ({type, options}); a value that is a list is a
+        # named group of member names. return both maps
         try:
-            entries = self._config('tools')
+            section = self._config('tools')
         except Exception:
-            entries = None
-        groups = {}
-        for entry in entries or []:
-            if isinstance(entry, dict):
-                for name, members in entry.items():
-                    groups[name] = list(members or [])
-        return groups
+            section = None
+        items, groups = {}, {}
+        for name, value in (section or {}).items():
+            if isinstance(value, list):
+                groups[name] = list(value)
+            elif isinstance(value, dict):
+                items[name] = value
+        return items, groups
 
     def _resolve_tools(self, names):
-        # expand group names (defined under ``ai.tools``) to their member
-        # tools; a plain name passes through as an individual tool. recursion
-        # lets a group contain groups; the path set guards against cycles;
-        # order is preserved and duplicates dropped
-        groups = self._toolset_groups()
+        # expand group names (lists under ``ai.tools``) to their member items;
+        # an item name passes through. recursion lets a group contain groups;
+        # the path set guards against cycles; order is preserved and
+        # duplicates dropped
+        _, groups = self._tools_config()
         resolved = []
         seen = set()
 
@@ -278,10 +360,9 @@ class TokeoAi(MetaMixin):
         if not provider_type:
             raise TokeoAiError(f'ai profile {name!r} is missing a type')
         provider = self._provider(provider_type)
-        # tools are available when registered and activated when listed on the
-        # profile (or passed in); a listed name may be an individual tool or a
-        # group from ``ai.tools`` (expanded here). without any, this is a plain
-        # chat
+        # tools are declared as items under ``ai.tools`` and activated when
+        # listed on the profile (or passed in); a listed name may be a tool
+        # item or a group (expanded here). without any, this is a plain chat
         requested = tools if tools is not None else profile.get('tools')
         specs = self._tool_specs(self._resolve_tools(requested))
         messages = list(messages)
@@ -411,12 +492,13 @@ class AiController(Controller):
 
 def ai_extend_app(app):
     """
-    Cement post-setup hook: create the ``app.ai`` handler.
+    Cement post-setup hook: create ``app.ai`` and register the built-ins.
 
-    Extends the application with the ai handler and sets it up, once every
-    extension has been loaded and the configuration is available. Providers
-    and tools are already in their module-global registries by then, having
-    registered directly in their own ``load``.
+    Extends the application with the ai handler, registers the built-in
+    providers on it, and sets it up, once every extension has been loaded and
+    the configuration is available. A project or third-party provider/tool is
+    not registered here; it is named by a dotted ``type`` in the config and
+    imported on demand.
 
     ### Args
 
@@ -424,6 +506,11 @@ def ai_extend_app(app):
 
     """
     app.extend('ai', TokeoAi(app))
+    # built-in providers, available by short name without any configuration:
+    # mock is the neutral test double, fundi the application's own local model.
+    # core ships no tools; a project names its own tools by a dotted ``type``
+    app.ai.register('provider', 'mock', TokeoAiMockProvider)
+    app.ai.register('provider', 'fundi', TokeoAiFundiProvider)
     app.ai._setup(app)
 
 
@@ -437,21 +524,13 @@ def load(app):
 
     ### Notes
 
-    - Built-in providers are registered directly, so they are available
-        without any configuration; core ships no tools
-    - Providers and tools register themselves: a provider or tool module calls
-        ``register_provider`` / ``register_tool`` in its own ``load``; the
-        registries are module-global, so no registration hook is needed
-    - Registers a post_setup hook that creates ``app.ai`` once the
-        configuration is available
+    - Registers a post_setup hook that creates ``app.ai``, registers the
+        built-in providers on it, and sets it up once the configuration is
+        available
+    - A project or third-party provider/tool is named by a dotted ``type`` in
+        the config and imported on demand, so it needs no registration and no
+        entry in the application extensions
 
     """
-    # built-in providers are always available without any configuration; mock
-    # is the neutral test double, fundi is the application's own local model.
-    # the registries hold classes; the handler instantiates them with the app.
-    # core ships no tools; a project registers and activates its own
-    register_provider('mock', TokeoAiMockProvider)
-    register_provider('fundi', TokeoAiFundiProvider)
-    # create app.ai at post_setup, when the configuration is available
     app.hook.register('post_setup', ai_extend_app)
     app.handler.register(AiController)

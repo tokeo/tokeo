@@ -12,17 +12,20 @@ ai:
   profiles:
     assistant:
       type: openai
-      model: qwen2.5
-      base_url: http://localhost:11434/v1
+      options:
+        model: qwen2.5
+        base_url: http://localhost:11434/v1
       purpose: general
 ```
 
 A provider is a dumb transport: given an already-resolved profile it turns a
 list of messages into a normalized ``ChatResult``. Providers, tools and the
 other services are registered as classes; the ``app.ai`` handler instantiates
-them with the application. They keep no mutable per-call state, so they are
-safe to use from several threads at once (for example dramatiq workers or
-scheduler jobs).
+them with the application. A ``type`` is either a short name from tokeo's
+registry or a dotted ``module.Class`` path imported on demand; the registry is
+reachable for inspection via ``app.ai.registry``. They keep no mutable per-call
+state, so they are safe to use from several threads at once (for example
+dramatiq workers or scheduler jobs).
 
 ### Notes
 
@@ -134,9 +137,10 @@ class TokeoAiProvider:
     Base class for ai providers.
 
     A provider receives an already-resolved profile and returns a
-    ``ChatResult``. It is registered as a class and instantiated with the
-    application by the ``app.ai`` handler. It must not keep mutable per-call
-    state, so that it can be called concurrently without locking.
+    ``ChatResult``. Its class is resolved from the profile ``type`` (a built-in
+    short name or a dotted path) and instantiated with the application by the
+    ``app.ai`` handler. It must not keep mutable per-call state, so that it can
+    be called concurrently without locking.
 
     """
 
@@ -183,62 +187,15 @@ class TokeoAiProvider:
         raise NotImplementedError
 
 
-# providers register their class under a ``type`` name; the registry is filled
-# once at load time and only read afterwards, so concurrent reads need no lock
-_providers = {}
-
-
-def register_provider(name, provider_class):
-    """
-    Register a provider class under a ``type`` name.
-
-    ### Args
-
-    - **name** (str): The ``type`` value that selects this provider
-    - **provider_class** (type): The provider class; the handler instantiates
-        it with the application
-
-    """
-    _providers[name] = provider_class
-
-
-def get_provider(name):
-    """
-    Return the registered provider class for a ``type`` name.
-
-    ### Args
-
-    - **name** (str): The ``type`` to look up
-
-    ### Returns
-
-    - **type**: The registered provider class
-
-    ### Raises
-
-    - **TokeoAiError**: If no provider is registered for the name
-
-    """
-    try:
-        return _providers[name]
-    except KeyError:
-        raise TokeoAiError(f'unknown ai provider {name!r}')
-
-
-def _enabled(profile):
-    # a profile is available unless it explicitly turns itself off; this lets
-    # a single session drop a profile via config or an env override
-    return bool(profile.get('enabled', True))
-
-
 class TokeoAiTool(MetaMixin):
     """
     Base class for agent tools.
 
-    A tool is registered as a class and instantiated with the application by
-    the ``app.ai`` handler, so it can read configuration, use ``app.db``, the
+    A tool's class is resolved from its ``ai.tools`` item ``type`` (a built-in
+    short name or a dotted path) and instantiated with the application by the
+    ``app.ai`` handler, so it can read configuration, use ``app.db``, the
     vault, and hold resources. ``Meta`` carries the ``description`` and the
-    JSON-schema ``parameters`` sent to the model; ``run`` does the work.
+    JSON-schema ``parameters`` sent to the model; ``exec`` does the work.
 
     """
 
@@ -276,7 +233,7 @@ class TokeoAiTool(MetaMixin):
         """
         pass
 
-    def run(self, **arguments):
+    def exec(self, **arguments):
         """
         Execute the tool and return its result.
 
@@ -293,48 +250,6 @@ class TokeoAiTool(MetaMixin):
         raise NotImplementedError
 
 
-# tools register their class under their name; like providers, the registry is
-# filled once at load time and only read afterwards
-_tools = {}
-
-
-def register_tool(name, tool_class):
-    """
-    Register a tool class under its name.
-
-    ### Args
-
-    - **name** (str): The tool name the model uses to call it
-    - **tool_class** (type): A ``TokeoAiTool`` subclass; the handler
-        instantiates it with the application
-
-    """
-    _tools[name] = tool_class
-
-
-def get_tool(name):
-    """
-    Return the registered tool class for a name.
-
-    ### Args
-
-    - **name** (str): The tool name to look up
-
-    ### Returns
-
-    - **type**: The registered tool class
-
-    ### Raises
-
-    - **TokeoAiError**: If no tool is registered for the name
-
-    """
-    try:
-        return _tools[name]
-    except KeyError:
-        raise TokeoAiError(f'unknown ai tool {name!r}')
-
-
 def find_profile(app, key, value):
     """
     Resolve a single enabled profile by name or by a field value.
@@ -343,7 +258,8 @@ def find_profile(app, key, value):
 
     - **app**: The application instance
     - **key** (str): ``profile`` or ``name`` to match the profile name; any
-        other key matches that field within the profile
+        other key matches that field at the profile top level or in its
+        ``options``
     - **value**: The value the key must equal
 
     ### Returns
@@ -367,10 +283,15 @@ def find_profile(app, key, value):
         profiles = {}
     if key in ('profile', 'name'):
         profile = profiles.get(value)
-        if isinstance(profile, dict) and _enabled(profile):
+        if isinstance(profile, dict) and bool(profile.get('enabled', True)):
             return value, profile
         raise TokeoAiError(f'no enabled ai profile named {value!r}')
     for name, profile in profiles.items():
-        if isinstance(profile, dict) and _enabled(profile) and profile.get(key) == value:
+        if not (isinstance(profile, dict) and bool(profile.get('enabled', True))):
+            continue
+        # a selector is either a top-level field (purpose ...) or lives in the
+        # provider options (model, base_url ...)
+        field = profile[key] if key in profile else (profile.get('options') or {}).get(key)
+        if field == value:
             return name, profile
     raise TokeoAiError(f'no enabled ai profile with {key}={value!r}')

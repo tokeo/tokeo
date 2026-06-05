@@ -9,29 +9,35 @@ ai:
   ### profile used when a command (for example "ai ask") names none
   default: mock
 
-  ### the configured toolset: list registered tools and form named groups,
-  ### so a profile can activate a single tool or a whole group at once. a
-  ### group is a name with its members (members may be tools or other groups)
+  ### the configured toolset, in the uniform form used across the ai config:
+  ### a dict value is an item ("type" names the class -- a built-in short
+  ### name or a full dotted class path -- plus optional "options"); a list
+  ### value is a named group of members (tools or other groups). a profile
+  ### then activates a single item or a whole group
   tools:
-    ### an individual tool, registered by this project (core/ai/tools/calc.py)
-    - calc
+    ### a project tool, named by its full dotted class path: no registration,
+    ### no entry in main.py -- the handler imports it on demand
+    calc:
+      type: {{ app_label }}.core.ai.tools.calc.TokeoAiCalcTool
     ### a named group that bundles math-related tools
-    - mathematics:
-        - calc
+    mathematics:
+      - calc
 
-  ### named profiles; each binds a provider type to its connection details
+  ### named profiles in the uniform form: top-level params (type, purpose,
+  ### tools, enabled) plus an "options" block carrying the provider's
+  ### connection settings (model, base_url, key). a profile is an item; its
+  ### "type" is a provider short name or a full dotted class path
   profiles:
     ### the built-in local model; deterministic, no server, no network
     mock:
-      ### provider type; "mock" is the application's own local model
+      ### provider type; "mock" is the application's own local model and
+      ### needs no options (it ignores model and server)
       type: mock
-      ### model version; mock is the deterministic stand-in
-      model: mock
       ### optional free-form selector, usable via "ai ask --purpose"
       purpose: mocking
-      ### tools this profile may use; each entry is an individual tool or a
-      ### group from ai.tools above. the "mathematics" group activates calc,
-      ### so "ai ask calc 2 + 3" works
+      ### tools this profile may use; each entry is an item or a group from
+      ### ai.tools above. the "mathematics" group activates calc, so
+      ### "ai ask calc 2 + 3" works
       tools:
         - mathematics
 
@@ -39,12 +45,14 @@ ai:
     # assistant:
     #   ### provider type; "openai" speaks the OpenAI-compatible chat api
     #   type: openai
-    #   ### model name as your local server exposes it
-    #   model: qwen2.5
-    #   ### base url of the running server (ollama 11434, vllm 8000, mlx 8080)
-    #   base_url: http://localhost:11434/v1
-    #   ### optional api key; local servers usually ignore it, vault-backed
-    #   ### with a !vault:<profile> tag when a real key is needed
-    #   # key: not-needed
+    #   ### provider connection settings live under "options"
+    #   options:
+    #     ### model name as your local server exposes it
+    #     model: qwen2.5
+    #     ### base url of the running server (ollama 11434, vllm 8000, mlx 8080)
+    #     base_url: http://localhost:11434/v1
+    #     ### optional api key; local servers usually ignore it, vault-backed
+    #     ### with a !vault:<profile> tag when a real key is needed
+    #     # key: not-needed
     #   ### optional free-form selector, usable via "ai ask --purpose"
     #   purpose: general

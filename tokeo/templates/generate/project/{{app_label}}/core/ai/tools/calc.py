@@ -5,16 +5,16 @@ A tiny, safe arithmetic tool that shows tool calling end to end with the
 built-in mock provider. It evaluates a numeric expression with a restricted
 AST walk, so no arbitrary code runs.
 
-This module is self-contained: ``load`` registers the tool with the ai core
-directly. Listing it in the app extensions after ``tokeo.ext.ai`` makes
-``ai ask calc 2 + 3`` compute, so the otherwise empty mock gains a working
-tool.
+This module is self-contained: it holds only the tool class. The project names
+it by its full dotted class path under ``ai.tools`` in the config, so it needs
+no registration and no entry in the app extensions; the handler imports and
+instantiates it on demand.
 """
 
 import ast
 import operator
 
-from tokeo.core.ai import TokeoAiError, TokeoAiTool, register_tool
+from tokeo.core.ai import TokeoAiError, TokeoAiTool
 
 
 _BINOPS = {
@@ -87,24 +87,3 @@ class TokeoAiCalcTool(TokeoAiTool):
             raise
         except Exception:
             raise TokeoAiError(f'calc cannot evaluate {input!r}')
-
-
-def load(app):
-    """
-    Load the calc tool, registering it with the ai core.
-
-    ### Args
-
-    - **app**: The application instance
-
-    ### Notes
-
-    : Registers the tool class directly; the registry is module-global, so no
-        hook is needed. List this module after ``tokeo.ext.ai`` in the app
-        extensions so ``ai ask calc 2 + 3`` computes.
-
-    """
-    # register this tool class with the ai core; the handler instantiates it
-    # with the app on first use. the registry is a module-global dict, so a
-    # direct call here is enough -- no hook required
-    register_tool('calc', TokeoAiCalcTool)
