@@ -6,8 +6,12 @@
 ### demos. A profile is selected by name, or by a field such as model or
 ### purpose; a profile with "enabled: false" is hidden for the session.
 ai:
-  ### profile used when a command (for example "ai ask") names none
-  default: mock
+  ### selection used when a command (for example "ai ask") names none:
+  ### "profile" is the model, "agent" the composition (tools, and later
+  ### guards). either may be omitted; a call can still pick one explicitly
+  defaults:
+    profile: mock
+    agent: main
 
   ### the configured toolset, in the uniform form used across the ai config:
   ### a dict value is an item ("type" names the class -- a built-in short
@@ -22,6 +26,26 @@ ai:
     ### a named group that bundles math-related tools
     mathematics:
       - calc
+
+  ### agents are the composition root: an agent binds the tools (and later
+  ### the guards and other building blocks) for a task and sets the step
+  ### budget. the model is not part of the agent -- it is bound late through
+  ### the selected profile, so one agent runs against any model. an agent is
+  ### an item; "type" is a built-in short name ("default") or a full dotted
+  ### class path. the active tools of a call are the selected profile's tools
+  ### and the agent's tools combined (deduplicated)
+  agents:
+    ### the default composition root, selected via defaults.agent above
+    main:
+      ### built-in agent type; no custom class needed
+      type: default
+      ### tools this agent contributes, combined with the selected profile's
+      ### own tools (deduplicated). left empty here -- the mock profile below
+      ### already activates the mathematics group
+      # tools:
+      #   - mathematics
+      ### model calls the loop may take before giving up (optional)
+      # max_steps: 6
 
   ### named profiles in the uniform form: top-level params (type, purpose,
   ### tools, enabled) plus an "options" block carrying the provider's

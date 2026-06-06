@@ -13,9 +13,17 @@ the built-in local model.
 
 ```yaml
 ai:
-  default: mock
+  defaults:
+    profile: mock          # model used when a call names none
+    agent: main            # composition used when a call names none
   tools:
-    calc: { type: myapp.core.ai.tools.calc.TokeoAiCalcTool }
+    calc:  { type: myapp.core.ai.tools.calc.TokeoAiCalcTool }
+    notes: { type: myapp.core.ai.tools.notes.TokeoAiNotesTool }
+  agents:
+    main:
+      type: default
+      tools:
+        - notes            # combined with the profile's own tools (calc)
   profiles:
     mock:
       type: mock
@@ -26,9 +34,10 @@ ai:
 
 ### Notes
 
-    : With no selector given, ``app.ai`` uses ``ai.default``, which ships as
-        the built-in ``mock`` profile, so ``ai ask`` answers out of the box
-        without any model or server; there is no hard-coded code fallback.
+    : With no selector given, ``app.ai`` uses ``ai.defaults.profile``, which
+        ships as the built-in ``mock`` profile, so ``ai ask`` answers out of
+        the box without any model or server; there is no hard-coded code
+        fallback.
 
 """
 
@@ -44,7 +53,7 @@ from tokeo.ext.argparse import Controller
 from tokeo.core.ai import (
     TokeoAiError,
     ToolResult,
-    find_profile,
+    TokeoAiAgent,
 )
 from tokeo.core.ai.linter import TokeoAiLinter
 from tokeo.core.ai.mock import TokeoAiMockProvider
@@ -78,14 +87,19 @@ class TokeoAi(MetaMixin):
         # Configuration section name in the application config
         config_section = 'ai'
 
+        # base step budget for the loop when neither the call nor the selected
+        # agent sets one; the single home for this default
+        max_steps = 1
+
         # Default configuration settings
         config_defaults = dict(
-            # profile used when a call names none
-            default='mock',
+            # the default profile (model) and agent used when a call names
+            # none; the built-in mock profile lets a fresh app answer at once
+            defaults=dict(profile='mock'),
             # named profiles; each binds a provider type to its details. the
             # built-in mock profile lets a fresh app answer without any setup.
             # core ships no tools, so the mock starts empty; a project adds
-            # and activates its own tools (for example the calc demo tool)
+            # and activates its own tools on a profile or an agent
             profiles=dict(
                 mock=dict(
                     type='mock',
@@ -119,6 +133,7 @@ class TokeoAi(MetaMixin):
         # first use and caches the (stateless) instances here
         self._provider_objs = {}
         self._tool_objs = {}
+        self._agent_objs = {}
 
     def _setup(self, app):
         """
@@ -126,7 +141,9 @@ class TokeoAi(MetaMixin):
 
         Called by the framework after the configuration has been loaded.
         Merges the default configuration so the ``ai`` section always exists,
-        without overriding values the application provides.
+        then reads the section into the handler once. After this the
+        operational methods work off these attributes and never read the
+        configuration again.
 
         ### Args
 
@@ -134,13 +151,27 @@ class TokeoAi(MetaMixin):
 
         """
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
+        # pull the ai configuration into the handler once, at setup time
+        self._defaults = self._config('defaults', fallback={}) or {}
+        self._profiles = self._config('profiles', fallback={}) or {}
+        self._agents = self._config('agents', fallback={}) or {}
+        # the ``ai.tools`` map uses the uniform form: a dict value is an item
+        # ({type, options}), a list value is a named group of member names.
+        # split it once into the two maps the loop works with
+        self._tool_items, self._tool_groups = {}, {}
+        for name, value in (self._config('tools', fallback={}) or {}).items():
+            if isinstance(value, list):
+                self._tool_groups[name] = list(value)
+            elif isinstance(value, dict):
+                self._tool_items[name] = value
 
     def _config(self, key, **kwargs):
         """
         Get a configuration value from the extension's config section.
 
         A simple wrapper around the application's ``config.get`` that uses the
-        correct configuration section.
+        correct configuration section. Used only at setup time to read the
+        configuration into the handler.
 
         ### Args
 
@@ -229,7 +260,7 @@ class TokeoAi(MetaMixin):
 
     def _resolve(self, profile=None, model=None, purpose=None):
         # at most one selector may be given; with none, use the configured
-        # default (the built-in mock profile via the Meta config_defaults);
+        # default profile (the built-in mock profile via the config_defaults);
         # with no default at all this raises, there is no code fallback
         keys = {'profile': profile, 'model': model, 'purpose': purpose}
         active = {k: v for k, v in keys.items() if v is not None}
@@ -237,13 +268,53 @@ class TokeoAi(MetaMixin):
             raise TokeoAiError('select a profile by only one of profile, model or purpose')
         if active:
             key, value = next(iter(active.items()))
-            return find_profile(self.app, key, value)
-        # no selector: use the configured default (which defaults to the mock
-        # profile via the Meta config_defaults)
-        default = self._config('default')
+            return self._find_profile(key, value)
+        # no selector: use the configured default profile
+        default = self._defaults.get('profile')
         if not default:
-            raise TokeoAiError('no ai profile selected and no ai.default configured')
-        return find_profile(self.app, 'profile', default)
+            raise TokeoAiError('no ai profile selected and no ai.defaults.profile configured')
+        return self._find_profile('profile', default)
+
+    def _find_profile(self, key, value):
+        """
+        Resolve a single enabled profile by name or by a field value.
+
+        ### Args
+
+        - **key** (str): ``profile`` or ``name`` to match the profile name;
+            any other key matches that field at the profile top level or in
+            its ``options``
+        - **value**: The value the key must equal
+
+        ### Returns
+
+        - **tuple**: ``(name, profile)`` of the matching profile
+
+        ### Raises
+
+        - **TokeoAiError**: If no enabled profile matches
+
+        ### Notes
+
+        - On a field match the first enabled profile in config order wins
+        - A disabled profile (``enabled: false``) is skipped, so it is also
+            not found by its name
+
+        """
+        if key in ('profile', 'name'):
+            profile = self._profiles.get(value)
+            if isinstance(profile, dict) and bool(profile.get('enabled', True)):
+                return value, profile
+            raise TokeoAiError(f'no enabled ai profile named {value!r}')
+        for name, profile in self._profiles.items():
+            if not (isinstance(profile, dict) and bool(profile.get('enabled', True))):
+                continue
+            # a selector is either a top-level field (purpose ...) or lives in
+            # the provider options (model, base_url ...)
+            field = profile[key] if key in profile else (profile.get('options') or {}).get(key)
+            if field == value:
+                return name, profile
+        raise TokeoAiError(f'no enabled ai profile with {key}={value!r}')
 
     def _provider(self, provider_type):
         # instantiate the registered provider class with the application once
@@ -263,8 +334,7 @@ class TokeoAi(MetaMixin):
         # providers applies
         obj = self._tool_objs.get(name)
         if obj is None:
-            items, _ = self._tools_config()
-            item = items.get(name)
+            item = self._tool_items.get(name)
             if not item or not item.get('type'):
                 raise TokeoAiError(f'ai tool {name!r} is not configured under ai.tools')
             obj = self.resolve('tool', item['type'])(self.app)
@@ -272,28 +342,12 @@ class TokeoAi(MetaMixin):
             self._tool_objs[name] = obj
         return obj
 
-    def _tools_config(self):
-        # read the ``ai.tools`` map in the uniform config form: a value that
-        # is a dict is an item ({type, options}); a value that is a list is a
-        # named group of member names. return both maps
-        try:
-            section = self._config('tools')
-        except Exception:
-            section = None
-        items, groups = {}, {}
-        for name, value in (section or {}).items():
-            if isinstance(value, list):
-                groups[name] = list(value)
-            elif isinstance(value, dict):
-                items[name] = value
-        return items, groups
-
     def _resolve_tools(self, names):
         # expand group names (lists under ``ai.tools``) to their member items;
         # an item name passes through. recursion lets a group contain groups;
         # the path set guards against cycles; order is preserved and
         # duplicates dropped
-        _, groups = self._tools_config()
+        groups = self._tool_groups
         resolved = []
         seen = set()
 
@@ -312,8 +366,8 @@ class TokeoAi(MetaMixin):
         return resolved
 
     def _tool_specs(self, names):
-        # build openai-style function specs from the tools' Meta; unknown
-        # names are skipped, an empty or missing list yields no specs
+        # build openai-style function specs from the tools' merged Meta;
+        # unknown names are skipped, an empty or missing list yields no specs
         specs = []
         for name in names or []:
             try:
@@ -330,24 +384,56 @@ class TokeoAi(MetaMixin):
             ))
         return specs
 
-    def chat(self, messages, tools=None, profile=None, model=None, purpose=None, max_steps=6):
+    def _agent(self, name):
+        # build the agent configured under ``ai.agents[name]`` once and reuse
+        # it; its ``type`` (a built-in short name or a dotted path) resolves to
+        # an agent class, built with the application and its config entry as
+        # keyword arguments (the keys override the agent's Meta defaults)
+        obj = self._agent_objs.get(name)
+        if obj is None:
+            config = self._agents.get(name)
+            if not isinstance(config, dict) or not config.get('type'):
+                raise TokeoAiError(f'ai agent {name!r} is not configured under ai.agents')
+            settings = {key: value for key, value in config.items() if key != 'type'}
+            obj = self.resolve('agent', config['type'])(self.app, **settings)
+            obj._setup(self.app)
+            self._agent_objs[name] = obj
+        return obj
+
+    def _agent_or_default(self, agent):
+        # resolve the agent to run: an explicit name wins, else the configured
+        # ``ai.defaults.agent`` (optional). with neither there is no agent, and
+        # the caller uses only the profile's own tools
+        if agent is None:
+            agent = self._defaults.get('agent')
+        if not agent:
+            return None
+        return self._agent(agent)
+
+    def chat(self, messages, tools=None, profile=None, model=None, purpose=None, agent=None, max_steps=None):
         """
         Run the agent loop and return the final ``ChatResult``.
 
-        Resolves a profile, then calls the provider. While the model asks for
-        tool calls, the activated tools are executed and their results are fed
-        back, until the model answers or ``max_steps`` is reached. With no
-        activated tool the loop degrades to a single, plain call.
+        Resolves a profile (the model), then calls the provider. The active
+        tools are the union of the profile's own tools and the agent's tools
+        (the agent, the composition root, also sets the step budget). While
+        the model asks for tool calls, the activated tools are executed and
+        their results are fed back, until the model answers or ``max_steps``
+        is reached. With no activated tool the loop degrades to a single,
+        plain call.
 
         ### Args
 
         - **messages** (list): Chat messages as plain OpenAI-style dicts
-        - **tools** (list | None): Tool names to activate; defaults to the
-            profile's ``tools`` list
+        - **tools** (list | None): Tool names to activate; the hard override
+            for the profile-and-agent union when given
         - **profile** (str | None): Select a profile by name
         - **model** (str | None): Select the first enabled profile by model
         - **purpose** (str | None): Select the first enabled profile by purpose
-        - **max_steps** (int): Maximum model calls before giving up
+        - **agent** (str | None): Select an agent by name; defaults to the
+            configured ``ai.defaults.agent`` when one is set
+        - **max_steps** (int | None): Maximum model calls before giving up;
+            defaults to the agent's budget, otherwise the framework default
 
         ### Returns
 
@@ -363,10 +449,24 @@ class TokeoAi(MetaMixin):
         if not provider_type:
             raise TokeoAiError(f'ai profile {name!r} is missing a type')
         provider = self._provider(provider_type)
-        # tools are declared as items under ``ai.tools`` and activated when
-        # listed on the profile (or passed in); a listed name may be a tool
-        # item or a group (expanded here). without any, this is a plain chat
-        requested = tools if tools is not None else profile.get('tools')
+        # the agent is the composition root: it adds tools and sets the step
+        # budget, while the profile selects only the model. tools are declared
+        # as items under ``ai.tools`` and a listed name may be a tool item or a
+        # group. for the active tools an explicit tools= argument is the hard
+        # override; otherwise the profile's own tools and the agent's tools
+        # combine (``_resolve_tools`` keeps order and drops duplicates)
+        agent_obj = self._agent_or_default(agent)
+        if tools is not None:
+            requested = tools
+        else:
+            requested = list(profile.get('tools') or [])
+            if agent_obj is not None:
+                requested = requested + list(agent_obj._meta.tools)
+        if max_steps is None:
+            # the agent's own budget wins; without one (None) the handler's
+            # base default (Meta.max_steps) applies
+            budget = agent_obj._meta.max_steps if agent_obj is not None else None
+            max_steps = budget if budget is not None else self._meta.max_steps
         specs = self._tool_specs(self._resolve_tools(requested))
         messages = list(messages)
         result = provider.chat(profile, messages, tools=specs)
@@ -399,18 +499,20 @@ class TokeoAi(MetaMixin):
             ],
         }
 
-    def ask(self, prompt, tools=None, profile=None, model=None, purpose=None):
+    def ask(self, prompt, tools=None, profile=None, model=None, purpose=None, agent=None):
         """
         Send a single user prompt through the loop and return the reply text.
 
         ### Args
 
         - **prompt** (str): The user prompt
-        - **tools** (list | None): Tool names to activate; defaults to the
-            profile's ``tools`` list
+        - **tools** (list | None): Tool names to activate; the hard override
+            for the profile-and-agent union when given
         - **profile** (str | None): Select a profile by name
         - **model** (str | None): Select the first enabled profile by model
         - **purpose** (str | None): Select the first enabled profile by purpose
+        - **agent** (str | None): Select an agent by name; defaults to the
+            configured ``ai.defaults.agent`` when one is set
 
         ### Returns
 
@@ -418,7 +520,7 @@ class TokeoAi(MetaMixin):
 
         """
         messages = [{'role': 'user', 'content': prompt}]
-        result = self.chat(messages, tools=tools, profile=profile, model=model, purpose=purpose)
+        result = self.chat(messages, tools=tools, profile=profile, model=model, purpose=purpose, agent=agent)
         return result.text
 
 
@@ -442,6 +544,7 @@ class AiController(Controller):
             (['--profile'], dict(help='select an ai profile by name', dest='profile')),
             (['--model'], dict(help='select an ai profile by model', dest='model')),
             (['--purpose'], dict(help='select an ai profile by purpose', dest='purpose')),
+            (['--agent'], dict(help='select an ai agent by name', dest='agent')),
             (['--json'], dict(help='print the full result as json', action='store_true', dest='as_json')),
         ],
     )
@@ -456,6 +559,7 @@ class AiController(Controller):
             profile=self.app.pargs.profile,
             model=self.app.pargs.model,
             purpose=self.app.pargs.purpose,
+            agent=self.app.pargs.agent,
         )
         if self.app.pargs.as_json:
             self.app.print(json.dumps(asdict(result), indent=2))
@@ -468,6 +572,7 @@ class AiController(Controller):
             (['--profile'], dict(help='select an ai profile by name', dest='profile')),
             (['--model'], dict(help='select an ai profile by model', dest='model')),
             (['--purpose'], dict(help='select an ai profile by purpose', dest='purpose')),
+            (['--agent'], dict(help='select an ai agent by name', dest='agent')),
         ],
     )
     def chat(self):
@@ -488,6 +593,7 @@ class AiController(Controller):
                 profile=self.app.pargs.profile,
                 model=self.app.pargs.model,
                 purpose=self.app.pargs.purpose,
+                agent=self.app.pargs.agent,
             )
             messages.append({'role': 'assistant', 'content': result.text})
             self.app.print(result.text)
@@ -536,6 +642,9 @@ def ai_extend_app(app):
     # core ships no tools; a project names its own tools by a dotted ``type``
     app.ai.register('provider', 'mock', TokeoAiMockProvider)
     app.ai.register('provider', 'fundi', TokeoAiFundiProvider)
+    # built-in agent: the default composition root; a project configures its
+    # agents under ``ai.agents`` and selects one per call or via defaults.agent
+    app.ai.register('agent', 'default', TokeoAiAgent)
     app.ai._setup(app)
 
 

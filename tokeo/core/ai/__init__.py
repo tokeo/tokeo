@@ -194,18 +194,19 @@ class TokeoAiTool(MetaMixin):
     A tool's class is resolved from its ``ai.tools`` item ``type`` (a built-in
     short name or a dotted path) and instantiated with the application by the
     ``app.ai`` handler, so it can read configuration, use ``app.db``, the
-    vault, and hold resources. ``Meta`` carries the ``description`` and the
-    JSON-schema ``parameters`` sent to the model; ``exec`` does the work.
+    vault, and hold resources. ``Meta`` declares the ``description`` and the
+    JSON-schema ``parameters`` sent to the model; a subclass overrides those
+    keys and ``exec`` does the work. The handler reads them from ``_meta``.
 
     """
 
     class Meta:
         """Tool meta-data sent to the model."""
 
-        # Short description the model sees
+        # short description the model sees
         description = ''
 
-        # JSON-schema object describing the arguments
+        # json-schema object describing the arguments the model may pass
         parameters = {}
 
     def __init__(self, app, *args, **kw):
@@ -250,48 +251,57 @@ class TokeoAiTool(MetaMixin):
         raise NotImplementedError
 
 
-def find_profile(app, key, value):
+class TokeoAiAgent(MetaMixin):
     """
-    Resolve a single enabled profile by name or by a field value.
+    Base class for agents, the composition root of an ai call.
 
-    ### Args
-
-    - **app**: The application instance
-    - **key** (str): ``profile`` or ``name`` to match the profile name; any
-        other key matches that field at the profile top level or in its
-        ``options``
-    - **value**: The value the key must equal
-
-    ### Returns
-
-    - **tuple**: ``(name, profile)`` of the matching profile
-
-    ### Raises
-
-    - **TokeoAiError**: If no enabled profile matches
+    An agent binds the building blocks of a task together: which tools are
+    active and how many model calls the loop may take. The model itself is
+    not part of the agent; it is bound late through the selected profile, so
+    the same agent can run against the mock, a local model, or a hosted one.
+    Its class is resolved from the ``ai.agents`` item ``type`` (a built-in
+    short name or a dotted path) by the ``app.ai`` handler, which passes the
+    agent's configuration entry as keyword arguments.
 
     ### Notes
 
-    - On a field match the first enabled profile in configuration order wins
-    - A disabled profile (``enabled: false``) is skipped, so it is also not
-        found by its name
+    : ``Meta`` declares the configurable keys (``tools``, ``max_steps``) with
+        neutral defaults; the ``ai.agents`` entry overrides them at build time
+        (the cement Meta keyword override), and they are read from ``_meta``.
 
     """
-    try:
-        profiles = app.config.get('ai', 'profiles') or {}
-    except Exception:
-        profiles = {}
-    if key in ('profile', 'name'):
-        profile = profiles.get(value)
-        if isinstance(profile, dict) and bool(profile.get('enabled', True)):
-            return value, profile
-        raise TokeoAiError(f'no enabled ai profile named {value!r}')
-    for name, profile in profiles.items():
-        if not (isinstance(profile, dict) and bool(profile.get('enabled', True))):
-            continue
-        # a selector is either a top-level field (purpose ...) or lives in the
-        # provider options (model, base_url ...)
-        field = profile[key] if key in profile else (profile.get('options') or {}).get(key)
-        if field == value:
-            return name, profile
-    raise TokeoAiError(f'no enabled ai profile with {key}={value!r}')
+
+    class Meta:
+        """Agent composition, overridden per agent by its config entry."""
+
+        # the tool selection (item or group names); merged with the profile's
+        tools = []
+
+        # per-agent step budget; None means use the handler's base default
+        max_steps = None
+
+    def __init__(self, app, *args, **kw):
+        """
+        Initialize the agent.
+
+        ### Args
+
+        - **app**: The Tokeo application instance
+        - ***args**: Positional arguments for the parent initializer
+        - ****kw**: The agent's config entry; keys matching ``Meta`` override
+            its defaults
+
+        """
+        super(TokeoAiAgent, self).__init__(*args, **kw)
+        self.app = app
+
+    def _setup(self, app):
+        """
+        Set up the agent after instantiation.
+
+        ### Args
+
+        - **app**: The Tokeo application instance
+
+        """
+        pass

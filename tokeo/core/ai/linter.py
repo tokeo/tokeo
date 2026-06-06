@@ -18,8 +18,10 @@ from tokeo.core.ai import TokeoAiError
 
 
 # allowed keys per section, so an unknown key (a typo such as ``toolss``) is
-# reported instead of being silently ignored
-_AI_KEYS = {'default', 'profiles', 'tools'}
+# reported instead of being silently ignored. agent contents get their own
+# checks in a later step; the ``defaults`` block is checked here
+_AI_KEYS = {'defaults', 'profiles', 'tools', 'agents'}
+_DEFAULTS_KEYS = {'profile', 'agent'}
 _PROFILE_KEYS = {
     'type', 'purpose', 'tools', 'enabled',
     'native_tools_call', 'tools_parser', 'options',
@@ -84,11 +86,12 @@ class TokeoAiLinter:
         self.issues = []
         tools = self._value('tools') or {}
         profiles = self._value('profiles') or {}
-        default = self._value('default')
+        agents = self._value('agents') or {}
+        defaults = self._value('defaults')
         self._lint_keys('ai', self._section_keys(), _AI_KEYS)
         self._lint_tools(tools)
         self._lint_profiles(profiles, tools)
-        self._lint_default(default, profiles)
+        self._lint_defaults(defaults, profiles, agents)
         return self.issues
 
     def _add(self, path, message, level='error'):
@@ -216,14 +219,27 @@ class TokeoAiLinter:
             if entry not in tool_names:
                 self._add(f'{path}.tools', _unknown('tool or group', entry, tool_names))
 
-    def _lint_default(self, default, profiles):
-        # the default may be omitted if every call selects a profile explicitly,
-        # so a missing default is a warning; a default naming nothing is an error
-        if not default:
-            self._add('ai.default', 'no default profile configured', 'warning')
+    def _lint_defaults(self, defaults, profiles, agents):
+        # the ``defaults`` block names the profile (model) and the agent
+        # (composition) used when a call selects none. both are optional, but
+        # when set must name an existing entry; a missing block is a warning
+        if not defaults:
+            self._add('ai.defaults', 'no default profile or agent configured', 'warning')
             return
-        if isinstance(profiles, dict) and default not in profiles:
-            self._add('ai.default', _unknown('profile', default, set(profiles)))
+        if not isinstance(defaults, dict):
+            self._add('ai.defaults', 'must be a mapping')
+            return
+        self._lint_keys('ai.defaults', defaults, _DEFAULTS_KEYS)
+        profile = defaults.get('profile')
+        if profile:
+            known = set(profiles) if isinstance(profiles, dict) else set()
+            if profile not in known:
+                self._add('ai.defaults.profile', _unknown('profile', profile, known))
+        agent = defaults.get('agent')
+        if agent:
+            known = set(agents) if isinstance(agents, dict) else set()
+            if agent not in known:
+                self._add('ai.defaults.agent', _unknown('agent', agent, known))
 
 
 def _unknown(what, name, known):
