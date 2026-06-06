@@ -26,7 +26,9 @@ class TokeoAiMockProvider(TokeoAiProvider):
     - A trailing ``tool`` message makes the mock answer with the result, which
         closes an agent loop
     - Otherwise, if the first word of the prompt names a provided tool, the
-        mock requests that tool; if not, it replies in plain text
+        mock requests that tool, filling its first declared parameter (a
+        required one if any) with the rest of the prompt; if not, it replies
+        in plain text
 
     """
 
@@ -55,11 +57,16 @@ class TokeoAiMockProvider(TokeoAiProvider):
         for message in messages:
             if isinstance(message, dict) and message.get('role') == 'user':
                 prompt = message.get('content') or ''
-        # if the prompt names an available tool, request that tool
+        # if the prompt names an available tool, request that tool with its
+        # first declared parameter filled from the rest of the prompt
         match = self._match_tool(prompt, tools)
         if match is not None:
-            name, argument = match
-            call = ToolCall(id='call_1', name=name, arguments={'input': argument})
+            spec, argument = match
+            call = ToolCall(
+                id='call_1',
+                name=self._tool_name(spec),
+                arguments=self._tool_arguments(spec, argument),
+            )
             return self._result('', tool_calls=[call], finish_reason='tool_calls')
         # plain reply: a canned answer for ping, an echo otherwise
         if prompt.strip().lower() == 'ping':
@@ -68,13 +75,13 @@ class TokeoAiMockProvider(TokeoAiProvider):
 
     def _match_tool(self, prompt, tools):
         # the first word of the prompt selects a tool when it matches one of
-        # the provided tool names; the rest of the prompt is its input
+        # the provided tool names; the rest of the prompt is its argument value
         if not prompt or not tools:
             return None
         head, _, rest = prompt.strip().partition(' ')
         for tool in tools:
             if self._tool_name(tool) == head:
-                return head, rest.strip()
+                return tool, rest.strip()
         return None
 
     def _tool_name(self, tool):
@@ -88,6 +95,27 @@ class TokeoAiMockProvider(TokeoAiProvider):
             if isinstance(function, dict):
                 return function.get('name')
         return None
+
+    def _tool_params(self, tool):
+        # read the declared parameter names and the required ones from an
+        # openai-style function spec; dicts preserve declaration order
+        schema = {}
+        if isinstance(tool, dict):
+            function = tool.get('function')
+            container = function if isinstance(function, dict) else tool
+            schema = container.get('parameters') or {}
+        properties = schema.get('properties') or {}
+        names = list(properties)
+        required = [name for name in (schema.get('required') or []) if name in properties]
+        return names, required
+
+    def _tool_arguments(self, tool, value):
+        # fill the first declared parameter (a required one if any) with the
+        # prompt remainder, so the mock drives any tool, not only one named
+        # ``input``; a parameterless tool is called with no arguments
+        names, required = self._tool_params(tool)
+        key = required[0] if required else (names[0] if names else None)
+        return {key: value} if key else {}
 
     def _result(self, text, tool_calls=None, finish_reason='stop'):
         # build a ChatResult with deterministic, faked token usage
