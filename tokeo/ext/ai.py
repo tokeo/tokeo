@@ -46,6 +46,7 @@ from tokeo.core.ai import (
     ToolResult,
     find_profile,
 )
+from tokeo.core.ai.linter import TokeoAiLinter
 from tokeo.core.ai.mock import TokeoAiMockProvider
 from tokeo.core.ai.fundi import TokeoAiFundiProvider
 
@@ -189,6 +190,8 @@ class TokeoAi(MetaMixin):
             be imported
 
         """
+        if not isinstance(type_value, str) or not type_value:
+            raise TokeoAiError(f'ai {kind} "type" is missing or not a string')
         if '.' in type_value:
             module_path, _, attr = type_value.rpartition('.')
             if not module_path:
@@ -489,6 +492,28 @@ class AiController(Controller):
             messages.append({'role': 'assistant', 'content': result.text})
             self.app.print(result.text)
 
+    @ex(
+        help='check the ai configuration for typos and broken references',
+        arguments=[
+            (['--strict'], dict(help='treat warnings as failures too', action='store_true', dest='strict')),
+        ],
+    )
+    def lint(self):
+        # report every form and reference problem at once, each with its
+        # ``ai.<section>.<name>`` path; exit non-zero on errors, and on
+        # warnings too when --strict is given
+        issues = TokeoAiLinter(self.app).lint()
+        for issue in issues:
+            self.app.print(f'{issue.level}: {issue.path}: {issue.message}')
+        if not issues:
+            self.app.print('ai config ok')
+            return
+        errors = [issue for issue in issues if issue.level == 'error']
+        warnings = [issue for issue in issues if issue.level == 'warning']
+        self.app.print(f'ai config: {len(errors)} error(s), {len(warnings)} warning(s)')
+        if errors or (self.app.pargs.strict and warnings):
+            self.app.exit_code = 1
+
 
 def ai_extend_app(app):
     """
@@ -514,6 +539,38 @@ def ai_extend_app(app):
     app.ai._setup(app)
 
 
+def ai_lint_on_run(app):
+    """
+    Cement pre-run hook: lint the ai configuration before an ai command.
+
+    Runs inside ``app.run`` (unlike ``post_setup``), so a typo in the ai config
+    surfaces as a clean error through the application's own handler instead of a
+    traceback. It guards only ``ai`` commands and steps aside for ``ai lint``
+    and ``--help``, so the report and the help text stay reachable.
+
+    ### Args
+
+    - **app**: The application instance
+
+    ### Raises
+
+    - **TokeoAiError**: If the configuration has an error-level problem; the
+        message lists every issue (warnings included) and points at ``ai lint``
+
+    """
+    argv = list(app.argv or [])
+    tokens = [arg for arg in argv if not arg.startswith('-')]
+    # only guard ai commands; let --help and the lint command itself through
+    if not tokens or tokens[0] != 'ai':
+        return
+    if '-h' in argv or '--help' in argv or (len(tokens) >= 2 and tokens[1] == 'lint'):
+        return
+    issues = TokeoAiLinter(app).lint()
+    if any(issue.level == 'error' for issue in issues):
+        report = '\n'.join(f'  {issue.level}: {issue.path}: {issue.message}' for issue in issues)
+        raise TokeoAiError(f'invalid ai configuration (run "ai lint" for the full report):\n{report}')
+
+
 def load(app):
     """
     Load the ai extension.
@@ -527,10 +584,13 @@ def load(app):
     - Registers a post_setup hook that creates ``app.ai``, registers the
         built-in providers on it, and sets it up once the configuration is
         available
+    - Registers a pre_run hook that lints the ai configuration before an ai
+        command, so a typo fails with a clean message rather than a traceback
     - A project or third-party provider/tool is named by a dotted ``type`` in
         the config and imported on demand, so it needs no registration and no
         entry in the application extensions
 
     """
     app.hook.register('post_setup', ai_extend_app)
+    app.hook.register('pre_run', ai_lint_on_run)
     app.handler.register(AiController)
