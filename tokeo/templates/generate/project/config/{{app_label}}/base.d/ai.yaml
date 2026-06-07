@@ -23,9 +23,55 @@ ai:
     ### no entry in main.py -- the handler imports it on demand
     calc:
       type: {{ app_label }}.core.ai.tools.calc.TokeoAiCalcTool
+    ### the simplest schema: no arguments; its reply format is a tool
+    ### setting (Meta key), overridable here under "options"
+    current:
+      type: {{ app_label }}.core.ai.tools.current.TokeoAiCurrentTool
+    ### reads text files strictly below base_dir (a tool setting); paths
+    ### that escape it are rejected inside the tool
+    read_file:
+      type: {{ app_label }}.core.ai.tools.read_file.TokeoAiReadFileTool
+      options:
+        base_dir: tmp
+    ### appends a line to the configured file below base_dir -- the writing
+    ### tool, and so the one the "readonly" policy guard below denies
+    append_file:
+      type: {{ app_label }}.core.ai.tools.append_file.TokeoAiAppendFileTool
+      options:
+        base_dir: tmp
+        file: notes.txt
     ### a named group that bundles math-related tools
     mathematics:
       - calc
+    ### a named group that bundles the file tools
+    filesystem:
+      - read_file
+      - append_file
+
+  ### guards form the tool-call pipeline of an agent: a before guard may
+  ### deny a call ahead of execution, an after guard observes the outcome
+  ### (it always runs, so a denial is recorded too). a denied call is not
+  ### executed; the loop continues and the model sees "denied: <reason>",
+  ### so it can correct itself (deny-and-continue). a guard is an item in
+  ### the uniform form: "type" is a built-in short name (validate, policy,
+  ### audit) or a full dotted class path, its settings live under "options"
+  guards:
+    ### checks a call's arguments against the tool's parameters schema
+    ### before it runs (missing required, unknown names, wrong basic types)
+    validate:
+      type: validate
+    ### allow/deny tool calls by name: "deny" always wins; "allow", when
+    ### set, restricts calls to its members. here it shapes what the agent
+    ### may do with the file pair: read yes, write no
+    readonly:
+      type: policy
+      options:
+        deny:
+          - append_file
+    ### logs every outcome (returned, denied, errored) to the app log and
+    ### blocks nothing; the structured trace is on the ChatResult
+    audit:
+      type: audit
 
   ### agents are the composition root: an agent binds the tools and guards
   ### for a task and sets the step budget. the model is not part of the
@@ -55,6 +101,24 @@ ai:
       #   ### consecutive rounds without one successful call before the
       #   ### execution is aborted (0 = unlimited)
       #   max_loops: 3
+
+    ### the guarded composition around the project tools: it may calculate,
+    ### tell the time, and read files, but the policy denies writing; every
+    ### outcome is audited. try, and watch the "ai audit: ..." log lines:
+    ###   {{ app_label }} ai ask "current" --agent mock
+    ###   {{ app_label }} ai ask "read_file notes.txt" --agent mock
+    ###   {{ app_label }} ai ask "append_file hello" --agent mock   # denied by policy
+    mock:
+      type: default
+      options:
+        tools:
+          - mathematics
+          - current
+          - filesystem
+        guards:
+          - readonly
+          - validate
+          - audit
 
   ### named profiles in the uniform form: top-level params (type, purpose,
   ### tools, enabled) plus an "options" block carrying the provider's
