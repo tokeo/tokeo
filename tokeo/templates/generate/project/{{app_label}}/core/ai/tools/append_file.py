@@ -1,12 +1,12 @@
 """
-Read-file tool for the {{ app_name }} ai agent.
+Append-file tool for the {{ app_name }} ai agent.
 
-Reads a text file strictly below a configured base directory, so an agent can
-look things up without roaming the file system: the ``base_dir`` is a tool
-setting from the configuration, and any path that escapes it (an absolute
-path or a ``..`` traversal) is rejected before anything is opened. Reading is
-the harmless half of the file pair; the writing ``append_file`` tool is the
-one a policy guard typically denies.
+Appends a line of text to one configured file below a configured base
+directory -- the writing half of the file pair, and so the natural target for
+a policy guard: an agent that may read should not silently write, and denying
+``append_file`` by name shows action-level governance on a tool that really
+exists. The target ``file`` and the ``base_dir`` are tool settings from the
+configuration; the model only supplies the text.
 
 This module is self-contained: it holds only the tool class. The project names
 it by its full dotted class path under ``ai.tools`` in the config, so it needs
@@ -30,13 +30,13 @@ def _resolve_below(base_dir, path):
     return target
 
 
-class TokeoAiReadFileTool(TokeoAiTool):
+class TokeoAiAppendFileTool(TokeoAiTool):
     """
-    Tool that reads a text file below the configured base directory.
+    Tool that appends a line of text to the configured file.
 
     The ``Meta`` description and parameters are what the model sees; the
-    ``base_dir`` is the tool's own setting, overridden per item by its config
-    ``options`` and read from ``_meta``.
+    ``base_dir`` and the target ``file`` are the tool's own settings,
+    overridden per item by its config ``options`` and read from ``_meta``.
 
     """
 
@@ -44,38 +44,38 @@ class TokeoAiReadFileTool(TokeoAiTool):
         """Tool meta-data sent to the model, plus the tool's own settings."""
 
         # Short description the model sees
-        description = 'read a text file below the configured base directory'
+        description = 'append a line of text to the configured notes file'
 
         # JSON-schema object describing the arguments
         parameters = dict(
             type='object',
-            properties=dict(path=dict(type='string', description='the file path relative to the base directory')),
-            required=['path'],
+            properties=dict(text=dict(type='string', description='the text line to append')),
+            required=['text'],
         )
 
-        # the directory the tool may read from; a tool setting, not
+        # the directory and file the tool may write to; tool settings, not
         # model-facing
         base_dir = 'tmp'
+        file = 'notes.txt'
 
-    def exec(self, path):
+    def exec(self, text):
         """
-        Read the file and return its text content.
+        Append the text as one line to the configured file.
 
         ### Args
 
-        - **path** (str): The file path relative to the base directory
+        - **text** (str): The text line to append
 
         ### Returns
 
-        - **str**: The file content
+        - **str**: A short confirmation naming the file
 
         ### Raises
 
-        - **TokeoAiError**: If the path escapes the base directory or the
-            file does not exist
+        - **TokeoAiError**: If the configured file escapes the base directory
 
         """
-        target = _resolve_below(self._meta.base_dir, path)
-        if not target.is_file():
-            raise TokeoAiError(f'no such file: {str(path)!r}')
-        return target.read_text()
+        target = _resolve_below(self._meta.base_dir, self._meta.file)
+        with open(target, 'a') as handle:
+            handle.write(str(text).rstrip('\n') + '\n')
+        return f'appended to {self._meta.file!r}'
