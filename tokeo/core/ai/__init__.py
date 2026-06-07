@@ -301,14 +301,14 @@ class TokeoAiAgent(MetaMixin):
     ### Notes
 
     : ``Meta`` declares the configurable keys (``tools``, ``guards``,
-        ``max_steps``) with neutral defaults; the ``ai.agents`` entry overrides
-        them at build time (the cement Meta keyword override), and they are
-        read from ``_meta``.
+        ``max_steps``) with neutral defaults; the ``options`` of the
+        ``ai.agents`` entry override them at build time (the cement Meta
+        keyword override), and they are read from ``_meta``.
 
     """
 
     class Meta:
-        """Agent composition, overridden per agent by its config entry."""
+        """Agent composition, overridden per agent by its entry's options."""
 
         # the tool selection (item or group names); merged with the profile's
         tools = []
@@ -358,8 +358,9 @@ class TokeoAiGuard(MetaMixin):
     (``agent.guards``); with none selected the loop calls the tool directly.
 
     Its class is resolved from the ``ai.guards`` item ``type`` (a built-in
-    short name or a dotted path) and instantiated with the application by the
-    ``app.ai`` handler. Like a provider, it holds no mutable per-call state.
+    short name or a dotted path) and instantiated with the application and the
+    item's ``options`` as Meta overrides by the ``app.ai`` handler. Like a
+    provider, it holds no mutable per-call state.
 
     """
 
