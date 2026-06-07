@@ -165,8 +165,8 @@ class TokeoAiLinter:
 
     def _validate_agent_options(self, section, name, item):
         # the base agent's known option keys: the tools selection points into
-        # ``ai.tools``, the guards selection into ``ai.guards``, and the step
-        # budget is a number; other keys may be a custom agent's own Meta keys
+        # ``ai.tools``, the guards selection into ``ai.guards``, and the
+        # budgets are numbers; other keys may be a custom agent's own Meta keys
         if not isinstance(item, dict):
             return
         options = item.get('options')
@@ -184,9 +184,10 @@ class TokeoAiLinter:
                 for entry in guards:
                     if entry not in known:
                         self._add(f'{path}.guards', _unknown('guard', entry, known))
-        max_steps = options.get('max_steps')
-        if max_steps is not None and not isinstance(max_steps, int):
-            self._add(f'{path}.max_steps', 'must be a number of model calls')
+        for key in ('max_steps', 'max_loops'):
+            value = options.get(key)
+            if value is not None and not isinstance(value, int):
+                self._add(f'{path}.{key}', 'must be a number (0 = unlimited)')
 
     def _add(self, path, message, level='error'):
         self.issues.append(AiLintIssue(path, message, level))

@@ -105,9 +105,13 @@ class TokeoAi(MetaMixin):
         # Configuration section name in the application config
         config_section = 'ai'
 
-        # base step budget for the loop when neither the call nor the selected
-        # agent sets one; the single home for this default
-        max_steps = 1
+        # base budgets for the loop when neither the call nor the selected
+        # agent sets one; the single home for these defaults. max_steps caps
+        # the tool rounds of one request (0 = unlimited); max_loops caps the
+        # consecutive rounds without one successful call (0 = unlimited), so
+        # a model stuck on denied or failing calls is stopped
+        max_steps = 0
+        max_loops = 3
 
         # Default configuration settings
         config_defaults = dict(
@@ -349,15 +353,18 @@ class TokeoAi(MetaMixin):
 
     def _tool(self, name):
         # instantiate the tool configured under ``ai.tools[name]`` once and
-        # reuse it; its ``type`` (a built-in short name or a full dotted path)
-        # resolves to a class. the same statelessness argument as for
-        # providers applies
+        # reuse it; the item has the uniform form: ``type`` (a built-in short
+        # name or a full dotted path) resolves to a class, built with the
+        # application and the item's ``options`` as keyword arguments (the
+        # keys override the tool's Meta defaults, like an agent or a guard).
+        # the same statelessness argument as for providers applies
         obj = self._tool_objs.get(name)
         if obj is None:
             item = self._tool_items.get(name)
             if not item or not item.get('type'):
                 raise TokeoAiError(f'ai tool {name!r} is not configured under ai.tools')
-            obj = self.resolve('tool', item['type'])(self.app)
+            settings = item.get('options') or {}
+            obj = self.resolve('tool', item['type'])(self.app, **settings)
             obj._setup(self.app)
             self._tool_objs[name] = obj
         return obj
@@ -490,17 +497,21 @@ class TokeoAi(MetaMixin):
             return f'error: {invocation.error}'
         return invocation.result.text if invocation.result is not None else ''
 
-    def chat(self, messages, tools=None, profile=None, model=None, purpose=None, agent=None, max_steps=None):
+    def chat(self, messages, tools=None, profile=None, model=None, purpose=None, agent=None, max_steps=None, max_loops=None):
         """
         Run the agent loop and return the final ``ChatResult``.
 
         Resolves a profile (the model), then calls the provider. The active
         tools are the union of the profile's own tools and the agent's tools
-        (the agent, the composition root, also sets the step budget). While
-        the model asks for tool calls, the activated tools are executed and
-        their results are fed back, until the model answers or ``max_steps``
-        is reached. With no activated tool the loop degrades to a single,
-        plain call.
+        (the agent, the composition root, also sets the budgets). While the
+        model asks for tool calls, the activated tools are executed and their
+        results are fed back, until the model answers. With no activated tool
+        the loop degrades to a single, plain call.
+
+        Two budgets bound the loop and abort it with an error when reached:
+        ``max_steps`` caps the tool rounds of one request, ``max_loops`` caps
+        the consecutive rounds without one successful call (a model stuck on
+        denied or failing calls). ``0`` means unlimited.
 
         ### Args
 
@@ -512,8 +523,11 @@ class TokeoAi(MetaMixin):
         - **purpose** (str | None): Select the first enabled profile by purpose
         - **agent** (str | None): Select an agent by name; defaults to the
             configured ``ai.defaults.agent`` when one is set
-        - **max_steps** (int | None): Maximum model calls before giving up;
+        - **max_steps** (int | None): Maximum tool rounds, 0 for unlimited;
             defaults to the agent's budget, otherwise the framework default
+        - **max_loops** (int | None): Maximum consecutive rounds without one
+            successful call, 0 for unlimited; defaults to the agent's budget,
+            otherwise the framework default
 
         ### Returns
 
@@ -521,7 +535,8 @@ class TokeoAi(MetaMixin):
 
         ### Raises
 
-        - **TokeoAiError**: If no profile resolves or it carries no ``type``
+        - **TokeoAiError**: If no profile resolves or it carries no ``type``,
+            or when a budget aborts the execution
 
         """
         name, profile = self._resolve(profile=profile, model=model, purpose=purpose)
@@ -543,10 +558,13 @@ class TokeoAi(MetaMixin):
             if agent_obj is not None:
                 requested = requested + list(agent_obj._meta.tools)
         if max_steps is None:
-            # the agent's own budget wins; without one (None) the handler's
-            # base default (Meta.max_steps) applies
+            # the agent's own budgets win; without one (None) the handler's
+            # base defaults (Meta.max_steps / Meta.max_loops) apply
             budget = agent_obj._meta.max_steps if agent_obj is not None else None
             max_steps = budget if budget is not None else self._meta.max_steps
+        if max_loops is None:
+            budget = agent_obj._meta.max_loops if agent_obj is not None else None
+            max_loops = budget if budget is not None else self._meta.max_loops
         specs = self._tool_specs(self._resolve_tools(requested))
         # guards (selected on the agent) wrap each tool call; with none, the
         # loop calls the tool directly, exactly as before, and collects no
@@ -556,21 +574,45 @@ class TokeoAi(MetaMixin):
         after_guards = [guard for guard in guards if guard._meta.phase == 'after']
         trace = []
         messages = list(messages)
+        steps = 0
+        failed_loops = 0
         result = provider.chat(profile, messages, tools=specs)
-        for _ in range(max_steps):
-            if not result.tool_calls:
-                result.trace = trace
-                return result
+        while result.tool_calls:
+            # max_steps caps the tool rounds of one request; 0 is unlimited.
+            # reaching it aborts loudly: a silent empty answer hides the cause
+            if max_steps and steps >= max_steps:
+                raise TokeoAiError(f'ai max_steps ({max_steps}) reached, execution aborted')
             messages.append(self._assistant_turn(result))
+            succeeded = False
             for call in result.tool_calls:
                 if guards:
                     content = self._run_guarded(call, before_guards, after_guards, trace)
+                    last = trace[-1]
+                    ok = last.decision != 'deny' and last.error is None
                 else:
-                    output = self._tool(call.name).exec(**(call.arguments or {}))
-                    # a tool may return a ToolResult or a plain string; only the
-                    # model-facing text goes back into the message history
-                    content = output.text if isinstance(output, ToolResult) else str(output)
+                    # the lean path is as resilient as the guard pipeline: an
+                    # unknown or failing tool becomes feedback the model may
+                    # correct itself on, instead of an exception killing the
+                    # whole loop
+                    try:
+                        output = self._tool(call.name).exec(**(call.arguments or {}))
+                        # a tool may return a ToolResult or a plain string;
+                        # only the model-facing text goes back into the history
+                        content = output.text if isinstance(output, ToolResult) else str(output)
+                        ok = True
+                    except Exception as err:
+                        content = f'error: {type(err).__name__}: {err}'
+                        ok = False
+                succeeded = succeeded or ok
                 messages.append({'role': 'tool', 'tool_call_id': call.id, 'content': content})
+            steps += 1
+            # max_loops caps the consecutive rounds without one successful
+            # call (every call denied or failing); 0 is unlimited. this stops
+            # a model stuck repeating broken calls, while any successful call
+            # resets the counter and lets honest work continue
+            failed_loops = 0 if succeeded else failed_loops + 1
+            if max_loops and failed_loops >= max_loops:
+                raise TokeoAiError(f'ai max_loops ({max_loops}) reached, execution aborted')
             result = provider.chat(profile, messages, tools=specs)
         result.trace = trace
         return result

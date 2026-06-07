@@ -9,11 +9,9 @@ relies on, so the loop can be shown and built without a real model:
 - a tool call when the prompt names an available tool, and
 - a final answer once a tool result comes back.
 
-For multi-step flows it also takes a fixed ``script`` from the profile options
-(an ordered list of steps, each a tool call or a final answer), so a test can
-drive an exact sequence with explicit arguments. The reply is a pure function
-of the input, so the same messages always produce the same result, and the
-``[mock]`` marker keeps it obvious that no real model was involved.
+The reply is a pure function of the input, so the same messages always produce
+the same result, and the ``[mock]`` marker keeps it obvious that no real model
+was involved.
 """
 
 from tokeo.core.ai import TokeoAiProvider, ChatResult, ToolCall, Usage
@@ -25,10 +23,6 @@ class TokeoAiMockProvider(TokeoAiProvider):
 
     ### Notes
 
-    - With a ``script`` in the profile options, the mock follows that fixed
-        sequence of steps instead of the heuristic below; the step is chosen
-        by how many tool results have come back, so it stays deterministic and
-        robust to a denied or failed call (each still advances the position)
     - A trailing ``tool`` message makes the mock answer with the result, which
         closes an agent loop
     - Otherwise, if the first word of the prompt names a provided tool, the
@@ -54,11 +48,6 @@ class TokeoAiMockProvider(TokeoAiProvider):
 
         """
         messages = messages or []
-        # a fixed script in the profile options takes over: follow it step by
-        # step, deterministically, ignoring the heuristic below
-        script = (profile.get('options') or {}).get('script')
-        if script:
-            return self._scripted(script, messages)
         # a tool result on top closes the loop: answer with that result
         last = messages[-1] if messages else {}
         if isinstance(last, dict) and last.get('role') == 'tool':
@@ -83,27 +72,6 @@ class TokeoAiMockProvider(TokeoAiProvider):
         if prompt.strip().lower() == 'ping':
             return self._result('pong')
         return self._result(f'[mock] {prompt}' if prompt else '[mock] (no prompt)')
-
-    def _scripted(self, script, messages):
-        # pick the step by how many tool results have already come back, so
-        # the mock holds no state and the position is robust: a denied or
-        # failed call still yields one tool message, advancing by one. a
-        # ``tool`` step requests that call with explicit args; a ``say`` step
-        # is the final answer; an exhausted script ends plainly
-        done = sum(1 for message in messages if isinstance(message, dict) and message.get('role') == 'tool')
-        if done >= len(script):
-            return self._result('[mock] done')
-        step = script[done] or {}
-        if 'say' in step:
-            return self._result(str(step['say']))
-        if 'tool' in step:
-            call = ToolCall(
-                id=f'call_{done + 1}',
-                name=step['tool'],
-                arguments=dict(step.get('args') or {}),
-            )
-            return self._result('', tool_calls=[call], finish_reason='tool_calls')
-        return self._result('[mock] (empty step)')
 
     def _match_tool(self, prompt, tools):
         # the first word of the prompt selects a tool when it matches one of

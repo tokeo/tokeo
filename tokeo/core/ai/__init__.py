@@ -231,11 +231,13 @@ class TokeoAiTool(MetaMixin):
     Base class for agent tools.
 
     A tool's class is resolved from its ``ai.tools`` item ``type`` (a built-in
-    short name or a dotted path) and instantiated with the application by the
-    ``app.ai`` handler, so it can read configuration, use ``app.db``, the
-    vault, and hold resources. ``Meta`` declares the ``description`` and the
-    JSON-schema ``parameters`` sent to the model; a subclass overrides those
-    keys and ``exec`` does the work. The handler reads them from ``_meta``.
+    short name or a dotted path) and instantiated with the application and the
+    item's ``options`` as Meta overrides by the ``app.ai`` handler, so it can
+    read configuration, use ``app.db``, the vault, and hold resources.
+    ``Meta`` declares the ``description`` and the JSON-schema ``parameters``
+    sent to the model, plus any setting of the tool's own (overridden per
+    item by its ``options``); a subclass overrides those keys and ``exec``
+    does the work. The handler reads them from ``_meta``.
 
     """
 
@@ -305,7 +307,7 @@ class TokeoAiAgent(MetaMixin):
     ### Notes
 
     : ``Meta`` declares the configurable keys (``tools``, ``guards``,
-        ``max_steps``) with neutral defaults; the ``options`` of the
+        ``max_steps``, ``max_loops``) with neutral defaults; the ``options`` of the
         ``ai.agents`` entry override them at build time (the cement Meta
         keyword override), and they are read from ``_meta``.
 
@@ -320,8 +322,13 @@ class TokeoAiAgent(MetaMixin):
         # the guard selection (guard names) for the tool-call pipeline
         guards = []
 
-        # per-agent step budget; None means use the handler's base default
+        # per-agent cap on tool rounds (0 = unlimited); None means use the
+        # handler's base default
         max_steps = None
+
+        # per-agent cap on consecutive rounds without one successful call
+        # (0 = unlimited); None means use the handler's base default
+        max_loops = None
 
     def __init__(self, app, *args, **kw):
         """

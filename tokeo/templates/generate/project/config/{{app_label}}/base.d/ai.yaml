@@ -50,8 +50,11 @@ ai:
       #   ### guards forming this agent's tool-call pipeline (see ai.guards)
       #   guards:
       #     - audit
-      #   ### model calls the loop may take before giving up (optional)
-      #   max_steps: 6
+      #   ### maximum tool rounds for one request (0 = unlimited)
+      #   max_steps: 0
+      #   ### consecutive rounds without one successful call before the
+      #   ### execution is aborted (0 = unlimited)
+      #   max_loops: 3
 
   ### named profiles in the uniform form: top-level params (type, purpose,
   ### tools, enabled) plus an "options" block carrying the provider's
