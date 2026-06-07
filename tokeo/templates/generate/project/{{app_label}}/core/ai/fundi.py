@@ -15,9 +15,9 @@ produces the same output. The version is selected through the profile's
 - it extracts arguments by the tool's ``parameters`` schema (ISO dates
     ``YYYY-MM-DD``, plain integers, or -- for a tool with a single required
     string -- the request remainder after the tool name),
-- it resolves the time words today/now/tonight (and the German heute/jetzt)
-    through an available current-date tool and chains at most two calls,
-    feeding the first result into the second,
+- it resolves the time words today/now/tonight/current (and the German
+    heute/jetzt/aktuell) through an available current-date tool and chains
+    at most two calls, feeding the first result into the second,
 - it never invents arguments: a matched tool whose required arguments
     cannot be filled from the request is dropped, and on ``denied:`` or
     ``error:`` feedback it answers with the reason instead of retrying.
@@ -39,7 +39,7 @@ from tokeo.core.ai import TokeoAiProvider, ChatResult, ToolCall, Usage
 
 # the model's tiny language knowledge: words that mean "the current date",
 # resolved through an available current-date tool (the time-word bridge)
-_TIME_WORDS = {'today', 'now', 'tonight', 'heute', 'jetzt'}
+_TIME_WORDS = {'today', 'now', 'tonight', 'current', 'heute', 'jetzt', 'aktuell'}
 
 # schema property names (or descriptions mentioning "date") treated as dates
 _DATE_NAMES = {'date', 'start', 'end', 'from', 'to'}
@@ -169,7 +169,7 @@ class TokeoAiFundiProvider(TokeoAiProvider):
         plan = []
         bridge = False
         for _, name, function in matched[:2]:
-            arguments, missing_date = self._arguments(name, function, request, dates, numbers, bool(plan))
+            arguments, missing_date = self._arguments(name, function, request, dates, numbers)
             if arguments is None:
                 # never invent arguments: an unfillable tool is dropped, the
                 # validate guard stays the safety net for real models
@@ -178,16 +178,18 @@ class TokeoAiFundiProvider(TokeoAiProvider):
                 bridge = True
             plan.append((name, arguments))
         if bridge:
-            current = self._current_tool(tools, plan)
+            current = self._current_tool(tools)
             if current:
-                # the time-word bridge: resolve "today" through the current
-                # tool first and feed its result into the planned call
+                # the time-word bridge: resolve "today"/"current" through
+                # the current-date tool first and feed its result into the
+                # dependent call; an already planned resolver moves to front
+                plan = [step for step in plan if step[0] != current]
                 plan.insert(0, (current, {}))
         # an unresolved placeholder without the bridge cannot run; drop it
         plan = [step for index, step in enumerate(plan) if _PREV not in step[1].values() or index > 0]
         return plan[:2]
 
-    def _arguments(self, name, function, request, dates, numbers, chained):
+    def _arguments(self, name, function, request, dates, numbers):
         # fill the schema properties in their declared order from the typed
         # values found in the request; required ones must all resolve
         properties = ((function.get('parameters') or {}).get('properties')) or {}
@@ -219,20 +221,16 @@ class TokeoAiFundiProvider(TokeoAiProvider):
         for key in required:
             if key not in arguments:
                 return None, False
-        if missing_date and chained:
-            # only the first planned tool may lean on the time-word bridge
-            return None, False
         return arguments, missing_date
 
-    def _current_tool(self, tools, plan):
+    def _current_tool(self, tools):
         # the zero-required-arg tool that tells the current date, by spec
-        planned = {name for name, _ in plan}
         for spec in tools:
             function = (spec or {}).get('function') or {}
             name = function.get('name') or ''
             required = ((function.get('parameters') or {}).get('required')) or []
             evidence = _words(function.get('description')) | {name.lower()}
-            if name and name not in planned and not required and evidence & {'current', 'time', 'date'}:
+            if name and not required and evidence & {'current', 'time', 'date'}:
                 return name
         return None
 

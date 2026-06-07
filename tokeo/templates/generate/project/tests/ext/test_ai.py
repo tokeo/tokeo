@@ -123,6 +123,13 @@ def test_{{ app_label }}_ai_fundi_calendar():
         chained = app.ai.chat([{'role': 'user', 'content': 'count the days from today until 2026-12-24'}], profile='fundi')
         assert chained.text == f'[fundi0.1] date_diff: {days}'
         assert chained.raw['plan'] == ['current', 'date_diff']
+        # "current" counts as a time word too: the bridge reorders the
+        # resolver to the front and chains the dependent call behind it
+        import calendar as calendar_names
+        name = calendar_names.day_name[date.today().weekday()]
+        bridged = app.ai.chat([{'role': 'user', 'content': 'weekday of current'}], profile='fundi')
+        assert bridged.text == f'[fundi0.1] weekday: {name}'
+        assert bridged.raw['plan'] == ['current', 'weekday']
         # under the guarded mock agent the readonly policy still rules: the
         # model asks for the writing tool, the guard denies, fundi explains
         denied = app.ai.ask('append_file remember the milk', profile='fundi', agent='mock')
