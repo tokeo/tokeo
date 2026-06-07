@@ -151,6 +151,9 @@ class Invocation:
     - **id** (str): The provider-assigned tool-call id, echoed in the result
     - **name** (str): The tool the model wants to call
     - **arguments** (dict): The parsed arguments for the call
+    - **parameters** (dict | None): The called tool's declared parameters
+        schema, attached by the handler so a before guard can validate the
+        arguments; ``None`` when the tool is unknown
     - **decision** (str): ``allow`` or ``deny``; a before guard may set it
     - **reason** (str | None): Why a guard denied or flagged the call
     - **result** (ToolResult | None): The tool's result when it ran
@@ -161,6 +164,7 @@ class Invocation:
     id: str
     name: str
     arguments: dict = field(default_factory=dict)
+    parameters: dict | None = None
     decision: str = 'allow'
     reason: str | None = None
     result: ToolResult | None = None

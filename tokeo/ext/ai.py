@@ -72,6 +72,7 @@ from tokeo.core.ai import (
 )
 from tokeo.core.ai.audit import TokeoAiAuditGuard
 from tokeo.core.ai.policy import TokeoAiPolicyGuard
+from tokeo.core.ai.validate import TokeoAiValidateGuard
 from tokeo.core.ai.linter import TokeoAiLinter
 from tokeo.core.ai.mock import TokeoAiMockProvider
 from tokeo.core.ai.fundi import TokeoAiFundiProvider
@@ -460,6 +461,13 @@ class TokeoAi(MetaMixin):
         # deny it, the tool runs unless denied, and the after guards always run
         # (so a denial is recorded too). every outcome is appended to the trace
         invocation = Invocation(id=call.id, name=call.name, arguments=dict(call.arguments or {}))
+        # attach the tool's declared schema so a before guard can validate
+        # the arguments; an unknown tool leaves it None and still errors at
+        # exec below, exactly as without guards
+        try:
+            invocation.parameters = self._tool(invocation.name)._meta.parameters
+        except TokeoAiError:
+            pass
         for guard in before_guards:
             guard.check(invocation)
             if invocation.decision == 'deny':
@@ -733,6 +741,8 @@ def ai_extend_app(app):
     app.ai.register('guard', 'audit', TokeoAiAuditGuard)
     # built-in guard: the baseline policy guard (allow/deny by tool name)
     app.ai.register('guard', 'policy', TokeoAiPolicyGuard)
+    # built-in guard: the argument-schema check before a tool runs
+    app.ai.register('guard', 'validate', TokeoAiValidateGuard)
     app.ai._setup(app)
 
 
