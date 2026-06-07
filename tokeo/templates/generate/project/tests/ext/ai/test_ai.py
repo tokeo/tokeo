@@ -106,3 +106,36 @@ def test_{{ app_label }}_ai_validate_guard_checks_arguments():
         guard.check(invocation)
         assert invocation.decision == 'deny'
         assert "missing required argument 'input'" in invocation.reason
+
+
+def test_{{ app_label }}_ai_fundi_calendar():
+    # the in-process fundi 0.1 micro model drives the calendar toolset: it
+    # reads the injected specs, extracts iso dates by schema, resolves
+    # "today" through the current tool (a real two-step chain), and answers
+    # a denial with the reason instead of retrying
+    from datetime import date
+    with {{ app_class_name }}AiTestApp() as app:
+        assert app.ai.ask('weekday of 2026-12-24', profile='fundi') == '[fundi0.1] weekday: Thursday'
+        assert app.ai.ask('week_number of 2026-12-24', profile='fundi') == '[fundi0.1] week_number: 52'
+        assert app.ai.ask('add_days 90 onto 2026-06-07', profile='fundi') == '[fundi0.1] add_days: 2026-09-05'
+        assert app.ai.ask('moon_phase on 2000-01-06', profile='fundi') == '[fundi0.1] moon_phase: new moon'
+        days = (date(2026, 12, 24) - date.today()).days
+        chained = app.ai.chat([{'role': 'user', 'content': 'count the days from today until 2026-12-24'}], profile='fundi')
+        assert chained.text == f'[fundi0.1] date_diff: {days}'
+        assert chained.raw['plan'] == ['current', 'date_diff']
+        # under the guarded mock agent the readonly policy still rules: the
+        # model asks for the writing tool, the guard denies, fundi explains
+        denied = app.ai.ask('append_file remember the milk', profile='fundi', agent='mock')
+        assert denied == "[fundi0.1] not permitted: tool 'append_file' is not permitted by policy"
+
+
+def test_{{ app_label }}_ai_fundi_model():
+    # the project owns its micro model, so the project verifies its
+    # documented behavior: spec matching, honest no-match, honest failure
+    with {{ app_class_name }}AiTestApp() as app:
+        # two description keywords match anywhere in the request
+        assert app.ai.ask('count the days between 2026-06-07 and 2026-07-07', profile='fundi') == '[fundi0.1] date_diff: 30'
+        # nothing matched, nothing invented: the labelled echo answers
+        assert app.ai.ask('sing me a song', profile='fundi') == '[fundi0.1] sing me a song'
+        # a failing tool ends with the reason instead of a retry
+        assert app.ai.ask('add_days 90 onto 2026-13-99', profile='fundi').startswith('[fundi0.1] failed: ')

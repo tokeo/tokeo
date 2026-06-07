@@ -7,8 +7,7 @@ agentic and ai-facing side. An extension registers its own provider, tool,
 agent, or guard via ``app.ai.register`` (for example in a ``post_setup`` hook).
 
 The technical namespace and the command group are both ``ai`` (this module,
-the ``tokeo.core.ai`` package, and the ``ai`` config section). ``fundi`` is
-the built-in local model.
+the ``tokeo.core.ai`` package, and the ``ai`` config section).
 
 Every configured component is an item in the uniform form ``{type, options}``:
 ``type`` names the class (a built-in short name or a dotted path), ``options``
@@ -75,7 +74,6 @@ from tokeo.core.ai.policy import TokeoAiPolicyGuard
 from tokeo.core.ai.validate import TokeoAiValidateGuard
 from tokeo.core.ai.linter import TokeoAiLinter
 from tokeo.core.ai.mock import TokeoAiMockProvider
-from tokeo.core.ai.fundi import TokeoAiFundiProvider
 
 
 class TokeoAi(MetaMixin):
@@ -771,11 +769,11 @@ def ai_extend_app(app):
 
     """
     app.extend('ai', TokeoAi(app))
-    # built-in providers, available by short name without any configuration:
-    # mock is the neutral test double, fundi the application's own local model.
-    # core ships no tools; a project names its own tools by a dotted ``type``
+    # built-in provider, available by short name without any configuration:
+    # mock is the neutral test double the framework needs for its own loop.
+    # core ships no tools and no domain models; a project names its own
+    # tools and providers by a dotted ``type``
     app.ai.register('provider', 'mock', TokeoAiMockProvider)
-    app.ai.register('provider', 'fundi', TokeoAiFundiProvider)
     # built-in agent: the default composition root; a project configures its
     # agents under ``ai.agents`` and selects one per call or via defaults.agent
     app.ai.register('agent', 'default', TokeoAiAgent)

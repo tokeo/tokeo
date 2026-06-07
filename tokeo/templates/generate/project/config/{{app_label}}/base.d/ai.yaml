@@ -2,9 +2,10 @@
 ###
 ### Named profiles for chat-completion models. {{ app_name }} talks to an
 ### OpenAI-compatible endpoint that you run yourself (Ollama, llama.cpp, vLLM,
-### MLX); the built-in fundi model needs no server and is handy for tests and
-### demos. A profile is selected by name, or by a field such as model or
-### purpose; a profile with "enabled: false" is hidden for the session.
+### MLX); the project's own fundi micro model (core/ai/fundi.py) needs no
+### server and is handy for tests and demos. A profile is selected by name,
+### or by a field such as model or purpose; a profile with "enabled: false"
+### is hidden for the session.
 ai:
   ### selection used when a command (for example "ai ask") names none:
   ### "profile" is the model, "agent" the composition (tools, and later
@@ -43,10 +44,32 @@ ai:
     ### a named group that bundles math-related tools
     mathematics:
       - calc
+    ### the calendar toolset the fundi micro model drives; every tool takes
+    ### strict iso dates (YYYY-MM-DD) -- understanding looser language is
+    ### the model's job, not the tool's
+    date_diff:
+      type: {{ app_label }}.core.ai.tools.date_diff.TokeoAiDateDiffTool
+    add_days:
+      type: {{ app_label }}.core.ai.tools.add_days.TokeoAiAddDaysTool
+    weekday:
+      type: {{ app_label }}.core.ai.tools.weekday.TokeoAiWeekdayTool
+    week_number:
+      type: {{ app_label }}.core.ai.tools.week_number.TokeoAiWeekNumberTool
+    moon_phase:
+      type: {{ app_label }}.core.ai.tools.moon_phase.TokeoAiMoonPhaseTool
     ### a named group that bundles the file tools
     filesystem:
       - read_file
       - append_file
+    ### a named group that bundles the calendar tools (current resolves the
+    ### time words today/now for the fundi model)
+    calendar:
+      - current
+      - date_diff
+      - add_days
+      - weekday
+      - week_number
+      - moon_phase
 
   ### guards form the tool-call pipeline of an agent: a before guard may
   ### deny a call ahead of execution, an after guard observes the outcome
@@ -113,7 +136,7 @@ ai:
       options:
         tools:
           - mathematics
-          - current
+          - calendar
           - filesystem
         guards:
           - readonly
@@ -137,6 +160,22 @@ ai:
       ### "ai ask calc 2 + 3" works
       tools:
         - mathematics
+
+    ### the application's own local micro model: in-process, no server, no
+    ### network, deterministic. fundi0.1 reads the injected tool specs,
+    ### extracts arguments by schema (iso dates, integers), resolves the
+    ### time words today/now through the current tool, and chains at most
+    ### two calls. try it (add --agent mock for the guarded pipeline):
+    ###   {{ app_label }} ai ask "weekday of 2026-12-24" --profile fundi
+    ###   {{ app_label }} ai ask "moon_phase on 2026-06-07" --profile fundi
+    ###   {{ app_label }} ai ask "count the days from today until 2026-12-24" --profile fundi
+    fundi:
+      type: {{ app_label }}.core.ai.fundi.TokeoAiFundiProvider
+      purpose: calendar
+      options:
+        model: fundi0.1
+      tools:
+        - calendar
 
     ### a local, OpenAI-compatible server you run yourself
     # assistant:
