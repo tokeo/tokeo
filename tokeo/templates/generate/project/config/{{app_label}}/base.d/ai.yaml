@@ -1,9 +1,9 @@
-### ### {{ app_name }} AI / Fundi configuration
+### ### Spiral AI / Fundi configuration
 ###
-### Named profiles for chat-completion models. {{ app_name }} talks to an
+### Named profiles for chat-completion models. Spiral talks to an
 ### OpenAI-compatible endpoint that you run yourself (Ollama, llama.cpp, vLLM,
-### MLX); the project's own fundi micro model (core/ai/fundi.py) needs no
-### server and is handy for tests and demos. A profile is selected by name,
+### MLX); the project's own trained fundi micro model (core/ai/fundi.py
+### and app/fundi) needs no server at all. A profile is selected by name,
 ### or by a field such as model or purpose; a profile with "enabled: false"
 ### is hidden for the session.
 ai:
@@ -12,7 +12,7 @@ ai:
   ### guards). either may be omitted; a call can still pick one explicitly
   defaults:
     profile: mock
-    agent: main
+    agent: null
 
   ### the configured toolset, in the uniform form used across the ai config:
   ### a dict value is an item ("type" names the class -- a built-in short
@@ -105,33 +105,37 @@ ai:
   ### of a call are the selected profile's tools and the agent's tools
   ### combined (deduplicated)
   agents:
-    ### the default composition root, selected via defaults.agent above
-    main:
+    ### the default composition root, selected via defaults.agent above:
+    ### it governs nothing, but it observes everything -- the audit guard
+    ### gives every request the "ai audit: ..." log lines and the full
+    ### structured trace on the ChatResult, with honest semantics (a
+    ### pipeline ran; one that denies nothing)
+    audited:
       ### built-in agent type; no custom class needed
       type: default
       ### the agent's settings (its Meta keys)
-      # options:
-      #   ### tools this agent contributes, combined with the selected
-      #   ### profile's own tools (deduplicated). left empty here -- the mock
-      #   ### profile below already activates the mathematics group
-      #   tools:
-      #     - mathematics
-      #   ### guards forming this agent's tool-call pipeline (see ai.guards)
-      #   guards:
-      #     - audit
-      #   ### maximum tool rounds for one request (0 = unlimited)
-      #   max_steps: 0
-      #   ### consecutive rounds without one successful call before the
-      #   ### execution is aborted (0 = unlimited)
-      #   max_loops: 3
+      options:
+        ### guards forming this agent's tool-call pipeline (see ai.guards)
+        guards:
+          - audit
+        ### further settings an agent may take:
+        ### tools this agent contributes, combined with the selected
+        ### profile's own tools (deduplicated)
+        # tools:
+        #   - mathematics
+        ### maximum tool rounds for one request (0 = unlimited)
+        # max_steps: 0
+        ### consecutive rounds without one successful call before the
+        ### execution is aborted (0 = unlimited)
+        # max_loops: 3
 
     ### the guarded composition around the project tools: it may calculate,
     ### tell the time, and read files, but the policy denies writing; every
-    ### outcome is audited. try, and watch the "ai audit: ..." log lines:
-    ###   {{ app_label }} ai ask "current" --agent mock
-    ###   {{ app_label }} ai ask "read_file notes.txt" --agent mock
-    ###   {{ app_label }} ai ask "append_file hello" --agent mock   # denied by policy
-    mock:
+    ### outcome is audited. try, and watch the denial:
+    ###   {{ app_label }} ai ask "current" --agent guarded
+    ###   {{ app_label }} ai ask "read_file notes.txt" --agent guarded
+    ###   {{ app_label }} ai ask "append_file hello" --agent guarded   # denied by policy
+    guarded:
       type: default
       options:
         tools:
@@ -161,19 +165,17 @@ ai:
       tools:
         - mathematics
 
-    ### the application's own local micro model: in-process, no server, no
-    ### network, deterministic. fundi0.1 reads the injected tool specs,
-    ### extracts arguments by schema (iso dates, integers), resolves the
-    ### time words today/now through the current tool, and chains at most
-    ### two calls. try it (add --agent mock for the guarded pipeline):
-    ###   {{ app_label }} ai ask "weekday of 2026-12-24" --profile fundi
-    ###   {{ app_label }} ai ask "moon_phase on 2026-06-07" --profile fundi
-    ###   {{ app_label }} ai ask "count the days from today until 2026-12-24" --profile fundi
+    ### the project's own micro language model (the lab and the weights
+    ### live in {{ app_label }}/app/fundi): trained from scratch on the project's
+    ### synthetic calendar data, it plans real tool chains -- also nested
+    ### requests like "the weekday of today plus 2 days" -- and runs
+    ### in-process with plain numpy, no server. train-first: create the
+    ### weights once with "make fundi-train", then try:
+    ###   {{ app_label }} ai ask "der wochentag von heute plus 14 tagen" --profile fundi
+    ###   {{ app_label }} ai ask "weekday of 2026-12-24" --profile fundi --json
     fundi:
       type: {{ app_label }}.core.ai.fundi.TokeoAiFundiProvider
       purpose: calendar
-      options:
-        model: fundi0.1
       tools:
         - calendar
 

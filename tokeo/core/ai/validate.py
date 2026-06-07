@@ -19,7 +19,7 @@ ai:
   guards:
     validate: { type: validate }
   agents:
-    main:
+    audited:
       type: default
       options:
         guards: [validate, audit]

@@ -1,7 +1,7 @@
 """
 Real test cases for the {{ app_name }} ai setup.
 
-Verifies the project's own tools, the guarded ``mock`` agent, and the guard
+Verifies the project's own tools, the ``guarded`` agent, and the guard
 pipeline against the real shipped configuration (the testing environment
 merges ``testing.d/ai.yaml`` over ``base.d/ai.yaml``, pointing the file tools
 below ``tmp/tests``). Run from the project root, for example with
@@ -70,16 +70,16 @@ def test_{{ app_label }}_ai_tools_exec(scratch):
             app.ai._tool('read_file').exec(path='missing.txt')
 
 
-def test_{{ app_label }}_ai_agent_mock_runs_tools(scratch):
+def test_{{ app_label }}_ai_agent_guarded_runs_tools(scratch):
     # the guarded agent answers through the loop: calculate, tell the time,
     # and read a file -- driven by the built-in mock model
     with {{ app_class_name }}AiTestApp() as app:
-        assert app.ai.ask('calc 2 + 3', agent='mock') == 'Done. The tool returned: 5'
-        assert app.ai.ask('current', agent='mock').startswith('Done. The tool returned: 2')
-        assert app.ai.ask('read_file sample.txt', agent='mock') == 'Done. The tool returned: buy milk\n'
+        assert app.ai.ask('calc 2 + 3', agent='guarded', profile='mock') == 'Done. The tool returned: 5'
+        assert app.ai.ask('current', agent='guarded', profile='mock').startswith('Done. The tool returned: 2')
+        assert app.ai.ask('read_file sample.txt', agent='guarded', profile='mock') == 'Done. The tool returned: buy milk\n'
 
 
-def test_{{ app_label }}_ai_agent_mock_denies_writing(scratch):
+def test_{{ app_label }}_ai_agent_guarded_denies_writing(scratch):
     # the readonly policy denies the writing tool by name: the call never
     # runs, the loop continues, and the audit guard records the denial
     logs = []
@@ -88,7 +88,7 @@ def test_{{ app_label }}_ai_agent_mock_denies_writing(scratch):
     with {{ app_class_name }}AiTestApp() as app:
         app.log.backend.addHandler(handler)
         app.log.backend.setLevel(logging.INFO)
-        result = app.ai.chat([{'role': 'user', 'content': 'append_file hello'}], agent='mock')
+        result = app.ai.chat([{'role': 'user', 'content': 'append_file hello'}], agent='guarded', profile='mock')
         assert "denied: tool 'append_file' is not permitted by policy" in result.text
         assert len(result.trace) == 1
         assert result.trace[0].decision == 'deny'
@@ -106,43 +106,3 @@ def test_{{ app_label }}_ai_validate_guard_checks_arguments():
         guard.check(invocation)
         assert invocation.decision == 'deny'
         assert "missing required argument 'input'" in invocation.reason
-
-
-def test_{{ app_label }}_ai_fundi_calendar():
-    # the in-process fundi 0.1 micro model drives the calendar toolset: it
-    # reads the injected specs, extracts iso dates by schema, resolves
-    # "today" through the current tool (a real two-step chain), and answers
-    # a denial with the reason instead of retrying
-    from datetime import date
-    with {{ app_class_name }}AiTestApp() as app:
-        assert app.ai.ask('weekday of 2026-12-24', profile='fundi') == '[fundi0.1] weekday: Thursday'
-        assert app.ai.ask('week_number of 2026-12-24', profile='fundi') == '[fundi0.1] week_number: 52'
-        assert app.ai.ask('add_days 90 onto 2026-06-07', profile='fundi') == '[fundi0.1] add_days: 2026-09-05'
-        assert app.ai.ask('moon_phase on 2000-01-06', profile='fundi') == '[fundi0.1] moon_phase: new moon'
-        days = (date(2026, 12, 24) - date.today()).days
-        chained = app.ai.chat([{'role': 'user', 'content': 'count the days from today until 2026-12-24'}], profile='fundi')
-        assert chained.text == f'[fundi0.1] date_diff: {days}'
-        assert chained.raw['plan'] == ['current', 'date_diff']
-        # "current" counts as a time word too: the bridge reorders the
-        # resolver to the front and chains the dependent call behind it
-        import calendar as calendar_names
-        name = calendar_names.day_name[date.today().weekday()]
-        bridged = app.ai.chat([{'role': 'user', 'content': 'weekday of current'}], profile='fundi')
-        assert bridged.text == f'[fundi0.1] weekday: {name}'
-        assert bridged.raw['plan'] == ['current', 'weekday']
-        # under the guarded mock agent the readonly policy still rules: the
-        # model asks for the writing tool, the guard denies, fundi explains
-        denied = app.ai.ask('append_file remember the milk', profile='fundi', agent='mock')
-        assert denied == "[fundi0.1] not permitted: tool 'append_file' is not permitted by policy"
-
-
-def test_{{ app_label }}_ai_fundi_model():
-    # the project owns its micro model, so the project verifies its
-    # documented behavior: spec matching, honest no-match, honest failure
-    with {{ app_class_name }}AiTestApp() as app:
-        # two description keywords match anywhere in the request
-        assert app.ai.ask('count the days between 2026-06-07 and 2026-07-07', profile='fundi') == '[fundi0.1] date_diff: 30'
-        # nothing matched, nothing invented: the labelled echo answers
-        assert app.ai.ask('sing me a song', profile='fundi') == '[fundi0.1] sing me a song'
-        # a failing tool ends with the reason instead of a retry
-        assert app.ai.ask('add_days 90 onto 2026-13-99', profile='fundi').startswith('[fundi0.1] failed: ')

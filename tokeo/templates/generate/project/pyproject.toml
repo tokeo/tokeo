@@ -60,6 +60,11 @@ dependencies = [
     "invoke>=2.1.4",
     "paramiko>=2.7,<4",
 {% endif -%}
+{% if feature_ai == "Y" and feature_ai_fundi == "Y" %}
+    "numpy",
+    "numba",
+    "torch",
+{% endif -%}
 ]
 
 [project.optional-dependencies]
