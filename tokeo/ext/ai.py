@@ -3,13 +3,17 @@ Tokeo ai extension.
 
 Wires the ai core into a Cement application: registers the built-in providers,
 exposes the ``app.ai`` handler, and adds the ``ai`` command group for the
-agentic and ai-facing side. An extension registers its own provider or tool
-directly in its ``load`` (the registries are module-global, so no hook is
-needed).
+agentic and ai-facing side. An extension registers its own provider, tool,
+agent, or guard via ``app.ai.register`` (for example in a ``post_setup`` hook).
 
 The technical namespace and the command group are both ``ai`` (this module,
 the ``tokeo.core.ai`` package, and the ``ai`` config section). ``fundi`` is
 the built-in local model.
+
+Every configured component is an item in the uniform form ``{type, options}``:
+``type`` names the class (a built-in short name or a dotted path), ``options``
+carries the component's own settings. Profiles add their documented top-level
+params (purpose, tools, enabled) around that form.
 
 ```yaml
 ai:
@@ -19,11 +23,21 @@ ai:
   tools:
     calc:  { type: myapp.core.ai.tools.calc.TokeoAiCalcTool }
     notes: { type: myapp.core.ai.tools.notes.TokeoAiNotesTool }
+  guards:
+    audit: { type: audit }
+    safe:
+      type: policy
+      options:
+        deny: [shell]
   agents:
     main:
       type: default
-      tools:
-        - notes            # combined with the profile's own tools (calc)
+      options:
+        tools:
+          - notes          # combined with the profile's own tools (calc)
+        guards:
+          - safe           # the tool-call pipeline of this agent
+          - audit
   profiles:
     mock:
       type: mock
@@ -53,8 +67,11 @@ from tokeo.ext.argparse import Controller
 from tokeo.core.ai import (
     TokeoAiError,
     ToolResult,
+    Invocation,
     TokeoAiAgent,
 )
+from tokeo.core.ai.audit import TokeoAiAuditGuard
+from tokeo.core.ai.policy import TokeoAiPolicyGuard
 from tokeo.core.ai.linter import TokeoAiLinter
 from tokeo.core.ai.mock import TokeoAiMockProvider
 from tokeo.core.ai.fundi import TokeoAiFundiProvider
@@ -134,6 +151,7 @@ class TokeoAi(MetaMixin):
         self._provider_objs = {}
         self._tool_objs = {}
         self._agent_objs = {}
+        self._guard_objs = {}
 
     def _setup(self, app):
         """
@@ -155,6 +173,7 @@ class TokeoAi(MetaMixin):
         self._defaults = self._config('defaults', fallback={}) or {}
         self._profiles = self._config('profiles', fallback={}) or {}
         self._agents = self._config('agents', fallback={}) or {}
+        self._guards = self._config('guards', fallback={}) or {}
         # the ``ai.tools`` map uses the uniform form: a dict value is an item
         # ({type, options}), a list value is a named group of member names.
         # split it once into the two maps the loop works with
@@ -386,15 +405,16 @@ class TokeoAi(MetaMixin):
 
     def _agent(self, name):
         # build the agent configured under ``ai.agents[name]`` once and reuse
-        # it; its ``type`` (a built-in short name or a dotted path) resolves to
-        # an agent class, built with the application and its config entry as
-        # keyword arguments (the keys override the agent's Meta defaults)
+        # it; the entry has the uniform item form: ``type`` (a built-in short
+        # name or a dotted path) resolves to an agent class, built with the
+        # application and the entry's ``options`` as keyword arguments (the
+        # keys override the agent's Meta defaults)
         obj = self._agent_objs.get(name)
         if obj is None:
             config = self._agents.get(name)
             if not isinstance(config, dict) or not config.get('type'):
                 raise TokeoAiError(f'ai agent {name!r} is not configured under ai.agents')
-            settings = {key: value for key, value in config.items() if key != 'type'}
+            settings = config.get('options') or {}
             obj = self.resolve('agent', config['type'])(self.app, **settings)
             obj._setup(self.app)
             self._agent_objs[name] = obj
@@ -409,6 +429,58 @@ class TokeoAi(MetaMixin):
         if not agent:
             return None
         return self._agent(agent)
+
+    def _guard(self, name):
+        # build the guard configured under ``ai.guards[name]`` once and reuse
+        # it; the entry has the uniform item form: ``type`` (a built-in short
+        # name or a dotted path) resolves to a guard class, built with the
+        # application and the entry's ``options`` as keyword arguments (the
+        # keys override the guard's Meta defaults, like an agent). guards hold
+        # no per-call state, so one cached instance is fine
+        obj = self._guard_objs.get(name)
+        if obj is None:
+            item = self._guards.get(name)
+            if not isinstance(item, dict) or not item.get('type'):
+                raise TokeoAiError(f'ai guard {name!r} is not configured under ai.guards')
+            settings = item.get('options') or {}
+            obj = self.resolve('guard', item['type'])(self.app, **settings)
+            obj._setup(self.app)
+            self._guard_objs[name] = obj
+        return obj
+
+    def _resolve_guards(self, agent_obj):
+        # the guards for the tool-call pipeline are selected on the agent;
+        # with no agent (or none selected) there is no pipeline
+        if agent_obj is None:
+            return []
+        return [self._guard(name) for name in agent_obj._meta.guards]
+
+    def _run_guarded(self, call, before_guards, after_guards, trace):
+        # run one tool call through the guard pipeline: the before guards may
+        # deny it, the tool runs unless denied, and the after guards always run
+        # (so a denial is recorded too). every outcome is appended to the trace
+        invocation = Invocation(id=call.id, name=call.name, arguments=dict(call.arguments or {}))
+        for guard in before_guards:
+            guard.check(invocation)
+            if invocation.decision == 'deny':
+                break
+        if invocation.decision != 'deny':
+            try:
+                output = self._tool(invocation.name).exec(**invocation.arguments)
+                invocation.result = output if isinstance(output, ToolResult) else ToolResult(text=str(output))
+            except Exception as err:
+                # the pipeline is resilient: a failing tool is recorded and the
+                # loop continues, instead of crashing the whole call
+                invocation.error = f'{type(err).__name__}: {err}'
+        for guard in after_guards:
+            guard.check(invocation)
+        trace.append(invocation)
+        # the text fed back to the model for this call
+        if invocation.decision == 'deny':
+            return f'denied: {invocation.reason or "blocked by a guard"}'
+        if invocation.error is not None:
+            return f'error: {invocation.error}'
+        return invocation.result.text if invocation.result is not None else ''
 
     def chat(self, messages, tools=None, profile=None, model=None, purpose=None, agent=None, max_steps=None):
         """
@@ -468,19 +540,31 @@ class TokeoAi(MetaMixin):
             budget = agent_obj._meta.max_steps if agent_obj is not None else None
             max_steps = budget if budget is not None else self._meta.max_steps
         specs = self._tool_specs(self._resolve_tools(requested))
+        # guards (selected on the agent) wrap each tool call; with none, the
+        # loop calls the tool directly, exactly as before, and collects no
+        # trace. partition once: before guards may deny, after guards observe
+        guards = self._resolve_guards(agent_obj)
+        before_guards = [guard for guard in guards if guard._meta.phase == 'before']
+        after_guards = [guard for guard in guards if guard._meta.phase == 'after']
+        trace = []
         messages = list(messages)
         result = provider.chat(profile, messages, tools=specs)
         for _ in range(max_steps):
             if not result.tool_calls:
+                result.trace = trace
                 return result
             messages.append(self._assistant_turn(result))
             for call in result.tool_calls:
-                output = self._tool(call.name).exec(**(call.arguments or {}))
-                # a tool may return a ToolResult or a plain string; only the
-                # model-facing text goes back into the message history
-                content = output.text if isinstance(output, ToolResult) else str(output)
+                if guards:
+                    content = self._run_guarded(call, before_guards, after_guards, trace)
+                else:
+                    output = self._tool(call.name).exec(**(call.arguments or {}))
+                    # a tool may return a ToolResult or a plain string; only the
+                    # model-facing text goes back into the message history
+                    content = output.text if isinstance(output, ToolResult) else str(output)
                 messages.append({'role': 'tool', 'tool_call_id': call.id, 'content': content})
             result = provider.chat(profile, messages, tools=specs)
+        result.trace = trace
         return result
 
     def _assistant_turn(self, result):
@@ -645,6 +729,10 @@ def ai_extend_app(app):
     # built-in agent: the default composition root; a project configures its
     # agents under ``ai.agents`` and selects one per call or via defaults.agent
     app.ai.register('agent', 'default', TokeoAiAgent)
+    # built-in guard: the baseline audit guard; agents opt in via agent.guards
+    app.ai.register('guard', 'audit', TokeoAiAuditGuard)
+    # built-in guard: the baseline policy guard (allow/deny by tool name)
+    app.ai.register('guard', 'policy', TokeoAiPolicyGuard)
     app.ai._setup(app)
 
 

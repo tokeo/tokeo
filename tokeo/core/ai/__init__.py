@@ -121,6 +121,8 @@ class ChatResult:
     - **finish_reason** (str | None): Why the model stopped, when reported
     - **raw** (dict | None): The unmodified provider response, kept so a
         caller can always inspect exactly what came back
+    - **trace** (list): The ``Invocation`` records of the tool calls the loop
+        ran, in order; empty when no guard pipeline was active
 
     """
 
@@ -130,6 +132,39 @@ class ChatResult:
     usage: Usage | None = None
     finish_reason: str | None = None
     raw: dict | None = None
+    trace: list = field(default_factory=list)
+
+
+@dataclass
+class Invocation:
+    """
+    A single tool call as it travels through the guard pipeline.
+
+    Built by the handler for each requested tool call, then passed to the
+    guards: the before-phase guards may set ``decision``/``reason`` to block
+    it, the tool runs unless denied, and the after-phase guards see the
+    ``result`` or ``error``. The object is mutable on purpose, so a guard can
+    adjust the outcome (a later redact/truncate guard rewrites ``result``).
+
+    ### Args
+
+    - **id** (str): The provider-assigned tool-call id, echoed in the result
+    - **name** (str): The tool the model wants to call
+    - **arguments** (dict): The parsed arguments for the call
+    - **decision** (str): ``allow`` or ``deny``; a before guard may set it
+    - **reason** (str | None): Why a guard denied or flagged the call
+    - **result** (ToolResult | None): The tool's result when it ran
+    - **error** (str | None): The error text when the tool raised
+
+    """
+
+    id: str
+    name: str
+    arguments: dict = field(default_factory=dict)
+    decision: str = 'allow'
+    reason: str | None = None
+    result: ToolResult | None = None
+    error: str | None = None
 
 
 class TokeoAiProvider:
@@ -265,9 +300,10 @@ class TokeoAiAgent(MetaMixin):
 
     ### Notes
 
-    : ``Meta`` declares the configurable keys (``tools``, ``max_steps``) with
-        neutral defaults; the ``ai.agents`` entry overrides them at build time
-        (the cement Meta keyword override), and they are read from ``_meta``.
+    : ``Meta`` declares the configurable keys (``tools``, ``guards``,
+        ``max_steps``) with neutral defaults; the ``ai.agents`` entry overrides
+        them at build time (the cement Meta keyword override), and they are
+        read from ``_meta``.
 
     """
 
@@ -276,6 +312,9 @@ class TokeoAiAgent(MetaMixin):
 
         # the tool selection (item or group names); merged with the profile's
         tools = []
+
+        # the guard selection (guard names) for the tool-call pipeline
+        guards = []
 
         # per-agent step budget; None means use the handler's base default
         max_steps = None
@@ -305,3 +344,65 @@ class TokeoAiAgent(MetaMixin):
 
         """
         pass
+
+
+class TokeoAiGuard(MetaMixin):
+    """
+    Base class for guards in the tool-call pipeline.
+
+    A guard inspects, and may shape, a tool call as an ``Invocation`` travels
+    through the pipeline. ``Meta.phase`` decides when it runs: a ``before``
+    guard runs pre-exec and may deny the call (set ``decision``/``reason``); an
+    ``after`` guard runs post-exec and sees the ``result`` or ``error`` (and
+    always runs, so it records a denial too). Guards are selected per agent
+    (``agent.guards``); with none selected the loop calls the tool directly.
+
+    Its class is resolved from the ``ai.guards`` item ``type`` (a built-in
+    short name or a dotted path) and instantiated with the application by the
+    ``app.ai`` handler. Like a provider, it holds no mutable per-call state.
+
+    """
+
+    class Meta:
+        """Guard meta-data."""
+
+        # 'before' runs pre-exec and may deny; 'after' runs post-exec
+        phase = 'after'
+
+    def __init__(self, app, *args, **kw):
+        """
+        Initialize the guard.
+
+        ### Args
+
+        - **app**: The Tokeo application instance
+        - ***args**: Positional arguments for the parent initializer
+        - ****kw**: Keyword arguments for the parent initializer
+
+        """
+        super(TokeoAiGuard, self).__init__(*args, **kw)
+        self.app = app
+
+    def _setup(self, app):
+        """
+        Set up the guard after instantiation.
+
+        ### Args
+
+        - **app**: The Tokeo application instance
+
+        """
+        pass
+
+    def check(self, invocation):
+        """
+        Inspect and possibly shape an invocation.
+
+        ### Args
+
+        - **invocation** (Invocation): The tool call passing through the
+            pipeline; a before guard may set ``decision``/``reason`` to deny
+            it, an after guard may read or adjust ``result``/``error``
+
+        """
+        raise NotImplementedError

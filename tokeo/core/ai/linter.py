@@ -18,15 +18,16 @@ from tokeo.core.ai import TokeoAiError
 
 
 # allowed keys per section, so an unknown key (a typo such as ``toolss``) is
-# reported instead of being silently ignored. agent contents get their own
-# checks in a later step; the ``defaults`` block is checked here
-_AI_KEYS = {'defaults', 'profiles', 'tools', 'agents'}
+# reported instead of being silently ignored. tools, agents, and guards share
+# the uniform item form ({type, options}); the ``defaults`` block is checked
+# here, agent option contents by the built-in element validators below
+_AI_KEYS = {'defaults', 'profiles', 'tools', 'agents', 'guards'}
 _DEFAULTS_KEYS = {'profile', 'agent'}
 _PROFILE_KEYS = {
     'type', 'purpose', 'tools', 'enabled',
     'native_tools_call', 'tools_parser', 'options',
 }
-_TOOL_ITEM_KEYS = {'type', 'options'}
+_ITEM_KEYS = {'type', 'options'}
 
 
 @dataclass
@@ -72,6 +73,35 @@ class TokeoAiLinter:
         """
         self.app = app
         self.issues = []
+        self._validators = {}
+        # built-in element validations; a project or a later derivation adds
+        # its own checks the same way (for example for a custom guard's
+        # options)
+        self.add_validator('agents', self._validate_item_form)
+        self.add_validator('agents', self._validate_agent_options)
+        self.add_validator('guards', self._validate_item_form)
+
+    def add_validator(self, section, validator):
+        """
+        Register a validation call for the elements of one ``ai`` section.
+
+        Every registered validator runs once per element of the section when
+        ``lint`` walks it, so a subclass or a project extends the linter
+        without touching its internals.
+
+        ### Args
+
+        - **section** (str): The ``ai`` section to validate (for example
+            ``agents`` or ``guards``)
+        - **validator** (callable): Called as ``validator(section, name,
+            value)`` per element; it returns an iterable of ``AiLintIssue``
+            entries (or ``None`` when it reports through the linter itself).
+            It may also raise: a ``TokeoAiError`` becomes an error issue with
+            its message at the element, any other exception is reported as a
+            failed validator -- the lint run itself never crashes
+
+        """
+        self._validators.setdefault(section, []).append(validator)
 
     def lint(self):
         """
@@ -86,13 +116,77 @@ class TokeoAiLinter:
         self.issues = []
         tools = self._value('tools') or {}
         profiles = self._value('profiles') or {}
-        agents = self._value('agents') or {}
         defaults = self._value('defaults')
+        agents = self._value('agents') or {}
         self._lint_keys('ai', self._section_keys(), _AI_KEYS)
         self._lint_tools(tools)
         self._lint_profiles(profiles, tools)
         self._lint_defaults(defaults, profiles, agents)
+        for section in self._validators:
+            self._run_validators(section)
         return self.issues
+
+    def _run_validators(self, section):
+        # run the registered validators over every element of one section; a
+        # non-mapping section is reported once instead of being walked
+        elements = self._value(section) or {}
+        if not isinstance(elements, dict):
+            self._add(f'ai.{section}', 'must be a mapping of name to item')
+            return
+        for name, value in elements.items():
+            for validator in self._validators.get(section, []):
+                # a raising validator never crashes the lint run: a
+                # TokeoAiError is a deliberate verdict and becomes an error
+                # issue with its message, any other exception is a fault in
+                # the validator itself and is reported as such
+                try:
+                    issues = validator(section, name, value)
+                except TokeoAiError as err:
+                    self._add(f'ai.{section}.{name}', str(err))
+                    continue
+                except Exception as err:
+                    self._add(f'ai.{section}.{name}', f'validator failed: {type(err).__name__}: {err}')
+                    continue
+                self.issues.extend(issues or [])
+
+    def _validate_item_form(self, section, name, item):
+        # the uniform item form shared by agents and guards: a mapping with a
+        # resolvable ``type`` and the component's own settings under
+        # ``options``; settings keys inside options are the component's Meta
+        # keys and stay unchecked here (a custom class declares its own)
+        path = f'ai.{section}.{name}'
+        if not isinstance(item, dict):
+            self._add(path, 'must be an item (mapping with a "type")')
+            return
+        self._lint_keys(path, item, _ITEM_KEYS)
+        self._lint_options(path, item)
+        # the registry kind is the singular section name (agents -> agent)
+        self._lint_type(section.rstrip('s'), path, item)
+
+    def _validate_agent_options(self, section, name, item):
+        # the base agent's known option keys: the tools selection points into
+        # ``ai.tools``, the guards selection into ``ai.guards``, and the step
+        # budget is a number; other keys may be a custom agent's own Meta keys
+        if not isinstance(item, dict):
+            return
+        options = item.get('options')
+        if not isinstance(options, dict):
+            return
+        path = f'ai.{section}.{name}'
+        tool_names = set(self._value('tools') or {})
+        self._lint_selection(path, options.get('tools'), tool_names)
+        guards = options.get('guards')
+        if guards is not None:
+            if not isinstance(guards, list):
+                self._add(f'{path}.guards', 'must be a list of guard names')
+            else:
+                known = set(self._value('guards') or {})
+                for entry in guards:
+                    if entry not in known:
+                        self._add(f'{path}.guards', _unknown('guard', entry, known))
+        max_steps = options.get('max_steps')
+        if max_steps is not None and not isinstance(max_steps, int):
+            self._add(f'{path}.max_steps', 'must be a number of model calls')
 
     def _add(self, path, message, level='error'):
         self.issues.append(AiLintIssue(path, message, level))
@@ -156,7 +250,7 @@ class TokeoAiLinter:
                 self._add(f'ai.tools.{name}', 'must be an item (mapping) or a group (list)')
         for name, item in items.items():
             path = f'ai.tools.{name}'
-            self._lint_keys(path, item, _TOOL_ITEM_KEYS)
+            self._lint_keys(path, item, _ITEM_KEYS)
             self._lint_options(path, item)
             self._lint_type('tool', path, item)
         known = set(items) | set(groups)

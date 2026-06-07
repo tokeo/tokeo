@@ -27,25 +27,31 @@ ai:
     mathematics:
       - calc
 
-  ### agents are the composition root: an agent binds the tools (and later
-  ### the guards and other building blocks) for a task and sets the step
-  ### budget. the model is not part of the agent -- it is bound late through
-  ### the selected profile, so one agent runs against any model. an agent is
-  ### an item; "type" is a built-in short name ("default") or a full dotted
-  ### class path. the active tools of a call are the selected profile's tools
-  ### and the agent's tools combined (deduplicated)
+  ### agents are the composition root: an agent binds the tools and guards
+  ### for a task and sets the step budget. the model is not part of the
+  ### agent -- it is bound late through the selected profile, so one agent
+  ### runs against any model. an agent is an item in the uniform form:
+  ### "type" is a built-in short name ("default") or a full dotted class
+  ### path, and the agent's settings live under "options". the active tools
+  ### of a call are the selected profile's tools and the agent's tools
+  ### combined (deduplicated)
   agents:
     ### the default composition root, selected via defaults.agent above
     main:
       ### built-in agent type; no custom class needed
       type: default
-      ### tools this agent contributes, combined with the selected profile's
-      ### own tools (deduplicated). left empty here -- the mock profile below
-      ### already activates the mathematics group
-      # tools:
-      #   - mathematics
-      ### model calls the loop may take before giving up (optional)
-      # max_steps: 6
+      ### the agent's settings (its Meta keys)
+      # options:
+      #   ### tools this agent contributes, combined with the selected
+      #   ### profile's own tools (deduplicated). left empty here -- the mock
+      #   ### profile below already activates the mathematics group
+      #   tools:
+      #     - mathematics
+      #   ### guards forming this agent's tool-call pipeline (see ai.guards)
+      #   guards:
+      #     - audit
+      #   ### model calls the loop may take before giving up (optional)
+      #   max_steps: 6
 
   ### named profiles in the uniform form: top-level params (type, purpose,
   ### tools, enabled) plus an "options" block carrying the provider's
