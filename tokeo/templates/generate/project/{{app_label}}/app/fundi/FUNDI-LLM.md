@@ -17,7 +17,7 @@ agent runs against `mock`, `fundi`, or a remote profile unchanged.
 
 Train-first: the weights are a project asset created by you. Run
 
-    make fundi-train        # or: python -m {{ app_label }}.app.fundi.train
+    python -m {{ app_label }}.app.fundi.train
 
 once; it reports the held-out accuracy and writes `weights.npz` into this
 package. Until then the `fundi` profile raises a clear hint and the fundi
@@ -120,7 +120,7 @@ and the grammar automaton -- same sentence, same plan, every time.
 
 The path is always the same: teach it in `data.py` (new templates, new
 tools in `DOMAIN`, more phrasings, more languages), retrain with
-`python -m {{ app_label }}.app.fundi.data`, and check the reported accuracy
+`python -m {{ app_label }}.app.fundi.train`, and check the reported accuracy
 plus the project's test suite. The provider (`core/ai/fundi.py`), the
 guards, and the agents need no change -- the plan grammar adapts to the
 active tools at runtime.

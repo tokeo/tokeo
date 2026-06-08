@@ -18,7 +18,7 @@ params (purpose, tools, enabled) around that form.
 ai:
   defaults:
     profile: mock          # model used when a call names none
-    agent: none
+    agent: null           # no default agent: calls run lean unless one is named
   tools:
     calc:  { type: myapp.core.ai.tools.calc.TokeoAiCalcTool }
     notes: { type: myapp.core.ai.tools.notes.TokeoAiNotesTool }
