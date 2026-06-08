@@ -94,7 +94,11 @@ only described here. Use the worded backward forms instead.
 Honesty is also taught close to the domain, not only far away: the
 negatives include calendar-near requests the model cannot serve ("the
 date of christmas", "wann ist ostern"), so unsupported wordings answer
-with the labelled echo instead of an invented plan. And a small share of
+with the labelled echo instead of an invented plan. A small set of short
+greetings and pleasantries ("hello", "hallo", "how are you", "danke
+schoen") is in the negatives too, kept free of calendar-ambiguous words,
+so a bare greeting echoes honestly rather than being answered with a
+date. And a small share of
 the training requests carries one human typo -- a doubled letter or
 swapped neighbours -- so common slips like "tommorrow" usually still
 find their plan, while dates and digits are never touched: exact copying
