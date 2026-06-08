@@ -1,17 +1,29 @@
 """
 Real test cases for fundi, the Spiral micro language model.
 
-Verifies the project's own trained model (the lab lives in
-``{{ app_label }}/core/fundi``) against the real shipped configuration, under
-the ``guarded`` agent. Train-first: until ``weights.npz`` exists the test
-skips. Run from the project root, for example with
-``pytest tests/core/test_fundi.py``.
+Two layers, because fundi is train-first. The data-contract tests run
+without weights and lock in what the synthetic data *teaches* -- bare time
+words, greetings, signed counts, plan legality, tool coverage. The model
+test needs ``weights.npz`` (skips until it exists) and checks the actual
+answers of the project's own trained model, under the ``guarded`` agent.
+Run from the project root, for example ``pytest tests/core/fundi``.
 """
 
+import re
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
 from {{ app_label }}.main import {{ app_class_name }}Test
+
+# english weekday names, locale-independent, matching the tool's output
+_WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+# a sign written immediately after a shift keyword is the signed-count
+# wording (the {n} slot); the dashes inside an iso date never match this
+_SIGNED = re.compile(
+    r'(plus|add|to|after|minus|subtract|from|before|nach|vor|auf|ab|off|addiere|ziehe|in)\s+[-+]\d'
+)
 
 
 class {{ app_class_name }}AiTestApp({{ app_class_name }}Test):
@@ -55,6 +67,69 @@ def test_{{ app_label }}_fundi_lexicon_loads():
     assert longest + 1 <= PLAN_BUDGET, (longest, PLAN_BUDGET)
 
 
+def test_{{ app_label }}_fundi_data_contract():
+    # the teaching guarantees that make the model's answers predictable.
+    # these assert what the synthetic data contains, so a lexicon or mixture
+    # edit that would change the trained behaviour fails here -- before a
+    # training run, and without needing any weights
+    from {{ app_label }}.core.fundi.data import dataset, _LEXICON
+    from {{ app_label }}.core.fundi.dsl import DOMAIN, NOMATCH, Constrainer, parse
+    pairs = dataset(12000, seed=7)
+
+    # a bare time word, standing on its own, must resolve to current(); the
+    # request ends with exactly the time word and the plan is current().
+    # without the bare-now slice 'today'/'now' were out of distribution and
+    # produced spurious shifts, so this is the regression lock for that fix
+    for word in _LEXICON['time_words']['en'] + _LEXICON['time_words']['de']:
+        assert any(
+            r.split() and r.split()[-1] == word and d == 'current()' for r, d in pairs
+        ), word
+
+    # short greetings and pleasantries are negatives, so a bare greeting
+    # echoes honestly instead of being answered with a date
+    greetings = ('hello', 'hi there', 'hey', 'hallo', 'moin', 'servus', 'danke schoen')
+    assert all(g in _LEXICON['negatives'] for g in greetings)
+    assert any(d == NOMATCH and 'hallo' in r for r, d in pairs)
+
+    # a sign written onto a count is not language: it maps to <nomatch>,
+    # bare and consumer-wrapped, and NO positive example ever carries one
+    assert not any(_SIGNED.search(r) for r, d in pairs if d != NOMATCH)
+    assert any(_SIGNED.search(r) and d == NOMATCH for r, d in pairs)
+    consumers = [names[lang] for names in _LEXICON['consumers'].values() for lang in ('en', 'de')]
+    assert any(
+        _SIGNED.search(r) and d == NOMATCH and any(c in r for c in consumers) for r, d in pairs
+    )
+
+    # every generated plan is legal under the grammar automaton (each
+    # character is accepted in turn) and round-trips through parse; ending
+    # the line is always legal once the plan is complete
+    for r, d in pairs[:3000]:
+        if d == NOMATCH:
+            continue
+        constrainer = Constrainer()
+        for character in d:
+            assert character in constrainer.allowed(), (d, character)
+            constrainer.feed(character)
+        assert '<eos>' in constrainer.allowed(), d
+        parse(d)
+
+    # the consumer-of-today composition still resolves through current as
+    # step one (this must not be broken by the bare-now change)
+    assert any(d == 'current();weekday(date=@1)' for _, d in pairs)
+
+    # every tool in the domain is actually exercised by the data
+    exercised = {tool for _, d in pairs for tool in DOMAIN if tool + '(' in d}
+    assert exercised == set(DOMAIN), set(DOMAIN) - exercised
+
+    # the generator is deterministic for a fixed seed
+    assert dataset(4000, seed=7)[:60] == dataset(4000, seed=7)[:60]
+
+    # the --no-minus ablation removes every backward wording: no plan in the
+    # minus-free dataset carries a negative count, while the normal data does
+    assert not any('=-' in d for _, d in dataset(8000, seed=7, minus=False))
+    assert any('=-' in d for _, d in pairs)
+
+
 @pytest.mark.skipif(
     not Path('{{ app_label }}/core/fundi/weights.npz').exists(),
     reason="fundi has no trained weights yet (run 'python -m {{ app_label }}.core.fundi.train')",
@@ -63,14 +138,34 @@ def test_{{ app_label }}_ai_fundi_model():
     # the project's own trained micro language model ({{ app_label }}/core/fundi)
     # plans with learned weights: exact copies, real chains incl. the
     # today-bridge, honest nomatch -- and the guards still rule the loop
-    from datetime import date, timedelta
     with {{ app_class_name }}AiTestApp() as app:
-        assert app.ai.ask('weekday of 2026-12-24', agent='guarded', profile='fundi') == '[fundi] weekday: Thursday'
-        assert app.ai.ask('weekday of 2026-12-24 minus 2 days', agent='guarded', profile='fundi') == '[fundi] weekday: Tuesday'
-        assert app.ai.ask('add 2 months to 2026-06-08', agent='guarded', profile='fundi') == '[fundi] add_months: 2026-08-08'
+
+        def ask(text):
+            return app.ai.ask(text, agent='guarded', profile='fundi')
+
+        # exact copies and single-step tools
+        assert ask('weekday of 2026-12-24') == '[fundi] weekday: Thursday'
+        assert ask('weekday of 2026-12-24 minus 2 days') == '[fundi] weekday: Tuesday'
+        assert ask('add 2 months to 2026-06-08') == '[fundi] add_months: 2026-08-08'
+        assert ask('die mondphase am 2000-01-06') == '[fundi] moon_phase: new moon'
+        iso_week = date(2026, 12, 24).isocalendar()[1]
+        assert ask('the week number of 2026-12-24') == f'[fundi] week_number: {iso_week}'
+
+        # a bare time word is the current date: today/now/heute/jetzt all
+        # resolve to current(); the time part varies, so match the date head
+        today = date.today().isoformat()
+        for word in ('today', 'now', 'heute', 'jetzt'):
+            out = ask(word)
+            assert out.startswith(f'[fundi] current: {today}'), (word, out)
+
+        # relative words and the today-bridge
         tomorrow = (date.today() + timedelta(days=1)).isoformat()
-        assert app.ai.ask('welches datum ist morgen', agent='guarded', profile='fundi') == f'[fundi] add_days: {tomorrow}'
-        assert app.ai.ask('die mondphase am 2000-01-06', agent='guarded', profile='fundi') == '[fundi] moon_phase: new moon'
+        assert ask('welches datum ist morgen') == f'[fundi] add_days: {tomorrow}'
+
+        # a consumer reading a shifted date: the weekday of (today + 14)
+        shifted = date.today() + timedelta(days=14)
+        assert ask('the weekday of today plus 14 days') == f'[fundi] weekday: {_WEEKDAYS[shifted.weekday()]}'
+
         # a relative chain: two shifts from today, day word then year word
         base = date.today() + timedelta(days=1)
         try:
@@ -78,17 +173,24 @@ def test_{{ app_label }}_ai_fundi_model():
         except ValueError:
             # feb 29 clamps to feb 28 in a common year, like the tool does
             target = base.replace(year=base.year + 1, day=28)
-        chain2 = app.ai.ask('the date of tomorrow next year', agent='guarded', profile='fundi')
-        assert chain2 == f'[fundi] add_years: {target.isoformat()}'
-        # a hard negative: calendar-near wording the model cannot serve
-        assert app.ai.ask('what date is my birthday', agent='guarded', profile='fundi') == '[fundi] what date is my birthday'
-        # a sign on a bare count is not language: honest echo, not a digit,
-        # whether bare or consumer-wrapped
-        assert app.ai.ask('today plus -2 days', agent='guarded', profile='fundi') == '[fundi] today plus -2 days'
+        assert ask('the date of tomorrow next year') == f'[fundi] add_years: {target.isoformat()}'
+
+        # honest abstention: hard negative, greetings, and signed counts all
+        # echo (no invented plan, no invented digit, no dropped shift)
+        assert ask('what date is my birthday') == '[fundi] what date is my birthday'
+        for greeting in ('hello', 'hallo', 'moin'):
+            assert ask(greeting) == f'[fundi] {greeting}'
+        assert ask('today plus -2 days') == '[fundi] today plus -2 days'
         wrapped = 'the weekday of today plus -2 days'
-        assert app.ai.ask(wrapped, agent='guarded', profile='fundi') == f'[fundi] {wrapped}'
-        assert app.ai.ask('sing me a song', agent='guarded', profile='fundi') == '[fundi] sing me a song'
+        assert ask(wrapped) == f'[fundi] {wrapped}'
+        assert ask('sing me a song') == '[fundi] sing me a song'
+
+        # multi-turn chat still threads and the guards report the plan
         days = (date(2026, 12, 24) - date.today()).days
-        chained = app.ai.chat([{'role': 'user', 'content': 'count the days from today until 2026-12-24'}], agent='guarded', profile='fundi')
+        chained = app.ai.chat(
+            [{'role': 'user', 'content': 'count the days from today until 2026-12-24'}],
+            agent='guarded',
+            profile='fundi',
+        )
         assert chained.text == f'[fundi] date_diff: {days}'
         assert chained.raw['plan'] == ['current', 'date_diff']

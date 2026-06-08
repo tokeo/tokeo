@@ -48,6 +48,10 @@ signed offsets. Small, but real tasks:
     {{ app_label }} ai ask "the date of tomorrow next year" --profile fundi
     {{ app_label }} ai ask "heute plus 1 jahr" --profile fundi
 
+    # the current date itself: a bare time word is enough
+    {{ app_label }} ai ask "today" --profile fundi
+    {{ app_label }} ai ask "heute" --profile fundi
+
     # and the three-step chains, its signature move
     {{ app_label }} ai ask "the weekday of today plus 14 days" --profile fundi
     {{ app_label }} ai ask "der wochentag von vor 2 tagen" --profile fundi

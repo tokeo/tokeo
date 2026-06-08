@@ -177,7 +177,8 @@ def sample(rng, minus=True):
     #   0.15-0.26  (11%)  single relative words (tomorrow, letzte woche)
     #   0.26-0.30  ( 4%)  relative chains (two shifts from today)
     #   0.30-0.72  (42%)  shifts, plain and consumer-composed (any unit)
-    #   0.72-1.00  (28%)  single-step calls to the non-shifting tools
+    #   0.72-0.76  ( 4%)  a bare time word (today/now/heute) -> current()
+    #   0.76-1.00  (24%)  single-step calls to the non-shifting tools
     kind = rng.random()
     if kind < 0.12:
         return _preamble(rng) + rng.choice(_LEXICON['negatives']), NOMATCH
@@ -193,6 +194,9 @@ def sample(rng, minus=True):
         return _render_relative_chain(rng, lang_en, minus)
     if kind < 0.72:
         return _render_shift(rng, lang_en, minus)
+    if kind < 0.76:
+        # a bare time word standing on its own means "the current date"
+        return _render_now(rng, lang_en)
     single = _LEXICON['patterns']['single']
     tool = rng.choice(list(single))
     phrase = rng.choice(single[tool][_lang(lang_en)])
@@ -323,6 +327,17 @@ def _render_shift(rng, lang_en, minus=True):
     plan.append((tool, {'date': base, DOMAIN[tool][1]: sign + str(count)}))
     request, plan = _consume(rng, lang_en, request, plan)
     return _preamble(rng) + request, render(plan)
+
+
+def _render_now(rng, lang_en):
+    # a bare time word standing on its own means "the current date":
+    # today/now/current and heute/jetzt/aktuell all resolve to current().
+    # without this the time words are only ever seen as the {d} slot of a
+    # larger pattern (e.g. "5 days before today"), so a bare "today" would
+    # be out of distribution and the model would bolt a spurious shift onto
+    # it. _preamble adds the usual optional preamble and lead-in for variety
+    word = _time_word(rng, lang_en)
+    return _preamble(rng) + word, render([('current', {})])
 
 
 def _render_single(rng, tool, phrase, lang_en):
