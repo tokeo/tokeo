@@ -73,7 +73,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-from prompt_toolkit.completion import NestedCompleter
+from prompt_toolkit.completion import Completer, Completion
 
 from tokeo.ext.argparse import Controller
 from tokeo.core.ai import (
@@ -701,6 +701,57 @@ class TokeoAi(MetaMixin):
         return result.text
 
 
+class _ChatCompleter(Completer):
+    """
+    Completion for the interactive ai chat shell.
+
+    Unlike a ``NestedCompleter`` (which only completes from the start of the
+    line, against its first word), this completes the selector switches and
+    their configured values *anywhere* in the line -- so they still pop up
+    after some prompt text, e.g. ``the weekday of today --agent gua|``. It
+    looks only at the word under the cursor and the word before it:
+
+    - the word before the cursor is a switch (``--profile`` / ``--agent`` /
+        ``--model`` / ``--purpose``) -> offer that switch's configured
+        values from the running config
+    - the word under the cursor starts with ``-`` -> offer the switch names
+    - otherwise (ordinary prompt text) -> offer nothing, so completion never
+        gets in the way of typing a normal request
+
+    """
+
+    def __init__(self, names, switches):
+        # names: {'profile': [...], 'agent': [...], 'model': [...],
+        # 'purpose': [...]} from the handler; switches: {'--profile':
+        # 'profile', ...} mapping the flag to its names key
+        self._names = names
+        self._switches = switches
+
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+        words = text.split()
+        # split the line into "the word being typed" (current) and "the word
+        # before it" (prev). when the cursor sits just after a space the
+        # current word is empty and prev is the last whole word
+        if text[-1:].isspace() or text == '':
+            current = ''
+            prev = words[-1] if words else ''
+        else:
+            current = words[-1] if words else ''
+            prev = words[-2] if len(words) >= 2 else ''
+        if prev in self._switches:
+            # completing a value right after a switch: offer that switch's
+            # configured names that match what is typed so far
+            for name in self._names.get(self._switches[prev], []):
+                if name.startswith(current):
+                    yield Completion(name, start_position=-len(current))
+        elif current.startswith('-'):
+            # completing a switch name itself
+            for switch in self._switches:
+                if switch.startswith(current):
+                    yield Completion(switch, start_position=-len(current))
+
+
 class AiController(Controller):
     """
     Ai command group for the agentic and ai-facing commands.
@@ -852,12 +903,15 @@ class AiController(Controller):
                     self.app.print(f'ai chat - error: {err}')
 
     def _chat_session(self, history, completer):
-        # the reusable prompt_toolkit session for the chat shell
+        # the reusable prompt_toolkit session for the chat shell. complete-
+        # while-typing must stay on so the selector menu pops up as you type;
+        # note that enable_history_search would silently turn it off (they are
+        # mutually exclusive in prompt_toolkit), so it is deliberately not set
         return PromptSession(
             history=history,
             completer=completer,
             auto_suggest=AutoSuggestFromHistory(),
-            enable_history_search=True,
+            complete_while_typing=True,
         )
 
     # the inline switches the chat shell understands; each --flag sets the
@@ -868,19 +922,10 @@ class AiController(Controller):
     _CHAT_EXCLUSIVE = ('profile', 'model', 'purpose')
 
     def _chat_completer(self):
-        # build the nested completer from the configured names, so "--"
-        # offers the four switches and each switch then offers its values
-        names = self.app.ai.selectors()
-        return NestedCompleter.from_nested_dict(
-            {
-                '--profile': {name: None for name in names['profile']},
-                '--agent': {name: None for name in names['agent']},
-                '--model': {name: None for name in names['model']},
-                '--purpose': {name: None for name in names['purpose']},
-                'exit': None,
-                'quit': None,
-            }
-        )
+        # a position-independent completer built from the running config, so
+        # "--" offers the four switches and a switch then offers its values
+        # no matter where in the line they are typed
+        return _ChatCompleter(self.app.ai.selectors(), self._CHAT_SWITCHES)
 
     def _chat_switches(self, line, session):
         # pull any "--flag value" pairs out of the line, validate each value

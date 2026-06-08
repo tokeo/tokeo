@@ -1071,14 +1071,17 @@ class TokeoScheduler(MetaMixin):
         self.app.log.info('Welcome to scheduler interactive shell.')
         # one prompt session for the whole shell: it holds the in-memory
         # history, the command completer, the from-history auto-suggest, and
-        # history-prefix search (up-arrow after typing a few letters), built
-        # once instead of rebuilt on every iteration. the dynamic prompt text
-        # and the edit-in-place default are passed per call below
+        # complete-while-typing (the completion menu pops up as you type),
+        # built once instead of rebuilt on every iteration. the dynamic
+        # prompt text and the edit-in-place default are passed per call below.
+        # note: enable_history_search would silently disable complete-while-
+        # typing (they are mutually exclusive in prompt_toolkit), so the
+        # completer takes precedence and it is deliberately not set
         session = PromptSession(
             history=self.shell_history(),
             completer=self.shell_completion(),
             auto_suggest=AutoSuggestFromHistory(),
-            enable_history_search=True,
+            complete_while_typing=True,
         )
         # initialize the user_input
         user_input = ''
