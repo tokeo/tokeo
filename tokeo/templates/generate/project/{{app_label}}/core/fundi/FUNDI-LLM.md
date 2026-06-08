@@ -23,6 +23,56 @@ once; it reports the held-out accuracy and writes `weights.npz` into this
 package. Until then the `fundi` profile raises a clear hint and the fundi
 test cases skip.
 
+## What you can ask it
+
+Its competence is exactly the trained domain: the calendar tools, in
+English and German, in plain and nested wordings, with time words and
+signed offsets. Small, but real tasks:
+
+    # appointments and weekdays
+    {{ app_label }} ai ask "der wochentag von heute" --profile fundi
+    {{ app_label }} ai ask "weekday of 2026-12-24" --profile fundi
+
+    # deadlines and countdowns
+    {{ app_label }} ai ask "count the days from today until 2026-12-24" --profile fundi
+    {{ app_label }} ai ask "add 90 days to 2026-06-08" --profile fundi
+    {{ app_label }} ai ask "das datum 14 tage vor 2026-12-24" --profile fundi
+
+    # planning
+    {{ app_label }} ai ask "die kalenderwoche von heute plus 30 tagen" --profile fundi
+    {{ app_label }} ai ask "die mondphase am 2000-01-06" --profile fundi
+
+    # and the three-step chains, its signature move
+    {{ app_label }} ai ask "the weekday of today plus 14 days" --profile fundi
+    {{ app_label }} ai ask "der wochentag von vor 2 tagen" --profile fundi
+
+Deadline calculators, release countdowns, week-number lookups, "x days of
+lead time before date y" -- deterministic, offline, tens of milliseconds,
+and fully audited under `--agent guarded`.
+
+### A planner, not a texter
+
+The model's only learned output language is the plan DSL (plus
+`<nomatch>`). The answer you see (`[fundi] weekday: Tuesday`) is always
+the result of the last tool in the chain: the facts come from the
+computation, never from the model. That split is deliberate -- dates and
+arithmetic are exactly what language models, small or large, get wrong
+when they memorize, and exactly what tools compute precisely. A 380k
+model could never store a million date facts, but it can learn perfectly
+*which computation is meant*. This is also why fundi cannot hallucinate:
+what it does not understand becomes an honest `<nomatch>`, and what it
+understands gets computed.
+
+So there are three kinds of answers: a **tool result** (the normal
+case), **honest ignorance** (`[fundi] sing me a song` -- the labelled
+echo marks "outside my domain"), and **explanations** when the guard
+pipeline reports `denied:` or `error:` ("not permitted: ..." instead of
+retrying). Free-form text is not this model's job: where wording matters,
+the clean place is a remote profile behind the very same agents, guards,
+and tools -- the ladder mock -> fundi -> remote model tells the full
+story. To give fundi new *tasks*, give it new tools and teach them (see
+below); the provider, guards, and agents stay untouched.
+
 ## The pieces in this package
 
 ### `dsl.py` -- the plan language and its gatekeeper
