@@ -19,7 +19,7 @@ Congratulations on creating your **{{ app_name }}** project! This is more than j
 
 Your application is ready for you to explore and expand. Here are some exciting directions you might take:
 
-- **AI Integration**: Add intelligence with machine learning using scikit-learn, PyTorch, or integrate with LLMs
+- **Agentic AI**: {% if feature_ai == "Y" %}Built in and governed -- ask via `{{ app_label }} ai ask`, every tool call passes validate, policy, audit{% if feature_ai_fundi == "Y" %}; train your own micro model in `core/fundi`{% endif %}{% else %}Add intelligence by integrating LLMs or classic ML pipelines{% endif %}
 - **Data Exploration**: Uncover insights by analyzing data with pandas, matplotlib, or seaborn
 - **Web Interfaces**: Create beautiful dashboard and web tools with the built-in NiceGUI extension and tailwindcss based admin theme
 - **Automation**: Schedule tasks and create workflows with the scheduler extension or total local and remote automation
@@ -145,6 +145,36 @@ Scheduler> tasks fire 1  # Resume task with ID 1
 ```
 
 {% endif %}
+{% if feature_ai == "Y" %}
+### Ask an AI Agent
+
+Your application speaks to AI providers through one governed runtime -- **the model plans, the pipeline governs, the tools compute**. Profiles and agents are plain YAML in `config/`: `audited` records everything and forbids nothing, `guarded` adds validation and policy. The tools are your own plain functions in `{{ app_label }}/core/ai/tools/`, activated in groups per profile.
+
+```bash
+# The mock provider answers without any external service
+{{ app_label }} ai ask "ping"
+
+# Inspect agents, profiles, and registered tools
+{{ app_label }} ai list
+```
+{% if feature_ai_fundi == "Y" %}
+
+Your project also ships **fundi**, a train-first micro LLM (378,240 parameters, ~1.5 MB) that plans calendar tool calls. No weights are included -- you create them, and that is the point:
+
+```bash
+# Train on your machine (CPU is fine)
+python -m {{ app_label }}.core.fundi.train
+
+# Then ask, in English or German -- guarded, traced, deterministic
+{{ app_label }} ai ask "the weekday of today plus 2 days" --profile fundi --agent guarded
+{{ app_label }} ai ask "welches datum ist übermorgen" --profile fundi
+```
+
+The model's whole language lives in `{{ app_label }}/core/fundi/FUNDI-LEX.yaml`: teach it new words and sentence patterns by editing the file and retraining. `FUNDI-LLM.md` next to it explains training, the anatomy of the weights, and grammar-constrained decoding with detailed diagrams.
+{% endif %}
+
+{% endif %}
+
 <br/>
 
 ## 📊 Development Tools
@@ -212,16 +242,22 @@ CEMENT_LOG=1 {{ app_label }} command
 Your project is organized into a clean, modular structure:
 
 - `config/` - Configuration files for prod, stage, dev and test environments
-- `{{ app_label }}/controllers/` - Command-line interface controllers
 - `{{ app_label }}/core/logic` - Space for your core application logic
+- `{{ app_label }}/core/tasks/` - Implementations of actors, agents, automations, operations, performers etc.
+{% if feature_ai == "Y" %}
+- `{{ app_label }}/core/ai/` - Your AI providers and plain-function tools behind the guarded contracts
+{% endif %}
+{% if feature_ai == "Y" and feature_ai_fundi == "Y" %}
+- `{{ app_label }}/core/fundi/` - The train-first micro LLM lab: model, lexicon (`FUNDI-LEX.yaml`), teaching docs
+{% endif %}
 {% if feature_grpc == "Y" %}
 - `{{ app_label }}/core/grpc/` - gRPC service definitions and implementations
 {% endif %}
+- `{{ app_label }}/core/utils/` - A place to put your overall tools and helper functions
+- `{{ app_label }}/controllers/` - Command-line interface controllers
 {% if feature_nicegui == "Y" %}
 - `{{ app_label }}/site/` - Web interface pages and apis
 {% endif %}
-- `{{ app_label }}/core/tasks/` - Implementations of actors, agents, automations, operations, performers etc.
-- `{{ app_label }}/core/utils/` - A place to put your overall tools and helper functions
 - `{{ app_label }}/templates/` - Templates for rendering content
 - `tests/` - Test suite to ensure reliability
 
@@ -234,6 +270,9 @@ This is just the beginning of your journey. As you build and shape this project,
 - What problem are you trying to solve?
 - Who will use your application and how?
 - How can you make it not just functional, but delightful to use?
+{% if feature_ai == "Y" %}
+- Which routine work could a governed agent take over and which tools would you trust it with?
+{% endif %}
 
 <br/>
 

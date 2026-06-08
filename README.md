@@ -8,7 +8,7 @@
   <strong>Unleashing the Power of Python, Cement, Dramatiq, APScheduler, and gRPC for Superior EDA Solutions!</strong>
 </p>
 <p align="center">
-  -- Event-Driven Architecture, Backend Automation, Event-Driven Automation --
+  -- Event-Driven Architecture, Backend Automation, Governed AI Agents --
 </p>
 
 <br/>
@@ -29,6 +29,10 @@ For timed job execution, a background and interactive [APScheduler](https://apsc
 
 Expose your values and functions via [NiceGUI](https://nicegui.io/) web-based API and pages.
 
+Secrets stay encrypted at rest: the `tokeo.ext.vault` config handler resolves `!vault:` tagged values transparently on read -- your YAML never holds a plaintext credential.
+
+And with `tokeo.ext.ai`, your application speaks to AI providers through one governed runtime: typed contracts, guarded tool execution, full traces -- the same agent pipeline from a 1.5 MB local micro model up to any large provider.
+
 Kickstart your EDA projects with **tokeo** and experience a seamless development cycle.
 
 **Checkout &nbsp; [Spiral](https://github.com/tokeo/spiral)** &nbsp; 🍒 &nbsp; It takes you on an interactive journey through Tokeo's capabilities, providing a
@@ -44,6 +48,8 @@ Tom
 Tokeo is a robust CLI framework for task automation, message queues, and web interfaces, making it ideal for Python backend projects. Key features include:
 
 - **Integrated EDA Stack**: Combines Dramatiq, RabbitMQ, and gRPC for efficient task processing and external access, plus APScheduler for scheduled jobs.
+- **Governed AI Agents**: A provider-agnostic AI runtime (`tokeo.ext.ai`) with typed contracts, profiles, and agents as plain configuration -- every tool call passes a guard pipeline (validate, policy, audit) and leaves a full trace.
+- **Encrypted Secrets in Config**: The vault extension (`tokeo.ext.vault`) keeps credentials encrypted inside your YAML (`!vault:<profile>` tags, built-in `enc` and `scrypt` handlers, keys from the environment) and decrypts them transparently at the leaf -- consumer code never changes, plaintext never lands in the config.
 - **Flexible Task Automation**: Use Fabric-based tools (`tokeo.ext.automate`) to define and run local or remote tasks, with flexible configuration via YAML and CLI overrides.
 - **Extensible CLI**: Built on Cement, Tokeo supports custom commands and plugins, simplifying complex workflows with minimal setup.
 - **Developer-Friendly Tools**: The `Makefile` provides one-liners for formatting (`fmt`), linting (`lint`), testing (`test`), and packaging (`sdist`, `wheel`), speeding up development.
@@ -171,6 +177,16 @@ your_app nicegui serve
 # Access the interface at http://localhost:4123
 ```
 
+### Ask an AI Agent
+
+```bash
+# Ask through the default profile (mock provider, no external service needed)
+your_app ai ask "ping"
+
+# Run the guarded agent: every tool call passes validate, policy, audit
+your_app ai ask "add 14 days to 2026-06-08" --profile fundi --agent guarded
+```
+
 ### Use Diskcache
 
 ```bash
@@ -183,6 +199,38 @@ your_app cache set counter --value 1 --value-type int
 # Get value
 your_app cache get counter
 ```
+
+<br/>
+
+## 🤖 Agents with Guardrails
+
+The newest part of Tokeo is a complete, small AI agent runtime -- built on one conviction: **the model plans, the pipeline governs, the tools compute**. No step is implicit, every step is inspectable. It is deliberately compact, fully typed, and tested end to end: the same suite drives the mock provider, the guard pipeline, and a real trained model.
+
+- **Contracts first**: Messages, tool calls, results, and traces are typed values (`tokeo.core.ai`), independent of any provider SDK.
+- **Agents are configuration**: An agent is a named guard chain in YAML. `audited` records everything and forbids nothing; `guarded` adds validation and policy (e.g. a readonly filesystem). Lean by default: with `agent: null` requests run plain and untraced -- you opt into governance.
+- **Tools are plain functions**: Registered with a spec, activated in groups (calendar, filesystem, mathematics) per profile. The provider never executes anything itself; results return as feedback through the guards.
+- **Late binding, honestly tested**: Providers are resolved by class path. The built-in `mock` provider makes the whole pipeline testable without any external service -- the contracts are the product.
+
+### fundi -- the train-first micro LLM lab
+
+[Spiral](https://github.com/tokeo/spiral) ships `fundi`, a complete and teachable micro language model that plans calendar tool calls -- small enough to read in an afternoon, real enough to prove the contracts end to end:
+
+- **378,240 parameters, ~1.5 MB** -- byte-level tokenizer, 3 transformer blocks, NumPy-only inference in tens of milliseconds, no GPU and no service.
+- **Train first, no shipped weights**: `python -m spiral.core.fundi.train` creates the model on your machine (CPU is fine) with an honest held-out evaluation.
+- **The language is data**: every word and sentence pattern lives in `FUNDI-LEX.yaml` -- teaching the model new language (English and German today) is editing a file and retraining. An ablation switch (`--no-minus`) demonstrates the core lesson live: capability lives in the data, not in the code.
+- **Grammar-constrained planning**: a byte-level automaton makes malformed plans impossible -- the model chooses *which* legal continuation, never *whether* to be legal.
+- **Taught, not just documented**: `FUNDI-LLM.md` explains training, the anatomy of the weights, and constrained decoding with detailed diagrams.
+
+### The road ahead
+
+The runtime is deliberately provider-shaped: the contracts you write against today are the contracts the next stages plug into.
+
+1. **OpenAI-compatible provider** -- cloud endpoints and local runtimes (Ollama, LM Studio) behind the very same agents and guards; switching providers becomes editing a profile, not a refactor -- with the API key `!vault:` encrypted right inside it.
+2. **Response guards** -- redact and truncate as after-guards: governance for what comes back, not only for what gets called.
+3. **Sandboxed tool execution** -- tools run isolated (subprocess first, stronger isolation opt-in), so even a misbehaving tool stays inside its fence.
+4. **Code mode** -- a `python_exec` tool that lets agents compose vetted tool calls as Python instead of many chat round-trips.
+
+The contracts stay; the providers scale.
 
 <br/>
 
@@ -234,12 +282,15 @@ make docker
 When you create a new project with Tokeo, you get a clean, modular structure:
 
 - `config/` - Configuration files for prod, stage, dev and test environments
-- `your_app/controllers/` - Command-line interface controllers
 - `your_app/core/logic` - Space for your core application logic
-- `your_app/core/grpc/` - gRPC service definitions and implementations
-- `your_app/core/pages/` - Web interface pages and apis
 - `your_app/core/tasks/` - Implementations of actors, agents, automations, operations, performers etc.
+- `your_app/core/ai/` - Your AI providers and plain-function tools behind the guarded contracts
+- `your_app/core/fundi/` - The train-first micro LLM lab: model, lexicon (`FUNDI-LEX.yaml`), teaching docs
+- `your_app/core/grpc/` - gRPC service definitions and implementations
 - `your_app/core/utils/` - A place to put your overall tools and helper functions
+- `your_app/controllers/` - Command-line interface controllers
+- `your_app/site/` - Web interface pages and apis
+- `your_app/templates/` - Templates for rendering content
 - `tests/` - Test suite to ensure reliability
 
 <br/>
@@ -252,7 +303,17 @@ Tokeo is designed to grow with your project. As you build, consider:
 - Creating new controllers for additional commands
 - Adding task processors for background workloads
 - Designing web interfaces to visualize data
+- Wiring your own AI provider behind the same guarded agent contracts
 - Implementing automated deployment pipelines
+
+<br/>
+<br/>
+
+## ⭐ Support the Project
+
+Tokeo is built in the open, with working code over promises: a governed agent runtime you can read in an afternoon, and a micro model you train yourself to prove the contracts end to end. If this approach is useful to you, a star on [GitHub](https://github.com/tokeo/tokeo) helps others find it -- issues, ideas, and pull requests are just as welcome.
+
+One note on contributions: we do not accept purely AI-generated issues or pull requests. We keep the human in the loop and use AI as an exoskeleton, not as a replacement -- the same conviction that shapes the runtime itself.
 
 <br/>
 <br/>
