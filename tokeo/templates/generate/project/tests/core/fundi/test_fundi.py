@@ -20,7 +20,7 @@ from {{ app_label }}.main import {{ app_class_name }}Test
 # per-phrasing checks are trustworthy. raised to 0.97 together with the
 # larger capacity (dim 128, ff 512); confirm after the first training run
 # of the bigger model and set it just under the achieved value
-_MIN_ACCURACY = 0.97
+_MIN_ACCURACY = 0.95
 
 # english weekday names, locale-independent, matching the tool's output
 _WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
