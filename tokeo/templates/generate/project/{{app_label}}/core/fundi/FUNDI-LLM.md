@@ -83,10 +83,11 @@ below); the provider, guards, and agents stay untouched.
 
 A literal sign inside a request is not part of the language. Direction is
 carried by words -- minus, before, ago (vor, abziehen in German) -- the
-count is always written bare, and the sign lives in the plan. Asking for
-"today plus -2 days" will therefore plan +2: the dash reads as chatter,
-and the trace shows exactly what was planned, which is the point of
-traces. Use the worded backward forms instead.
+count is always written bare, and the sign lives in the plan. A sign
+written onto the count itself ("today plus -2 days", "add +5 months") is
+taught as ``<nomatch>``: the model answers with the honest labelled echo
+instead of inventing a digit, so the rule is enforced by the model, not
+only described here. Use the worded backward forms instead.
 
 Honesty is also taught close to the domain, not only far away: the
 negatives include calendar-near requests the model cannot serve ("the
@@ -322,6 +323,62 @@ JIT-compiled automatically -- without it the same numbers run as pure NumPy.
 A compressed archive of named float32 matrices, one per parameter, plus the
 architecture and the achieved accuracy as embedded metadata, so inference
 and weights can never drift apart. Created exclusively by training.
+
+#### Anatomy of the weights -- every number accounted for
+
+The default architecture (`dim=96`, `layers=3`, `heads=4`, `ff=384`,
+`context=184`, `vocab=259`) produces exactly **378,240** trainable numbers.
+Here is where each one lives:
+
+| part | matrix | shape | numbers |
+|---|---|---|---|
+| token meaning | `embed.weight` | 259 x 96 | 24,864 |
+| position meaning | `position.weight` | 184 x 96 | 17,664 |
+| per block: norm 1 | `ln1.weight` + `ln1.bias` | 96 + 96 | 192 |
+| per block: attention in | `attn.in_proj_weight` + bias | 288 x 96 + 288 | 27,936 |
+| per block: attention out | `attn.out_proj.weight` + bias | 96 x 96 + 96 | 9,312 |
+| per block: norm 2 | `ln2.weight` + `ln2.bias` | 96 + 96 | 192 |
+| per block: MLP up | `mlp.0.weight` + bias | 384 x 96 + 384 | 37,248 |
+| per block: MLP down | `mlp.2.weight` + bias | 96 x 384 + 96 | 36,960 |
+| **one block** | (sum of the six rows above) | | **111,840** |
+| three blocks | 3 x 111,840 | | 335,520 |
+| final norm | `ln.weight` + `ln.bias` | 96 + 96 | 192 |
+| output head | tied to `embed.weight` | (shared) | 0 |
+| **total** | | | **378,240** |
+
+Two details worth pausing on. The **output head adds zero parameters**: it
+reuses the embedding matrix transposed (`embed.weight.T`), so the same
+24,864 numbers both map a byte to a vector and map a vector back to byte
+scores. And the **attention projection is the per-block heavyweight**
+(27,936 + 9,312): `in_proj` is three stacked 96 x 96 maps (query, key,
+value) plus bias, which is why widening `dim` grows the model roughly with
+its square. The whole file is float32, so 378,240 numbers are about 1.5 MB
+on disk -- small enough to read, ship, and reason about completely.
+
+One save-side footnote: because the head is tied, the exported `state_dict`
+lists `head.weight` as a second name for the same matrix, so the npz
+physically stores that 24,864-number table twice. The runtime only ever
+reads `embed.weight`; the duplicate is harmless and never counted as a
+parameter (`model.parameters()` reports the 378,240 unique numbers).
+
+#### What the pipeline checks
+
+The lab fails loud rather than wrong. Every guard, and what it catches:
+
+- **lexicon validation** (`data._load_lexicon`, at import): an unknown
+    tool or a pattern missing a required placeholder raises immediately --
+    a typo in `FUNDI-LEX.yaml` can never train silently.
+- **grammar legality** (`dsl.Constrainer`): a generated plan can only be
+    legal DSL over the active tools; a malformed plan is impossible to emit.
+- **the decoder budget guard** (a weight-free test): the longest plan the
+    data can produce must fit `PLAN_BUDGET`, with room for EOS -- so a new,
+    longer pattern group surfaces in the tests instead of being truncated.
+- **byte-exact held-out evaluation** (`train.evaluate`): accuracy counts
+    only whole plan lines that match character for character, decoded
+    without the grammar fence -- an honest lower bound on the raw model.
+- **the ablation invariant** (`--no-minus`): no example carries a backward
+    wording, and no plan a negative value -- one variable changes, nothing
+    else, so the two models differ only in what the data taught.
 
 ## Training, in plain words
 

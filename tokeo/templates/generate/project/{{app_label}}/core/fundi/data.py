@@ -1,5 +1,5 @@
 """
-Synthetic training data for the {{ app_name }} fundi micro model.
+Synthetic training data for the Spiral fundi micro model.
 
 The calendar domain is closed, so the dataset is generated, not collected.
 Every example is a (request, plan-DSL) pair. The complete language -- every
@@ -11,11 +11,15 @@ lexicon and retraining.
 
 ### What the mixture teaches
 
-- ~15% negatives (chatter mapped to ``<nomatch>``): without them the model
+- ~15% abstentions mapped to ``<nomatch>`` (about 12% chatter and hard
+    negatives, about 3% signed-count requests): without them the model
     would invent a plan for every input -- this is the anti-hallucination
     share. Negatives carry preambles and lead-ins too, so surrounding
     chatter alone never signals "calendar"; calendar-near hard negatives
-    ("the date of christmas") keep the honesty close to the domain.
+    ("the date of christmas") keep the honesty close to the domain, and
+    a sign written onto a bare count ("plus -2 days", "add +5 months")
+    is taught as ``<nomatch>`` too -- a sign in the request is not part
+    of the language, so the model echoes instead of inventing a digit.
 - ~11% relative words (tomorrow, uebermorgen, last week, next year ...):
     the lexicon maps every word to its shift from today; umlaut and
     folded spellings are taught side by side.
@@ -122,7 +126,9 @@ def _lang(lang_en):
 
 
 def _iso(rng):
-    # a uniform date in a wide window keeps the digit patterns diverse
+    # a literal date for a {d} slot: uniform over ~55 years (20000 days from
+    # 2000-01-01). the wide window keeps every digit position varied, so the
+    # model learns to copy any date layout rather than memorizing a few
     return (date(2000, 1, 1) + timedelta(days=rng.randrange(0, 20000))).isoformat()
 
 
@@ -161,10 +167,24 @@ def sample(rng, minus=True):
     without any notion of minus.
 
     """
+    # one uniform roll in [0,1) partitions the mixture; the cut points are
+    # the cumulative shares. tuning them shifts what the model practises
+    # most, which directly shapes what it gets good at:
+    #   0.00-0.12  (12%)  lexicon negatives -> learn to abstain on chatter
+    #   0.12-0.15  ( 3%)  signed-count requests -> abstain, don't invent
+    #   0.15-0.26  (11%)  single relative words (tomorrow, letzte woche)
+    #   0.26-0.30  ( 4%)  relative chains (two shifts from today)
+    #   0.30-0.72  (42%)  shifts, plain and consumer-composed (any unit)
+    #   0.72-1.00  (28%)  single-step calls to the non-shifting tools
     kind = rng.random()
-    if kind < 0.15:
+    if kind < 0.12:
         return _preamble(rng) + rng.choice(_LEXICON['negatives']), NOMATCH
+    # the second roll picks the language: ~65% english, ~35% german. raising
+    # this would teach english better at german's expense, and vice versa
     lang_en = rng.random() < 0.65
+    if kind < 0.15:
+        # a sign on a bare count: honest <nomatch>, not an invented digit
+        return _render_signed_nomatch(rng, lang_en)
     if kind < 0.26:
         return _render_relative(rng, lang_en, minus)
     if kind < 0.30:
@@ -178,8 +198,11 @@ def sample(rng, minus=True):
 
 
 def _unit(rng, lang_en):
-    # the day unit gets half the mass: exact short day counts are the
-    # bread-and-butter capability, months and years share the rest
+    # which unit a shift uses. days get half the probability mass on
+    # purpose: day arithmetic is the bread-and-butter skill and the hardest
+    # to copy exactly, so it is practised twice as often as months+years
+    # combined. drop this bias and the model would see fewer day examples
+    # and copy day counts a little less reliably
     rows = _LEXICON['units'][_lang(lang_en)]
     days = [row for row in rows if row['tool'] == 'add_days']
     if days and rng.random() < 0.5:
@@ -188,8 +211,13 @@ def _unit(rng, lang_en):
 
 
 def _count(rng, tool):
-    # day counts stay half single-digit (short numbers must copy, not
-    # extend); months fit a year, years stay small
+    # how large the {n} count is, per tool. the day distribution is the
+    # important one: half the time a single digit (1-9), half the time a
+    # larger number (10-364). the single-digit half is deliberate -- short
+    # numbers MUST be copied exactly ("2" stays "2", never becomes "26"),
+    # so they are over-represented to drill exact copying. months stay
+    # within a year (1-11) and years stay small (1-5), the ranges that
+    # actually occur in calendar talk
     if tool == 'add_days':
         return rng.randrange(1, 10) if rng.random() < 0.5 else rng.randrange(10, 365)
     return rng.randrange(1, 12 if tool == 'add_months' else 6)
@@ -238,6 +266,25 @@ def _render_relative_chain(rng, lang_en, minus=True):
         (tool2, {'date': '@2', DOMAIN[tool2][1]: value2}),
     ]
     return _preamble(rng) + request, render(plan)
+
+
+def _render_signed_nomatch(rng, lang_en):
+    # a sign written onto a bare count is not part of the language
+    # ('plus -2 days', 'add +5 months to ...'): direction is carried by
+    # words, never by a sign in the request. taught as <nomatch> so the
+    # model answers with the honest echo instead of copying a confused
+    # digit. generated, not a fixed string -- it varies over units,
+    # counts, both languages, and both signs
+    unit = _unit(rng, lang_en)
+    group = 'shift_minus' if rng.random() < 0.5 else 'shift'
+    plain = [phrase for phrase in _LEXICON['patterns'][group][_lang(lang_en)] if '{c}' not in phrase]
+    phrase = rng.choice(plain)
+    count = _count(rng, unit['tool'])
+    sign = rng.choice(['-', '+'])
+    request = phrase.replace('{n}', sign + str(count))
+    request = request.replace('{u}', rng.choice(unit['one'] if count == 1 else unit['many']))
+    request = request.replace('{d}', _time_word(rng, lang_en))
+    return _preamble(rng) + request, NOMATCH
 
 
 def _render_shift(rng, lang_en, minus=True):
