@@ -75,6 +75,21 @@ via `FUNDI_CKPT`/`FUNDI_CHUNK`. At the end it evaluates exact-plan accuracy
 on held-out examples and saves `weights.npz`. Torch is a dev-side tool only;
 the application never imports it.
 
+The `--no-minus` switch is a built-in ablation experiment:
+
+    python -m {{ app_label }}.core.fundi.train             # with minus teaching
+    python -m {{ app_label }}.core.fundi.train --no-minus  # without
+
+Both runs share the architecture, the budget, and the schedule -- only the
+dataset differs: with the switch, every signed-offset wording is left out,
+and the resulting model has no notion of minus days (a request like
+*"today minus 2 days"* falls back to the nearest learned pattern). Training
+two weights files this way makes the central lesson of the lab tangible:
+capability lives in the data, not in the code. The choice is recorded in
+the exported metadata (`minus: true/false`), so a weights file always tells
+what it was taught; the sample printer takes the same switch
+(`python -m {{ app_label }}.core.fundi.data --no-minus`).
+
 ### `infer.py` -- the runtime (plain NumPy)
 
 Loads `weights.npz` and reruns the exact forward pass in NumPy (verified
