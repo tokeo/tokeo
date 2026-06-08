@@ -42,9 +42,10 @@ signed offsets. Small, but real tasks:
     {{ app_label }} ai ask "die kalenderwoche von heute plus 30 tagen" --profile fundi
     {{ app_label }} ai ask "die mondphase am 2000-01-06" --profile fundi
 
-    # relative words and month/year shifts
+    # relative words, chains of them, and month/year shifts
     {{ app_label }} ai ask "welches datum ist übermorgen" --profile fundi
     {{ app_label }} ai ask "the week number of next month" --profile fundi
+    {{ app_label }} ai ask "the date of tomorrow next year" --profile fundi
     {{ app_label }} ai ask "heute plus 1 jahr" --profile fundi
 
     # and the three-step chains, its signature move
@@ -77,6 +78,24 @@ the clean place is a remote profile behind the very same agents, guards,
 and tools -- the ladder mock -> fundi -> remote model tells the full
 story. To give fundi new *tasks*, give it new tools and teach them (see
 below); the provider, guards, and agents stay untouched.
+
+### Honest limits, by design
+
+A literal sign inside a request is not part of the language. Direction is
+carried by words -- minus, before, ago (vor, abziehen in German) -- the
+count is always written bare, and the sign lives in the plan. Asking for
+"today plus -2 days" will therefore plan +2: the dash reads as chatter,
+and the trace shows exactly what was planned, which is the point of
+traces. Use the worded backward forms instead.
+
+Honesty is also taught close to the domain, not only far away: the
+negatives include calendar-near requests the model cannot serve ("the
+date of christmas", "wann ist ostern"), so unsupported wordings answer
+with the labelled echo instead of an invented plan. And a small share of
+the training requests carries one human typo -- a doubled letter or
+swapped neighbours -- so common slips like "tommorrow" usually still
+find their plan, while dates and digits are never touched: exact copying
+stays exact.
 
 ## From ask to answer, as a picture
 
@@ -241,8 +260,9 @@ training. Day offsets are signed: plus/after/in wordings map to positive
 day values, minus/before/ago (minus/vor in German) to negative ones.
 Relative words (tomorrow, übermorgen, last week, next year ...) live in a
 lookup table -- one line per word, mapping it to its shift from today --
-and every shift shape speaks all units alike -- the unit word (days,
-months, years) picks the tool.
+they chain ("tomorrow next year" is two shifts in order), and every
+shift shape speaks all units alike -- the unit word (days, months,
+years) picks the tool.
 Teaching a new word is adding a table line and retraining. A fixed seed makes the dataset reproducible at any time; run
 `python -m {{ app_label }}.core.fundi.data` to print samples.
 
@@ -251,9 +271,9 @@ Teaching a new word is adding a table line and retraining. A fixed seed makes th
 The complete language of the training data as a richly commented yaml
 file in three parts: **words** (time words, relative words with their
 shift from today, the units with their declensions, consumer names),
-**chatter** (negatives, preambles, lead-ins), and **patterns** -- four
-groups only (`single`, `shift`, `shift_minus`, `relative`), held
-together by one rule: *a `{c}` in any pattern means a consumer reads the
+**chatter** (negatives, preambles, lead-ins), and **patterns** -- five
+groups (`single`, `shift`, `shift_minus`, `relative`, `relative_chain`),
+held together by one rule: *a `{c}` in any pattern means a consumer reads the
 result*. `data.py` loads and validates it at import time (unknown tools
 and missing placeholders fail loudly), a weight-free test guards the
 format, and pdoc renders the whole file syntax-highlighted into the data
@@ -328,7 +348,7 @@ flowchart TD
         direction LR
         LW("<b>1. words</b><br/>time words, relative words,<br/>units with declensions,<br/>consumer names")
         LC("<b>2. chatter</b><br/>negatives, preambles,<br/>lead-ins")
-        LP("<b>3. patterns</b><br/>four groups: single, shift,<br/>shift_minus, relative --<br/>one rule: a consumer slot<br/>in a pattern reads the result")
+        LP("<b>3. patterns</b><br/>five groups: single, shift, shift_minus,<br/>relative, relative_chain --<br/>one rule: a consumer slot<br/>in a pattern reads the result")
     end
 
     GEN("<b>data.dataset(30000, seed=7)</b><br/>the mixture: 15% nomatch, 12% relative words,<br/>45% shifts plain and composed, 28% single-step<br/>example pair:<br/>'der wochentag von heute plus 2 tagen'<br/>current();add_days(date=@1,days=2);weekday(date=@2)")

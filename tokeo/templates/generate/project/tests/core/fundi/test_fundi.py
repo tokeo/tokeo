@@ -40,7 +40,7 @@ def test_{{ app_label }}_fundi_lexicon_loads():
         assert _LEXICON['time_words'][language]
         assert _LEXICON['relative_words'][language]
         assert _LEXICON['units'][language]
-        for group in ('single', 'shift', 'shift_minus', 'relative'):
+        for group in ('single', 'shift', 'shift_minus', 'relative', 'relative_chain'):
             pool = _LEXICON['patterns'][group]
             assert (pool[language] if language in pool else all(pool[tool][language] for tool in pool))
     assert _LEXICON['negatives'] and _LEXICON['preambles'] and _LEXICON['leadins']
@@ -64,6 +64,17 @@ def test_{{ app_label }}_ai_fundi_model():
         tomorrow = (date.today() + timedelta(days=1)).isoformat()
         assert app.ai.ask('welches datum ist morgen', agent='guarded', profile='fundi') == f'[fundi] add_days: {tomorrow}'
         assert app.ai.ask('die mondphase am 2000-01-06', agent='guarded', profile='fundi') == '[fundi] moon_phase: new moon'
+        # a relative chain: two shifts from today, day word then year word
+        base = date.today() + timedelta(days=1)
+        try:
+            target = base.replace(year=base.year + 1)
+        except ValueError:
+            # feb 29 clamps to feb 28 in a common year, like the tool does
+            target = base.replace(year=base.year + 1, day=28)
+        chain2 = app.ai.ask('the date of tomorrow next year', agent='guarded', profile='fundi')
+        assert chain2 == f'[fundi] add_years: {target.isoformat()}'
+        # a hard negative: calendar-near wording the model cannot serve
+        assert app.ai.ask('what date is my birthday', agent='guarded', profile='fundi') == '[fundi] what date is my birthday'
         assert app.ai.ask('sing me a song', agent='guarded', profile='fundi') == '[fundi] sing me a song'
         days = (date(2026, 12, 24) - date.today()).days
         chained = app.ai.chat([{'role': 'user', 'content': 'count the days from today until 2026-12-24'}], agent='guarded', profile='fundi')

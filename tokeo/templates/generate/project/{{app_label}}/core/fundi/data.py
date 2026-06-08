@@ -14,10 +14,14 @@ lexicon and retraining.
 - ~15% negatives (chatter mapped to ``<nomatch>``): without them the model
     would invent a plan for every input -- this is the anti-hallucination
     share. Negatives carry preambles and lead-ins too, so surrounding
-    chatter alone never signals "calendar".
-- ~12% relative words (tomorrow, uebermorgen, last week, next year ...):
+    chatter alone never signals "calendar"; calendar-near hard negatives
+    ("the date of christmas") keep the honesty close to the domain.
+- ~11% relative words (tomorrow, uebermorgen, last week, next year ...):
     the lexicon maps every word to its shift from today; umlaut and
     folded spellings are taught side by side.
+- ~4% relative chains ("tomorrow next year"): two relative words, two
+    shifts from today in order -- the three-step plan is full, so these
+    carry no consumer.
 - ~45% shifts, plain and composed: the unit word (days, months, years)
     picks the tool, signs included, day units get half the mass; a {c}
     in the pattern puts a consumer behind the shift -- the three-step
@@ -31,7 +35,12 @@ lexicon and retraining.
     copied exactly, not extended (2 is 2, never 26).
 - Offsets are signed: minus/before/ago wordings (minus/vor in German)
     map to negative values, plus/after/in to positive ones -- the request
-    always shows the bare count, the sign lives in the plan.
+    always shows the bare count, the sign lives in the plan. A literal
+    sign inside a request ("plus -2 days") is deliberately not part of
+    the language.
+- ~6% of the requests carry one human typo, a doubled letter or swapped
+    neighbours ("tommorrow"); digits and date characters are never
+    touched, the plan side stays exact.
 
 The whole dataset is a pure function of its seed and the lexicon: same
 seed, same lexicon, same deduplicated pairs -- a training run is fully
@@ -58,6 +67,7 @@ _REQUIRED = {
     'shift': ('{n}', '{u}'),
     'shift_minus': ('{n}', '{u}'),
     'relative': ('{w}',),
+    'relative_chain': ('{w}', '{w2}'),
 }
 
 
@@ -142,8 +152,9 @@ def sample(rng, minus=True):
     """
     Draw one (request, dsl) example from the mixture.
 
-    The first roll picks the bucket (negative, relative word, shift, or
-    single-step), the second the language (about two thirds
+    The first roll picks the bucket (negative, relative word, relative
+    chain, shift, or single-step), the second the language (about two
+    thirds
     English); the helpers then pick a pattern from the lexicon, fill its
     slots, and render the matching plan. With ``minus=False`` every
     backward wording is left out: the resulting dataset teaches a model
@@ -154,8 +165,10 @@ def sample(rng, minus=True):
     if kind < 0.15:
         return _preamble(rng) + rng.choice(_LEXICON['negatives']), NOMATCH
     lang_en = rng.random() < 0.65
-    if kind < 0.27:
+    if kind < 0.26:
         return _render_relative(rng, lang_en, minus)
+    if kind < 0.30:
+        return _render_relative_chain(rng, lang_en, minus)
     if kind < 0.72:
         return _render_shift(rng, lang_en, minus)
     single = _LEXICON['patterns']['single']
@@ -204,6 +217,26 @@ def _render_relative(rng, lang_en, minus=True):
     request = phrase.replace('{w}', word)
     plan = [('current', {}), (tool, {'date': '@1', DOMAIN[tool][1]: value})]
     request, plan = _consume(rng, lang_en, request, plan)
+    return _preamble(rng) + request, render(plan)
+
+
+def _render_relative_chain(rng, lang_en, minus=True):
+    # two relative words chain into two shifts from today: a day word
+    # first, then a month or year word -- three steps fill the plan, so
+    # no consumer fits here
+    words = _LEXICON['relative_words'][_lang(lang_en)]
+    rows = [(word, row['tool'], str(row['shift'])) for word, row in words.items()]
+    if not minus:
+        rows = [row for row in rows if not row[2].startswith('-')]
+    word, tool, value = rng.choice([row for row in rows if row[1] == 'add_days'])
+    word2, tool2, value2 = rng.choice([row for row in rows if row[1] != 'add_days'])
+    phrase = rng.choice(_LEXICON['patterns']['relative_chain'][_lang(lang_en)])
+    request = phrase.replace('{w}', word).replace('{w2}', word2)
+    plan = [
+        ('current', {}),
+        (tool, {'date': '@1', DOMAIN[tool][1]: value}),
+        (tool2, {'date': '@2', DOMAIN[tool2][1]: value2}),
+    ]
     return _preamble(rng) + request, render(plan)
 
 
@@ -258,6 +291,20 @@ def _render_single(rng, tool, phrase, lang_en):
     return _preamble(rng) + request, render(plan)
 
 
+def _typo(rng, request):
+    # one human typo, a doubled letter or swapped neighbours ('tomorrow'
+    # becomes 'tommorrow'), so the byte matcher survives sloppy fingers;
+    # only letter pairs qualify -- digits and date characters are never
+    # touched, the plan side stays exact
+    spots = [i for i in range(len(request) - 1) if request[i].isalpha() and request[i + 1].isalpha()]
+    if not spots:
+        return request
+    i = rng.choice(spots)
+    if rng.random() < 0.5:
+        return request[:i] + request[i] + request[i:]
+    return request[:i] + request[i + 1] + request[i] + request[i + 2:]
+
+
 def dataset(count, seed=7, minus=True):
     """
     Generate a deduplicated list of (request, dsl) pairs.
@@ -280,6 +327,9 @@ def dataset(count, seed=7, minus=True):
     examples = []
     while len(examples) < count:
         request, dsl = sample(rng, minus)
+        # a small typo share teaches robustness against sloppy fingers
+        if rng.random() < 0.06:
+            request = _typo(rng, request)
         if request not in seen:
             seen.add(request)
             examples.append((request, dsl))

@@ -26,6 +26,10 @@
 #   the byte tokenizer sees them as different words, both need teaching
 # - shifts are integers; negative entries are the backward words and are
 #   left out when training with --no-minus
+# - direction is carried by words (minus/before/ago, vor/abziehen): the
+#   count in a request is always written bare. a literal sign inside a
+#   request ('plus -2 days') is NOT part of the language and reads as
+#   chatter -- use the worded backward forms instead
 # - quote patterns in single quotes; the placeholders are:
 #     {d}  a date mention (literal iso date or a time word)
 #     {d2} the second date of a range
@@ -109,6 +113,7 @@ consumers:
 # out-of-domain requests mapped to <nomatch>: the anti-hallucination
 # share -- without it the model would invent a plan for every input
 negatives:
+  # plainly off-domain chatter
   - 'sing me a song'
   - 'what is the capital of france'
   - 'please review my pull request'
@@ -119,6 +124,14 @@ negatives:
   - 'erzaehl mir einen witz'
   - 'order a pizza for tonight'
   - 'translate this sentence to spanish'
+  # hard negatives: calendar-near but unsupported -- honesty must hold
+  # close to the domain, not only far away
+  - 'the date of christmas'
+  - 'when is easter next year'
+  - 'what date is my birthday'
+  - 'das datum von weihnachten'
+  - 'wann ist ostern'
+  - 'wieviele tage bis zum sommer'
 
 # distractor sentences in front of the intent, cross-language on purpose
 # (they also precede negatives, so chatter never signals "calendar");
@@ -237,6 +250,18 @@ patterns:
       - 'der {c} von {d} minus {n} {u}'
       - 'der {c} von vor {n} {u}'
       - 'erst {n} {u} von {d} abziehen und dann der {c}'
+
+  # two relative words chained: both shifts apply in order from today
+  # ('tomorrow next year' -> add_days, then add_years); a day word comes
+  # first, a month or year word second -- three steps fill the plan, so
+  # no consumer fits here
+  relative_chain:
+    en:
+      - 'what date is {w} {w2}'
+      - 'the date of {w} {w2}'
+    de:
+      - 'welches datum ist {w} {w2}'
+      - 'das datum von {w} {w2}'
 
   # wrappers around a relative word; with {c} a consumer reads the result
   relative:
