@@ -51,6 +51,10 @@ ai:
       type: {{ app_label }}.core.ai.tools.date_diff.TokeoAiDateDiffTool
     add_days:
       type: {{ app_label }}.core.ai.tools.add_days.TokeoAiAddDaysTool
+    add_months:
+      type: {{ app_label }}.core.ai.tools.add_months.TokeoAiAddMonthsTool
+    add_years:
+      type: {{ app_label }}.core.ai.tools.add_years.TokeoAiAddYearsTool
     weekday:
       type: {{ app_label }}.core.ai.tools.weekday.TokeoAiWeekdayTool
     week_number:
@@ -67,6 +71,8 @@ ai:
       - current
       - date_diff
       - add_days
+      - add_months
+      - add_years
       - weekday
       - week_number
       - moon_phase

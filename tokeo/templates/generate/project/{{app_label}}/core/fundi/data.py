@@ -1,11 +1,13 @@
 """
 Synthetic training data for the {{ app_name }} fundi micro model.
 
-The calendar domain is closed, so the dataset is generated, not collected:
-phrase templates (English and German) with slots for dates and numbers,
-compositional programs up to three chained steps rendered into language, plus
-distractor preambles and out-of-domain negatives that teach the honest
-``<nomatch>``. Every example is a (request, plan-DSL) pair.
+The calendar domain is closed, so the dataset is generated, not collected.
+Every example is a (request, plan-DSL) pair. The complete language -- every
+word and every sentence pattern the model is taught -- lives in
+``FUNDI-LEX.yaml`` next to this module; this module holds the mechanics:
+loading and validating the lexicon, the mixture, and how patterns are
+filled and rendered into plans. Teaching fundi new language is editing the
+lexicon and retraining.
 
 ### What the mixture teaches
 
@@ -13,28 +15,100 @@ distractor preambles and out-of-domain negatives that teach the honest
     would invent a plan for every input -- this is the anti-hallucination
     share. Negatives carry preambles and lead-ins too, so surrounding
     chatter alone never signals "calendar".
-- ~55% single-step requests: tool recognition and exact slot filling
-    (dates copied byte by byte, numbers as written).
-- ~30% nested requests rendered from two- and three-step programs: the
-    compositional share, e.g. "the weekday of today plus 2 days" ->
+- ~12% relative words (tomorrow, uebermorgen, last week, next year ...):
+    the lexicon maps every word to its shift from today; umlaut and
+    folded spellings are taught side by side.
+- ~45% shifts, plain and composed: the unit word (days, months, years)
+    picks the tool, signs included, day units get half the mass; a {c}
+    in the pattern puts a consumer behind the shift -- the three-step
+    share, e.g. "the weekday of today plus 2 days" ->
     ``current();add_days(date=@1,days=2);weekday(date=@2)``.
+- ~28% single-step requests for the non-shifting tools: recognition and
+    exact slot filling (dates copied byte by byte, numbers as written).
 - Time words (today/now/current, heute/jetzt/aktuell) teach the bridge:
     they put ``current()`` in front and reference its result via ``@1``.
 - Day counts are half single-digit on purpose: short numbers must be
     copied exactly, not extended (2 is 2, never 26).
 - Offsets are signed: minus/before/ago wordings (minus/vor in German)
-    map to negative day values, plus/after/in to positive ones -- the
-    request always shows the bare count, the sign lives in the plan.
+    map to negative values, plus/after/in to positive ones -- the request
+    always shows the bare count, the sign lives in the plan.
 
-The whole dataset is a pure function of its seed: ``dataset(n, seed)``
-always returns the same deduplicated pairs, so a training run is fully
+The whole dataset is a pure function of its seed and the lexicon: same
+seed, same lexicon, same deduplicated pairs -- a training run is fully
 reproducible. Run ``python -m {{ app_label }}.core.fundi.data`` to print samples.
+
+### The lexicon
+
+```yaml
+.. include:: ./FUNDI-LEX.yaml
+```
 """
 
+import pathlib
 import random
 from datetime import date, timedelta
 
-from {{ app_label }}.core.fundi.dsl import render, NOMATCH
+import yaml
+
+from {{ app_label }}.core.fundi.dsl import render, DOMAIN, NOMATCH
+
+# which placeholders every pattern group must carry; the loader checks
+# them so a lexicon edit fails loudly, never silently in training
+_REQUIRED = {
+    'shift': ('{n}', '{u}'),
+    'shift_minus': ('{n}', '{u}'),
+    'relative': ('{w}',),
+}
+
+
+def _load_lexicon():
+    """
+    Load and validate ``FUNDI-LEX.yaml``.
+
+    The lexicon is data, so it is checked like data: tools must exist in
+    the plan grammar, shifts must be integers, and every pattern group
+    must carry its required placeholders.
+
+    ### Returns
+
+    - **dict**: The parsed lexicon (words, names, and pattern groups)
+
+    """
+    path = pathlib.Path(__file__).parent / 'FUNDI-LEX.yaml'
+    lexicon = yaml.safe_load(path.read_text())
+    for language, words in lexicon['relative_words'].items():
+        for word, row in words.items():
+            if row['tool'] not in DOMAIN:
+                raise ValueError(f'FUNDI-LEX.yaml: unknown tool {row["tool"]!r} for {word!r}')
+            int(row['shift'])
+    for language, rows in lexicon['units'].items():
+        for row in rows:
+            if row['tool'] not in DOMAIN:
+                raise ValueError(f'FUNDI-LEX.yaml: unknown tool {row["tool"]!r} in units/{language}')
+            # declensions: 'one' and 'many' may be a word or a list of words
+            for key in ('one', 'many'):
+                if not isinstance(row[key], list):
+                    row[key] = [row[key]]
+    for tool in lexicon['consumers']:
+        if tool not in DOMAIN:
+            raise ValueError(f'FUNDI-LEX.yaml: unknown consumer tool {tool!r}')
+    for tool in lexicon['patterns']['single']:
+        if tool not in DOMAIN:
+            raise ValueError(f'FUNDI-LEX.yaml: unknown tool {tool!r} in patterns/single')
+    for group, needed in _REQUIRED.items():
+        for language, phrases in lexicon['patterns'][group].items():
+            for phrase in phrases:
+                for placeholder in needed:
+                    if placeholder not in phrase:
+                        raise ValueError(f'FUNDI-LEX.yaml: {group}/{language} pattern {phrase!r} misses {placeholder}')
+    return lexicon
+
+
+_LEXICON = _load_lexicon()
+
+
+def _lang(lang_en):
+    return 'en' if lang_en else 'de'
 
 
 def _iso(rng):
@@ -42,133 +116,133 @@ def _iso(rng):
     return (date(2000, 1, 1) + timedelta(days=rng.randrange(0, 20000))).isoformat()
 
 
-# how a date slot is spoken: literal iso, or a time word that the plan
-# resolves through the current tool
-_TIME_WORDS_EN = ['today', 'now', 'current']
-_TIME_WORDS_DE = ['heute', 'jetzt', 'aktuell']
+def _time_word(rng, lang_en):
+    return rng.choice(_LEXICON['time_words'][_lang(lang_en)])
 
-# distractor preambles teach the model to ignore chatter around the intent
-_PREAMBLES = [
-    '', '', '',
-    'i will write a new calendar app and need some specific dates. ',
-    'we are planning the release schedule. ',
-    'quick question for my project notes. ',
-    'ich plane gerade ein paar termine. ',
-    'fuer meine neue kalender app brauche ich daten. ',
-    'short one: ',
-]
 
-# polite framings directly in front of the intent
-_LEADINS = [
-    '', '', '',
-    'let me know first of all ',
-    'please tell me ',
-    'can you tell me ',
-    'i need ',
-    'sag mir bitte ',
-    'ich brauche ',
-]
+def _consumer(rng, lang_en):
+    # the tool and its spoken name in the requested language
+    tool = rng.choice(list(_LEXICON['consumers']))
+    return tool, _LEXICON['consumers'][tool][_lang(lang_en)]
 
-# single-step phrasings; {d} is a date mention, {n} a number
-_SINGLE_EN = {
-    'weekday': ['the weekday of {d}', 'which weekday is {d}', 'weekday {d}', 'what day of the week is {d}'],
-    'week_number': ['the week number of {d}', 'which calendar week is {d}', 'week_number {d}', 'iso week of {d}'],
-    'moon_phase': ['the moon phase of {d}', 'moon phase on {d}', 'moon_phase {d}', 'how is the moon on {d}'],
-    'date_diff': ['count the days between {d} and {d2}', 'days from {d} until {d2}', 'date_diff between {d} and {d2}',
-                  'how many days lie between {d} and {d2}'],
-    'add_days': ['add {n} days to {d}', 'add_days {n} onto {d}', 'the date {n} days after {d}', '{d} plus {n} days'],
-    'current': ['the current date', 'what is the date right now', 'current', 'tell me the time'],
-}
-_SINGLE_DE = {
-    'weekday': ['der wochentag von {d}', 'welcher wochentag ist {d}', 'wochentag {d}'],
-    'week_number': ['die kalenderwoche von {d}', 'welche kw ist {d}'],
-    'moon_phase': ['die mondphase am {d}', 'mondphase {d}'],
-    'date_diff': ['zaehle die tage zwischen {d} und {d2}', 'tage von {d} bis {d2}', 'wieviele tage liegen zwischen {d} und {d2}'],
-    'add_days': ['addiere {n} tage auf {d}', 'das datum {n} tage nach {d}', '{d} plus {n} tage'],
-    'current': ['das aktuelle datum', 'wie spaet ist es'],
-}
 
-# the composed shape of the user incident: consumer of (add days to a date)
-_NESTED_EN = ['the {c} of add a number of days {d} plus {n}', 'the {c} of {d} plus {n} days',
-              '{c} of the date {n} days after {d}', 'first add {n} days to {d} and then the {c}']
-_NESTED_DE = ['der {c} von {d} plus {n} tagen', 'erst {n} tage auf {d} addieren und dann der {c}']
-
-# the minus side of the same shapes: the wording flips, the plan carries a
-# negative days value; ago/vor forms name no date and imply today
-_MINUS_EN = ['subtract {n} days from {d}', 'take {n} days off {d}',
-             'the date {n} days before {d}', '{d} minus {n} days', 'the date {n} days ago']
-_MINUS_DE = ['ziehe {n} tage von {d} ab', 'das datum {n} tage vor {d}',
-             '{d} minus {n} tagen', 'das datum von vor {n} tagen']
-_NESTED_MINUS_EN = ['the {c} of {d} minus {n} days', '{c} of the date {n} days before {d}',
-                    'first subtract {n} days from {d} and then the {c}', 'the {c} of {n} days ago']
-_NESTED_MINUS_DE = ['der {c} von {d} minus {n} tagen', 'der {c} von vor {n} tagen',
-                    'erst {n} tage von {d} abziehen und dann der {c}']
-_CONSUMER_EN = {'weekday': 'weekday', 'week_number': 'week number', 'moon_phase': 'moon phase'}
-_CONSUMER_DE = {'weekday': 'wochentag', 'week_number': 'kalenderwoche', 'moon_phase': 'mondphase'}
-
-_NEGATIVE = [
-    'sing me a song', 'what is the capital of france', 'please review my pull request',
-    'schreibe mir ein gedicht', 'wie wird das wetter morgen', 'open the pod bay doors',
-    'summarize this document for me', 'erzaehl mir einen witz', 'order a pizza for tonight',
-    'translate this sentence to spanish',
-]
+def _preamble(rng):
+    # negatives carry preambles and lead-ins too, so chatter around the
+    # request never becomes a positive signal by itself; about two thirds
+    # of the examples carry each of them
+    parts = []
+    if rng.random() < 0.667:
+        parts.append(rng.choice(_LEXICON['preambles']))
+    if rng.random() < 0.667:
+        parts.append(rng.choice(_LEXICON['leadins']))
+    return ''.join(part + ' ' for part in parts)
 
 
 def sample(rng, minus=True):
     """
     Draw one (request, dsl) example from the mixture.
 
-    The first roll picks the bucket (negative, single-step, or nested),
-    the second the language (about two thirds English); the helpers then
-    pick a template, fill its slots, and render the matching plan. With
-    ``minus=False`` the signed-offset wordings are left out entirely: the
-    resulting dataset teaches a model without any notion of minus days.
+    The first roll picks the bucket (negative, relative word, shift, or
+    single-step), the second the language (about two thirds
+    English); the helpers then pick a pattern from the lexicon, fill its
+    slots, and render the matching plan. With ``minus=False`` every
+    backward wording is left out: the resulting dataset teaches a model
+    without any notion of minus.
 
     """
     kind = rng.random()
     if kind < 0.15:
-        return _preamble(rng) + rng.choice(_NEGATIVE), NOMATCH
+        return _preamble(rng) + rng.choice(_LEXICON['negatives']), NOMATCH
     lang_en = rng.random() < 0.65
-    single = _SINGLE_EN if lang_en else _SINGLE_DE
-    if kind < 0.70:
-        tool = rng.choice(list(single))
-        phrase = rng.choice(single[tool])
-        return _render_single(rng, tool, phrase, lang_en, minus)
-    consumer = rng.choice(list(_CONSUMER_EN))
-    phrase = rng.choice(_NESTED_EN if lang_en else _NESTED_DE)
-    names = _CONSUMER_EN if lang_en else _CONSUMER_DE
-    return _render_nested(rng, consumer, phrase, names[consumer], lang_en, minus)
+    if kind < 0.27:
+        return _render_relative(rng, lang_en, minus)
+    if kind < 0.72:
+        return _render_shift(rng, lang_en, minus)
+    single = _LEXICON['patterns']['single']
+    tool = rng.choice(list(single))
+    phrase = rng.choice(single[tool][_lang(lang_en)])
+    return _render_single(rng, tool, phrase, lang_en)
 
 
-def _time_word(rng, lang_en):
-    return rng.choice(_TIME_WORDS_EN if lang_en else _TIME_WORDS_DE)
+def _unit(rng, lang_en):
+    # the day unit gets half the mass: exact short day counts are the
+    # bread-and-butter capability, months and years share the rest
+    rows = _LEXICON['units'][_lang(lang_en)]
+    days = [row for row in rows if row['tool'] == 'add_days']
+    if days and rng.random() < 0.5:
+        return rng.choice(days)
+    return rng.choice(rows)
 
 
-def _preamble(rng):
-    # negatives carry preambles and lead-ins too, so chatter around the
-    # request never becomes a positive signal by itself
-    return rng.choice(_PREAMBLES) + rng.choice(_LEADINS)
+def _count(rng, tool):
+    # day counts stay half single-digit (short numbers must copy, not
+    # extend); months fit a year, years stay small
+    if tool == 'add_days':
+        return rng.randrange(1, 10) if rng.random() < 0.5 else rng.randrange(10, 365)
+    return rng.randrange(1, 12 if tool == 'add_months' else 6)
 
 
-def _render_single(rng, tool, phrase, lang_en, minus=True):
-    # a date mention is literal or a time word; the plan resolves a time
-    # word through current as step one. for add_days a sign roll swaps the
-    # wording to the minus pool; the plan then carries a negative value
-    sign = ''
-    if minus and tool == 'add_days' and rng.random() < 0.4:
-        phrase = rng.choice(_MINUS_EN if lang_en else _MINUS_DE)
-        sign = '-'
+def _consume(rng, lang_en, request, plan):
+    # a {c} in the pattern means a consumer reads the latest result; the
+    # rule holds across every pattern group
+    if '{c}' in request:
+        consumer, name = _consumer(rng, lang_en)
+        request = request.replace('{c}', name)
+        plan.append((consumer, {'date': f'@{len(plan)}'}))
+    return request, plan
+
+
+def _render_relative(rng, lang_en, minus=True):
+    # relative words always shift from today: current resolves the day,
+    # the lexicon row says which shift, an optional consumer reads it
+    words = _LEXICON['relative_words'][_lang(lang_en)]
+    rows = [(word, row['tool'], str(row['shift'])) for word, row in words.items()]
+    if not minus:
+        rows = [row for row in rows if not row[2].startswith('-')]
+    word, tool, value = rng.choice(rows)
+    phrase = rng.choice(_LEXICON['patterns']['relative'][_lang(lang_en)])
+    request = phrase.replace('{w}', word)
+    plan = [('current', {}), (tool, {'date': '@1', DOMAIN[tool][1]: value})]
+    request, plan = _consume(rng, lang_en, request, plan)
+    return _preamble(rng) + request, render(plan)
+
+
+def _render_shift(rng, lang_en, minus=True):
+    # one renderer for every shift, plain or composed: the unit wording
+    # (days, months, years) picks the tool, the request shows the bare
+    # count, the sign lives in the plan, and a {c} appends the consumer
+    unit = _unit(rng, lang_en)
+    tool = unit['tool']
+    sign = '-' if minus and rng.random() < 0.4 else ''
+    group = 'shift_minus' if sign else 'shift'
+    phrase = rng.choice(_LEXICON['patterns'][group][_lang(lang_en)])
+    count = _count(rng, tool)
+    request = phrase.replace('{n}', str(count)).replace('{u}', rng.choice(unit['one'] if count == 1 else unit['many']))
+    plan = []
+    if '{d}' in request and rng.random() < 0.5:
+        value = _iso(rng)
+        request = request.replace('{d}', value)
+        base = value
+    else:
+        # a time word or an ago/vor wording: today is implied
+        request = request.replace('{d}', _time_word(rng, lang_en))
+        plan.append(('current', {}))
+        base = '@1'
+    plan.append((tool, {'date': base, DOMAIN[tool][1]: sign + str(count)}))
+    request, plan = _consume(rng, lang_en, request, plan)
+    return _preamble(rng) + request, render(plan)
+
+
+def _render_single(rng, tool, phrase, lang_en):
+    # one call to a non-shifting tool; a date mention is literal or a time
+    # word, and a time word resolves through current as step one
     plan = []
     request = phrase
     first = '@1'
-    if '{d}' not in phrase and tool == 'add_days':
-        # an ago/vor wording names no date: today is implied
-        plan.append(('current', {}))
     if '{d}' in phrase:
         if rng.random() < 0.35:
             request = request.replace('{d}', _time_word(rng, lang_en))
             plan.append(('current', {}))
-            first = '@1'
         else:
             value = _iso(rng)
             request = request.replace('{d}', value)
@@ -179,41 +253,8 @@ def _render_single(rng, tool, phrase, lang_en, minus=True):
         second = _iso(rng)
         request = request.replace('{d2}', second)
         plan.append(('date_diff', {'start': first, 'end': second}))
-    elif tool == 'add_days':
-        # single digits get half the mass: short numbers must copy exactly;
-        # the request always shows the bare count, the sign lives in the plan
-        days = str(rng.randrange(1, 10) if rng.random() < 0.5 else rng.randrange(10, 365))
-        request = request.replace('{n}', days)
-        plan.append(('add_days', {'date': first, 'days': sign + days}))
     else:
         plan.append((tool, {'date': first}))
-    return _preamble(rng) + request, render(plan)
-
-
-def _render_nested(rng, consumer, phrase, consumer_name, lang_en, minus=True):
-    # the three-step shape: resolve the date, shift it, consume the result;
-    # a sign roll swaps the wording to the minus pool, the plan goes negative
-    sign = ''
-    if minus and rng.random() < 0.4:
-        phrase = rng.choice(_NESTED_MINUS_EN if lang_en else _NESTED_MINUS_DE)
-        sign = '-'
-    plan = []
-    days = str(rng.randrange(1, 10) if rng.random() < 0.5 else rng.randrange(10, 90))
-    request = phrase.replace('{c}', consumer_name).replace('{n}', days)
-    if '{d}' not in phrase:
-        # an ago/vor wording names no date: today is implied
-        plan.append(('current', {}))
-        base = '@1'
-    elif rng.random() < 0.5:
-        request = request.replace('{d}', _time_word(rng, lang_en))
-        plan.append(('current', {}))
-        base = '@1'
-    else:
-        value = _iso(rng)
-        request = request.replace('{d}', value)
-        base = value
-    plan.append(('add_days', {'date': base, 'days': sign + days}))
-    plan.append((consumer, {'date': f'@{len(plan)}'}))
     return _preamble(rng) + request, render(plan)
 
 
@@ -224,9 +265,10 @@ def dataset(count, seed=7, minus=True):
     ### Args
 
     - **count** (int): How many unique examples to return
-    - **seed** (int): The rng seed; same seed and flags, same dataset
-    - **minus** (bool): Include the signed-offset wordings (minus/ago);
-        ``False`` builds the ablation dataset without any minus teaching
+    - **seed** (int): The rng seed; same seed and lexicon, same dataset
+    - **minus** (bool): Include the backward wordings (minus/ago and the
+        backward relative words); ``False`` builds the ablation dataset
+        without any minus teaching
 
     ### Returns
 

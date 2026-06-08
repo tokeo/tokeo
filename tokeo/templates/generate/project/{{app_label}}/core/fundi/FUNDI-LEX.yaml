@@ -1,0 +1,251 @@
+# =========================================================================
+# fundi lexicon -- the complete language of the training data
+# =========================================================================
+#
+# everything the model can learn to understand is written down here: the
+# words and the sentence patterns. data.py reads this file when it
+# generates training examples, so teaching fundi new language is editing
+# this file and retraining:
+#
+#     python -m {{ app_label }}.core.fundi.train
+#
+# what stays in code (data.py): the mixture shares, the probability
+# rolls, and how patterns are filled and rendered into plans. what lives
+# here: every word and every phrasing the model is taught.
+#
+# the file has three parts:
+#   1. words    -- time words, relative words, units, consumer names
+#   2. chatter  -- negatives, preambles, lead-ins
+#   3. patterns -- the sentence shapes; one rule throughout: a {c} in
+#                  a pattern means a consumer reads the result
+#
+# editing rules
+# - tools must exist in the plan grammar (dsl.DOMAIN); a typo fails
+#   loudly at import, never silently in training
+# - umlaut and ascii-folded spellings are separate entries on purpose:
+#   the byte tokenizer sees them as different words, both need teaching
+# - shifts are integers; negative entries are the backward words and are
+#   left out when training with --no-minus
+# - quote patterns in single quotes; the placeholders are:
+#     {d}  a date mention (literal iso date or a time word)
+#     {d2} the second date of a range
+#     {n}  a number (the request shows the bare count, signs live in
+#          the plan)
+#     {u}  a unit word (see units; days, months, and years alike)
+#     {w}  a relative word (see relative_words)
+#     {c}  a consumer name (see consumers)
+
+
+# =========================================================================
+# 1. words
+# =========================================================================
+
+# words that simply mean "today": they put a current() step in front of
+# the plan and reference its result
+time_words:
+  en:
+    - 'today'
+    - 'now'
+    - 'current'
+  de:
+    - 'heute'
+    - 'jetzt'
+    - 'aktuell'
+
+# words that shift from today; tool and value say how
+relative_words:
+  en:
+    'tomorrow':                 {tool: add_days,   shift: 1}
+    'the day after tomorrow':   {tool: add_days,   shift: 2}
+    'yesterday':                {tool: add_days,   shift: -1}
+    'the day before yesterday': {tool: add_days,   shift: -2}
+    'next week':                {tool: add_days,   shift: 7}
+    'last week':                {tool: add_days,   shift: -7}
+    'next month':               {tool: add_months, shift: 1}
+    'last month':               {tool: add_months, shift: -1}
+    'next year':                {tool: add_years,  shift: 1}
+    'last year':                {tool: add_years,  shift: -1}
+  de:
+    'morgen':                   {tool: add_days,   shift: 1}
+    'uebermorgen':              {tool: add_days,   shift: 2}
+    'übermorgen':               {tool: add_days,   shift: 2}
+    'gestern':                  {tool: add_days,   shift: -1}
+    'vorgestern':               {tool: add_days,   shift: -2}
+    'naechste woche':           {tool: add_days,   shift: 7}
+    'nächste woche':            {tool: add_days,   shift: 7}
+    'letzte woche':             {tool: add_days,   shift: -7}
+    'naechsten monat':          {tool: add_months, shift: 1}
+    'nächsten monat':           {tool: add_months, shift: 1}
+    'letzten monat':            {tool: add_months, shift: -1}
+    'naechstes jahr':           {tool: add_years,  shift: 1}
+    'nächstes jahr':            {tool: add_years,  shift: 1}
+    'letztes jahr':             {tool: add_years,  shift: -1}
+
+# the unit words for every '{n} {u}' shift; the unit picks the tool.
+# 'one' is spoken for a count of 1, 'many' otherwise -- both may be a
+# single word or a list of declensions (german: tage/tagen), the
+# generator then picks one of them
+units:
+  en:
+    - {one: 'day',   many: 'days',             tool: add_days}
+    - {one: 'month', many: 'months',           tool: add_months}
+    - {one: 'year',  many: 'years',            tool: add_years}
+  de:
+    - {one: 'tag',   many: ['tage', 'tagen'],  tool: add_days}
+    - {one: 'monat', many: ['monate'],         tool: add_months}
+    - {one: 'jahr',  many: ['jahre', 'jahren'], tool: add_years}
+
+# how a tool is spoken when a pattern consumes a shifted date via {c}
+consumers:
+  weekday:     {en: 'weekday',     de: 'wochentag'}
+  week_number: {en: 'week number', de: 'kalenderwoche'}
+  moon_phase:  {en: 'moon phase',  de: 'mondphase'}
+
+
+# =========================================================================
+# 2. chatter
+# =========================================================================
+
+# out-of-domain requests mapped to <nomatch>: the anti-hallucination
+# share -- without it the model would invent a plan for every input
+negatives:
+  - 'sing me a song'
+  - 'what is the capital of france'
+  - 'please review my pull request'
+  - 'schreibe mir ein gedicht'
+  - 'wie wird das wetter morgen'
+  - 'open the pod bay doors'
+  - 'summarize this document for me'
+  - 'erzaehl mir einen witz'
+  - 'order a pizza for tonight'
+  - 'translate this sentence to spanish'
+
+# distractor sentences in front of the intent, cross-language on purpose
+# (they also precede negatives, so chatter never signals "calendar");
+# about two thirds of the examples carry one
+preambles:
+  - 'i will write a new calendar app and need some specific dates.'
+  - 'we are planning the release schedule.'
+  - 'quick question for my project notes.'
+  - 'ich plane gerade ein paar termine.'
+  - 'fuer meine neue kalender app brauche ich daten.'
+  - 'short one:'
+
+# polite framings directly in front of the intent, same odds
+leadins:
+  - 'let me know first of all'
+  - 'please tell me'
+  - 'can you tell me'
+  - 'i need'
+  - 'sag mir bitte'
+  - 'ich brauche'
+
+
+# =========================================================================
+# 3. patterns -- one sentence shape per group
+# =========================================================================
+
+patterns:
+
+  # one tool call per request, for the tools that do not shift; keys are
+  # the tools of the plan grammar
+  single:
+    weekday:
+      en:
+        - 'the weekday of {d}'
+        - 'which weekday is {d}'
+        - 'weekday {d}'
+        - 'what day of the week is {d}'
+      de:
+        - 'der wochentag von {d}'
+        - 'welcher wochentag ist {d}'
+        - 'wochentag {d}'
+    week_number:
+      en:
+        - 'the week number of {d}'
+        - 'which calendar week is {d}'
+        - 'week_number {d}'
+        - 'iso week of {d}'
+      de:
+        - 'die kalenderwoche von {d}'
+        - 'welche kw ist {d}'
+    moon_phase:
+      en:
+        - 'the moon phase of {d}'
+        - 'moon phase on {d}'
+        - 'moon_phase {d}'
+        - 'how is the moon on {d}'
+      de:
+        - 'die mondphase am {d}'
+        - 'mondphase {d}'
+    date_diff:
+      en:
+        - 'count the days between {d} and {d2}'
+        - 'days from {d} until {d2}'
+        - 'date_diff between {d} and {d2}'
+        - 'how many days lie between {d} and {d2}'
+      de:
+        - 'zaehle die tage zwischen {d} und {d2}'
+        - 'tage von {d} bis {d2}'
+        - 'wieviele tage liegen zwischen {d} und {d2}'
+    current:
+      en:
+        - 'the current date'
+        - 'what is the date right now'
+        - 'current'
+        - 'tell me the time'
+      de:
+        - 'das aktuelle datum'
+        - 'wie spaet ist es'
+
+  # a shift, any unit (days, months, years): the unit word picks the
+  # tool. patterns with {c} put a consumer behind the shift -- the
+  # composed three-step shape ("the weekday of today plus 2 days")
+  shift:
+    en:
+      - '{d} plus {n} {u}'
+      - 'add {n} {u} to {d}'
+      - 'the date {n} {u} after {d}'
+      - 'the {c} of {d} plus {n} {u}'
+      - '{c} of the date {n} {u} after {d}'
+      - 'first add {n} {u} to {d} and then the {c}'
+      - 'the {c} of add a number of {u} {d} plus {n}'
+    de:
+      - '{d} plus {n} {u}'
+      - 'addiere {n} {u} auf {d}'
+      - 'das datum {n} {u} nach {d}'
+      - 'der {c} von {d} plus {n} {u}'
+      - 'erst {n} {u} auf {d} addieren und dann der {c}'
+
+  # the same shapes backwards; ago/vor forms name no date and imply today
+  shift_minus:
+    en:
+      - '{d} minus {n} {u}'
+      - 'subtract {n} {u} from {d}'
+      - 'take {n} {u} off {d}'
+      - 'the date {n} {u} before {d}'
+      - 'the date {n} {u} ago'
+      - 'the {c} of {d} minus {n} {u}'
+      - '{c} of the date {n} {u} before {d}'
+      - 'first subtract {n} {u} from {d} and then the {c}'
+      - 'the {c} of {n} {u} ago'
+    de:
+      - '{d} minus {n} {u}'
+      - 'ziehe {n} {u} von {d} ab'
+      - 'das datum {n} {u} vor {d}'
+      - 'das datum von vor {n} {u}'
+      - 'der {c} von {d} minus {n} {u}'
+      - 'der {c} von vor {n} {u}'
+      - 'erst {n} {u} von {d} abziehen und dann der {c}'
+
+  # wrappers around a relative word; with {c} a consumer reads the result
+  relative:
+    en:
+      - 'what date is {w}'
+      - 'the date of {w}'
+      - 'the {c} of {w}'
+      - '{c} of {w}'
+    de:
+      - 'welches datum ist {w}'
+      - 'das datum von {w}'
+      - 'der {c} von {w}'

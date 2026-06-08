@@ -23,6 +23,8 @@ DOMAIN = {
     'current': [],
     'date_diff': ['start', 'end'],
     'add_days': ['date', 'days'],
+    'add_months': ['date', 'months'],
+    'add_years': ['date', 'years'],
     'weekday': ['date'],
     'week_number': ['date'],
     'moon_phase': ['date'],

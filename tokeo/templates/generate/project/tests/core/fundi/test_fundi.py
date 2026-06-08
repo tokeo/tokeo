@@ -29,6 +29,25 @@ class {{ app_class_name }}AiTestApp({{ app_class_name }}Test):
         ]
 
 
+def test_{{ app_label }}_fundi_lexicon_loads():
+    # the editable language definition (FUNDI-LEX.yaml) must parse and
+    # validate cleanly: every section filled for both languages, tools
+    # known to the grammar, required placeholders present -- this runs
+    # without weights and catches lexicon edits before a training run
+    from {{ app_label }}.core.fundi.data import _LEXICON
+    from {{ app_label }}.core.fundi.dsl import DOMAIN
+    for language in ('en', 'de'):
+        assert _LEXICON['time_words'][language]
+        assert _LEXICON['relative_words'][language]
+        assert _LEXICON['units'][language]
+        for group in ('single', 'shift', 'shift_minus', 'relative'):
+            pool = _LEXICON['patterns'][group]
+            assert (pool[language] if language in pool else all(pool[tool][language] for tool in pool))
+    assert _LEXICON['negatives'] and _LEXICON['preambles'] and _LEXICON['leadins']
+    for tool in _LEXICON['consumers']:
+        assert tool in DOMAIN
+
+
 @pytest.mark.skipif(
     not Path('{{ app_label }}/core/fundi/weights.npz').exists(),
     reason="fundi has no trained weights yet (run 'python -m {{ app_label }}.core.fundi.train')",
@@ -37,10 +56,13 @@ def test_{{ app_label }}_ai_fundi_model():
     # the project's own trained micro language model ({{ app_label }}/core/fundi)
     # plans with learned weights: exact copies, real chains incl. the
     # today-bridge, honest nomatch -- and the guards still rule the loop
-    from datetime import date
+    from datetime import date, timedelta
     with {{ app_class_name }}AiTestApp() as app:
         assert app.ai.ask('weekday of 2026-12-24', agent='guarded', profile='fundi') == '[fundi] weekday: Thursday'
         assert app.ai.ask('weekday of 2026-12-24 minus 2 days', agent='guarded', profile='fundi') == '[fundi] weekday: Tuesday'
+        assert app.ai.ask('add 2 months to 2026-06-08', agent='guarded', profile='fundi') == '[fundi] add_months: 2026-08-08'
+        tomorrow = (date.today() + timedelta(days=1)).isoformat()
+        assert app.ai.ask('welches datum ist morgen', agent='guarded', profile='fundi') == f'[fundi] add_days: {tomorrow}'
         assert app.ai.ask('die mondphase am 2000-01-06', agent='guarded', profile='fundi') == '[fundi] moon_phase: new moon'
         assert app.ai.ask('sing me a song', agent='guarded', profile='fundi') == '[fundi] sing me a song'
         days = (date(2026, 12, 24) - date.today()).days
