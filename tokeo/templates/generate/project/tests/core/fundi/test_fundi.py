@@ -40,6 +40,7 @@ def test_{{ app_label }}_ai_fundi_model():
     from datetime import date
     with {{ app_class_name }}AiTestApp() as app:
         assert app.ai.ask('weekday of 2026-12-24', agent='guarded', profile='fundi') == '[fundi] weekday: Thursday'
+        assert app.ai.ask('weekday of 2026-12-24 minus 2 days', agent='guarded', profile='fundi') == '[fundi] weekday: Tuesday'
         assert app.ai.ask('die mondphase am 2000-01-06', agent='guarded', profile='fundi') == '[fundi] moon_phase: new moon'
         assert app.ai.ask('sing me a song', agent='guarded', profile='fundi') == '[fundi] sing me a song'
         days = (date(2026, 12, 24) - date.today()).days

@@ -22,6 +22,9 @@ distractor preambles and out-of-domain negatives that teach the honest
     they put ``current()`` in front and reference its result via ``@1``.
 - Day counts are half single-digit on purpose: short numbers must be
     copied exactly, not extended (2 is 2, never 26).
+- Offsets are signed: minus/before/ago wordings (minus/vor in German)
+    map to negative day values, plus/after/in to positive ones -- the
+    request always shows the bare count, the sign lives in the plan.
 
 The whole dataset is a pure function of its seed: ``dataset(n, seed)``
 always returns the same deduplicated pairs, so a training run is fully
@@ -89,6 +92,17 @@ _SINGLE_DE = {
 _NESTED_EN = ['the {c} of add a number of days {d} plus {n}', 'the {c} of {d} plus {n} days',
               '{c} of the date {n} days after {d}', 'first add {n} days to {d} and then the {c}']
 _NESTED_DE = ['der {c} von {d} plus {n} tagen', 'erst {n} tage auf {d} addieren und dann der {c}']
+
+# the minus side of the same shapes: the wording flips, the plan carries a
+# negative days value; ago/vor forms name no date and imply today
+_MINUS_EN = ['subtract {n} days from {d}', 'take {n} days off {d}',
+             'the date {n} days before {d}', '{d} minus {n} days', 'the date {n} days ago']
+_MINUS_DE = ['ziehe {n} tage von {d} ab', 'das datum {n} tage vor {d}',
+             '{d} minus {n} tagen', 'das datum von vor {n} tagen']
+_NESTED_MINUS_EN = ['the {c} of {d} minus {n} days', '{c} of the date {n} days before {d}',
+                    'first subtract {n} days from {d} and then the {c}', 'the {c} of {n} days ago']
+_NESTED_MINUS_DE = ['der {c} von {d} minus {n} tagen', 'der {c} von vor {n} tagen',
+                    'erst {n} tage von {d} abziehen und dann der {c}']
 _CONSUMER_EN = {'weekday': 'weekday', 'week_number': 'week number', 'moon_phase': 'moon phase'}
 _CONSUMER_DE = {'weekday': 'wochentag', 'week_number': 'kalenderwoche', 'moon_phase': 'mondphase'}
 
@@ -136,9 +150,18 @@ def _preamble(rng):
 
 def _render_single(rng, tool, phrase, lang_en):
     # a date mention is literal or a time word; the plan resolves a time
-    # word through current as step one
+    # word through current as step one. for add_days a sign roll swaps the
+    # wording to the minus pool; the plan then carries a negative value
+    sign = ''
+    if tool == 'add_days' and rng.random() < 0.4:
+        phrase = rng.choice(_MINUS_EN if lang_en else _MINUS_DE)
+        sign = '-'
     plan = []
     request = phrase
+    first = '@1'
+    if '{d}' not in phrase and tool == 'add_days':
+        # an ago/vor wording names no date: today is implied
+        plan.append(('current', {}))
     if '{d}' in phrase:
         if rng.random() < 0.35:
             request = request.replace('{d}', _time_word(rng, lang_en))
@@ -155,26 +178,31 @@ def _render_single(rng, tool, phrase, lang_en):
         request = request.replace('{d2}', second)
         plan.append(('date_diff', {'start': first, 'end': second}))
     elif tool == 'add_days':
-        # single digits get half the mass: short numbers must copy exactly
-        if rng.random() < 0.1:
-            days = str(-rng.randrange(1, 60))
-        elif rng.random() < 0.5:
-            days = str(rng.randrange(1, 10))
-        else:
-            days = str(rng.randrange(10, 365))
+        # single digits get half the mass: short numbers must copy exactly;
+        # the request always shows the bare count, the sign lives in the plan
+        days = str(rng.randrange(1, 10) if rng.random() < 0.5 else rng.randrange(10, 365))
         request = request.replace('{n}', days)
-        plan.append(('add_days', {'date': first, 'days': days}))
+        plan.append(('add_days', {'date': first, 'days': sign + days}))
     else:
         plan.append((tool, {'date': first}))
     return _preamble(rng) + request, render(plan)
 
 
 def _render_nested(rng, consumer, phrase, consumer_name, lang_en):
-    # the three-step shape: resolve the date, shift it, consume the result
+    # the three-step shape: resolve the date, shift it, consume the result;
+    # a sign roll swaps the wording to the minus pool, the plan goes negative
+    sign = ''
+    if rng.random() < 0.4:
+        phrase = rng.choice(_NESTED_MINUS_EN if lang_en else _NESTED_MINUS_DE)
+        sign = '-'
     plan = []
     days = str(rng.randrange(1, 10) if rng.random() < 0.5 else rng.randrange(10, 90))
     request = phrase.replace('{c}', consumer_name).replace('{n}', days)
-    if rng.random() < 0.5:
+    if '{d}' not in phrase:
+        # an ago/vor wording names no date: today is implied
+        plan.append(('current', {}))
+        base = '@1'
+    elif rng.random() < 0.5:
         request = request.replace('{d}', _time_word(rng, lang_en))
         plan.append(('current', {}))
         base = '@1'
@@ -182,7 +210,7 @@ def _render_nested(rng, consumer, phrase, consumer_name, lang_en):
         value = _iso(rng)
         request = request.replace('{d}', value)
         base = value
-    plan.append(('add_days', {'date': base, 'days': days}))
+    plan.append(('add_days', {'date': base, 'days': sign + days}))
     plan.append((consumer, {'date': f'@{len(plan)}'}))
     return _preamble(rng) + request, render(plan)
 

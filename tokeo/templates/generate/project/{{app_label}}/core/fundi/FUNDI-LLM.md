@@ -59,7 +59,8 @@ per tool in English and German, nested compositions, time words
 front of the plan, distractor preambles and polite lead-ins (also in front
 of negatives, so chatter never becomes a positive signal by itself), and
 out-of-domain negatives that map to `<nomatch>` -- the anti-hallucination
-training. A fixed seed makes the dataset reproducible at any time; run
+training. Day offsets are signed: plus/after/in wordings map to positive
+day values, minus/before/ago (minus/vor in German) to negative ones. A fixed seed makes the dataset reproducible at any time; run
 `python -m {{ app_label }}.core.fundi.data` to print samples.
 
 ### `train.py` -- the training tool (the only torch in the project)
