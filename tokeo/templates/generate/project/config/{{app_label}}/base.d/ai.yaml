@@ -1,9 +1,9 @@
-### ### Spiral AI / Fundi configuration
+### ### {{ app_name }} AI / Fundi configuration
 ###
-### Named profiles for chat-completion models. Spiral talks to an
+### Named profiles for chat-completion models. {{ app_name }} talks to an
 ### OpenAI-compatible endpoint that you run yourself (Ollama, llama.cpp, vLLM,
 ### MLX); the project's own trained fundi micro model (core/ai/fundi.py
-### and app/fundi) needs no server at all. A profile is selected by name,
+### and core/fundi) needs no server at all. A profile is selected by name,
 ### or by a field such as model or purpose; a profile with "enabled: false"
 ### is hidden for the session.
 ai:
@@ -166,7 +166,7 @@ ai:
         - mathematics
 
     ### the project's own micro language model (the lab and the weights
-    ### live in {{ app_label }}/app/fundi): trained from scratch on the project's
+    ### live in {{ app_label }}/core/fundi): trained from scratch on the project's
     ### synthetic calendar data, it plans real tool chains -- also nested
     ### requests like "the weekday of today plus 2 days" -- and runs
     ### in-process with plain numpy, no server. train-first: create the

@@ -3,7 +3,7 @@ Fundi ai provider for the {{ app_name }} application.
 
 ``fundi`` is the project's own micro language model: a few hundred thousand
 parameters trained from scratch on the project's synthetic calendar data (the
-lab lives in ``{{ app_label }}/app/fundi``), running in-process with plain NumPy -- no
+lab lives in ``{{ app_label }}/core/fundi``), running in-process with plain NumPy -- no
 host to start, no network, deterministic. It plans tool chains, including
 nested requests like "the weekday of today plus 2 days", as a constrained
 plan DSL decoded greedily over the active tools, so it can never emit a
@@ -14,7 +14,7 @@ trained for, in English and German. Outside that domain it answers with a
 labelled echo instead of guessing, it never invents arguments, and on
 ``denied:`` or ``error:`` feedback it explains instead of retrying. The
 weights are a project asset: run ``make fundi-train`` to create (or improve)
-``{{ app_label }}/app/fundi/weights.npz``; without them this provider raises a clear
+``{{ app_label }}/core/fundi/weights.npz``; without them this provider raises a clear
 error and the neutral ``mock`` stays available.
 
 This module is self-contained: it holds only the provider class. The project
@@ -88,19 +88,21 @@ class TokeoAiFundiProvider(TokeoAiProvider):
         return self._result(f'[fundi] {prompt}' if prompt else '[fundi] (no prompt)', prompt)
 
     def _plan(self, prompt, tools):
-        # the trained model (app/fundi) emits the plan as constrained DSL
+        # the trained model (core/fundi) emits the plan as constrained DSL
         # over the active tools; numpy and the weights load lazily, and a
         # missing asset turns into a clear, actionable error
         try:
-            from {{ app_label }}.app.fundi.dsl import parse
-            from {{ app_label }}.app.fundi.infer import FundiModel
+            from {{ app_label }}.core.fundi.dsl import parse
+            from {{ app_label }}.core.fundi.infer import FundiModel
         except ImportError as error:
-            raise TokeoAiError(f'fundi needs the app/fundi lab and numpy: {error}')
+            raise TokeoAiError(f'fundi needs the core/fundi lab and numpy: {error}')
         if self._engine is None:
             try:
                 self._engine = FundiModel()
             except FileNotFoundError:
-                raise TokeoAiError("fundi has no trained weights yet -- run 'make fundi-train' to create {{ app_label }}/app/fundi/weights.npz")
+                raise TokeoAiError(
+                    "fundi has no trained weights yet -- run 'python -m {{ app_label }}.core.fundi.train' to create {{ app_label }}/core/fundi/weights.npz"
+                )
         active = {((spec or {}).get('function') or {}).get('name') for spec in tools}
         steps = []
         for name, arguments in parse(self._engine.plan(prompt, active=active)):

@@ -11,6 +11,19 @@ If `numba <https://numba.pydata.org>`_ is installed, the hot attention loop
 is JIT-compiled automatically; without it the pure NumPy path runs the same
 numbers (the model is matmul-dominated, so BLAS does the heavy lifting
 either way).
+
+### How a plan is decoded
+
+1. The request bytes plus the ``SEP`` token run through the net once; the
+    keys and values of every layer are kept (the KV cache).
+2. The output logits rank all bytes; the ``Constrainer`` says which
+    characters are legal at this point of the plan grammar -- the best
+    legal one wins (greedy), so the result is deterministic.
+3. The chosen byte runs as a single-position forward against the cache,
+    yielding the next logits; repeat until the grammar allows the end.
+
+The weights file carries its architecture as embedded metadata, read at
+load time -- the runtime adapts to whatever ``train.py`` exported.
 """
 
 import json
@@ -18,8 +31,8 @@ import pathlib
 
 import numpy
 
-from {{ app_label }}.app.fundi import tokenizer
-from {{ app_label }}.app.fundi.dsl import Constrainer
+from {{ app_label }}.core.fundi import tokenizer
+from {{ app_label }}.core.fundi.dsl import Constrainer
 
 try:
     # optional acceleration: a no-op fallback keeps numpy the only need

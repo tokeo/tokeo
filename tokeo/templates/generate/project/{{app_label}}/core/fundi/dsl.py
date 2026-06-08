@@ -1,5 +1,5 @@
 """
-Fundi plan DSL for the {{ app_name }} ai micro model.
+Fundi plan DSL for the Spiral ai micro model.
 
 The trained fundi model does one thing: it turns a request into a plan,
 written in a tiny deterministic language. One line, steps joined by ``;``,

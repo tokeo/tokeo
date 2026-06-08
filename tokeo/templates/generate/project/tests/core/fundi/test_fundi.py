@@ -2,10 +2,10 @@
 Real test cases for fundi, the {{ app_name }} micro language model.
 
 Verifies the project's own trained model (the lab lives in
-``{{ app_label }}/app/fundi``) against the real shipped configuration, under
+``{{ app_label }}/core/fundi``) against the real shipped configuration, under
 the ``guarded`` agent. Train-first: until ``weights.npz`` exists the test
 skips. Run from the project root, for example with
-``pytest tests/ext/test_ai_fundi.py``.
+``pytest tests/core/test_fundi.py``.
 """
 
 from pathlib import Path
@@ -30,11 +30,11 @@ class {{ app_class_name }}AiTestApp({{ app_class_name }}Test):
 
 
 @pytest.mark.skipif(
-    not Path('{{ app_label }}/app/fundi/weights.npz').exists(),
-    reason="fundi has no trained weights yet (run 'python -m {{ app_label }}.app.fundi.train')",
+    not Path('{{ app_label }}/core/fundi/weights.npz').exists(),
+    reason="fundi has no trained weights yet (run 'python -m {{ app_label }}.core.fundi.train')",
 )
 def test_{{ app_label }}_ai_fundi_model():
-    # the project's own trained micro language model ({{ app_label }}/app/fundi)
+    # the project's own trained micro language model ({{ app_label }}/core/fundi)
     # plans with learned weights: exact copies, real chains incl. the
     # today-bridge, honest nomatch -- and the guards still rule the loop
     from datetime import date

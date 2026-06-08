@@ -7,13 +7,31 @@ compositional programs up to three chained steps rendered into language, plus
 distractor preambles and out-of-domain negatives that teach the honest
 ``<nomatch>``. Every example is a (request, plan-DSL) pair.
 
-Run ``python -m {{ app_label }}.app.fundi.data`` to print a few samples.
+### What the mixture teaches
+
+- ~15% negatives (chatter mapped to ``<nomatch>``): without them the model
+    would invent a plan for every input -- this is the anti-hallucination
+    share. Negatives carry preambles and lead-ins too, so surrounding
+    chatter alone never signals "calendar".
+- ~55% single-step requests: tool recognition and exact slot filling
+    (dates copied byte by byte, numbers as written).
+- ~30% nested requests rendered from two- and three-step programs: the
+    compositional share, e.g. "the weekday of today plus 2 days" ->
+    ``current();add_days(date=@1,days=2);weekday(date=@2)``.
+- Time words (today/now/current, heute/jetzt/aktuell) teach the bridge:
+    they put ``current()`` in front and reference its result via ``@1``.
+- Day counts are half single-digit on purpose: short numbers must be
+    copied exactly, not extended (2 is 2, never 26).
+
+The whole dataset is a pure function of its seed: ``dataset(n, seed)``
+always returns the same deduplicated pairs, so a training run is fully
+reproducible. Run ``python -m {{ app_label }}.core.fundi.data`` to print samples.
 """
 
 import random
 from datetime import date, timedelta
 
-from {{ app_label }}.app.fundi.dsl import render, NOMATCH
+from {{ app_label }}.core.fundi.dsl import render, NOMATCH
 
 
 def _iso(rng):
@@ -83,7 +101,14 @@ _NEGATIVE = [
 
 
 def sample(rng):
-    """Draw one (request, dsl) example."""
+    """
+    Draw one (request, dsl) example from the mixture.
+
+    The first roll picks the bucket (negative, single-step, or nested),
+    the second the language (about two thirds English); the helpers then
+    pick a template, fill its slots, and render the matching plan.
+
+    """
     kind = rng.random()
     if kind < 0.15:
         return _preamble(rng) + rng.choice(_NEGATIVE), NOMATCH
@@ -163,7 +188,19 @@ def _render_nested(rng, consumer, phrase, consumer_name, lang_en):
 
 
 def dataset(count, seed=7):
-    """Generate a deduplicated list of (request, dsl) pairs."""
+    """
+    Generate a deduplicated list of (request, dsl) pairs.
+
+    ### Args
+
+    - **count** (int): How many unique examples to return
+    - **seed** (int): The rng seed; same seed, same dataset
+
+    ### Returns
+
+    - **list**: (request, plan line) tuples, requests unique
+
+    """
     rng = random.Random(seed)
     seen = set()
     examples = []

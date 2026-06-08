@@ -4,8 +4,33 @@ Training for the {{ app_name }} fundi micro model.
 A from-scratch decoder-only transformer (a few hundred thousand parameters)
 learns one mapping: request bytes -> plan DSL bytes. Torch is a training-side
 tool only; the application runs the trained weights with plain NumPy (see
-``infer.py``). Run ``python -m {{ app_label }}.app.fundi.train`` from the project
-root; the weights land in ``{{ app_label }}/app/fundi/weights.npz``.
+``infer.py``). Run ``python -m {{ app_label }}.core.fundi.train`` from the project
+root; the weights land in ``{{ app_label }}/core/fundi/weights.npz``.
+
+### The pipeline, step by step
+
+1. ``data.dataset()`` generates the synthetic (request, plan) pairs; the
+    first 600 are held back for the final evaluation and never trained on.
+2. ``encode_pair``/``tensorize`` turn every pair into one fixed-length row
+    of byte tokens: ``request + SEP + plan + EOS``, padded with ``PAD``.
+3. The loop samples random batches and minimizes cross-entropy on the
+    next-token prediction -- but only on the plan side: every position
+    before ``SEP`` is masked out, so the model is never graded on
+    predicting the request, only on producing the plan.
+4. ``evaluate`` decodes the held-out requests greedily and counts exact
+    plan-line matches -- the number printed as accuracy.
+5. ``save`` exports every parameter as a named float32 array into
+    ``weights.npz``, together with the architecture, so the NumPy runtime
+    can never load weights that do not fit its math.
+
+### Environment knobs
+
+- ``FUNDI_STEPS`` (default 1400): optimizer steps of the full schedule
+- ``FUNDI_BATCH`` (default 96): examples per step
+- ``FUNDI_DATA`` (default 30000): generated examples (600 held out)
+- ``FUNDI_CKPT``: path to a checkpoint file; enables resumable training
+- ``FUNDI_CHUNK``: steps per invocation when checkpointing (call the
+    module repeatedly until the full schedule is done)
 """
 
 import json
@@ -16,14 +41,23 @@ import numpy
 import torch
 from torch import nn
 
-from {{ app_label }}.app.fundi import tokenizer
-from {{ app_label }}.app.fundi.data import dataset
+from {{ app_label }}.core.fundi import tokenizer
+from {{ app_label }}.core.fundi.data import dataset
 
 # small enough to train on a laptop cpu, big enough for the closed domain
 CONFIG = dict(dim=96, layers=3, heads=4, ff=384, context=184, vocab=tokenizer.VOCAB)
 
 
 class Block(nn.Module):
+    """
+    One transformer block: attention, then a small per-position MLP.
+
+    Both halves are residual (their output is added to the input), with a
+    layer norm in front of each -- the standard pre-norm layout that keeps
+    tiny models stable in training.
+
+    """
+
     def __init__(self, dim, heads, ff):
         super().__init__()
         self.ln1 = nn.LayerNorm(dim)
@@ -39,6 +73,19 @@ class Block(nn.Module):
 
 
 class FundiNet(nn.Module):
+    """
+    The decoder-only transformer behind fundi.
+
+    Byte embedding plus learned position embedding, ``config['layers']``
+    blocks, a final layer norm, and a head projecting back to byte logits.
+    The head shares its matrix with the embedding (tied weights): the same
+    table maps bytes to vectors and vectors back to byte scores, which
+    halves the parameter count of the largest layer. The causal mask makes
+    every position see only its left context, so the net can generate one
+    byte at a time.
+
+    """
+
     def __init__(self, config):
         super().__init__()
         self.embed = nn.Embedding(config['vocab'], config['dim'])
@@ -61,11 +108,19 @@ class FundiNet(nn.Module):
 
 
 def encode_pair(request, dsl, context):
+    """
+    Encode one training example as ``request + SEP + plan + EOS`` tokens.
+
+    The request is clipped so at least 60 token positions stay free for
+    the plan; the whole row is clipped to the context length.
+
+    """
     tokens = tokenizer.encode(request)[: context - 60] + [tokenizer.SEP] + tokenizer.encode(dsl) + [tokenizer.EOS]
     return tokens[:context]
 
 
 def tensorize(examples, context):
+    """Pad every encoded example to one fixed-length tensor row."""
     rows = []
     for request, dsl in examples:
         tokens = encode_pair(request, dsl, context)
@@ -74,6 +129,17 @@ def tensorize(examples, context):
 
 
 def main():
+    """
+    Run the full training schedule and export ``weights.npz``.
+
+    Deterministic by construction: fixed seeds for torch and the data
+    generator, so the same invocation reproduces the same weights. With
+    ``FUNDI_CKPT`` set, the run resumes from the stored step and stops
+    after ``FUNDI_CHUNK`` steps, saving model, optimizer, schedule, and
+    rng state -- evaluation and export only happen once the final step of
+    the schedule is reached.
+
+    """
     torch.manual_seed(7)
     torch.set_num_threads(os.cpu_count() or 1)
     steps = int(os.environ.get('FUNDI_STEPS', '1400'))
@@ -129,6 +195,14 @@ def main():
 
 @torch.no_grad()
 def evaluate(model, examples):
+    """
+    Exact-plan accuracy on held-out examples.
+
+    Greedy decoding without the grammar automaton: the raw model must
+    produce the plan line character by character, byte-exact. The runtime
+    adds the grammar constraint on top, so real use is at least this good.
+
+    """
     model.eval()
     hits = 0
     for request, dsl in examples:
@@ -140,6 +214,7 @@ def evaluate(model, examples):
 
 @torch.no_grad()
 def generate(model, request):
+    """Greedy-decode the plan line for one request (training-side only)."""
     tokens = tokenizer.encode(request)[: CONFIG['context'] - 60] + [tokenizer.SEP]
     for _ in range(58):
         logits = model(torch.tensor([tokens]))[0, -1]
@@ -151,6 +226,16 @@ def generate(model, request):
 
 
 def save(model, accuracy):
+    """
+    Export the trained model as ``weights.npz``.
+
+    One named float32 array per parameter (the names follow the torch
+    state dict, e.g. ``blocks.0.attn.in_proj_weight``), plus the
+    architecture and the achieved held-out accuracy as embedded json under
+    ``__config__`` -- the NumPy runtime reads its dimensions from there,
+    so inference and weights can never drift apart.
+
+    """
     weights = {name: parameter.detach().numpy().astype(numpy.float32) for name, parameter in model.state_dict().items()}
     weights['__config__'] = numpy.frombuffer(json.dumps(CONFIG | {'accuracy': round(accuracy, 4)}).encode(), dtype=numpy.uint8)
     target = pathlib.Path(__file__).parent / 'weights.npz'
