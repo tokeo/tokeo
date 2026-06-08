@@ -19,7 +19,12 @@ Congratulations on creating your **{{ app_name }}** project! This is more than j
 
 Your application is ready for you to explore and expand. Here are some exciting directions you might take:
 
-- **Agentic AI**: {% if feature_ai == "Y" %}Built in and governed -- ask via `{{ app_label }} ai ask`, every tool call passes validate, policy, audit{% if feature_ai_fundi == "Y" %}; train your own micro model in `core/fundi`{% endif %}{% else %}Add intelligence by integrating LLMs or classic ML pipelines{% endif %}
+{% if feature_ai == "Y" %}
+- **Agentic AI**: Built in and governed, ask via `{{ app_label }} ai ask`, every tool call passes validate, policy and audit.{% if feature_ai_fundi == "Y" %} Trained own micro model in `core/fundi`.
+{% endif %}
+{% else %}
+- **AI Integration**: Add intelligence by integrating LLMs or classic ML pipelines
+{% endif %}
 - **Data Exploration**: Uncover insights by analyzing data with pandas, matplotlib, or seaborn
 - **Web Interfaces**: Create beautiful dashboard and web tools with the built-in NiceGUI extension and tailwindcss based admin theme
 - **Automation**: Schedule tasks and create workflows with the scheduler extension or total local and remote automation
