@@ -32,7 +32,7 @@ variables:
 
   - name: app_copyright
     prompt: "App copyright hint"
-    default: "©2025 ACME Inc."
+    default: "©2026 ACME Inc."
 
   - name: creator_name
     prompt: "Creator Name"
