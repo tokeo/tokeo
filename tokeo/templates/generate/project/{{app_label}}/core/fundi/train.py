@@ -23,6 +23,15 @@ root; the weights land in ``{{ app_label }}/core/fundi/weights.npz``.
     ``weights.npz``, together with the architecture, so the NumPy runtime
     can never load weights that do not fit its math.
 
+### Command line
+
+- ``--no-minus``: train without the signed-offset wordings (minus/ago,
+    minus/vor) -- an ablation switch: same architecture and budget, but
+    the resulting model has no notion of minus days. Keep the flag
+    identical across resumed chunks (``FUNDI_CKPT``), since the dataset
+    and its held-out split are rebuilt from seed and flags on every
+    invocation.
+
 ### Environment knobs
 
 - ``FUNDI_STEPS`` (default 1400): optimizer steps of the full schedule
@@ -33,6 +42,7 @@ root; the weights land in ``{{ app_label }}/core/fundi/weights.npz``.
     module repeatedly until the full schedule is done)
 """
 
+import argparse
 import json
 import os
 import pathlib
@@ -132,6 +142,10 @@ def main():
     """
     Run the full training schedule and export ``weights.npz``.
 
+    The ``--no-minus`` command line switch builds the ablation dataset
+    without signed day offsets; the choice is recorded in the exported
+    metadata, so a weights file always tells what it was taught.
+
     Deterministic by construction: fixed seeds for torch and the data
     generator, so the same invocation reproduces the same weights. With
     ``FUNDI_CKPT`` set, the run resumes from the stored step and stops
@@ -144,7 +158,15 @@ def main():
     torch.set_num_threads(os.cpu_count() or 1)
     steps = int(os.environ.get('FUNDI_STEPS', '1400'))
     batch = int(os.environ.get('FUNDI_BATCH', '96'))
-    examples = dataset(int(os.environ.get('FUNDI_DATA', '30000')))
+    parser = argparse.ArgumentParser(description='train the fundi micro language model')
+    parser.add_argument(
+        '--no-minus',
+        action='store_true',
+        help='train without signed day offsets (minus/ago wordings)',
+    )
+    arguments = parser.parse_args()
+    minus = not arguments.no_minus
+    examples = dataset(int(os.environ.get('FUNDI_DATA', '30000')), minus=minus)
     held = examples[:600]
     train = examples[600:]
     data = tensorize(train, CONFIG['context'])
@@ -190,7 +212,7 @@ def main():
         return
     accuracy = evaluate(model, held)
     print(f'held-out exact-plan accuracy: {accuracy:.3f}')
-    save(model, accuracy)
+    save(model, accuracy, minus)
 
 
 @torch.no_grad()
@@ -225,7 +247,7 @@ def generate(model, request):
     return tokenizer.decode(tokens[tokens.index(tokenizer.SEP) + 1:])
 
 
-def save(model, accuracy):
+def save(model, accuracy, minus=True):
     """
     Export the trained model as ``weights.npz``.
 
@@ -237,7 +259,10 @@ def save(model, accuracy):
 
     """
     weights = {name: parameter.detach().numpy().astype(numpy.float32) for name, parameter in model.state_dict().items()}
-    weights['__config__'] = numpy.frombuffer(json.dumps(CONFIG | {'accuracy': round(accuracy, 4)}).encode(), dtype=numpy.uint8)
+    weights['__config__'] = numpy.frombuffer(
+        json.dumps(CONFIG | {'accuracy': round(accuracy, 4), 'minus': minus}).encode(),
+        dtype=numpy.uint8,
+    )
     target = pathlib.Path(__file__).parent / 'weights.npz'
     numpy.savez_compressed(target, **weights)
     print('saved:', target, f'({target.stat().st_size / 1e6:.2f} MB)')

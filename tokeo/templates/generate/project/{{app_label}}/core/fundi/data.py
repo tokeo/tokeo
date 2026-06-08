@@ -114,13 +114,15 @@ _NEGATIVE = [
 ]
 
 
-def sample(rng):
+def sample(rng, minus=True):
     """
     Draw one (request, dsl) example from the mixture.
 
     The first roll picks the bucket (negative, single-step, or nested),
     the second the language (about two thirds English); the helpers then
-    pick a template, fill its slots, and render the matching plan.
+    pick a template, fill its slots, and render the matching plan. With
+    ``minus=False`` the signed-offset wordings are left out entirely: the
+    resulting dataset teaches a model without any notion of minus days.
 
     """
     kind = rng.random()
@@ -131,11 +133,11 @@ def sample(rng):
     if kind < 0.70:
         tool = rng.choice(list(single))
         phrase = rng.choice(single[tool])
-        return _render_single(rng, tool, phrase, lang_en)
+        return _render_single(rng, tool, phrase, lang_en, minus)
     consumer = rng.choice(list(_CONSUMER_EN))
     phrase = rng.choice(_NESTED_EN if lang_en else _NESTED_DE)
     names = _CONSUMER_EN if lang_en else _CONSUMER_DE
-    return _render_nested(rng, consumer, phrase, names[consumer], lang_en)
+    return _render_nested(rng, consumer, phrase, names[consumer], lang_en, minus)
 
 
 def _time_word(rng, lang_en):
@@ -148,12 +150,12 @@ def _preamble(rng):
     return rng.choice(_PREAMBLES) + rng.choice(_LEADINS)
 
 
-def _render_single(rng, tool, phrase, lang_en):
+def _render_single(rng, tool, phrase, lang_en, minus=True):
     # a date mention is literal or a time word; the plan resolves a time
     # word through current as step one. for add_days a sign roll swaps the
     # wording to the minus pool; the plan then carries a negative value
     sign = ''
-    if tool == 'add_days' and rng.random() < 0.4:
+    if minus and tool == 'add_days' and rng.random() < 0.4:
         phrase = rng.choice(_MINUS_EN if lang_en else _MINUS_DE)
         sign = '-'
     plan = []
@@ -188,11 +190,11 @@ def _render_single(rng, tool, phrase, lang_en):
     return _preamble(rng) + request, render(plan)
 
 
-def _render_nested(rng, consumer, phrase, consumer_name, lang_en):
+def _render_nested(rng, consumer, phrase, consumer_name, lang_en, minus=True):
     # the three-step shape: resolve the date, shift it, consume the result;
     # a sign roll swaps the wording to the minus pool, the plan goes negative
     sign = ''
-    if rng.random() < 0.4:
+    if minus and rng.random() < 0.4:
         phrase = rng.choice(_NESTED_MINUS_EN if lang_en else _NESTED_MINUS_DE)
         sign = '-'
     plan = []
@@ -215,14 +217,16 @@ def _render_nested(rng, consumer, phrase, consumer_name, lang_en):
     return _preamble(rng) + request, render(plan)
 
 
-def dataset(count, seed=7):
+def dataset(count, seed=7, minus=True):
     """
     Generate a deduplicated list of (request, dsl) pairs.
 
     ### Args
 
     - **count** (int): How many unique examples to return
-    - **seed** (int): The rng seed; same seed, same dataset
+    - **seed** (int): The rng seed; same seed and flags, same dataset
+    - **minus** (bool): Include the signed-offset wordings (minus/ago);
+        ``False`` builds the ablation dataset without any minus teaching
 
     ### Returns
 
@@ -233,7 +237,7 @@ def dataset(count, seed=7):
     seen = set()
     examples = []
     while len(examples) < count:
-        request, dsl = sample(rng)
+        request, dsl = sample(rng, minus)
         if request not in seen:
             seen.add(request)
             examples.append((request, dsl))
@@ -241,5 +245,7 @@ def dataset(count, seed=7):
 
 
 if __name__ == '__main__':
-    for request, dsl in dataset(12):
+    import sys
+
+    for request, dsl in dataset(12, minus='--no-minus' not in sys.argv):
         print(f'{request!r:80s} -> {dsl}')
