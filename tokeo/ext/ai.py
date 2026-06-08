@@ -56,11 +56,24 @@ ai:
 
 from cement import ex
 from cement.core.meta import MetaMixin
+from cement.core.foundation import SIGNALS
+from cement.core.exc import CaughtSignal
 
 import json
 import importlib
+import shlex
 from copy import deepcopy
 from dataclasses import asdict
+
+# the interactive chat shell uses prompt_toolkit for a real line editor with
+# session history and completion (the same building blocks the scheduler
+# shell uses); prompt_toolkit is a base dependency, so the imports are
+# top-level
+from prompt_toolkit import prompt
+from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+from prompt_toolkit.completion import NestedCompleter
 
 from tokeo.ext.argparse import Controller
 from tokeo.core.ai import (
@@ -279,6 +292,38 @@ class TokeoAi(MetaMixin):
         if kind is None:
             return deepcopy(self._registry)
         return deepcopy(self._registry.get(kind, {}))
+
+    def selectors(self):
+        """
+        The selectable names for the interactive chat shell.
+
+        Used to build the chat completer, so typing ``--profile`` offers the
+        profile names, ``--agent`` the agent names, and ``--model`` /
+        ``--purpose`` the distinct values across the enabled profiles.
+
+        ### Returns
+
+        - **dict**: Lists under the keys ``profile``, ``agent``, ``model``,
+            and ``purpose``
+
+        """
+
+        def field(profile, key):
+            # a profile field may sit at the top level (purpose) or inside
+            # the provider options (model, base_url); read either place
+            return profile[key] if key in profile else (profile.get('options') or {}).get(key)
+
+        enabled = [
+            (name, profile)
+            for name, profile in self._profiles.items()
+            if isinstance(profile, dict) and bool(profile.get('enabled', True))
+        ]
+        return {
+            'profile': [name for name, _ in enabled],
+            'agent': list(self._agents.keys()),
+            'model': sorted({field(p, 'model') for _, p in enabled} - {None}),
+            'purpose': sorted({field(p, 'purpose') for _, p in enabled} - {None}),
+        }
 
     def _resolve(self, profile=None, model=None, purpose=None):
         # at most one selector may be given; with none, use the configured
@@ -708,27 +753,143 @@ class AiController(Controller):
         ],
     )
     def chat(self):
-        # keep the running conversation so each turn sees the earlier ones;
-        # an empty line or "exit" ends the session
+        # keep the running conversation so each turn sees the earlier ones.
+        #
+        # the prompt is a prompt_toolkit line editor with a session-only
+        # InMemoryHistory (up/down walk this run's prompts, ctrl-r searches
+        # them, no persistence -- the history lives and dies with the
+        # session) and a completer: typing "--" offers the four selector
+        # switches, and after one the configured values follow. inline
+        # --profile/--agent/--model/--purpose change the session for the
+        # turns that follow; an empty line is a no-op, and the session ends
+        # only on "exit"/"quit" or Ctrl-D.
+        #
+        # prompt_toolkit appends each accepted, non-empty line to the shared
+        # history automatically, so the arrows work without manual
+        # bookkeeping; AutoSuggestFromHistory also offers the previous
+        # matching prompt as greyed-out ghost text while typing.
+        session = {
+            'profile': self.app.pargs.profile,
+            'agent': self.app.pargs.agent,
+            'model': self.app.pargs.model,
+            'purpose': self.app.pargs.purpose,
+        }
         messages = []
-        self.app.print('ai chat - empty line or "exit" to quit')
-        while True:
-            try:
-                line = input('> ')
-            except EOFError:
-                break
-            if line.strip() in ('', 'exit', 'quit'):
-                break
-            messages.append({'role': 'user', 'content': line})
-            result = self.app.ai.chat(
-                messages,
-                profile=self.app.pargs.profile,
-                model=self.app.pargs.model,
-                purpose=self.app.pargs.purpose,
-                agent=self.app.pargs.agent,
-            )
-            messages.append({'role': 'assistant', 'content': result.text})
-            self.app.print(result.text)
+        history = InMemoryHistory()
+        completer = self._chat_completer()
+        self.app.print('ai chat - "--" for options, "exit"/"quit" or Ctrl-D to quit')
+        # patch_stdout keeps any guard/audit log lines printed during a turn
+        # from corrupting the live prompt line
+        with patch_stdout(raw=True):
+            while True:
+                try:
+                    line = prompt(
+                        '> ',
+                        history=history,
+                        auto_suggest=AutoSuggestFromHistory(),
+                        completer=completer,
+                    )
+                    # an empty line is a no-op; only exit/quit or Ctrl-D end
+                    if not line.strip():
+                        continue
+                    if line.strip() in ('exit', 'quit'):
+                        break
+                    # apply any inline selector switches, keep the rest as
+                    # this turn's prompt
+                    text, changed = self._chat_switches(line, session)
+                    text = text.strip()
+                    if changed and not text:
+                        # a pure switch line: confirm the new selection and
+                        # wait for the next prompt, no model call
+                        self.app.print(
+                            'ai chat - '
+                            f"profile={session['profile'] or '-'} "
+                            f"agent={session['agent'] or '-'} "
+                            f"model={session['model'] or '-'} "
+                            f"purpose={session['purpose'] or '-'}"
+                        )
+                        continue
+                    if not text:
+                        continue
+                    messages.append({'role': 'user', 'content': text})
+                    result = self.app.ai.chat(
+                        messages,
+                        profile=session['profile'],
+                        model=session['model'],
+                        purpose=session['purpose'],
+                        agent=session['agent'],
+                    )
+                    messages.append({'role': 'assistant', 'content': result.text})
+                    self.app.print(result.text)
+                except KeyboardInterrupt:
+                    # ctrl-c clears the current line and re-prompts, like a
+                    # shell -- it does not end the session
+                    continue
+                except EOFError:
+                    # ctrl-d ends the session
+                    break
+                except CaughtSignal as err:
+                    # allow shutdown via caught signals (same as the
+                    # scheduler shell)
+                    if err.signum in SIGNALS:
+                        break
+                except Exception as err:
+                    # one failed turn (for example a provider error) must
+                    # not kill the session: log it and keep the shell alive
+                    self.app.log.debug(f'ai chat turn failed: {err}')
+
+    # the inline switches the chat shell understands; each --flag sets the
+    # matching selector for the rest of the session. profile/model/purpose
+    # are mutually exclusive (the handler resolves a profile by exactly one
+    # of them), so setting one clears the other two; agent is independent
+    _CHAT_SWITCHES = {'--profile': 'profile', '--agent': 'agent', '--model': 'model', '--purpose': 'purpose'}
+    _CHAT_EXCLUSIVE = ('profile', 'model', 'purpose')
+
+    def _chat_completer(self):
+        # build the nested completer from the configured names, so "--"
+        # offers the four switches and each switch then offers its values
+        names = self.app.ai.selectors()
+        return NestedCompleter.from_nested_dict(
+            {
+                '--profile': {name: None for name in names['profile']},
+                '--agent': {name: None for name in names['agent']},
+                '--model': {name: None for name in names['model']},
+                '--purpose': {name: None for name in names['purpose']},
+                'exit': None,
+                'quit': None,
+            }
+        )
+
+    def _chat_switches(self, line, session):
+        # pull any "--flag value" pairs out of the line, apply them to the
+        # session selectors, and return (residual_prompt, changed). a normal
+        # prompt has none of these tokens, so it passes through untouched
+        try:
+            tokens = shlex.split(line)
+        except ValueError:
+            # an unbalanced quote (an apostrophe in the prompt): fall back to
+            # a naive split, used only to spot the switch tokens
+            tokens = line.split()
+        rest = []
+        changed = False
+        index = 0
+        while index < len(tokens):
+            token = tokens[index]
+            if token in self._CHAT_SWITCHES and index + 1 < len(tokens):
+                key = self._CHAT_SWITCHES[token]
+                if key in self._CHAT_EXCLUSIVE:
+                    # keep the three profile selectors mutually exclusive
+                    for other in self._CHAT_EXCLUSIVE:
+                        session[other] = None
+                session[key] = tokens[index + 1]
+                changed = True
+                index += 2
+                continue
+            rest.append(token)
+            index += 1
+        # when nothing changed, return the original line so a normal
+        # prompt's punctuation and spacing survive exactly
+        return (' '.join(rest) if changed else line), changed
 
     @ex(
         help='check the ai configuration for typos and broken references',
