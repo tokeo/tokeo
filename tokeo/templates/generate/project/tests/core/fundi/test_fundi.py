@@ -16,6 +16,11 @@ from pathlib import Path
 import pytest
 from {{ app_label }}.main import {{ app_class_name }}Test
 
+# the held-out exact-plan accuracy the trained model must reach before the
+# per-phrasing checks are trustworthy; below this the model is undertrained
+# and a borderline wording can fail by chance (retrain with more steps)
+_MIN_ACCURACY = 0.97
+
 # english weekday names, locale-independent, matching the tool's output
 _WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -152,6 +157,17 @@ def test_{{ app_label }}_ai_fundi_model():
 
         def ask(text):
             return app.ai.ask(text, agent='guarded', profile='fundi')
+
+        # the quality bar first: the held-out exact-plan accuracy is recorded
+        # in the weights, and below the floor the per-phrasing checks below
+        # are flaky -- so fail here with a clear message instead of on some
+        # borderline wording. retrain with more steps to lift it
+        from {{ app_label }}.core.fundi.infer import FundiModel
+        accuracy = FundiModel().config.get('accuracy', 0.0)
+        assert accuracy >= _MIN_ACCURACY, (
+            f'fundi held-out accuracy {accuracy:.4f} < {_MIN_ACCURACY}; '
+            'retrain with more steps (e.g. FUNDI_STEPS=2000 FUNDI_DATA=40000)'
+        )
 
         # exact copies and single-step tools
         assert ask('weekday of 2026-12-24') == '[fundi] weekday: Thursday'
