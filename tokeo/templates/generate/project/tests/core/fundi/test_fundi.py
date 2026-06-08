@@ -117,6 +117,16 @@ def test_{{ app_label }}_fundi_data_contract():
     # step one (this must not be broken by the bare-now change)
     assert any(d == 'current();weekday(date=@1)' for _, d in pairs)
 
+    # a "N weeks" shift has no add_weeks tool: it expands to add_days with a
+    # multiple of 7 (1 week -> 7 days). day shifts stay unconstrained, so
+    # this catches a regression where a week were treated as a single day
+    weeks = re.compile(r'\b\d+\s+(weeks?|wochen?)\b')
+    week_examples = [(r, d) for r, d in pairs if weeks.search(r) and 'add_days(' in d]
+    assert week_examples, 'no "N weeks" shift examples in the data'
+    for r, d in week_examples:
+        match = re.search(r'days=(-?\d+)', d)
+        assert match and int(match.group(1)) % 7 == 0, (r, d)
+
     # every tool in the domain is actually exercised by the data
     exercised = {tool for _, d in pairs for tool in DOMAIN if tool + '(' in d}
     assert exercised == set(DOMAIN), set(DOMAIN) - exercised
@@ -161,6 +171,11 @@ def test_{{ app_label }}_ai_fundi_model():
         # relative words and the today-bridge
         tomorrow = (date.today() + timedelta(days=1)).isoformat()
         assert ask('welches datum ist morgen') == f'[fundi] add_days: {tomorrow}'
+
+        # a week is seven days (there is no add_weeks tool): a week shift
+        # expands to add_days with a multiple of 7
+        assert ask('today minus 1 week') == f'[fundi] add_days: {(date.today() - timedelta(days=7)).isoformat()}'
+        assert ask('2026-06-08 plus 3 weeks') == '[fundi] add_days: 2026-06-29'
 
         # a consumer reading a shifted date: the weekday of (today + 14)
         shifted = date.today() + timedelta(days=14)

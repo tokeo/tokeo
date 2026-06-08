@@ -204,26 +204,30 @@ def sample(rng, minus=True):
 
 
 def _unit(rng, lang_en):
-    # which unit a shift uses. days get half the probability mass on
-    # purpose: day arithmetic is the bread-and-butter skill and the hardest
-    # to copy exactly, so it is practised twice as often as months+years
-    # combined. drop this bias and the model would see fewer day examples
-    # and copy day counts a little less reliably
+    # which unit a shift uses. the day unit gets half the probability mass
+    # on purpose: day arithmetic is the bread-and-butter skill and the
+    # hardest to copy exactly, so it is practised more than the others
+    # combined. the day unit is the factor-1 add_days row (weeks are also an
+    # add_days row, but with factor 7, so they must not steal the day boost)
     rows = _LEXICON['units'][_lang(lang_en)]
-    days = [row for row in rows if row['tool'] == 'add_days']
-    if days and rng.random() < 0.5:
-        return rng.choice(days)
+    day = [row for row in rows if row['tool'] == 'add_days' and row.get('factor', 1) == 1]
+    if day and rng.random() < 0.5:
+        return rng.choice(day)
     return rng.choice(rows)
 
 
-def _count(rng, tool):
-    # how large the {n} count is, per tool. the day distribution is the
+def _count(rng, unit):
+    # how large the {n} count is, per unit. the day distribution is the
     # important one: half the time a single digit (1-9), half the time a
     # larger number (10-364). the single-digit half is deliberate -- short
     # numbers MUST be copied exactly ("2" stays "2", never becomes "26"),
-    # so they are over-represented to drill exact copying. months stay
-    # within a year (1-11) and years stay small (1-5), the ranges that
-    # actually occur in calendar talk
+    # so they are over-represented to drill exact copying. weeks stay small
+    # (1-8) so the resulting day shift (count x 7) is realistic and well
+    # within the grammar's three-digit cap; months stay within a year
+    # (1-11) and years stay small (1-5), the ranges that actually occur
+    if unit.get('factor', 1) > 1:
+        return rng.randrange(1, 9)
+    tool = unit['tool']
     if tool == 'add_days':
         return rng.randrange(1, 10) if rng.random() < 0.5 else rng.randrange(10, 365)
     return rng.randrange(1, 12 if tool == 'add_months' else 6)
@@ -288,7 +292,7 @@ def _render_signed_nomatch(rng, lang_en):
     group = 'shift_minus' if rng.random() < 0.5 else 'shift'
     # all patterns now, plain or with a consumer {c}
     phrase = rng.choice(_LEXICON['patterns'][group][_lang(lang_en)])
-    count = _count(rng, unit['tool'])
+    count = _count(rng, unit)
     sign = rng.choice(['-', '+'])
     request = phrase.replace('{n}', sign + str(count))
     request = request.replace('{u}', rng.choice(unit['one'] if count == 1 else unit['many']))
@@ -312,7 +316,7 @@ def _render_shift(rng, lang_en, minus=True):
     sign = '-' if minus and rng.random() < 0.4 else ''
     group = 'shift_minus' if sign else 'shift'
     phrase = rng.choice(_LEXICON['patterns'][group][_lang(lang_en)])
-    count = _count(rng, tool)
+    count = _count(rng, unit)
     request = phrase.replace('{n}', str(count)).replace('{u}', rng.choice(unit['one'] if count == 1 else unit['many']))
     plan = []
     if '{d}' in request and rng.random() < 0.5:
@@ -324,7 +328,11 @@ def _render_shift(rng, lang_en, minus=True):
         request = request.replace('{d}', _time_word(rng, lang_en))
         plan.append(('current', {}))
         base = '@1'
-    plan.append((tool, {'date': base, DOMAIN[tool][1]: sign + str(count)}))
+    # the request shows the bare count and the unit word ("1 week"); the
+    # plan carries count x factor, so a week becomes 7 days on add_days
+    # (there is no add_weeks tool -- a week shift IS a seven-day shift)
+    amount = count * unit.get('factor', 1)
+    plan.append((tool, {'date': base, DOMAIN[tool][1]: sign + str(amount)}))
     request, plan = _consume(rng, lang_en, request, plan)
     return _preamble(rng) + request, render(plan)
 

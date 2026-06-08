@@ -52,6 +52,10 @@ signed offsets. Small, but real tasks:
     {{ app_label }} ai ask "today" --profile fundi
     {{ app_label }} ai ask "heute" --profile fundi
 
+    # weeks are seven-day shifts (no add_weeks tool)
+    {{ app_label }} ai ask "today minus 1 week" --profile fundi
+    {{ app_label }} ai ask "2026-06-08 plus 3 weeks" --profile fundi
+
     # and the three-step chains, its signature move
     {{ app_label }} ai ask "the weekday of today plus 14 days" --profile fundi
     {{ app_label }} ai ask "der wochentag von vor 2 tagen" --profile fundi
@@ -281,8 +285,10 @@ Teaching a new word is adding a table line and retraining. A fixed seed makes th
 
 The complete language of the training data as a richly commented yaml
 file in three parts: **words** (time words, relative words with their
-shift from today, the units with their declensions, consumer names),
-**chatter** (negatives, preambles, lead-ins), and **patterns** -- five
+shift from today, the units with their declensions -- and a week is just
+an `add_days` unit with a factor of 7, since a week shift is a seven-day
+shift and there is no `add_weeks` tool -- consumer names), **chatter**
+(negatives, preambles, lead-ins), and **patterns** -- five
 groups (`single`, `shift`, `shift_minus`, `relative`, `relative_chain`),
 held together by one rule: *a `{c}` in any pattern means a consumer reads the
 result*. `data.py` loads and validates it at import time (unknown tools

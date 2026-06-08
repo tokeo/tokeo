@@ -92,10 +92,12 @@ relative_words:
 units:
   en:
     - {one: 'day',   many: 'days',             tool: add_days}
+    - {one: 'week',  many: 'weeks',            tool: add_days, factor: 7}
     - {one: 'month', many: 'months',           tool: add_months}
     - {one: 'year',  many: 'years',            tool: add_years}
   de:
     - {one: 'tag',   many: ['tage', 'tagen'],  tool: add_days}
+    - {one: 'woche', many: ['wochen'],         tool: add_days, factor: 7}
     - {one: 'monat', many: ['monate'],         tool: add_months}
     - {one: 'jahr',  many: ['jahre', 'jahren'], tool: add_years}
 
