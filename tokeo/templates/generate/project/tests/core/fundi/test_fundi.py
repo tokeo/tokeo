@@ -82,8 +82,11 @@ def test_{{ app_label }}_ai_fundi_model():
         assert chain2 == f'[fundi] add_years: {target.isoformat()}'
         # a hard negative: calendar-near wording the model cannot serve
         assert app.ai.ask('what date is my birthday', agent='guarded', profile='fundi') == '[fundi] what date is my birthday'
-        # a sign on a bare count is not language: honest echo, not a digit
+        # a sign on a bare count is not language: honest echo, not a digit,
+        # whether bare or consumer-wrapped
         assert app.ai.ask('today plus -2 days', agent='guarded', profile='fundi') == '[fundi] today plus -2 days'
+        wrapped = 'the weekday of today plus -2 days'
+        assert app.ai.ask(wrapped, agent='guarded', profile='fundi') == f'[fundi] {wrapped}'
         assert app.ai.ask('sing me a song', agent='guarded', profile='fundi') == '[fundi] sing me a song'
         days = (date(2026, 12, 24) - date.today()).days
         chained = app.ai.chat([{'role': 'user', 'content': 'count the days from today until 2026-12-24'}], agent='guarded', profile='fundi')

@@ -17,9 +17,11 @@ lexicon and retraining.
     share. Negatives carry preambles and lead-ins too, so surrounding
     chatter alone never signals "calendar"; calendar-near hard negatives
     ("the date of christmas") keep the honesty close to the domain, and
-    a sign written onto a bare count ("plus -2 days", "add +5 months")
-    is taught as ``<nomatch>`` too -- a sign in the request is not part
-    of the language, so the model echoes instead of inventing a digit.
+    a sign written onto a bare count is taught as ``<nomatch>`` too, in
+    every phrasing -- bare ("plus -2 days") and consumer-wrapped ("the
+    weekday of today plus -2 days") -- since a sign in the request is not
+    part of the language, so the model echoes instead of inventing a digit
+    or quietly dropping the shift.
 - ~11% relative words (tomorrow, uebermorgen, last week, next year ...):
     the lexicon maps every word to its shift from today; umlaut and
     folded spellings are taught side by side.
@@ -269,21 +271,31 @@ def _render_relative_chain(rng, lang_en, minus=True):
 
 
 def _render_signed_nomatch(rng, lang_en):
-    # a sign written onto a bare count is not part of the language
-    # ('plus -2 days', 'add +5 months to ...'): direction is carried by
-    # words, never by a sign in the request. taught as <nomatch> so the
-    # model answers with the honest echo instead of copying a confused
-    # digit. generated, not a fixed string -- it varies over units,
-    # counts, both languages, and both signs
+    # a sign written onto a bare count is not part of the language, in
+    # every phrasing: bare ('plus -2 days', 'add +5 months to ...') AND
+    # consumer-wrapped ('the weekday of today plus -2 days'). direction is
+    # carried by words, never by a sign in the request, so a sign flips the
+    # whole request to <nomatch> no matter how it is dressed. taught across
+    # both forms so the model answers with the honest echo instead of
+    # quietly dropping the shift or copying a confused digit. generated,
+    # varying over units, counts, languages, signs, the date kind, and the
+    # optional consumer
     unit = _unit(rng, lang_en)
     group = 'shift_minus' if rng.random() < 0.5 else 'shift'
-    plain = [phrase for phrase in _LEXICON['patterns'][group][_lang(lang_en)] if '{c}' not in phrase]
-    phrase = rng.choice(plain)
+    # all patterns now, plain or with a consumer {c}
+    phrase = rng.choice(_LEXICON['patterns'][group][_lang(lang_en)])
     count = _count(rng, unit['tool'])
     sign = rng.choice(['-', '+'])
     request = phrase.replace('{n}', sign + str(count))
     request = request.replace('{u}', rng.choice(unit['one'] if count == 1 else unit['many']))
-    request = request.replace('{d}', _time_word(rng, lang_en))
+    # the date is a time word most of the time, sometimes a literal date,
+    # so 'today plus -2 days' and '2026-06-08 plus -2 days' both echo
+    if '{d}' in request:
+        request = request.replace('{d}', _time_word(rng, lang_en) if rng.random() < 0.6 else _iso(rng))
+    # fill the consumer name when the chosen pattern carries one
+    if '{c}' in request:
+        _, name = _consumer(rng, lang_en)
+        request = request.replace('{c}', name)
     return _preamble(rng) + request, NOMATCH
 
 

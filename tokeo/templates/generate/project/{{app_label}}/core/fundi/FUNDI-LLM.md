@@ -84,9 +84,11 @@ below); the provider, guards, and agents stay untouched.
 A literal sign inside a request is not part of the language. Direction is
 carried by words -- minus, before, ago (vor, abziehen in German) -- the
 count is always written bare, and the sign lives in the plan. A sign
-written onto the count itself ("today plus -2 days", "add +5 months") is
-taught as ``<nomatch>``: the model answers with the honest labelled echo
-instead of inventing a digit, so the rule is enforced by the model, not
+written onto the count itself is taught as ``<nomatch>`` in every
+phrasing -- bare ("today plus -2 days", "add +5 months") and
+consumer-wrapped ("the weekday of today plus -2 days") alike. The model
+answers with the honest labelled echo instead of inventing a digit or
+quietly dropping the shift, so the rule is enforced by the model, not
 only described here. Use the worded backward forms instead.
 
 Honesty is also taught close to the domain, not only far away: the
