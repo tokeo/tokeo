@@ -56,6 +56,10 @@ signed offsets. Small, but real tasks:
     {{ app_label }} ai ask "today minus 1 week" --profile fundi
     {{ app_label }} ai ask "2026-06-08 plus 3 weeks" --profile fundi
 
+    # days between today and a date relative to today
+    {{ app_label }} ai ask "count the days from today until tomorrow" --profile fundi
+    {{ app_label }} ai ask "tage von heute bis naechste woche" --profile fundi
+
     # and the three-step chains, its signature move
     {{ app_label }} ai ask "the weekday of today plus 14 days" --profile fundi
     {{ app_label }} ai ask "der wochentag von vor 2 tagen" --profile fundi
@@ -342,40 +346,40 @@ and weights can never drift apart. Created exclusively by training.
 
 #### Anatomy of the weights -- every number accounted for
 
-The default architecture (`dim=96`, `layers=3`, `heads=4`, `ff=384`,
-`context=184`, `vocab=259`) produces exactly **378,240** trainable numbers.
+The default architecture (`dim=128`, `layers=3`, `heads=4`, `ff=512`,
+`context=184`, `vocab=259`) produces exactly **651,776** trainable numbers.
 Here is where each one lives:
 
 | part | matrix | shape | numbers |
 |---|---|---|---|
-| token meaning | `embed.weight` | 259 x 96 | 24,864 |
-| position meaning | `position.weight` | 184 x 96 | 17,664 |
-| per block: norm 1 | `ln1.weight` + `ln1.bias` | 96 + 96 | 192 |
-| per block: attention in | `attn.in_proj_weight` + bias | 288 x 96 + 288 | 27,936 |
-| per block: attention out | `attn.out_proj.weight` + bias | 96 x 96 + 96 | 9,312 |
-| per block: norm 2 | `ln2.weight` + `ln2.bias` | 96 + 96 | 192 |
-| per block: MLP up | `mlp.0.weight` + bias | 384 x 96 + 384 | 37,248 |
-| per block: MLP down | `mlp.2.weight` + bias | 96 x 384 + 96 | 36,960 |
-| **one block** | (sum of the six rows above) | | **111,840** |
-| three blocks | 3 x 111,840 | | 335,520 |
-| final norm | `ln.weight` + `ln.bias` | 96 + 96 | 192 |
+| token meaning | `embed.weight` | 259 x 128 | 33,152 |
+| position meaning | `position.weight` | 184 x 128 | 23,552 |
+| per block: norm 1 | `ln1.weight` + `ln1.bias` | 128 + 128 | 256 |
+| per block: attention in | `attn.in_proj_weight` + bias | 384 x 128 + 384 | 49,536 |
+| per block: attention out | `attn.out_proj.weight` + bias | 128 x 128 + 128 | 16,512 |
+| per block: norm 2 | `ln2.weight` + `ln2.bias` | 128 + 128 | 256 |
+| per block: MLP up | `mlp.0.weight` + bias | 512 x 128 + 512 | 66,048 |
+| per block: MLP down | `mlp.2.weight` + bias | 128 x 512 + 128 | 65,664 |
+| **one block** | (sum of the six rows above) | | **198,272** |
+| three blocks | 3 x 198,272 | | 594,816 |
+| final norm | `ln.weight` + `ln.bias` | 128 + 128 | 256 |
 | output head | tied to `embed.weight` | (shared) | 0 |
-| **total** | | | **378,240** |
+| **total** | | | **651,776** |
 
 Two details worth pausing on. The **output head adds zero parameters**: it
 reuses the embedding matrix transposed (`embed.weight.T`), so the same
-24,864 numbers both map a byte to a vector and map a vector back to byte
+33,152 numbers both map a byte to a vector and map a vector back to byte
 scores. And the **attention projection is the per-block heavyweight**
-(27,936 + 9,312): `in_proj` is three stacked 96 x 96 maps (query, key,
+(49,536 + 16,512): `in_proj` is three stacked 128 x 128 maps (query, key,
 value) plus bias, which is why widening `dim` grows the model roughly with
-its square. The whole file is float32, so 378,240 numbers are about 1.5 MB
+its square. The whole file is float32, so 651,776 numbers are about 2.6 MB
 on disk -- small enough to read, ship, and reason about completely.
 
 One save-side footnote: because the head is tied, the exported `state_dict`
 lists `head.weight` as a second name for the same matrix, so the npz
-physically stores that 24,864-number table twice. The runtime only ever
+physically stores that 33,152-number table twice. The runtime only ever
 reads `embed.weight`; the duplicate is harmless and never counted as a
-parameter (`model.parameters()` reports the 378,240 unique numbers).
+parameter (`model.parameters()` reports the 651,776 unique numbers).
 
 #### What the pipeline checks
 
@@ -428,7 +432,7 @@ flowchart TD
     HELD("<b>600 held-out pairs</b><br/>never trained on")
     TRAIN("<b>29400 training pairs</b>")
     TOK("<b>tokenizer: one fixed row of bytes</b><br/>'heute' becomes 104 101 117 116 101,<br/>then SEP=257, the plan bytes, EOS=258,<br/>padded with PAD=256 to 184 positions")
-    NET("<b>FundiNet forward</b><br/>byte embedding 259x96 plus position embedding 184x96,<br/>3 blocks of: norm, attention with 4 heads, norm, MLP 96-384-96,<br/>final norm, tied head: 259 scores for every position")
+    NET("<b>FundiNet forward</b><br/>byte embedding 259x128 plus position embedding 184x128,<br/>3 blocks of: norm, attention with 4 heads, norm, MLP 128-512-128,<br/>final norm, tied head: 259 scores for every position")
     LOSS("<b>cross-entropy, masked</b><br/>request side before SEP: ignored, counts zero<br/>plan side after SEP: graded character by character")
     OPT("<b>AdamW + OneCycle</b><br/>1400 steps x 96 examples,<br/>gradient clipping")
     EVAL("<b>evaluate, the honest number</b><br/>greedy-decode the 600 held-out requests<br/>without the grammar automaton --<br/>exact plan-line match, e.g. accuracy 0.98")
@@ -445,11 +449,11 @@ flowchart TD
     HELD --> EVAL
     EVAL --> SAVE
 
-    subgraph NPZ["weights.npz -- 378240 float32 numbers, about 1.5 MB; this IS the model"]
+    subgraph NPZ["weights.npz -- 651776 float32 numbers, about 2.6 MB; this IS the model"]
         direction TB
-        W1("<b>embed.weight</b> 259x96 = 24864 numbers<br/>what each byte means")
-        W2("<b>position.weight</b> 184x96 = 17664 numbers<br/>where in the sentence it stands")
-        W3("<b>3 blocks, about 111800 numbers each:</b><br/>attention 288x96 + 96x96 -- learned gazes:<br/>copy date characters, spot intent words<br/>MLP 384x96 + 96x384 -- combine what was<br/>seen into patterns, plus the layer norms")
+        W1("<b>embed.weight</b> 259x128 = 33152 numbers<br/>what each byte means")
+        W2("<b>position.weight</b> 184x128 = 23552 numbers<br/>where in the sentence it stands")
+        W3("<b>3 blocks, about 198272 numbers each:</b><br/>attention 384x128 + 128x128 -- learned gazes:<br/>copy date characters, spot intent words<br/>MLP 512x128 + 128x512 -- combine what was<br/>seen into patterns, plus the layer norms")
         W4("<b>__config__</b> embedded json<br/>architecture, accuracy, minus flag --<br/>the runtime reads its dimensions here,<br/>weights and inference can never drift")
     end
     SAVE --> NPZ
@@ -473,7 +477,7 @@ learning loop, teal the honest measurement, green the shipped artifact.
 
 How to read the loop in the middle: one step takes 96 fresh examples,
 asks the net for its next-character guesses, measures the gap on the
-plan side only, and turns all 378240 numbers a tiny bit -- 1400 times,
+plan side only, and turns all 651776 numbers a tiny bit -- 1400 times,
 first with large turns, then fine ones (the OneCycle schedule). The
 held-out 600 never enter that loop, which is what makes the final
 accuracy an honest number. And the weights box is the whole model: no

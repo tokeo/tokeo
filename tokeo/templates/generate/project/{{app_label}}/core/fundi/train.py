@@ -70,7 +70,7 @@ from {{ app_label }}.core.fundi.infer import PLAN_BUDGET
 # - context: the maximum number of token positions; it caps request+plan
 #   length and is the size of the position embedding table
 # - vocab: 259, fixed by the tokenizer (256 bytes + PAD/SEP/EOS)
-CONFIG = dict(dim=96, layers=3, heads=4, ff=384, context=184, vocab=tokenizer.VOCAB)
+CONFIG = dict(dim=128, layers=3, heads=4, ff=512, context=184, vocab=tokenizer.VOCAB)
 
 
 class Block(nn.Module):

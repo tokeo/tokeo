@@ -17,9 +17,10 @@ import pytest
 from {{ app_label }}.main import {{ app_class_name }}Test
 
 # the held-out exact-plan accuracy the trained model must reach before the
-# per-phrasing checks are trustworthy; below this the model is undertrained
-# and a borderline wording can fail by chance (retrain with more steps)
-_MIN_ACCURACY = 0.95
+# per-phrasing checks are trustworthy. raised to 0.97 together with the
+# larger capacity (dim 128, ff 512); confirm after the first training run
+# of the bigger model and set it just under the achieved value
+_MIN_ACCURACY = 0.97
 
 # english weekday names, locale-independent, matching the tool's output
 _WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -132,6 +133,15 @@ def test_{{ app_label }}_fundi_data_contract():
         match = re.search(r'days=(-?\d+)', d)
         assert match and int(match.group(1)) % 7 == 0, (r, d)
 
+    # date_diff between today and a date relative to today is a three-step
+    # plan: current(); a forward shift (@1 -> @2); date_diff(start=@1,
+    # end=@2). so the second endpoint is resolved rather than treated as a
+    # bare shift, and the shift is forward, so no negative value appears
+    relative_diff = [(r, d) for r, d in pairs if 'date_diff(start=@1,end=@2)' in d and d.count(';') == 2]
+    assert relative_diff, 'no relative-endpoint date_diff examples in the data'
+    for r, d in relative_diff:
+        assert d.startswith('current();') and '=-' not in d, (r, d)
+
     # every tool in the domain is actually exercised by the data
     exercised = {tool for _, d in pairs for tool in DOMAIN if tool + '(' in d}
     assert exercised == set(DOMAIN), set(DOMAIN) - exercised
@@ -192,6 +202,12 @@ def test_{{ app_label }}_ai_fundi_model():
         # expands to add_days with a multiple of 7
         assert ask('today minus 1 week') == f'[fundi] add_days: {(date.today() - timedelta(days=7)).isoformat()}'
         assert ask('2026-06-08 plus 3 weeks') == '[fundi] add_days: 2026-06-29'
+
+        # date_diff between today and a date relative to today (three steps:
+        # current, a forward shift, then the diff): today until tomorrow is
+        # one day, today until next week is seven
+        assert ask('count the days from today until tomorrow') == '[fundi] date_diff: 1'
+        assert ask('count the days from today until next week') == '[fundi] date_diff: 7'
 
         # a consumer reading a shifted date: the weekday of (today + 14)
         shifted = date.today() + timedelta(days=14)

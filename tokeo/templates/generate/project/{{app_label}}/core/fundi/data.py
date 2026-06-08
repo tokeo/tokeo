@@ -178,7 +178,8 @@ def sample(rng, minus=True):
     #   0.26-0.30  ( 4%)  relative chains (two shifts from today)
     #   0.30-0.72  (42%)  shifts, plain and consumer-composed (any unit)
     #   0.72-0.76  ( 4%)  a bare time word (today/now/heute) -> current()
-    #   0.76-1.00  (24%)  single-step calls to the non-shifting tools
+    #   0.76-0.80  ( 4%)  date_diff between today and a relative date
+    #   0.80-1.00  (20%)  single-step calls to the non-shifting tools
     kind = rng.random()
     if kind < 0.12:
         return _preamble(rng) + rng.choice(_LEXICON['negatives']), NOMATCH
@@ -197,6 +198,9 @@ def sample(rng, minus=True):
     if kind < 0.76:
         # a bare time word standing on its own means "the current date"
         return _render_now(rng, lang_en)
+    if kind < 0.80:
+        # date_diff between today and a date relative to today
+        return _render_date_diff_relative(rng, lang_en)
     single = _LEXICON['patterns']['single']
     tool = rng.choice(list(single))
     phrase = rng.choice(single[tool][_lang(lang_en)])
@@ -346,6 +350,29 @@ def _render_now(rng, lang_en):
     # it. _preamble adds the usual optional preamble and lead-in for variety
     word = _time_word(rng, lang_en)
     return _preamble(rng) + word, render([('current', {})])
+
+
+def _render_date_diff_relative(rng, lang_en):
+    # date_diff where the first endpoint is today and the second is a date
+    # relative to today: current() resolves today (@1), one forward shift
+    # produces the other endpoint (@2), and date_diff counts the days
+    # between them. exactly three steps, so it fits the plan budget. only
+    # forward relative words are used, so the count is positive and the
+    # phrasing natural ("from today until tomorrow"). two relative endpoints
+    # ("from yesterday until tomorrow") would need four steps -- a shift for
+    # each endpoint plus the diff -- which exceeds the cap, so they are
+    # deliberately out of scope
+    words = _LEXICON['relative_words'][_lang(lang_en)]
+    forward = [(word, row['tool'], str(row['shift'])) for word, row in words.items() if row['shift'] > 0]
+    word, tool, value = rng.choice(forward)
+    phrase = rng.choice(_LEXICON['patterns']['single']['date_diff'][_lang(lang_en)])
+    request = phrase.replace('{d}', _time_word(rng, lang_en)).replace('{d2}', word)
+    plan = [
+        ('current', {}),
+        (tool, {'date': '@1', DOMAIN[tool][1]: value}),
+        ('date_diff', {'start': '@1', 'end': '@2'}),
+    ]
+    return _preamble(rng) + request, render(plan)
 
 
 def _render_single(rng, tool, phrase, lang_en):
