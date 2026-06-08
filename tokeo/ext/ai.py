@@ -69,7 +69,7 @@ from dataclasses import asdict
 # session history and completion (the same building blocks the scheduler
 # shell uses); prompt_toolkit is a base dependency, so the imports are
 # top-level
-from prompt_toolkit import prompt
+from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -775,28 +775,31 @@ class AiController(Controller):
             'purpose': self.app.pargs.purpose,
         }
         messages = []
-        history = InMemoryHistory()
         completer = self._chat_completer()
+        # one prompt session for the whole chat, reused across turns (it
+        # carries the history, the selector completer, auto-suggest, and
+        # history-prefix search) instead of being rebuilt every turn
+        editor = self._chat_session(InMemoryHistory(), completer)
         self.app.print('ai chat - "--" for options, "exit"/"quit" or Ctrl-D to quit')
         # patch_stdout keeps any guard/audit log lines printed during a turn
         # from corrupting the live prompt line
         with patch_stdout(raw=True):
             while True:
                 try:
-                    line = prompt(
-                        '> ',
-                        history=history,
-                        auto_suggest=AutoSuggestFromHistory(),
-                        completer=completer,
-                    )
+                    line = editor.prompt('> ')
                     # an empty line is a no-op; only exit/quit or Ctrl-D end
                     if not line.strip():
                         continue
                     if line.strip() in ('exit', 'quit'):
                         break
-                    # apply any inline selector switches, keep the rest as
-                    # this turn's prompt
-                    text, changed = self._chat_switches(line, session)
+                    # apply any inline selector switches (validated against
+                    # the running config); keep the rest as this turn's prompt
+                    text, changed, error = self._chat_switches(line, session)
+                    if error:
+                        # a bad --profile/--agent/--model/--purpose value:
+                        # report it with the configured options and re-prompt
+                        self.app.print(f'ai chat - {error}')
+                        continue
                     text = text.strip()
                     if changed and not text:
                         # a pure switch line: confirm the new selection and
@@ -812,13 +815,22 @@ class AiController(Controller):
                     if not text:
                         continue
                     messages.append({'role': 'user', 'content': text})
-                    result = self.app.ai.chat(
-                        messages,
-                        profile=session['profile'],
-                        model=session['model'],
-                        purpose=session['purpose'],
-                        agent=session['agent'],
-                    )
+                    try:
+                        result = self.app.ai.chat(
+                            messages,
+                            profile=session['profile'],
+                            model=session['model'],
+                            purpose=session['purpose'],
+                            agent=session['agent'],
+                        )
+                    except TokeoAiError as err:
+                        # a selector or provider problem from the handler
+                        # (for example an agent given on the command line that
+                        # is not configured): show it, drop the unanswered
+                        # turn, and keep the session alive
+                        self.app.print(f'ai chat - {err}')
+                        messages.pop()
+                        continue
                     messages.append({'role': 'assistant', 'content': result.text})
                     self.app.print(result.text)
                 except KeyboardInterrupt:
@@ -829,14 +841,24 @@ class AiController(Controller):
                     # ctrl-d ends the session
                     break
                 except CaughtSignal as err:
-                    # allow shutdown via caught signals (same as the
-                    # scheduler shell)
+                    # allow shutdown by the configured signals; re-raise any
+                    # other caught signal instead of swallowing it
                     if err.signum in SIGNALS:
                         break
+                    raise
                 except Exception as err:
-                    # one failed turn (for example a provider error) must
-                    # not kill the session: log it and keep the shell alive
-                    self.app.log.debug(f'ai chat turn failed: {err}')
+                    # surface unexpected errors instead of hiding them; the
+                    # shell stays alive for the next turn
+                    self.app.print(f'ai chat - error: {err}')
+
+    def _chat_session(self, history, completer):
+        # the reusable prompt_toolkit session for the chat shell
+        return PromptSession(
+            history=history,
+            completer=completer,
+            auto_suggest=AutoSuggestFromHistory(),
+            enable_history_search=True,
+        )
 
     # the inline switches the chat shell understands; each --flag sets the
     # matching selector for the rest of the session. profile/model/purpose
@@ -861,35 +883,47 @@ class AiController(Controller):
         )
 
     def _chat_switches(self, line, session):
-        # pull any "--flag value" pairs out of the line, apply them to the
-        # session selectors, and return (residual_prompt, changed). a normal
-        # prompt has none of these tokens, so it passes through untouched
+        # pull any "--flag value" pairs out of the line, validate each value
+        # against the running config, and apply them to the session selectors
+        # only if all are valid. returns (residual_prompt, changed, error);
+        # a normal prompt has none of these tokens and passes through
+        # untouched. validation here (plus the completer) is what stops a
+        # typo such as "--agent guardedsss" from silently doing nothing
         try:
             tokens = shlex.split(line)
         except ValueError:
             # an unbalanced quote (an apostrophe in the prompt): fall back to
             # a naive split, used only to spot the switch tokens
             tokens = line.split()
+        names = self.app.ai.selectors()
+        pending = []
         rest = []
-        changed = False
         index = 0
         while index < len(tokens):
             token = tokens[index]
             if token in self._CHAT_SWITCHES and index + 1 < len(tokens):
                 key = self._CHAT_SWITCHES[token]
-                if key in self._CHAT_EXCLUSIVE:
-                    # keep the three profile selectors mutually exclusive
-                    for other in self._CHAT_EXCLUSIVE:
-                        session[other] = None
-                session[key] = tokens[index + 1]
-                changed = True
+                value = tokens[index + 1]
+                if value not in names[key]:
+                    # reject unknown values with the configured options
+                    options = ', '.join(names[key]) or '(none configured)'
+                    return line, False, f'unknown {key} {value!r}; available: {options}'
+                pending.append((key, value))
                 index += 2
                 continue
             rest.append(token)
             index += 1
-        # when nothing changed, return the original line so a normal
-        # prompt's punctuation and spacing survive exactly
-        return (' '.join(rest) if changed else line), changed
+        if not pending:
+            # nothing changed: return the original line so a normal prompt's
+            # punctuation and spacing survive exactly
+            return line, False, None
+        for key, value in pending:
+            if key in self._CHAT_EXCLUSIVE:
+                # keep the three profile selectors mutually exclusive
+                for other in self._CHAT_EXCLUSIVE:
+                    session[other] = None
+            session[key] = value
+        return ' '.join(rest), True, None
 
     @ex(
         help='check the ai configuration for typos and broken references',

@@ -37,7 +37,7 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.triggers.cron import CronTrigger
 from argparse import ArgumentParser
 import shlex
-from prompt_toolkit import prompt
+from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -1069,8 +1069,17 @@ class TokeoScheduler(MetaMixin):
 
         """
         self.app.log.info('Welcome to scheduler interactive shell.')
-        # build in-memory history for interactive shell
-        history = self.shell_history()
+        # one prompt session for the whole shell: it holds the in-memory
+        # history, the command completer, the from-history auto-suggest, and
+        # history-prefix search (up-arrow after typing a few letters), built
+        # once instead of rebuilt on every iteration. the dynamic prompt text
+        # and the edit-in-place default are passed per call below
+        session = PromptSession(
+            history=self.shell_history(),
+            completer=self.shell_completion(),
+            auto_suggest=AutoSuggestFromHistory(),
+            enable_history_search=True,
+        )
         # initialize the user_input
         user_input = ''
         # get std.output and prevent ruining interface
@@ -1079,21 +1088,16 @@ class TokeoScheduler(MetaMixin):
             while True:
                 # catch exceptions
                 try:
-                    user_input = prompt(
+                    user_input = session.prompt(
                         'Scheduler> ' if self._scheduler.state == STATE_RUNNING else '(not running) Scheduler> ',
-                        completer=self.shell_completion(),
-                        history=history,
-                        auto_suggest=AutoSuggestFromHistory(),
                         default=user_input,
                     )
+                    # prompt_toolkit already appended the accepted line to the
+                    # history on Enter, so there is nothing to store by hand.
+                    # on a successful command clear the edit buffer; on a
+                    # failed one keep it so it re-appears for correction
                     if self.command(user_input):
-                        # add input to history while a successful command
-                        # but do not repeat as input
-                        history.store_string(user_input)
                         user_input = ''
-                    else:
-                        # repeat the error input to edit and correct
-                        pass
 
                 except KeyboardInterrupt:
                     # we don't support Ctrl-C but reset input
@@ -1104,12 +1108,15 @@ class TokeoScheduler(MetaMixin):
                     self.app.log.info('bye bye using scheduler...')
                     break
                 except CaughtSignal as err:
-                    # check for caught signals and allow shutdown by signals
+                    # allow shutdown by the configured signals; re-raise any
+                    # other caught signal instead of silently swallowing it
                     if err.signum in SIGNALS:
                         break
+                    raise
                 except Exception as err:
-                    # print out the exception and continue
-                    self.app.log.debug(f'Logged unknown exception: {err}')
+                    # surface the error (not only at debug level) so a broken
+                    # command handler is visible, then keep the shell alive
+                    self.app.log.error(f'scheduler shell command failed: {err}')
 
                 # make one line space
                 print('')
