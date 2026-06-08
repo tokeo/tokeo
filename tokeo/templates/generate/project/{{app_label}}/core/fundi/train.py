@@ -232,7 +232,7 @@ def main():
     # reproducible: same flags in, same weights out
     torch.manual_seed(7)
     torch.set_num_threads(os.cpu_count() or 1)
-    steps = int(os.environ.get('FUNDI_STEPS', '3000'))
+    steps = int(os.environ.get('FUNDI_STEPS', '4000'))
     batch = int(os.environ.get('FUNDI_BATCH', '96'))
     parser = argparse.ArgumentParser(description='train the fundi micro language model')
     parser.add_argument(
@@ -245,7 +245,7 @@ def main():
     minus = not arguments.no_minus
     # build the dataset, then split off a fixed held-out slice that the loop
     # never sees -- the only honest place to read accuracy from
-    examples = dataset(int(os.environ.get('FUNDI_DATA', '40000')), minus=minus)
+    examples = dataset(int(os.environ.get('FUNDI_DATA', '60000')), minus=minus)
     held = examples[:600]
     train = examples[600:]
     data = tensorize(train, CONFIG['context'])
