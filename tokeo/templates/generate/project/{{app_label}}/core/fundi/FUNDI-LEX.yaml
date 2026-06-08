@@ -132,6 +132,22 @@ negatives:
   - 'das datum von weihnachten'
   - 'wann ist ostern'
   - 'wieviele tage bis zum sommer'
+  # short greetings and pleasantries: a small set so a bare hello is an
+  # honest echo, not an invented date. kept deliberately free of calendar-
+  # ambiguous words (no morgen/heute/abend/morning/today/...), so they do
+  # not blur a real time word
+  - 'hello'
+  - 'hi there'
+  - 'hey'
+  - 'thanks a lot'
+  - 'how are you'
+  - 'what is up'
+  - 'hallo'
+  - 'moin'
+  - 'servus'
+  - 'danke schoen'
+  - 'wie geht es dir'
+  - 'gruess dich'
 
 # distractor sentences in front of the intent, cross-language on purpose
 # (they also precede negatives, so chatter never signals "calendar");
