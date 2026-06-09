@@ -83,7 +83,8 @@ ai:
   ### executed; the loop continues and the model sees "denied: <reason>",
   ### so it can correct itself (deny-and-continue). a guard is an item in
   ### the uniform form: "type" is a built-in short name (validate, policy,
-  ### audit) or a full dotted class path, its settings live under "options"
+  ### audit, redact, truncate) or a full dotted class path, its settings
+  ### live under "options"
   guards:
     ### checks a call's arguments against the tool's parameters schema
     ### before it runs (missing required, unknown names, wrong basic types)
@@ -101,6 +102,17 @@ ai:
     ### blocks nothing; the structured trace is on the ChatResult
     audit:
       type: audit
+    ### masks secret-looking spans in a tool result after it ran (bearer
+    ### tokens, sk- keys, aws key ids, password:/token: assignments); add
+    ### project patterns under "options.patterns". list it before truncate
+    redact:
+      type: redact
+    ### caps an over-long tool result so a big blob cannot blow the context
+    ### budget; keeps the head and appends a "[truncated N chars]" marker
+    truncate:
+      type: truncate
+      options:
+        limit: 2000
 
   ### agents are the composition root: an agent binds the tools and guards
   ### for a task and sets the step budget. the model is not part of the
@@ -136,8 +148,9 @@ ai:
         # max_loops: 3
 
     ### the guarded composition around the project tools: it may calculate,
-    ### tell the time, and read files, but the policy denies writing; every
-    ### outcome is audited. try, and watch the denial:
+    ### tell the time, and read files, but the policy denies writing; tool
+    ### results are redacted and capped, and every outcome is audited. try,
+    ### and watch the denial:
     ###   {{ app_label }} ai ask "current" --agent guarded
     ###   {{ app_label }} ai ask "read_file notes.txt" --agent guarded
     ###   {{ app_label }} ai ask "append_file hello" --agent guarded   # denied by policy
@@ -151,6 +164,8 @@ ai:
         guards:
           - readonly
           - validate
+          - redact
+          - truncate
           - audit
 
   ### named profiles in the uniform form: top-level params (type, purpose,

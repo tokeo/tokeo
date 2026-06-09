@@ -12,9 +12,11 @@ import logging
 from pathlib import Path
 
 import pytest
-from tokeo.core.ai import Invocation, TokeoAiError
+from tokeo.core.ai import Invocation, ToolResult, TokeoAiError
 from tokeo.core.ai.linter import TokeoAiLinter
 from tokeo.core.ai.validate import TokeoAiValidateGuard
+from tokeo.core.ai.redact import TokeoAiRedactGuard
+from tokeo.core.ai.truncate import TokeoAiTruncateGuard
 from {{ app_label }}.core.ai.tools.calc import TokeoAiCalcTool
 from {{ app_label }}.main import {{ app_class_name }}Test
 
@@ -109,3 +111,30 @@ def test_{{ app_label }}_ai_validate_guard_checks_arguments():
         guard.check(invocation)
         assert invocation.decision == 'deny'
         assert "missing required argument 'input'" in invocation.reason
+
+
+def test_{{ app_label }}_ai_redact_guard_masks_secrets():
+    # the after-phase redact guard masks a secret-looking span in a tool
+    # result, so a leaked token never reaches the history, trace, or log
+    with {{ app_class_name }}AiTestApp() as app:
+        guard = TokeoAiRedactGuard(app)
+        guard._setup(app)
+        invocation = Invocation(id='t1', name='read_file', arguments={})
+        invocation.result = ToolResult(text='the page said Bearer abc123DEF456ghi789 here')
+        guard.check(invocation)
+        assert 'abc123DEF456ghi789' not in invocation.result.text
+        assert '[redacted]' in invocation.result.text
+        assert 'redacted' in (invocation.reason or '')
+        assert invocation.decision == 'allow'
+
+
+def test_{{ app_label }}_ai_truncate_guard_caps_long_results():
+    # the after-phase truncate guard keeps the head of an over-long result
+    # and marks the cut, so a big blob cannot blow the context budget
+    with {{ app_class_name }}AiTestApp() as app:
+        guard = TokeoAiTruncateGuard(app, limit=10)
+        invocation = Invocation(id='t1', name='read_file', arguments={})
+        invocation.result = ToolResult(text='x' * 50)
+        guard.check(invocation)
+        assert invocation.result.text == 'x' * 10 + '... [truncated 40 chars]'
+        assert 'truncated 40 chars' in (invocation.reason or '')

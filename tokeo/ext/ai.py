@@ -85,6 +85,8 @@ from tokeo.core.ai import (
 from tokeo.core.ai.audit import TokeoAiAuditGuard
 from tokeo.core.ai.policy import TokeoAiPolicyGuard
 from tokeo.core.ai.validate import TokeoAiValidateGuard
+from tokeo.core.ai.redact import TokeoAiRedactGuard
+from tokeo.core.ai.truncate import TokeoAiTruncateGuard
 from tokeo.core.ai.linter import TokeoAiLinter
 from tokeo.core.ai.mock import TokeoAiMockProvider
 
@@ -1023,6 +1025,10 @@ def ai_extend_app(app):
     app.ai.register('guard', 'policy', TokeoAiPolicyGuard)
     # built-in guard: the argument-schema check before a tool runs
     app.ai.register('guard', 'validate', TokeoAiValidateGuard)
+    # built-in guard: masks secret-looking spans in a tool result (after)
+    app.ai.register('guard', 'redact', TokeoAiRedactGuard)
+    # built-in guard: caps an over-long tool result (after)
+    app.ai.register('guard', 'truncate', TokeoAiTruncateGuard)
     app.ai._setup(app)
 
 
