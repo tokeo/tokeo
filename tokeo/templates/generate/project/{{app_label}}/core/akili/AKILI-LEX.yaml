@@ -1,13 +1,13 @@
 # =========================================================================
-# fundi lexicon -- the complete language of the training data
+# akili lexicon -- the complete language of the training data
 # =========================================================================
 #
 # everything the model can learn to understand is written down here: the
 # words and the sentence patterns. data.py reads this file when it
-# generates training examples, so teaching fundi new language is editing
+# generates training examples, so teaching akili new language is editing
 # this file and retraining:
 #
-#     python -m {{ app_label }}.core.fundi.train
+#     python -m {{ app_label }}.core.akili.train
 #
 # what stays in code (data.py): the mixture shares, the probability
 # rolls, and how patterns are filled and rendered into plans. what lives

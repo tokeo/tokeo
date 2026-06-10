@@ -115,8 +115,8 @@ variables:
     case: "upper"
     default: "Y"
 
-  - name: feature_ai_fundi
-    prompt: "Enable ai fundi llm [(Y)es/(N)o]"
+  - name: feature_ai_akili
+    prompt: "Enable ai akili llm [(Y)es/(N)o]"
     validate: "^[YN]$"
     case: "upper"
     default: "Y"

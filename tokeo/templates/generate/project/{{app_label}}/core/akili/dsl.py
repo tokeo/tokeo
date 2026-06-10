@@ -1,7 +1,7 @@
 """
-Fundi plan DSL for the Spiral ai micro model.
+Akili plan DSL for the Spiral ai micro model.
 
-The trained fundi model does one thing: it turns a request into a *plan*,
+The trained akili model does one thing: it turns a request into a *plan*,
 written in a tiny deterministic language. One line, steps joined by ``;``,
 each step a tool call; ``@k`` references the result of step k; a request
 outside the domain becomes ``<nomatch>``::
@@ -24,7 +24,7 @@ automaton supplies the *fence* (what is legal at all).
 # legal "plan", so the model can honestly abstain instead of inventing one
 NOMATCH = '<nomatch>'
 
-# the closed domain fundi is trained for: the calendar toolset, each tool
+# the closed domain akili is trained for: the calendar toolset, each tool
 # mapped to its ordered list of argument slots. this ordering is load-
 # bearing -- render writes slots in this order, parse checks the keys come
 # back in exactly this order, and the Constrainer fills them one by one in

@@ -1,8 +1,8 @@
 """
-NumPy inference for the Spiral fundi micro model.
+NumPy inference for the Spiral akili micro model.
 
 The application runs the trained weights (``weights.npz``, created by
-``python -m {{ app_label }}.core.fundi.train``) with plain NumPy -- no torch, no
+``python -m {{ app_label }}.core.akili.train``) with plain NumPy -- no torch, no
 server. This file is the *runtime*: it re-implements the same forward pass
 ``train.py`` defines in torch, then decodes a plan greedily and
 grammar-constrained. At every step the next byte must be legal plan DSL over
@@ -34,8 +34,8 @@ import pathlib
 
 import numpy
 
-from {{ app_label }}.core.fundi import tokenizer
-from {{ app_label }}.core.fundi.dsl import Constrainer
+from {{ app_label }}.core.akili import tokenizer
+from {{ app_label }}.core.akili.dsl import Constrainer
 
 try:
     # optional acceleration: if numba is present the attention loop is
@@ -80,7 +80,7 @@ def _attend(scores, values):   # pragma: no cover - numba compiles this
     return out
 
 
-class FundiModel:
+class AkiliModel:
     """
     The trained micro model: weights, forward pass, constrained decoding.
 
@@ -163,7 +163,7 @@ class FundiModel:
 
     def _forward(self, tokens, cache=None):
         # the full forward pass that primes the cache. it mirrors
-        # FundiNet.forward in train.py exactly, in numpy. matmul-dominated,
+        # AkiliNet.forward in train.py exactly, in numpy. matmul-dominated,
         # so BLAS does the heavy lifting
         weights = self._weights
         config = self._config

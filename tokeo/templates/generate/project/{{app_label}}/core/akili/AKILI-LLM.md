@@ -1,6 +1,6 @@
-# fundi -- the project's own micro language model
+# akili -- the project's own micro language model
 
-`fundi` is a real, trained language model that belongs to this application:
+`akili` is a real, trained language model that belongs to this application:
 a few hundred thousand parameters learned from scratch on the project's own
 synthetic data, running in-process with plain NumPy -- no host to start, no
 network, no third-party weights. It does one thing, and does it exactly: it
@@ -10,17 +10,17 @@ calls over the project's calendar toolset, including nested requests like
 
 It complements the framework's built-in `mock` provider: `mock` is the
 neutral, deliberately dumb test double that proves the machinery (loop,
-guards, budgets, trace) without any prerequisite; `fundi` is the content --
+guards, budgets, trace) without any prerequisite; `akili` is the content --
 the proof that a generated project can own, train, and operate its model.
 The agents stay model-free compositions: the same `audited` or `guarded`
-agent runs against `mock`, `fundi`, or a remote profile unchanged.
+agent runs against `mock`, `akili`, or a remote profile unchanged.
 
 Train-first: the weights are a project asset created by you. Run
 
-    python -m {{ app_label }}.core.fundi.train
+    python -m {{ app_label }}.core.akili.train
 
 once; it reports the held-out accuracy and writes `weights.npz` into this
-package. Until then the `fundi` profile raises a clear hint and the fundi
+package. Until then the `akili` profile raises a clear hint and the akili
 test cases skip.
 
 ## What you can ask it
@@ -30,39 +30,39 @@ English and German, in plain and nested wordings, with time words and
 signed offsets. Small, but real tasks:
 
     # appointments and weekdays
-    {{ app_label }} ai ask "der wochentag von heute" --profile fundi
-    {{ app_label }} ai ask "weekday of 2026-12-24" --profile fundi
+    {{ app_label }} ai ask "der wochentag von heute" --profile akili
+    {{ app_label }} ai ask "weekday of 2026-12-24" --profile akili
 
     # deadlines and countdowns
-    {{ app_label }} ai ask "count the days from today until 2026-12-24" --profile fundi
-    {{ app_label }} ai ask "add 90 days to 2026-06-08" --profile fundi
-    {{ app_label }} ai ask "das datum 14 tage vor 2026-12-24" --profile fundi
+    {{ app_label }} ai ask "count the days from today until 2026-12-24" --profile akili
+    {{ app_label }} ai ask "add 90 days to 2026-06-08" --profile akili
+    {{ app_label }} ai ask "das datum 14 tage vor 2026-12-24" --profile akili
 
     # planning
-    {{ app_label }} ai ask "die kalenderwoche von heute plus 30 tagen" --profile fundi
-    {{ app_label }} ai ask "die mondphase am 2000-01-06" --profile fundi
+    {{ app_label }} ai ask "die kalenderwoche von heute plus 30 tagen" --profile akili
+    {{ app_label }} ai ask "die mondphase am 2000-01-06" --profile akili
 
     # relative words, chains of them, and month/year shifts
-    {{ app_label }} ai ask "welches datum ist übermorgen" --profile fundi
-    {{ app_label }} ai ask "the week number of next month" --profile fundi
-    {{ app_label }} ai ask "the date of tomorrow next year" --profile fundi
-    {{ app_label }} ai ask "heute plus 1 jahr" --profile fundi
+    {{ app_label }} ai ask "welches datum ist übermorgen" --profile akili
+    {{ app_label }} ai ask "the week number of next month" --profile akili
+    {{ app_label }} ai ask "the date of tomorrow next year" --profile akili
+    {{ app_label }} ai ask "heute plus 1 jahr" --profile akili
 
     # the current date itself: a bare time word is enough
-    {{ app_label }} ai ask "today" --profile fundi
-    {{ app_label }} ai ask "heute" --profile fundi
+    {{ app_label }} ai ask "today" --profile akili
+    {{ app_label }} ai ask "heute" --profile akili
 
     # weeks are seven-day shifts (no add_weeks tool)
-    {{ app_label }} ai ask "today minus 1 week" --profile fundi
-    {{ app_label }} ai ask "2026-06-08 plus 3 weeks" --profile fundi
+    {{ app_label }} ai ask "today minus 1 week" --profile akili
+    {{ app_label }} ai ask "2026-06-08 plus 3 weeks" --profile akili
 
     # days between today and a date relative to today
-    {{ app_label }} ai ask "count the days from today until tomorrow" --profile fundi
-    {{ app_label }} ai ask "tage von heute bis naechste woche" --profile fundi
+    {{ app_label }} ai ask "count the days from today until tomorrow" --profile akili
+    {{ app_label }} ai ask "tage von heute bis naechste woche" --profile akili
 
     # and the three-step chains, its signature move
-    {{ app_label }} ai ask "the weekday of today plus 14 days" --profile fundi
-    {{ app_label }} ai ask "der wochentag von vor 2 tagen" --profile fundi
+    {{ app_label }} ai ask "the weekday of today plus 14 days" --profile akili
+    {{ app_label }} ai ask "der wochentag von vor 2 tagen" --profile akili
 
 Deadline calculators, release countdowns, week-number lookups, "x days of
 lead time before date y" -- deterministic, offline, tens of milliseconds,
@@ -71,24 +71,24 @@ and fully audited under `--agent guarded`.
 ### A planner, not a texter
 
 The model's only learned output language is the plan DSL (plus
-`<nomatch>`). The answer you see (`[fundi] weekday: Tuesday`) is always
+`<nomatch>`). The answer you see (`[akili] weekday: Tuesday`) is always
 the result of the last tool in the chain: the facts come from the
 computation, never from the model. That split is deliberate -- dates and
 arithmetic are exactly what language models, small or large, get wrong
 when they memorize, and exactly what tools compute precisely. A 380k
 model could never store a million date facts, but it can learn perfectly
-*which computation is meant*. This is also why fundi cannot hallucinate:
+*which computation is meant*. This is also why akili cannot hallucinate:
 what it does not understand becomes an honest `<nomatch>`, and what it
 understands gets computed.
 
 So there are three kinds of answers: a **tool result** (the normal
-case), **honest ignorance** (`[fundi] sing me a song` -- the labelled
+case), **honest ignorance** (`[akili] sing me a song` -- the labelled
 echo marks "outside my domain"), and **explanations** when the guard
 pipeline reports `denied:` or `error:` ("not permitted: ..." instead of
 retrying). Free-form text is not this model's job: where wording matters,
 the clean place is a remote profile behind the very same agents, guards,
-and tools -- the ladder mock -> fundi -> remote model tells the full
-story. To give fundi new *tasks*, give it new tools and teach them (see
+and tools -- the ladder mock -> akili -> remote model tells the full
+story. To give akili new *tasks*, give it new tools and teach them (see
 below); the provider, guards, and agents stay untouched.
 
 ### Honest limits, by design
@@ -129,12 +129,12 @@ sequenceDiagram
     actor U as user (cli)
     participant H as app.ai handler
     participant G as guard pipeline (agent guarded)
-    participant P as fundi provider
-    participant E as engine (core/fundi, NumPy)
+    participant P as akili provider
+    participant E as engine (core/akili, NumPy)
     participant T as calendar tools
 
     U->>H: ask "der wochentag von heute plus 2 tagen"
-    H->>H: resolve profile fundi + agent guarded, activate calendar tools
+    H->>H: resolve profile akili + agent guarded, activate calendar tools
 
     rect rgb(237, 233, 254)
         Note right of U: the model plans -- nothing is executed yet
@@ -160,14 +160,14 @@ sequenceDiagram
             else denied or error
                 G-->>H: denied by policy
                 H->>P: feedback
-                P-->>H: answer "[fundi] not permitted ..." and stop, no retry
+                P-->>H: answer "[akili] not permitted ..." and stop, no retry
             end
         end
     end
 
     rect rgb(220, 252, 231)
         Note right of U: the answer is the last tool's result
-        P-->>H: text "[fundi] weekday: Wednesday" plus raw.plan
+        P-->>H: text "[akili] weekday: Wednesday" plus raw.plan
         H-->>U: ChatResult with text, raw, and trace (3 entries)
     end
 ```
@@ -283,9 +283,9 @@ they chain ("tomorrow next year" is two shifts in order), and every
 shift shape speaks all units alike -- the unit word (days, months,
 years) picks the tool.
 Teaching a new word is adding a table line and retraining. A fixed seed makes the dataset reproducible at any time; run
-`python -m {{ app_label }}.core.fundi.data` to print samples.
+`python -m {{ app_label }}.core.akili.data` to print samples.
 
-### `FUNDI-LEX.yaml` -- the editable language definition
+### `AKILI-LEX.yaml` -- the editable language definition
 
 The complete language of the training data as a richly commented yaml
 file in three parts: **words** (time words, relative words with their
@@ -308,15 +308,15 @@ embeddings, three blocks of multi-head attention and a small MLP, projected
 back against the embedding matrix (tied head) -- about 380k parameters. The
 training sequence is `sentence + SEP + plan + EOS`, and the loss only counts
 the plan side. AdamW with a one-cycle schedule, environment knobs
-(`FUNDI_STEPS`, `FUNDI_BATCH`, `FUNDI_DATA`), and interruptible chunked runs
-via `FUNDI_CKPT`/`FUNDI_CHUNK`. At the end it evaluates exact-plan accuracy
+(`AKILI_STEPS`, `AKILI_BATCH`, `AKILI_DATA`), and interruptible chunked runs
+via `AKILI_CKPT`/`AKILI_CHUNK`. At the end it evaluates exact-plan accuracy
 on held-out examples and saves `weights.npz`. Torch is a dev-side tool only;
 the application never imports it.
 
 The `--no-minus` switch is a built-in ablation experiment:
 
-    python -m {{ app_label }}.core.fundi.train             # with minus teaching
-    python -m {{ app_label }}.core.fundi.train --no-minus  # without
+    python -m {{ app_label }}.core.akili.train             # with minus teaching
+    python -m {{ app_label }}.core.akili.train --no-minus  # without
 
 Both runs share the architecture, the budget, and the schedule -- only the
 dataset differs: with the switch, every signed-offset wording is left out,
@@ -326,7 +326,7 @@ two weights files this way makes the central lesson of the lab tangible:
 capability lives in the data, not in the code. The choice is recorded in
 the exported metadata (`minus: true/false`), so a weights file always tells
 what it was taught; the sample printer takes the same switch
-(`python -m {{ app_label }}.core.fundi.data --no-minus`).
+(`python -m {{ app_label }}.core.akili.data --no-minus`).
 
 ### `infer.py` -- the runtime (plain NumPy)
 
@@ -387,7 +387,7 @@ The lab fails loud rather than wrong. Every guard, and what it catches:
 
 - **lexicon validation** (`data._load_lexicon`, at import): an unknown
     tool or a pattern missing a required placeholder raises immediately --
-    a typo in `FUNDI-LEX.yaml` can never train silently.
+    a typo in `AKILI-LEX.yaml` can never train silently.
 - **grammar legality** (`dsl.Constrainer`): a generated plan can only be
     legal DSL over the active tools; a malformed plan is impossible to emit.
 - **the decoder budget guard** (a weight-free test): the longest plan the
@@ -421,7 +421,7 @@ shows what the weights file actually contains:
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#1f2937", "lineColor": "#64748b", "fontSize": "14px"}}}%%
 flowchart TD
-    subgraph LEXP["FUNDI-LEX.yaml -- the language, three parts"]
+    subgraph LEXP["AKILI-LEX.yaml -- the language, three parts"]
         direction LR
         LW("<b>1. words</b><br/>time words, relative words,<br/>units with declensions,<br/>consumer names")
         LC("<b>2. chatter</b><br/>negatives, preambles,<br/>lead-ins")
@@ -432,7 +432,7 @@ flowchart TD
     HELD("<b>600 held-out pairs</b><br/>never trained on")
     TRAIN("<b>29400 training pairs</b>")
     TOK("<b>tokenizer: one fixed row of bytes</b><br/>'heute' becomes 104 101 117 116 101,<br/>then SEP=257, the plan bytes, EOS=258,<br/>padded with PAD=256 to 184 positions")
-    NET("<b>FundiNet forward</b><br/>byte embedding 259x128 plus position embedding 184x128,<br/>3 blocks of: norm, attention with 4 heads, norm, MLP 128-512-128,<br/>final norm, tied head: 259 scores for every position")
+    NET("<b>AkiliNet forward</b><br/>byte embedding 259x128 plus position embedding 184x128,<br/>3 blocks of: norm, attention with 4 heads, norm, MLP 128-512-128,<br/>final norm, tied head: 259 scores for every position")
     LOSS("<b>cross-entropy, masked</b><br/>request side before SEP: ignored, counts zero<br/>plan side after SEP: graded character by character")
     OPT("<b>AdamW + OneCycle</b><br/>1400 steps x 96 examples,<br/>gradient clipping")
     EVAL("<b>evaluate, the honest number</b><br/>greedy-decode the 600 held-out requests<br/>without the grammar automaton --<br/>exact plan-line match, e.g. accuracy 0.98")
@@ -503,7 +503,7 @@ and the grammar automaton -- same sentence, same plan, every time.
 
 The path is always the same: teach it in `data.py` (new templates, new
 tools in `DOMAIN`, more phrasings, more languages), retrain with
-`python -m {{ app_label }}.core.fundi.train`, and check the reported accuracy
-plus the project's test suite. The provider (`core/ai/fundi.py`), the
+`python -m {{ app_label }}.core.akili.train`, and check the reported accuracy
+plus the project's test suite. The provider (`core/ai/akili.py`), the
 guards, and the agents need no change -- the plan grammar adapts to the
 active tools at runtime.

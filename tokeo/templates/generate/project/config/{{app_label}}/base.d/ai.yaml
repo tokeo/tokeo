@@ -2,8 +2,8 @@
 ###
 ### Named profiles for chat-completion models. {{ app_name }} talks to an
 ### OpenAI-compatible endpoint that you run yourself (Ollama, llama.cpp, vLLM,
-### MLX); the project's own trained fundi micro model (core/ai/fundi.py
-### and core/fundi) needs no server at all. A profile is selected by name,
+### MLX); the project's own trained akili micro model (core/ai/akili.py
+### and core/akili) needs no server at all. A profile is selected by name,
 ### or by a field such as model or purpose; a profile with "enabled: false"
 ### is hidden for the session.
 ai:
@@ -44,7 +44,7 @@ ai:
     ### a named group that bundles math-related tools
     mathematics:
       - calc
-    ### the calendar toolset the fundi micro model drives; every tool takes
+    ### the calendar toolset the akili micro model drives; every tool takes
     ### strict iso dates (YYYY-MM-DD) -- understanding looser language is
     ### the model's job, not the tool's
     date_diff:
@@ -66,7 +66,7 @@ ai:
       - read_file
       - append_file
     ### a named group that bundles the calendar tools (current resolves the
-    ### time words today/now for the fundi model)
+    ### time words today/now for the akili model)
     calendar:
       - current
       - date_diff
@@ -187,15 +187,15 @@ ai:
         - mathematics
 
     ### the project's own micro language model (the lab and the weights
-    ### live in {{ app_label }}/core/fundi): trained from scratch on the project's
+    ### live in {{ app_label }}/core/akili): trained from scratch on the project's
     ### synthetic calendar data, it plans real tool chains -- also nested
     ### requests like "the weekday of today plus 2 days" -- and runs
     ### in-process with plain numpy, no server. train-first: create the
-    ### weights once with "make fundi-train", then try:
-    ###   {{ app_label }} ai ask "der wochentag von heute plus 14 tagen" --profile fundi
-    ###   {{ app_label }} ai ask "weekday of 2026-12-24" --profile fundi --json
-    fundi:
-      type: {{ app_label }}.core.ai.fundi.TokeoAiFundiProvider
+    ### weights once with "make akili-train", then try:
+    ###   {{ app_label }} ai ask "der wochentag von heute plus 14 tagen" --profile akili
+    ###   {{ app_label }} ai ask "weekday of 2026-12-24" --profile akili --json
+    akili:
+      type: {{ app_label }}.core.ai.akili.TokeoAiAkiliProvider
       purpose: calendar
       tools:
         - calendar

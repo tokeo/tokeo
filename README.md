@@ -184,7 +184,7 @@ your_app nicegui serve
 your_app ai ask "ping"
 
 # Run the guarded agent: every tool call passes validate, policy, audit
-your_app ai ask "add 14 days to 2026-06-08" --profile fundi --agent guarded
+your_app ai ask "add 14 days to 2026-06-08" --profile akili --agent guarded
 ```
 
 ### Use Diskcache
@@ -211,15 +211,15 @@ The newest part of Tokeo is a complete, small AI agent runtime -- built on one c
 - **Tools are plain functions**: Registered with a spec, activated in groups (calendar, filesystem, mathematics) per profile. The provider never executes anything itself; results return as feedback through the guards.
 - **Late binding, honestly tested**: Providers are resolved by class path. The built-in `mock` provider makes the whole pipeline testable without any external service -- the contracts are the product.
 
-### fundi -- the train-first micro LLM lab
+### akili -- the train-first micro LLM lab
 
-[Spiral](https://github.com/tokeo/spiral) ships `fundi`, a complete and teachable micro language model that plans calendar tool calls -- small enough to read in an afternoon, real enough to prove the contracts end to end:
+[Spiral](https://github.com/tokeo/spiral) ships `akili`, a complete and teachable micro language model that plans calendar tool calls -- small enough to read in an afternoon, real enough to prove the contracts end to end:
 
 - **378,240 parameters, ~1.5 MB** -- byte-level tokenizer, 3 transformer blocks, NumPy-only inference in tens of milliseconds, no GPU and no service.
-- **Train first, no shipped weights**: `python -m spiral.core.fundi.train` creates the model on your machine (CPU is fine) with an honest held-out evaluation.
-- **The language is data**: every word and sentence pattern lives in `FUNDI-LEX.yaml` -- teaching the model new language (English and German today) is editing a file and retraining. An ablation switch (`--no-minus`) demonstrates the core lesson live: capability lives in the data, not in the code.
+- **Train first, no shipped weights**: `python -m spiral.core.akili.train` creates the model on your machine (CPU is fine) with an honest held-out evaluation.
+- **The language is data**: every word and sentence pattern lives in `AKILI-LEX.yaml` -- teaching the model new language (English and German today) is editing a file and retraining. An ablation switch (`--no-minus`) demonstrates the core lesson live: capability lives in the data, not in the code.
 - **Grammar-constrained planning**: a byte-level automaton makes malformed plans impossible -- the model chooses *which* legal continuation, never *whether* to be legal.
-- **Taught, not just documented**: `FUNDI-LLM.md` explains training, the anatomy of the weights, and constrained decoding with detailed diagrams.
+- **Taught, not just documented**: `AKILI-LLM.md` explains training, the anatomy of the weights, and constrained decoding with detailed diagrams.
 
 ### The road ahead
 
@@ -285,7 +285,7 @@ When you create a new project with Tokeo, you get a clean, modular structure:
 - `your_app/core/logic` - Space for your core application logic
 - `your_app/core/tasks/` - Implementations of actors, agents, automations, operations, performers etc.
 - `your_app/core/ai/` - Your AI providers and plain-function tools behind the guarded contracts
-- `your_app/core/fundi/` - The train-first micro LLM lab: model, lexicon (`FUNDI-LEX.yaml`), teaching docs
+- `your_app/core/akili/` - The train-first micro LLM lab: model, lexicon (`AKILI-LEX.yaml`), teaching docs
 - `your_app/core/grpc/` - gRPC service definitions and implementations
 - `your_app/core/utils/` - A place to put your overall tools and helper functions
 - `your_app/controllers/` - Command-line interface controllers

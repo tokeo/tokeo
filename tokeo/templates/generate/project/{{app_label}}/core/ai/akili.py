@@ -1,9 +1,9 @@
 """
-Fundi ai provider for the {{ app_name }} application.
+Akili ai provider for the {{ app_name }} application.
 
-``fundi`` is the project's own micro language model: a few hundred thousand
+``akili`` is the project's own micro language model: a few hundred thousand
 parameters trained from scratch on the project's synthetic calendar data (the
-lab lives in ``{{ app_label }}/core/fundi``), running in-process with plain NumPy -- no
+lab lives in ``{{ app_label }}/core/akili``), running in-process with plain NumPy -- no
 host to start, no network, deterministic. It plans tool chains, including
 nested requests like "the weekday of today plus 2 days", as a constrained
 plan DSL decoded greedily over the active tools, so it can never emit a
@@ -13,8 +13,8 @@ Its capability is small but clearly defined: the calendar domain it was
 trained for, in English and German. Outside that domain it answers with a
 labelled echo instead of guessing, it never invents arguments, and on
 ``denied:`` or ``error:`` feedback it explains instead of retrying. The
-weights are a project asset: run ``make fundi-train`` to create (or improve)
-``{{ app_label }}/core/fundi/weights.npz``; without them this provider raises a clear
+weights are a project asset: run ``make akili-train`` to create (or improve)
+``{{ app_label }}/core/akili/weights.npz``; without them this provider raises a clear
 error and the neutral ``mock`` stays available.
 
 This module is self-contained: it holds only the provider class. The project
@@ -32,13 +32,13 @@ _ISO_DATE = re.compile(r'\b\d{4}-\d{2}-\d{2}\b')
 _INTEGER = re.compile(r'(?<![\d-])-?\d+(?![\d-])')
 
 
-class TokeoAiFundiProvider(TokeoAiProvider):
+class TokeoAiAkiliProvider(TokeoAiProvider):
     """
     The project's own trained micro language model.
 
     ### Notes
 
-    : Replies are labelled (``[fundi] ...``), so it stays obvious which
+    : Replies are labelled (``[akili] ...``), so it stays obvious which
         model answered. The plan the model decided is inspectable in the
         result's ``raw`` payload next to the answer.
 
@@ -71,9 +71,9 @@ class TokeoAiFundiProvider(TokeoAiProvider):
         # denied or failed feedback ends the run with the reason; the micro
         # model does not retry, so a stuck loop can never build up
         if feedback and feedback[-1].startswith('denied:'):
-            return self._result(f'[fundi] not permitted: {feedback[-1][len("denied:"):].strip()}', prompt)
+            return self._result(f'[akili] not permitted: {feedback[-1][len("denied:"):].strip()}', prompt)
         if feedback and feedback[-1].startswith('error:'):
-            return self._result(f'[fundi] failed: {feedback[-1][len("error:"):].strip()}', prompt)
+            return self._result(f'[akili] failed: {feedback[-1][len("error:"):].strip()}', prompt)
         plan = self._plan(prompt, tools or [])
         done = len(feedback)
         if done < len(plan):
@@ -84,24 +84,24 @@ class TokeoAiFundiProvider(TokeoAiProvider):
             call = ToolCall(id=f'call_{done + 1}', name=name, arguments=arguments)
             return self._result('', prompt, tool_calls=[call], finish_reason='tool_calls', plan=plan)
         if plan:
-            return self._result(f'[fundi] {plan[-1][0]}: {feedback[-1]}', prompt, plan=plan)
-        return self._result(f'[fundi] {prompt}' if prompt else '[fundi] (no prompt)', prompt)
+            return self._result(f'[akili] {plan[-1][0]}: {feedback[-1]}', prompt, plan=plan)
+        return self._result(f'[akili] {prompt}' if prompt else '[akili] (no prompt)', prompt)
 
     def _plan(self, prompt, tools):
-        # the trained model (core/fundi) emits the plan as constrained DSL
+        # the trained model (core/akili) emits the plan as constrained DSL
         # over the active tools; numpy and the weights load lazily, and a
         # missing asset turns into a clear, actionable error
         try:
-            from {{ app_label }}.core.fundi.dsl import parse
-            from {{ app_label }}.core.fundi.infer import FundiModel
+            from {{ app_label }}.core.akili.dsl import parse
+            from {{ app_label }}.core.akili.infer import AkiliModel
         except ImportError as error:
-            raise TokeoAiError(f'fundi needs the core/fundi lab and numpy: {error}')
+            raise TokeoAiError(f'akili needs the core/akili lab and numpy: {error}')
         if self._engine is None:
             try:
-                self._engine = FundiModel()
+                self._engine = AkiliModel()
             except FileNotFoundError:
                 raise TokeoAiError(
-                    "fundi has no trained weights yet -- run 'python -m {{ app_label }}.core.fundi.train' to create {{ app_label }}/core/fundi/weights.npz"
+                    "akili has no trained weights yet -- run 'python -m {{ app_label }}.core.akili.train' to create {{ app_label }}/core/akili/weights.npz"
                 )
         active = {((spec or {}).get('function') or {}).get('name') for spec in tools}
         steps = []
@@ -160,5 +160,5 @@ class TokeoAiFundiProvider(TokeoAiProvider):
             tool_calls=tool_calls or [],
             usage=usage,
             finish_reason=finish_reason,
-            raw={'provider': 'fundi', 'model': 'fundi', 'plan': [name for name, _ in (plan or [])]},
+            raw={'provider': 'akili', 'model': 'akili', 'plan': [name for name, _ in (plan or [])]},
         )

@@ -20,7 +20,7 @@ Congratulations on creating your **{{ app_name }}** project! This is more than j
 Your application is ready for you to explore and expand. Here are some exciting directions you might take:
 
 {% if feature_ai == "Y" %}
-- **Agentic AI**: Built in and governed, ask via `{{ app_label }} ai ask`, every tool call passes validate, policy and audit.{% if feature_ai_fundi == "Y" %} Trained own micro model in `core/fundi`.
+- **Agentic AI**: Built in and governed, ask via `{{ app_label }} ai ask`, every tool call passes validate, policy and audit.{% if feature_ai_akili == "Y" %} Trained own micro model in `core/akili`.
 {% endif %}
 {% else %}
 - **AI Integration**: Add intelligence by integrating LLMs or classic ML pipelines
@@ -162,20 +162,20 @@ Your application speaks to AI providers through one governed runtime -- **the mo
 # Inspect agents, profiles, and registered tools
 {{ app_label }} ai list
 ```
-{% if feature_ai_fundi == "Y" %}
+{% if feature_ai_akili == "Y" %}
 
-Your project also ships **fundi**, a train-first micro LLM (378,240 parameters, ~1.5 MB) that plans calendar tool calls. No weights are included -- you create them, and that is the point:
+Your project also ships **akili**, a train-first micro LLM (378,240 parameters, ~1.5 MB) that plans calendar tool calls. No weights are included -- you create them, and that is the point:
 
 ```bash
 # Train on your machine (CPU is fine)
-python -m {{ app_label }}.core.fundi.train
+python -m {{ app_label }}.core.akili.train
 
 # Then ask, in English or German -- guarded, traced, deterministic
-{{ app_label }} ai ask "the weekday of today plus 2 days" --profile fundi --agent guarded
-{{ app_label }} ai ask "welches datum ist übermorgen" --profile fundi
+{{ app_label }} ai ask "the weekday of today plus 2 days" --profile akili --agent guarded
+{{ app_label }} ai ask "welches datum ist übermorgen" --profile akili
 ```
 
-The model's whole language lives in `{{ app_label }}/core/fundi/FUNDI-LEX.yaml`: teach it new words and sentence patterns by editing the file and retraining. `FUNDI-LLM.md` next to it explains training, the anatomy of the weights, and grammar-constrained decoding with detailed diagrams.
+The model's whole language lives in `{{ app_label }}/core/akili/AKILI-LEX.yaml`: teach it new words and sentence patterns by editing the file and retraining. `AKILI-LLM.md` next to it explains training, the anatomy of the weights, and grammar-constrained decoding with detailed diagrams.
 {% endif %}
 
 {% endif %}
@@ -252,8 +252,8 @@ Your project is organized into a clean, modular structure:
 {% if feature_ai == "Y" %}
 - `{{ app_label }}/core/ai/` - Your AI providers and plain-function tools behind the guarded contracts
 {% endif %}
-{% if feature_ai == "Y" and feature_ai_fundi == "Y" %}
-- `{{ app_label }}/core/fundi/` - The train-first micro LLM lab: model, lexicon (`FUNDI-LEX.yaml`), teaching docs
+{% if feature_ai == "Y" and feature_ai_akili == "Y" %}
+- `{{ app_label }}/core/akili/` - The train-first micro LLM lab: model, lexicon (`AKILI-LEX.yaml`), teaching docs
 {% endif %}
 {% if feature_grpc == "Y" %}
 - `{{ app_label }}/core/grpc/` - gRPC service definitions and implementations

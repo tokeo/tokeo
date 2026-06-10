@@ -2,7 +2,7 @@
 Date-diff tool for the {{ app_name }} ai agent.
 
 Counts the days between two dates -- the workhorse of the calendar toolset
-the fundi micro model drives. Dates are strict ISO (``YYYY-MM-DD``);
+the akili micro model drives. Dates are strict ISO (``YYYY-MM-DD``);
 understanding looser language is the model's job, not the tool's.
 
 This module is self-contained: it holds only the tool class. The project names

@@ -1,16 +1,16 @@
 """
-Byte tokenizer for the Spiral fundi micro model.
+Byte tokenizer for the Spiral akili micro model.
 
 A tokenizer turns text into integers the network can embed, and turns the
 network's integer outputs back into text. Most language models learn a
 *subword* vocabulary (tens of thousands of merged fragments) from a large
-corpus. fundi does the opposite and on purpose: it has **no trained
+corpus. akili does the opposite and on purpose: it has **no trained
 vocabulary at all**. The alphabet is simply the 256 possible byte values
 plus three control tokens.
 
 ### Why bytes, not subwords
 
-The whole job of fundi is to copy dates and numbers exactly -- "2026-12-24"
+The whole job of akili is to copy dates and numbers exactly -- "2026-12-24"
 must come out as "2026-12-24", and "2" must stay "2", never "two" and never
 "26". A subword vocabulary would merge "202", "6-", "12" into learned
 chunks whose splitting depends on the training corpus, which makes faithful

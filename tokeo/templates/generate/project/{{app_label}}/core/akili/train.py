@@ -1,11 +1,11 @@
 """
-Training for the Spiral fundi micro model.
+Training for the Spiral akili micro model.
 
 A from-scratch decoder-only transformer (a few hundred thousand parameters)
 learns one mapping: request bytes -> plan DSL bytes. Torch is a training-side
 tool only; the application runs the trained weights with plain NumPy (see
-``infer.py``). Run ``python -m {{ app_label }}.core.fundi.train`` from the project
-root; the weights land in ``{{ app_label }}/core/fundi/weights.npz``.
+``infer.py``). Run ``python -m {{ app_label }}.core.akili.train`` from the project
+root; the weights land in ``{{ app_label }}/core/akili/weights.npz``.
 
 ### The pipeline, step by step
 
@@ -28,17 +28,17 @@ root; the weights land in ``{{ app_label }}/core/fundi/weights.npz``.
 - ``--no-minus``: train without the signed-offset wordings (minus/ago,
     minus/vor) -- an ablation switch: same architecture and budget, but
     the resulting model has no notion of minus days. Keep the flag
-    identical across resumed chunks (``FUNDI_CKPT``), since the dataset
+    identical across resumed chunks (``AKILI_CKPT``), since the dataset
     and its held-out split are rebuilt from seed and flags on every
     invocation.
 
 ### Environment knobs
 
-- ``FUNDI_STEPS`` (default 3000): optimizer steps of the full schedule
-- ``FUNDI_BATCH`` (default 96): examples per step
-- ``FUNDI_DATA`` (default 40000): generated examples (600 held out)
-- ``FUNDI_CKPT``: path to a checkpoint file; enables resumable training
-- ``FUNDI_CHUNK``: steps per invocation when checkpointing (call the
+- ``AKILI_STEPS`` (default 3000): optimizer steps of the full schedule
+- ``AKILI_BATCH`` (default 96): examples per step
+- ``AKILI_DATA`` (default 40000): generated examples (600 held out)
+- ``AKILI_CKPT``: path to a checkpoint file; enables resumable training
+- ``AKILI_CHUNK``: steps per invocation when checkpointing (call the
     module repeatedly until the full schedule is done)
 """
 
@@ -51,12 +51,12 @@ import numpy
 import torch
 from torch import nn
 
-from {{ app_label }}.core.fundi import tokenizer
-from {{ app_label }}.core.fundi.data import dataset
+from {{ app_label }}.core.akili import tokenizer
+from {{ app_label }}.core.akili.data import dataset
 # one source of truth for the plan-length budget: the same constant the
 # NumPy runtime uses, so training-side decoding and evaluation reserve
 # exactly as much room for the plan as inference does
-from {{ app_label }}.core.fundi.infer import PLAN_BUDGET
+from {{ app_label }}.core.akili.infer import PLAN_BUDGET
 
 # the architecture, fixed and small. every value here is a lever on
 # capacity and parameter count; the comments say what each one buys:
@@ -106,9 +106,9 @@ class Block(nn.Module):
         return hidden + self.mlp(self.ln2(hidden))
 
 
-class FundiNet(nn.Module):
+class AkiliNet(nn.Module):
     """
-    The decoder-only transformer behind fundi.
+    The decoder-only transformer behind akili.
 
     A byte embedding plus a learned position embedding feed a stack of
     blocks, a final layer norm, and a head that projects each position back
@@ -222,8 +222,8 @@ def main():
     offsets; the choice is recorded in the exported metadata, so a weights
     file always tells what it was taught. Deterministic by construction:
     fixed seeds for torch and the data generator reproduce the same weights
-    from the same invocation. With ``FUNDI_CKPT`` set, the run resumes from
-    the stored step and stops after ``FUNDI_CHUNK`` steps, saving model,
+    from the same invocation. With ``AKILI_CKPT`` set, the run resumes from
+    the stored step and stops after ``AKILI_CHUNK`` steps, saving model,
     optimizer, schedule, and rng state; evaluation and export happen only
     once the final step of the schedule is reached.
 
@@ -232,9 +232,9 @@ def main():
     # reproducible: same flags in, same weights out
     torch.manual_seed(7)
     torch.set_num_threads(os.cpu_count() or 1)
-    steps = int(os.environ.get('FUNDI_STEPS', '4000'))
-    batch = int(os.environ.get('FUNDI_BATCH', '96'))
-    parser = argparse.ArgumentParser(description='train the fundi micro language model')
+    steps = int(os.environ.get('AKILI_STEPS', '4000'))
+    batch = int(os.environ.get('AKILI_BATCH', '96'))
+    parser = argparse.ArgumentParser(description='train the akili micro language model')
     parser.add_argument(
         '--no-minus',
         action='store_true',
@@ -245,11 +245,11 @@ def main():
     minus = not arguments.no_minus
     # build the dataset, then split off a fixed held-out slice that the loop
     # never sees -- the only honest place to read accuracy from
-    examples = dataset(int(os.environ.get('FUNDI_DATA', '60000')), minus=minus)
+    examples = dataset(int(os.environ.get('AKILI_DATA', '60000')), minus=minus)
     held = examples[:600]
     train = examples[600:]
     data = tensorize(train, CONFIG['context'])
-    model = FundiNet(CONFIG)
+    model = AkiliNet(CONFIG)
     # the printed number is the total parameter count (~378k by default)
     print('parameters:', sum(parameter.numel() for parameter in model.parameters()))
     # AdamW: adaptive per-parameter steps with weight decay (0.01) as gentle
@@ -265,7 +265,7 @@ def main():
     loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer.PAD)
     # optional chunked training: a checkpoint lets short runs resume, so the
     # full schedule can be split over several invocations (laptop-friendly)
-    checkpoint = os.environ.get('FUNDI_CKPT')
+    checkpoint = os.environ.get('AKILI_CKPT')
     first = 0
     if checkpoint and pathlib.Path(checkpoint).exists():
         # restore everything that defines "where we were": weights, the
@@ -277,7 +277,7 @@ def main():
         torch.set_rng_state(state['rng'])
         first = state['step']
         print('resumed at step', first)
-    chunk = int(os.environ.get('FUNDI_CHUNK', str(steps)))
+    chunk = int(os.environ.get('AKILI_CHUNK', str(steps)))
     last = min(first + chunk, steps)
     for step in range(first, last):
         # draw a random batch of rows (sampling with replacement)
@@ -340,7 +340,7 @@ def evaluate(model, examples):
 
     ### Args
 
-    - **model** (FundiNet): The trained model in eval mode
+    - **model** (AkiliNet): The trained model in eval mode
     - **examples** (list): Held-out (request, dsl) pairs
 
     ### Returns
@@ -372,7 +372,7 @@ def generate(model, request):
 
     ### Args
 
-    - **model** (FundiNet): The trained model
+    - **model** (AkiliNet): The trained model
     - **request** (str): The user request
 
     ### Returns
@@ -406,7 +406,7 @@ def save(model, accuracy, minus=True):
 
     ### Args
 
-    - **model** (FundiNet): The trained model
+    - **model** (AkiliNet): The trained model
     - **accuracy** (float): The held-out exact-plan accuracy to record
     - **minus** (bool): Whether minus wordings were taught (recorded)
 

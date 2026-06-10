@@ -1,12 +1,12 @@
 """
-Synthetic training data for the Spiral fundi micro model.
+Synthetic training data for the Spiral akili micro model.
 
 The calendar domain is closed, so the dataset is generated, not collected.
 Every example is a (request, plan-DSL) pair. The complete language -- every
 word and every sentence pattern the model is taught -- lives in
-``FUNDI-LEX.yaml`` next to this module; this module holds the mechanics:
+``AKILI-LEX.yaml`` next to this module; this module holds the mechanics:
 loading and validating the lexicon, the mixture, and how patterns are
-filled and rendered into plans. Teaching fundi new language is editing the
+filled and rendered into plans. Teaching akili new language is editing the
 lexicon and retraining.
 
 ### What the mixture teaches
@@ -50,12 +50,12 @@ lexicon and retraining.
 
 The whole dataset is a pure function of its seed and the lexicon: same
 seed, same lexicon, same deduplicated pairs -- a training run is fully
-reproducible. Run ``python -m {{ app_label }}.core.fundi.data`` to print samples.
+reproducible. Run ``python -m {{ app_label }}.core.akili.data`` to print samples.
 
 ### The lexicon
 
 ```yaml
-.. include:: ./FUNDI-LEX.yaml
+.. include:: ./AKILI-LEX.yaml
 ```
 """
 
@@ -65,7 +65,7 @@ from datetime import date, timedelta
 
 import yaml
 
-from {{ app_label }}.core.fundi.dsl import render, DOMAIN, NOMATCH
+from {{ app_label }}.core.akili.dsl import render, DOMAIN, NOMATCH
 
 # which placeholders every pattern group must carry; the loader checks
 # them so a lexicon edit fails loudly, never silently in training
@@ -79,7 +79,7 @@ _REQUIRED = {
 
 def _load_lexicon():
     """
-    Load and validate ``FUNDI-LEX.yaml``.
+    Load and validate ``AKILI-LEX.yaml``.
 
     The lexicon is data, so it is checked like data: tools must exist in
     the plan grammar, shifts must be integers, and every pattern group
@@ -90,33 +90,33 @@ def _load_lexicon():
     - **dict**: The parsed lexicon (words, names, and pattern groups)
 
     """
-    path = pathlib.Path(__file__).parent / 'FUNDI-LEX.yaml'
+    path = pathlib.Path(__file__).parent / 'AKILI-LEX.yaml'
     lexicon = yaml.safe_load(path.read_text())
     for language, words in lexicon['relative_words'].items():
         for word, row in words.items():
             if row['tool'] not in DOMAIN:
-                raise ValueError(f'FUNDI-LEX.yaml: unknown tool {row["tool"]!r} for {word!r}')
+                raise ValueError(f'AKILI-LEX.yaml: unknown tool {row["tool"]!r} for {word!r}')
             int(row['shift'])
     for language, rows in lexicon['units'].items():
         for row in rows:
             if row['tool'] not in DOMAIN:
-                raise ValueError(f'FUNDI-LEX.yaml: unknown tool {row["tool"]!r} in units/{language}')
+                raise ValueError(f'AKILI-LEX.yaml: unknown tool {row["tool"]!r} in units/{language}')
             # declensions: 'one' and 'many' may be a word or a list of words
             for key in ('one', 'many'):
                 if not isinstance(row[key], list):
                     row[key] = [row[key]]
     for tool in lexicon['consumers']:
         if tool not in DOMAIN:
-            raise ValueError(f'FUNDI-LEX.yaml: unknown consumer tool {tool!r}')
+            raise ValueError(f'AKILI-LEX.yaml: unknown consumer tool {tool!r}')
     for tool in lexicon['patterns']['single']:
         if tool not in DOMAIN:
-            raise ValueError(f'FUNDI-LEX.yaml: unknown tool {tool!r} in patterns/single')
+            raise ValueError(f'AKILI-LEX.yaml: unknown tool {tool!r} in patterns/single')
     for group, needed in _REQUIRED.items():
         for language, phrases in lexicon['patterns'][group].items():
             for phrase in phrases:
                 for placeholder in needed:
                     if placeholder not in phrase:
-                        raise ValueError(f'FUNDI-LEX.yaml: {group}/{language} pattern {phrase!r} misses {placeholder}')
+                        raise ValueError(f'AKILI-LEX.yaml: {group}/{language} pattern {phrase!r} misses {placeholder}')
     return lexicon
 
 

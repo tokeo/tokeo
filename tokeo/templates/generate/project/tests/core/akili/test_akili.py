@@ -1,12 +1,12 @@
 """
-Real test cases for fundi, the Spiral micro language model.
+Real test cases for akili, the Spiral micro language model.
 
-Two layers, because fundi is train-first. The data-contract tests run
+Two layers, because akili is train-first. The data-contract tests run
 without weights and lock in what the synthetic data *teaches* -- bare time
 words, greetings, signed counts, plan legality, tool coverage. The model
 test needs ``weights.npz`` (skips until it exists) and checks the actual
 answers of the project's own trained model, under the ``guarded`` agent.
-Run from the project root, for example ``pytest tests/core/fundi``.
+Run from the project root, for example ``pytest tests/core/akili``.
 """
 
 import re
@@ -47,13 +47,13 @@ class {{ app_class_name }}AiTestApp({{ app_class_name }}Test):
         ]
 
 
-def test_{{ app_label }}_fundi_lexicon_loads():
-    # the editable language definition (FUNDI-LEX.yaml) must parse and
+def test_{{ app_label }}_akili_lexicon_loads():
+    # the editable language definition (AKILI-LEX.yaml) must parse and
     # validate cleanly: every section filled for both languages, tools
     # known to the grammar, required placeholders present -- this runs
     # without weights and catches lexicon edits before a training run
-    from {{ app_label }}.core.fundi.data import _LEXICON
-    from {{ app_label }}.core.fundi.dsl import DOMAIN
+    from {{ app_label }}.core.akili.data import _LEXICON
+    from {{ app_label }}.core.akili.dsl import DOMAIN
     for language in ('en', 'de'):
         assert _LEXICON['time_words'][language]
         assert _LEXICON['relative_words'][language]
@@ -67,19 +67,19 @@ def test_{{ app_label }}_fundi_lexicon_loads():
     # the longest plan the data can produce must fit the decoder budget,
     # with room for the closing EOS step -- a longer pattern group would
     # otherwise be silently truncated at inference time
-    from {{ app_label }}.core.fundi.data import dataset
-    from {{ app_label }}.core.fundi.infer import PLAN_BUDGET
+    from {{ app_label }}.core.akili.data import dataset
+    from {{ app_label }}.core.akili.infer import PLAN_BUDGET
     longest = max(len(d) for _, d in dataset(8000, seed=7) if d != '<nomatch>')
     assert longest + 1 <= PLAN_BUDGET, (longest, PLAN_BUDGET)
 
 
-def test_{{ app_label }}_fundi_data_contract():
+def test_{{ app_label }}_akili_data_contract():
     # the teaching guarantees that make the model's answers predictable.
     # these assert what the synthetic data contains, so a lexicon or mixture
     # edit that would change the trained behaviour fails here -- before a
     # training run, and without needing any weights
-    from {{ app_label }}.core.fundi.data import dataset, _LEXICON
-    from {{ app_label }}.core.fundi.dsl import DOMAIN, NOMATCH, Constrainer, parse
+    from {{ app_label }}.core.akili.data import dataset, _LEXICON
+    from {{ app_label }}.core.akili.dsl import DOMAIN, NOMATCH, Constrainer, parse
     pairs = dataset(12000, seed=7)
 
     # a bare time word, standing on its own, must resolve to current(); the
@@ -156,62 +156,62 @@ def test_{{ app_label }}_fundi_data_contract():
 
 
 @pytest.mark.skipif(
-    not Path('{{ app_label }}/core/fundi/weights.npz').exists(),
-    reason="fundi has no trained weights yet (run 'python -m {{ app_label }}.core.fundi.train')",
+    not Path('{{ app_label }}/core/akili/weights.npz').exists(),
+    reason="akili has no trained weights yet (run 'python -m {{ app_label }}.core.akili.train')",
 )
-def test_{{ app_label }}_ai_fundi_model():
-    # the project's own trained micro language model ({{ app_label }}/core/fundi)
+def test_{{ app_label }}_ai_akili_model():
+    # the project's own trained micro language model ({{ app_label }}/core/akili)
     # plans with learned weights: exact copies, real chains incl. the
     # today-bridge, honest nomatch -- and the guards still rule the loop
     with {{ app_class_name }}AiTestApp() as app:
 
         def ask(text):
-            return app.ai.ask(text, agent='guarded', profile='fundi')
+            return app.ai.ask(text, agent='guarded', profile='akili')
 
         # the quality bar first: the held-out exact-plan accuracy is recorded
         # in the weights, and below the floor the per-phrasing checks below
         # are flaky -- so fail here with a clear message instead of on some
         # borderline wording. retrain with more steps to lift it
-        from {{ app_label }}.core.fundi.infer import FundiModel
-        accuracy = FundiModel().config.get('accuracy', 0.0)
+        from {{ app_label }}.core.akili.infer import AkiliModel
+        accuracy = AkiliModel().config.get('accuracy', 0.0)
         assert accuracy >= _MIN_ACCURACY, (
-            f'fundi held-out accuracy {accuracy:.4f} < {_MIN_ACCURACY}; '
-            'retrain with more steps (e.g. FUNDI_STEPS=4000 FUNDI_DATA=60000)'
+            f'akili held-out accuracy {accuracy:.4f} < {_MIN_ACCURACY}; '
+            'retrain with more steps (e.g. AKILI_STEPS=4000 AKILI_DATA=60000)'
         )
 
         # exact copies and single-step tools
-        assert ask('weekday of 2026-12-24') == '[fundi] weekday: Thursday'
-        assert ask('weekday of 2026-12-24 minus 2 days') == '[fundi] weekday: Tuesday'
-        assert ask('add 2 months to 2026-06-08') == '[fundi] add_months: 2026-08-08'
-        assert ask('die mondphase am 2000-01-06') == '[fundi] moon_phase: new moon'
+        assert ask('weekday of 2026-12-24') == '[akili] weekday: Thursday'
+        assert ask('weekday of 2026-12-24 minus 2 days') == '[akili] weekday: Tuesday'
+        assert ask('add 2 months to 2026-06-08') == '[akili] add_months: 2026-08-08'
+        assert ask('die mondphase am 2000-01-06') == '[akili] moon_phase: new moon'
         iso_week = date(2026, 12, 24).isocalendar()[1]
-        assert ask('the week number of 2026-12-24') == f'[fundi] week_number: {iso_week}'
+        assert ask('the week number of 2026-12-24') == f'[akili] week_number: {iso_week}'
 
         # a bare time word is the current date: today/now/heute/jetzt all
         # resolve to current(); the time part varies, so match the date head
         today = date.today().isoformat()
         for word in ('today', 'now', 'heute', 'jetzt'):
             out = ask(word)
-            assert out.startswith(f'[fundi] current: {today}'), (word, out)
+            assert out.startswith(f'[akili] current: {today}'), (word, out)
 
         # relative words and the today-bridge
         tomorrow = (date.today() + timedelta(days=1)).isoformat()
-        assert ask('welches datum ist morgen') == f'[fundi] add_days: {tomorrow}'
+        assert ask('welches datum ist morgen') == f'[akili] add_days: {tomorrow}'
 
         # a week is seven days (there is no add_weeks tool): a week shift
         # expands to add_days with a multiple of 7
-        assert ask('today minus 1 week') == f'[fundi] add_days: {(date.today() - timedelta(days=7)).isoformat()}'
-        assert ask('2026-06-08 plus 3 weeks') == '[fundi] add_days: 2026-06-29'
+        assert ask('today minus 1 week') == f'[akili] add_days: {(date.today() - timedelta(days=7)).isoformat()}'
+        assert ask('2026-06-08 plus 3 weeks') == '[akili] add_days: 2026-06-29'
 
         # date_diff between today and a date relative to today (three steps:
         # current, a forward shift, then the diff): today until tomorrow is
         # one day, today until next week is seven
-        assert ask('count the days from today until tomorrow') == '[fundi] date_diff: 1'
-        assert ask('count the days from today until next week') == '[fundi] date_diff: 7'
+        assert ask('count the days from today until tomorrow') == '[akili] date_diff: 1'
+        assert ask('count the days from today until next week') == '[akili] date_diff: 7'
 
         # a consumer reading a shifted date: the weekday of (today + 14)
         shifted = date.today() + timedelta(days=14)
-        assert ask('the weekday of today plus 14 days') == f'[fundi] weekday: {_WEEKDAYS[shifted.weekday()]}'
+        assert ask('the weekday of today plus 14 days') == f'[akili] weekday: {_WEEKDAYS[shifted.weekday()]}'
 
         # a relative chain: two shifts from today, day word then year word
         base = date.today() + timedelta(days=1)
@@ -220,24 +220,24 @@ def test_{{ app_label }}_ai_fundi_model():
         except ValueError:
             # feb 29 clamps to feb 28 in a common year, like the tool does
             target = base.replace(year=base.year + 1, day=28)
-        assert ask('the date of tomorrow next year') == f'[fundi] add_years: {target.isoformat()}'
+        assert ask('the date of tomorrow next year') == f'[akili] add_years: {target.isoformat()}'
 
         # honest abstention: hard negative, greetings, and signed counts all
         # echo (no invented plan, no invented digit, no dropped shift)
-        assert ask('what date is my birthday') == '[fundi] what date is my birthday'
+        assert ask('what date is my birthday') == '[akili] what date is my birthday'
         for greeting in ('hello', 'hallo', 'moin'):
-            assert ask(greeting) == f'[fundi] {greeting}'
-        assert ask('today plus -2 days') == '[fundi] today plus -2 days'
+            assert ask(greeting) == f'[akili] {greeting}'
+        assert ask('today plus -2 days') == '[akili] today plus -2 days'
         wrapped = 'the weekday of today plus -2 days'
-        assert ask(wrapped) == f'[fundi] {wrapped}'
-        assert ask('sing me a song') == '[fundi] sing me a song'
+        assert ask(wrapped) == f'[akili] {wrapped}'
+        assert ask('sing me a song') == '[akili] sing me a song'
 
         # multi-turn chat still threads and the guards report the plan
         days = (date(2026, 12, 24) - date.today()).days
         chained = app.ai.chat(
             [{'role': 'user', 'content': 'count the days from today until 2026-12-24'}],
             agent='guarded',
-            profile='fundi',
+            profile='akili',
         )
-        assert chained.text == f'[fundi] date_diff: {days}'
+        assert chained.text == f'[akili] date_diff: {days}'
         assert chained.raw['plan'] == ['current', 'date_diff']
