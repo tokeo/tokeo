@@ -13,7 +13,8 @@ Its capability is small but clearly defined: the calendar domain it was
 trained for, in English and German. Outside that domain it answers with a
 labelled echo instead of guessing, it never invents arguments, and on
 ``denied:`` or ``error:`` feedback it explains instead of retrying. The
-weights are a project asset: run ``make akili-train`` to create (or improve)
+weights are a project asset, to create (or improve) run:
+``python -m {{ app_label }}.core.akili.train``. This will create or update
 ``{{ app_label }}/core/akili/weights.npz``; without them this provider raises a clear
 error and the neutral ``mock`` stays available.
 

@@ -1,5 +1,6 @@
 """
-The Spiral akili micro language model -- a small, complete, teachable lab.
+The {{ app_name }} akili micro language model -- a small, complete,
+teachable lab.
 
 This package is a from-scratch decoder-only transformer that does exactly
 one thing: turn a calendar request into a plan of tool calls. It is meant
@@ -17,7 +18,11 @@ to be read end to end. The modules, in the order they make sense:
 
 The long-form walkthrough below (``AKILI-LLM.md``) explains the training
 pipeline, the anatomy of the weights, and constrained decoding with
-diagrams.
+diagrams. After it, ``AKILI-USE.md`` is the guided demo in three acts:
+the fundi agent, the akili model, and -- on purpose -- the limits where
+a language model breaks.
 
 .. include:: ./AKILI-LLM.md
+
+.. include:: ./AKILI-USE.md
 """

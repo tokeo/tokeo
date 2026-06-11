@@ -76,19 +76,22 @@ from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import Completer, Completion
 
 from tokeo.ext.argparse import Controller
+from tokeo.core.utils.base import as_list
 from tokeo.core.ai import (
     TokeoAiError,
     ToolResult,
     Invocation,
-    TokeoAiAgent,
+    TokeoAiFundiAgent,
 )
-from tokeo.core.ai.audit import TokeoAiAuditGuard
-from tokeo.core.ai.policy import TokeoAiPolicyGuard
-from tokeo.core.ai.validate import TokeoAiValidateGuard
-from tokeo.core.ai.redact import TokeoAiRedactGuard
-from tokeo.core.ai.truncate import TokeoAiTruncateGuard
+from tokeo.core.ai.guards.audit import TokeoAiAuditGuard
+from tokeo.core.ai.guards.policy import TokeoAiPolicyGuard
+from tokeo.core.ai.guards.validate import TokeoAiValidateGuard
+from tokeo.core.ai.guards.redact import TokeoAiRedactGuard
+from tokeo.core.ai.guards.truncate import TokeoAiTruncateGuard
+from tokeo.core.ai.sandboxes.in_process import TokeoAiInProcessSandbox
+from tokeo.core.ai.sandboxes.subprocess import TokeoAiSubprocessSandbox
 from tokeo.core.ai.linter import TokeoAiLinter
-from tokeo.core.ai.mock import TokeoAiMockProvider
+from tokeo.core.ai.providers.mock import TokeoAiMockProvider
 
 
 class TokeoAi(MetaMixin):
@@ -170,6 +173,11 @@ class TokeoAi(MetaMixin):
         self._tool_objs = {}
         self._agent_objs = {}
         self._guard_objs = {}
+        self._sandbox_objs = {}
+        # an app-wide sandbox override set via ``set_sandbox``; when set it
+        # replaces the agent's sandbox chain for every tool (a deliberate,
+        # process-global choice, e.g. force everything into a container)
+        self._sandbox_override = None
 
     def _setup(self, app):
         """
@@ -192,6 +200,10 @@ class TokeoAi(MetaMixin):
         self._profiles = self._config('profiles', fallback={}) or {}
         self._agents = self._config('agents', fallback={}) or {}
         self._guards = self._config('guards', fallback={}) or {}
+        # the ``ai.sandboxes`` map uses the uniform item form: a dict value is
+        # a sandbox item ({type, tools, except, options}); there are no groups
+        # here (a sandbox lists tool/group names under its own ``tools``)
+        self._sandboxes = self._config('sandboxes', fallback={}) or {}
         # the ``ai.tools`` map uses the uniform form: a dict value is an item
         # ({type, options}), a list value is a named group of member names.
         # split it once into the two maps the loop works with
@@ -411,6 +423,12 @@ class TokeoAi(MetaMixin):
             settings = item.get('options') or {}
             obj = self.resolve('tool', item['type'])(self.app, **settings)
             obj._setup(self.app)
+            # WHY: a sandbox that runs the tool in another process (subprocess,
+            # docker) must rebuild it there from its dotted path and options;
+            # carry both on the instance so the in-process tool and its worker
+            # twin are built the same way (the uniformity rule)
+            obj._tokeo_parent_instance_type = item['type']
+            obj._tokeo_parent_instance_options = dict(settings)
             self._tool_objs[name] = obj
         return obj
 
@@ -473,15 +491,43 @@ class TokeoAi(MetaMixin):
             self._agent_objs[name] = obj
         return obj
 
-    def _agent_or_default(self, agent):
-        # resolve the agent to run: an explicit name wins, else the configured
-        # ``ai.defaults.agent`` (optional). with neither there is no agent, and
-        # the caller uses only the profile's own tools
+    def _agent_or_default(self, agent, profile=None):
+        # resolve the agent to run, in order: an explicit call argument wins;
+        # else the selected profile's ``agent`` (which must be stated, even as
+        # null to opt out); else ``ai.defaults.agent``. with none bound there
+        # is no agent and, under the sandbox rules, a tool call is denied --
+        # binding an agent is how a profile opts into running tools at all
+        if agent is None and profile is not None and 'agent' in profile:
+            # an explicit ``agent: null`` on the profile opts out on purpose,
+            # overriding defaults.agent; a present name selects that agent
+            agent = profile.get('agent')
+            if not agent:
+                return None
         if agent is None:
             agent = self._defaults.get('agent')
         if not agent:
             return None
         return self._agent(agent)
+
+    def _deny_set(self, agent_obj, profile, call_deny=None):
+        # the resolved set of denied tools, shared by the spec-trimming and the
+        # exec-time defence line so both always agree: the agent's deny, the
+        # profile's deny, and the call's deny, each a single name or a group
+        denied = set()
+        if agent_obj is not None:
+            denied |= set(self._resolve_tools(as_list(agent_obj._meta.deny)))
+        denied |= set(self._resolve_tools(as_list((profile or {}).get('deny'))))
+        denied |= set(self._resolve_tools(as_list(call_deny)))
+        return denied
+
+    def _tools_minus_deny(self, agent_obj, profile, call_deny=None):
+        # the active tool set: the agent's tools minus the shared deny set. a
+        # call can only narrow the set, never extend it -- there is no way to
+        # add a tool the agent does not carry. tools resolve to concrete names
+        # first (so a denied group removes all its members), order is kept
+        active = self._resolve_tools(agent_obj._meta.tools)
+        denied = self._deny_set(agent_obj, profile, call_deny)
+        return [name for name in active if name not in denied]
 
     def _guard(self, name):
         # build the guard configured under ``ai.guards[name]`` once and reuse
@@ -508,10 +554,100 @@ class TokeoAi(MetaMixin):
             return []
         return [self._guard(name) for name in agent_obj._meta.guards]
 
-    def _run_guarded(self, call, before_guards, after_guards, trace):
+    def _sandbox(self, name):
+        # build the sandbox configured under ``ai.sandboxes[name]`` once and
+        # reuse it; the entry has the uniform item form: ``type`` (a built-in
+        # short name or a dotted path) resolves to a sandbox class, built with
+        # the application and the entry's ``options`` as keyword arguments (the
+        # keys override the sandbox's Meta defaults). like a provider it holds
+        # no per-call state, so one cached instance is fine
+        obj = self._sandbox_objs.get(name)
+        if obj is None:
+            item = self._sandboxes.get(name)
+            if not isinstance(item, dict) or not item.get('type'):
+                raise TokeoAiError(f'ai sandbox {name!r} is not configured under ai.sandboxes')
+            settings = item.get('options') or {}
+            obj = self.resolve('sandbox', item['type'])(self.app, **settings)
+            obj._setup(self.app)
+            self._sandbox_objs[name] = obj
+        return obj
+
+    def set_sandbox(self, name):
+        """
+        Force every tool into one sandbox for this process, or clear it.
+
+        An app-wide override that replaces the agent's sandbox chain: a
+        deliberate, global choice (for example, run everything in a container
+        regardless of the agent). It does not touch the agent's hard ``deny``.
+
+        ### Args
+
+        - **name** (str | None): A configured sandbox name, or ``None`` to
+            clear the override and return to the per-agent chain
+
+        """
+        # validate eagerly so a bad name fails here, not deep in a later call
+        if name is not None:
+            self._sandbox(name)
+        self._sandbox_override = name
+
+    def _sandbox_tools_contain(self, name, tool_name):
+        # do the tools of sandbox ``name`` contain ``tool_name``? ``tools`` is the
+        # keyword ``_all`` (every tool that reaches it) or a list of
+        # tool/group names (expanded like the agent's tools); its ``except``
+        # excludes members from THIS sandbox only -- not a ban, the chain
+        # walks on for them
+        item = self._sandboxes.get(name) or {}
+        listed = item.get('tools')
+        if listed == '_all':
+            in_set = True
+        else:
+            in_set = tool_name in self._resolve_tools(listed or [])
+        if not in_set:
+            return False
+        excepted = self._resolve_tools(as_list(item.get('except')))
+        return tool_name not in excepted
+
+    def _sandbox_for(self, tool_name, agent_obj):
+        # choose the sandbox a tool runs in. the app-wide override wins; else
+        # walk the agent's ordered chain and take the first sandbox whose
+        # tools contain
+        # the tool (and does not ``except`` it). an exhausted chain returns
+        # None, which the caller turns into a deny -- no sandbox listing the tool
+        # IS the deny-by-default
+        if self._sandbox_override is not None:
+            return self._sandbox(self._sandbox_override)
+        if agent_obj is None:
+            return None
+        for name in agent_obj._meta.sandboxes:
+            if self._sandbox_tools_contain(name, tool_name):
+                return self._sandbox(name)
+        return None
+
+    def _denies(self, tool_name, agent_obj, profile, call_deny=None):
+        # the exec-time defence line: refuse a tool that is in the shared deny
+        # set before any sandbox lookup -- the same set used to trim the specs,
+        # so a model calling a carved-out tool is refused here too
+        return tool_name in self._deny_set(agent_obj, profile, call_deny)
+
+    def _exec_in_sandbox(self, tool_name, arguments, agent_obj, profile=None, call_deny=None):
+        # the seam: resolve the tool, choose its sandbox, and run the call
+        # through it. a hard ``deny`` or an exhausted chain raises, so the
+        # caller records a denial; otherwise the chosen sandbox contains the
+        # ``tool.exec``
+        if self._denies(tool_name, agent_obj, profile, call_deny):
+            raise TokeoAiError(f'tool {tool_name!r} is denied')
+        tool = self._tool(tool_name)
+        sandbox = self._sandbox_for(tool_name, agent_obj)
+        if sandbox is None:
+            raise TokeoAiError(f'tool {tool_name!r} has no sandbox in the agent chain (denied)')
+        return sandbox.exec(tool, arguments or {})
+
+    def _exec_guarded(self, call, before_guards, after_guards, trace, agent_obj, profile, call_deny=None):
         # run one tool call through the guard pipeline: the before guards may
-        # deny it, the tool runs unless denied, and the after guards always run
-        # (so a denial is recorded too). every outcome is appended to the trace
+        # deny it, the tool runs (inside its sandbox) unless denied, and the
+        # after guards always run (so a denial is recorded too). every outcome
+        # is appended to the trace
         invocation = Invocation(id=call.id, name=call.name, arguments=dict(call.arguments or {}))
         # attach the tool's declared schema so a before guard can validate
         # the arguments; an unknown tool leaves it None and still errors at
@@ -526,7 +662,9 @@ class TokeoAi(MetaMixin):
                 break
         if invocation.decision != 'deny':
             try:
-                output = self._tool(invocation.name).exec(**invocation.arguments)
+                # the seam: the agent's sandbox chain contains the exec (a hard
+                # deny or an exhausted chain raises and is recorded as an error)
+                output = self._exec_in_sandbox(invocation.name, invocation.arguments, agent_obj, profile, call_deny)
                 invocation.result = output if isinstance(output, ToolResult) else ToolResult(text=str(output))
             except Exception as err:
                 # the pipeline is resilient: a failing tool is recorded and the
@@ -542,16 +680,16 @@ class TokeoAi(MetaMixin):
             return f'error: {invocation.error}'
         return invocation.result.text if invocation.result is not None else ''
 
-    def chat(self, messages, tools=None, profile=None, model=None, purpose=None, agent=None, max_steps=None, max_loops=None):
+    def chat(self, messages, deny=None, profile=None, model=None, purpose=None, agent=None, max_steps=None, max_loops=None):
         """
         Run the agent loop and return the final ``ChatResult``.
 
         Resolves a profile (the model), then calls the provider. The active
-        tools are the union of the profile's own tools and the agent's tools
-        (the agent, the composition root, also sets the budgets). While the
-        model asks for tool calls, the activated tools are executed and their
-        results are fed back, until the model answers. With no activated tool
-        the loop degrades to a single, plain call.
+        tools come from the agent (the composition root, which also sets the
+        budgets); the call cannot add tools, only narrow them. While the model
+        asks for tool calls, the activated tools are executed and their results
+        are fed back, until the model answers. With no activated tool the loop
+        degrades to a single, plain call.
 
         Two budgets bound the loop and abort it with an error when reached:
         ``max_steps`` caps the tool rounds of one request, ``max_loops`` caps
@@ -561,8 +699,9 @@ class TokeoAi(MetaMixin):
         ### Args
 
         - **messages** (list): Chat messages as plain OpenAI-style dicts
-        - **tools** (list | None): Tool names to activate; the hard override
-            for the profile-and-agent union when given
+        - **deny** (list | str | None): Tools or groups this call forbids, on
+            top of the agent's and the profile's deny. A call may only narrow
+            the agent's tool set, never extend it
         - **profile** (str | None): Select a profile by name
         - **model** (str | None): Select the first enabled profile by model
         - **purpose** (str | None): Select the first enabled profile by purpose
@@ -589,19 +728,18 @@ class TokeoAi(MetaMixin):
         if not provider_type:
             raise TokeoAiError(f'ai profile {name!r} is missing a type')
         provider = self._provider(provider_type)
-        # the agent is the composition root: it adds tools and sets the step
-        # budget, while the profile selects only the model. tools are declared
-        # as items under ``ai.tools`` and a listed name may be a tool item or a
-        # group. for the active tools an explicit tools= argument is the hard
-        # override; otherwise the profile's own tools and the agent's tools
-        # combine (``_resolve_tools`` keeps order and drops duplicates)
-        agent_obj = self._agent_or_default(agent)
-        if tools is not None:
-            requested = tools
+        # the agent is the composition root: it supplies the tools and the
+        # guards and sets the budgets and the sandbox chain, while the profile
+        # selects only the model. the active tools are the agent's tools, minus
+        # the agent's deny, minus the profile's deny, minus this call's deny --
+        # a call can only narrow the set, never extend it. so several profiles
+        # (and calls) share one agent and each carve out a subset. the agent is
+        # resolved call > profile.agent > defaults.agent
+        agent_obj = self._agent_or_default(agent, profile)
+        if agent_obj is not None:
+            requested = self._tools_minus_deny(agent_obj, profile, deny)
         else:
-            requested = list(profile.get('tools') or [])
-            if agent_obj is not None:
-                requested = requested + list(agent_obj._meta.tools)
+            requested = []
         if max_steps is None:
             # the agent's own budgets win; without one (None) the handler's
             # base defaults (Meta.max_steps / Meta.max_loops) apply
@@ -610,7 +748,7 @@ class TokeoAi(MetaMixin):
         if max_loops is None:
             budget = agent_obj._meta.max_loops if agent_obj is not None else None
             max_loops = budget if budget is not None else self._meta.max_loops
-        specs = self._tool_specs(self._resolve_tools(requested))
+        specs = self._tool_specs(requested)
         # guards (selected on the agent) wrap each tool call; with none, the
         # loop calls the tool directly, exactly as before, and collects no
         # trace. partition once: before guards may deny, after guards observe
@@ -631,16 +769,16 @@ class TokeoAi(MetaMixin):
             succeeded = False
             for call in result.tool_calls:
                 if guards:
-                    content = self._run_guarded(call, before_guards, after_guards, trace)
+                    content = self._exec_guarded(call, before_guards, after_guards, trace, agent_obj, profile, deny)
                     last = trace[-1]
                     ok = last.decision != 'deny' and last.error is None
                 else:
                     # the lean path is as resilient as the guard pipeline: an
-                    # unknown or failing tool becomes feedback the model may
-                    # correct itself on, instead of an exception killing the
-                    # whole loop
+                    # unknown or failing tool (or a deny/exhausted sandbox
+                    # chain) becomes feedback the model may correct itself on,
+                    # instead of an exception killing the whole loop
                     try:
-                        output = self._tool(call.name).exec(**(call.arguments or {}))
+                        output = self._exec_in_sandbox(call.name, call.arguments or {}, agent_obj, profile, deny)
                         # a tool may return a ToolResult or a plain string;
                         # only the model-facing text goes back into the history
                         content = output.text if isinstance(output, ToolResult) else str(output)
@@ -678,15 +816,16 @@ class TokeoAi(MetaMixin):
             ],
         }
 
-    def ask(self, prompt, tools=None, profile=None, model=None, purpose=None, agent=None):
+    def ask(self, prompt, deny=None, profile=None, model=None, purpose=None, agent=None):
         """
         Send a single user prompt through the loop and return the reply text.
 
         ### Args
 
         - **prompt** (str): The user prompt
-        - **tools** (list | None): Tool names to activate; the hard override
-            for the profile-and-agent union when given
+        - **deny** (list | str | None): Tools or groups this call forbids, on
+            top of the agent's and the profile's deny. A call may only narrow
+            the agent's tool set, never extend it
         - **profile** (str | None): Select a profile by name
         - **model** (str | None): Select the first enabled profile by model
         - **purpose** (str | None): Select the first enabled profile by purpose
@@ -699,7 +838,7 @@ class TokeoAi(MetaMixin):
 
         """
         messages = [{'role': 'user', 'content': prompt}]
-        result = self.chat(messages, tools=tools, profile=profile, model=model, purpose=purpose, agent=agent)
+        result = self.chat(messages, deny=deny, profile=profile, model=model, purpose=purpose, agent=agent)
         return result.text
 
 
@@ -1016,9 +1155,14 @@ def ai_extend_app(app):
     # core ships no tools and no domain models; a project names its own
     # tools and providers by a dotted ``type``
     app.ai.register('provider', 'mock', TokeoAiMockProvider)
-    # built-in agent: the default composition root; a project configures its
-    # agents under ``ai.agents`` and selects one per call or via defaults.agent
-    app.ai.register('agent', 'default', TokeoAiAgent)
+    # built-in agent: the standard composition root, the ``fundi`` type (the
+    # master that wields the tools); a project configures its agents under
+    # ``ai.agents`` and selects one per call, via a profile, or defaults.agent
+    app.ai.register('agent', 'fundi', TokeoAiFundiAgent)
+    # built-in sandboxes: in_process (zero isolation, the catch-all with
+    # ``tools: _all``) and subprocess (fault/resource isolation via the worker)
+    app.ai.register('sandbox', 'in_process', TokeoAiInProcessSandbox)
+    app.ai.register('sandbox', 'subprocess', TokeoAiSubprocessSandbox)
     # built-in guard: the baseline audit guard; agents opt in via agent.guards
     app.ai.register('guard', 'audit', TokeoAiAuditGuard)
     # built-in guard: the baseline policy guard (allow/deny by tool name)

@@ -77,9 +77,14 @@ computation, never from the model. That split is deliberate -- dates and
 arithmetic are exactly what language models, small or large, get wrong
 when they memorize, and exactly what tools compute precisely. A 380k
 model could never store a million date facts, but it can learn perfectly
-*which computation is meant*. This is also why akili cannot hallucinate:
-what it does not understand becomes an honest `<nomatch>`, and what it
-understands gets computed.
+*which computation is meant*. This is also why akili cannot hallucinate
+*form*: the plan grammar admits no invented tools or syntax, and what the
+model does not understand becomes an honest `<nomatch>`. It can still
+hallucinate *meaning* -- a well-formed plan for a question that was never
+asked -- typically where a request falls into the gap between the trained
+patterns and the trained refusals. ``AKILI-USE.md`` (act 3) demonstrates
+these limits on purpose, and why the fundi machinery around the model is
+there to catch them.
 
 So there are three kinds of answers: a **tool result** (the normal
 case), **honest ignorance** (`[akili] sing me a song` -- the labelled

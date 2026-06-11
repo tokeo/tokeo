@@ -14,6 +14,7 @@ unresolved ``type``) fails fast at startup, and is also exposed as the
 import difflib
 from dataclasses import dataclass
 
+from tokeo.core.utils.base import as_list
 from tokeo.core.ai import TokeoAiError
 
 
@@ -21,13 +22,14 @@ from tokeo.core.ai import TokeoAiError
 # reported instead of being silently ignored. tools, agents, and guards share
 # the uniform item form ({type, options}); the ``defaults`` block is checked
 # here, agent option contents by the built-in element validators below
-_AI_KEYS = {'defaults', 'profiles', 'tools', 'agents', 'guards'}
+_AI_KEYS = {'defaults', 'profiles', 'tools', 'agents', 'guards', 'sandboxes'}
 _DEFAULTS_KEYS = {'profile', 'agent'}
 _PROFILE_KEYS = {
-    'type', 'purpose', 'tools', 'enabled',
+    'type', 'purpose', 'agent', 'deny', 'enabled',
     'native_tools_call', 'tools_parser', 'options',
 }
 _ITEM_KEYS = {'type', 'options'}
+_SANDBOX_KEYS = {'type', 'tools', 'except', 'options'}
 
 
 @dataclass
@@ -80,6 +82,7 @@ class TokeoAiLinter:
         self.add_validator('agents', self._validate_item_form)
         self.add_validator('agents', self._validate_agent_options)
         self.add_validator('guards', self._validate_item_form)
+        self.add_validator('sandboxes', self._validate_sandbox)
 
     def add_validator(self, section, validator):
         """
@@ -188,6 +191,75 @@ class TokeoAiLinter:
             value = options.get(key)
             if value is not None and not isinstance(value, int):
                 self._add(f'{path}.{key}', 'must be a number (0 = unlimited)')
+        # the sandbox chain references ``ai.sandboxes`` by name, in order; an
+        # empty or absent chain means no sandbox lists a tool -> denied
+        sandboxes = options.get('sandboxes')
+        if sandboxes is not None:
+            if not isinstance(sandboxes, list):
+                self._add(f'{path}.sandboxes', 'must be a list of sandbox names')
+            else:
+                known = set(self._value('sandboxes') or {})
+                for entry in sandboxes:
+                    if entry not in known:
+                        self._add(f'{path}.sandboxes', _unknown('sandbox', entry, known))
+        # deny is a hard exclusion: a single tool/group name or a list of them
+        self._lint_names(f'{path}.deny', options.get('deny'), tool_names, 'tool or group')
+
+    def _validate_sandbox(self, section, name, item):
+        # a sandbox item: a resolvable ``type``, the required ``tools``
+        # selection (the keyword ``_all`` or tool/group names), an
+        # optional ``except`` skip set (single or list), and the class's own
+        # ``options``. the option keys are validated by the class itself
+        # through ``validate_options`` -- the linter does not know them
+        path = f'ai.{section}.{name}'
+        if not isinstance(item, dict):
+            self._add(path, 'must be an item (mapping with a "type")')
+            return
+        self._lint_keys(path, item, _SANDBOX_KEYS)
+        self._lint_type('sandbox', path, item)
+        tool_names = set(self._value('tools') or {})
+        # tools is required: either the reserved keyword _all (every
+        # tool that reaches it) or a list of tool/group names from ai.tools
+        listed = item.get('tools')
+        if listed is None:
+            self._add(f'{path}.tools', 'is required (a list of tool/group names, or _all)')
+        elif listed != '_all':
+            self._lint_names(f'{path}.tools', listed, tool_names, 'tool or group')
+        # except excludes members from THIS sandbox only (single or list)
+        self._lint_names(f'{path}.except', item.get('except'), tool_names, 'tool or group')
+        # ask the resolved class to validate its own option keys
+        self._validate_options_via_class('sandbox', path, item)
+
+    def _validate_options_via_class(self, kind, path, item):
+        # the class knows its allowed option keys; resolve it and call its
+        # ``validate_options`` hook. a resolution failure is already reported
+        # by ``_lint_type``; a hook that returns messages becomes lint errors
+        options = item.get('options')
+        if not isinstance(options, dict):
+            return
+        try:
+            cls = self.app.ai.resolve(kind, item.get('type'))
+        except Exception:
+            return
+        hook = getattr(cls, 'validate_options', None)
+        if hook is None:
+            return
+        try:
+            # the hook is an instance method on the base; call it unbound with
+            # a None self, since the built-in checks only read the argument
+            errors = hook(None, options)
+        except Exception:
+            return
+        for message in errors or []:
+            self._add(f'{path}.options', message)
+
+    def _lint_names(self, path, selection, known, what):
+        # a single name or a list of names from ``known``; None is allowed
+        # (the field is absent). used for the agent ``deny`` and a sandbox
+        # ``except``/``tools``, which all accept one entry or many
+        for entry in as_list(selection):
+            if entry not in known:
+                self._add(path, _unknown(what, entry, known))
 
     def _add(self, path, message, level='error'):
         self.issues.append(AiLintIssue(path, message, level))
@@ -289,6 +361,7 @@ class TokeoAiLinter:
             if profiles:
                 self._add('ai.profiles', 'must be a mapping of name to profile')
             return
+        agent_names = set(self._value('agents') or {})
         tool_names = set(tools) if isinstance(tools, dict) else set()
         for name, profile in profiles.items():
             path = f'ai.profiles.{name}'
@@ -300,7 +373,14 @@ class TokeoAiLinter:
             self._lint_type('provider', path, profile)
             if 'enabled' in profile and not isinstance(profile['enabled'], bool):
                 self._add(f'{path}.enabled', 'must be true or false')
-            self._lint_selection(path, profile.get('tools'), tool_names)
+            # a profile binds the agent (composition); null opts out on
+            # purpose, a name must exist. tools no longer live on a profile;
+            # instead a profile may ``deny`` tools/groups to carve out its own
+            # subset of a shared agent's tools
+            agent = profile.get('agent')
+            if agent is not None and agent not in agent_names:
+                self._add(f'{path}.agent', _unknown('agent', agent, agent_names))
+            self._lint_names(f'{path}.deny', profile.get('deny'), tool_names, 'tool or group')
 
     def _lint_selection(self, path, selection, tool_names):
         # a profile's ``tools`` is a selection list of item or group names from

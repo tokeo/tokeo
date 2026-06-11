@@ -114,14 +114,52 @@ ai:
       options:
         limit: 2000
 
-  ### agents are the composition root: an agent binds the tools and guards
-  ### for a task and sets the step budget. the model is not part of the
-  ### agent -- it is bound late through the selected profile, so one agent
-  ### runs against any model. an agent is an item in the uniform form:
-  ### "type" is a built-in short name ("default") or a full dotted class
-  ### path, and the agent's settings live under "options". the active tools
-  ### of a call are the selected profile's tools and the agent's tools
-  ### combined (deduplicated)
+  ### sandboxes contain a tool's execution -- a guard decides if a call may
+  ### run, a sandbox is the wall it runs behind. an agent lists a sandbox
+  ### chain; a tool runs in the first sandbox whose "tools" contain it (a
+  ### selection of tool/group names, or "_all" for every tool that
+  ### reaches it). a sandbox "except" skips that sandbox for the named tools
+  ### so the chain walks on. when no sandbox lists a tool the call is denied,
+  ### so the "allow" sandbox (in_process, tools: _all) placed last is the
+  ### opt-in catch-all. a sandbox is an item: "type" is a built-in short name
+  ### (in_process, subprocess) or a full dotted class path, its settings live
+  ### under "options"
+  sandboxes:
+    ### the catch-all: zero isolation, runs in the app process. put it last
+    ### in a chain to let the remaining tools run in-process; without it an
+    ### unlisted tool is denied
+    allow:
+      type: in_process
+      ### "_all" is the reserved keyword for "every tool that reaches me"
+      tools: _all
+    ### fault and resource isolation in a fresh interpreter: own memory cap
+    ### and wall-clock timeout, then SIGKILL. NOT a jail against hostile code
+    ### (no path or network isolation -- that needs a container or wasm). here
+    ### it contains the calculator
+    jailed:
+      type: subprocess
+      tools:
+        - mathematics
+      options:
+        ### wall-clock seconds before the run is killed -- enforced on every
+        ### platform (the parent kills the child), the universal stop
+        timeout: 10
+        ### memory cap in MB, enforced via rlimit on linux. current macos
+        ### rejects caps below the process's already-mapped virtual space
+        ### (gigabytes on apple silicon), so realistic values error the
+        ### call there by design (no sham caps) -- enable on linux
+        # memory_mb: 256
+        ### scratch working directory (steers relative writes)
+        cwd: tmp/sandbox
+
+  ### agents are the composition root: an agent binds the tools, the guards,
+  ### and the sandbox chain for a task and sets the step budget. the model is
+  ### not part of the agent -- it is bound late through the selected profile,
+  ### so one agent runs against any model. an agent is an item in the uniform
+  ### form: "type" is a built-in short name ("fundi", the standard agent) or a
+  ### full dotted class path, and the agent's settings (tools, guards,
+  ### sandboxes, deny, budgets) live under "options". the active tools of a
+  ### call are the agent's tools
   agents:
     ### the default composition root, selected via defaults.agent above:
     ### it governs nothing, but it observes everything -- the audit guard
@@ -129,18 +167,25 @@ ai:
     ### structured trace on the ChatResult, with honest semantics (a
     ### pipeline ran; one that denies nothing)
     audited:
-      ### built-in agent type; no custom class needed
-      type: default
+      ### built-in agent type ("fundi", the standard agent); no custom class
+      type: fundi
       ### the agent's settings (its Meta keys)
       options:
         ### guards forming this agent's tool-call pipeline (see ai.guards)
         guards:
           - audit
+        ### the sandbox chain: with the catch-all "allow" any tool this agent
+        ### gains runs in-process; drop it and an unlisted tool is denied
+        sandboxes:
+          - allow
         ### further settings an agent may take:
-        ### tools this agent contributes, combined with the selected
-        ### profile's own tools (deduplicated)
+        ### tools this agent contributes (the active tools of a call)
         # tools:
         #   - mathematics
+        ### tools or groups this agent forbids outright (single or list),
+        ### before any sandbox lookup -- a hard ban, unlike a sandbox except
+        # deny:
+        #   - append_file
         ### maximum tool rounds for one request (0 = unlimited)
         # max_steps: 0
         ### consecutive rounds without one successful call before the
@@ -149,13 +194,14 @@ ai:
 
     ### the guarded composition around the project tools: it may calculate,
     ### tell the time, and read files, but the policy denies writing; tool
-    ### results are redacted and capped, and every outcome is audited. try,
-    ### and watch the denial:
+    ### results are redacted and capped, and every outcome is audited. the
+    ### calculator runs in the "jailed" subprocess sandbox, everything else
+    ### falls through to "allow" (in-process). try, and watch the denial:
     ###   {{ app_label }} ai ask "current" --agent guarded
     ###   {{ app_label }} ai ask "read_file notes.txt" --agent guarded
-    ###   {{ app_label }} ai ask "append_file hello" --agent guarded   # denied by policy
+    ###   {{ app_label }} ai ask "append_file hello" --agent guarded   # denied
     guarded:
-      type: default
+      type: fundi
       options:
         tools:
           - mathematics
@@ -167,38 +213,52 @@ ai:
           - redact
           - truncate
           - audit
+        ### ordered chain: "jailed" (subprocess) lists calc, the rest
+        ### is not, so it falls through to the "allow" catch-all (in-process)
+        sandboxes:
+          - jailed
+          - allow
 
   ### named profiles in the uniform form: top-level params (type, purpose,
   ### tools, enabled) plus an "options" block carrying the provider's
   ### connection settings (model, base_url, key). a profile is an item; its
   ### "type" is a provider short name or a full dotted class path
   profiles:
-    ### the built-in local model; deterministic, no server, no network
+    ### the built-in local model; deterministic, no server, no network. it is
+    ### the universal test/demo driver, so it keeps all of the guarded agent's
+    ### tools (it makes a tool call when the first prompt word names one):
+    ###   {{ app_label }} ai ask "calc 2 + 3" --agent guarded
+    ###   {{ app_label }} ai ask "current" --agent guarded
     mock:
       ### provider type; "mock" is the application's own local model and
       ### needs no options (it ignores model and server)
       type: mock
       ### optional free-form selector, usable via "ai ask --purpose"
       purpose: mocking
-      ### tools this profile may use; each entry is an item or a group from
-      ### ai.tools above. the "mathematics" group activates calc, so
-      ### "ai ask calc 2 + 3" works
-      tools:
-        - mathematics
+      ### the agent (composition) this profile runs. a profile must state its
+      ### agent, even as null to run without one
+      agent: guarded
 
     ### the project's own micro language model (the lab and the weights
     ### live in {{ app_label }}/core/akili): trained from scratch on the project's
     ### synthetic calendar data, it plans real tool chains -- also nested
     ### requests like "the weekday of today plus 2 days" -- and runs
     ### in-process with plain numpy, no server. train-first: create the
-    ### weights once with "make akili-train", then try:
-    ###   {{ app_label }} ai ask "der wochentag von heute plus 14 tagen" --profile akili
+    ### weights once with "python -m {{ app_label }}.core.akili.train",
+    ### then try ({{ app_label }}/core/akili/AKILI-USE.md walks all demos):
+    ###   {{ app_label }} ai ask "wochentag von heute plus 14 tage" --profile akili
     ###   {{ app_label }} ai ask "weekday of 2026-12-24" --profile akili --json
     akili:
       type: {{ app_label }}.core.ai.akili.TokeoAiAkiliProvider
       purpose: calendar
-      tools:
-        - calendar
+      ### shares the guarded agent (its guard pipeline and jailed -> allow
+      ### sandbox chain) but adds no tools of its own and "deny"s the ones it
+      ### does not need, keeping only the calendar tools. the active tools are
+      ### agent.tools minus agent.deny minus this profile.deny
+      agent: guarded
+      deny:
+        - mathematics
+        - filesystem
 
     ### a local, OpenAI-compatible server you run yourself
     # assistant:
@@ -215,3 +275,5 @@ ai:
     #     # key: not-needed
     #   ### optional free-form selector, usable via "ai ask --purpose"
     #   purpose: general
+    #   ### the agent (composition) this profile runs
+    #   agent: guarded

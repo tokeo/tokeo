@@ -14,9 +14,9 @@ from pathlib import Path
 import pytest
 from tokeo.core.ai import Invocation, ToolResult, TokeoAiError
 from tokeo.core.ai.linter import TokeoAiLinter
-from tokeo.core.ai.validate import TokeoAiValidateGuard
-from tokeo.core.ai.redact import TokeoAiRedactGuard
-from tokeo.core.ai.truncate import TokeoAiTruncateGuard
+from tokeo.core.ai.guards.validate import TokeoAiValidateGuard
+from tokeo.core.ai.guards.redact import TokeoAiRedactGuard
+from tokeo.core.ai.guards.truncate import TokeoAiTruncateGuard
 from {{ app_label }}.core.ai.tools.calc import TokeoAiCalcTool
 from {{ app_label }}.main import {{ app_class_name }}Test
 
