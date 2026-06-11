@@ -19,10 +19,10 @@ from tokeo.core.ai.linter import TokeoAiLinter
 
 
 # dotted paths to the importable test tools the worker loads in a child
-ECHO = 'tests.core.fundi.tools.EchoTool'
-CWD = 'tests.core.fundi.tools.CwdTool'
-ENV = 'tests.core.fundi.tools.EnvTool'
-SLEEP = 'tests.core.fundi.tools.SleepTool'
+ECHO = 'tests.core.ai.tools.EchoTool'
+CWD = 'tests.core.ai.tools.CwdTool'
+ENV = 'tests.core.ai.tools.EnvTool'
+SLEEP = 'tests.core.ai.tools.SleepTool'
 
 
 class FundiTest(TokeoTest):
