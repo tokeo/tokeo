@@ -1,4 +1,4 @@
-import os  # noqa: F401
+import os
 import pytest
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
@@ -27,7 +27,7 @@ class SmtpTest(TokeoTest):
         mail_handler = 'tokeo.smtp'
 
 
-def test_smtp_qp_message(rando, tmp_path):
+def test_smtp_qp_message(rando, tmp):
     # the message build needs no credentials and no network: embedded dummy
     # settings and generated attachment files keep this half runnable anywhere
     test_defaults = dict(smtp=dict(defaults['smtp']))
@@ -35,10 +35,12 @@ def test_smtp_qp_message(rando, tmp_path):
     test_defaults['smtp']['from_addr'] = 'Tester <tester@example.com>'
     test_defaults['smtp']['to'] = 'dev@example.com'
 
-    pdf = tmp_path / 'invoice.pdf'
-    pdf.write_bytes(b'%PDF-1.4 dummy invoice')
-    webp = tmp_path / 'abcd1234.webp'
-    webp.write_bytes(b'RIFF0000WEBPVP8 dummy')
+    pdf = os.path.join(tmp.dir, 'invoice.pdf')
+    with open(pdf, 'wb') as f:
+        f.write(b'%PDF-1.4 dummy invoice')
+    webp = os.path.join(tmp.dir, 'abcd1234.webp')
+    with open(webp, 'wb') as f:
+        f.write(b'RIFF0000WEBPVP8 dummy')
 
     with SmtpTest(config_defaults=test_defaults) as app:
         mail = app.mail
@@ -47,8 +49,8 @@ def test_smtp_qp_message(rando, tmp_path):
             to=mail._config('to'),
             subject=subjMsg,
             files=[
-                ('Demo-Rechnung.pdf', str(pdf)),
-                {'alt_name': 'abcd1234.webp', 'path': str(webp), 'cid': 'abcd1234.webp'},
+                ('Demo-Rechnung.pdf', pdf),
+                {'alt_name': 'abcd1234.webp', 'path': webp, 'cid': 'abcd1234.webp'},
             ],
         )
         msg = mail._make_message(body, **get_params).as_string()
