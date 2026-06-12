@@ -1,19 +1,19 @@
 """
-Built-in ``redact`` guard for Tokeo applications.
+Built-in ```redact``` guard for Tokeo applications.
 
 Masks secret-looking spans in a tool's model-facing result text after the tool
 ran, so a value a tool happened to surface (a token in a file it read, a key in
 a fetched page) does not flow on into the message history, the trace, or the
-``audit`` log line. It runs in the after-phase and blocks nothing; it only
-rewrites ``result.text`` (the structured ``result.data`` is left untouched, as
+```audit``` log line. It runs in the after-phase and blocks nothing; it only
+rewrites ```result.text``` (the structured ```result.data``` is left untouched, as
 it stays out of the message history).
 
 Redaction is best-effort masking by pattern, not a guarantee: the built-in set
-targets a few high-precision secret shapes (bearer tokens, ``sk-`` keys, AWS
-key ids, ``password:``/``token:`` assignments), and a project extends or
-replaces it through the ``patterns`` option for the shapes its own data carries.
-List it before ``truncate`` so a secret is masked across the whole text before
-any tail is cut, and before ``audit`` so the log line records the masked text.
+targets a few high-precision secret shapes (bearer tokens, ```sk-``` keys, AWS
+key ids, ```password:```/```token:``` assignments), and a project extends or
+replaces it through the ```patterns``` option for the shapes its own data carries.
+List it before ```truncate``` so a secret is masked across the whole text before
+any tail is cut, and before ```audit``` so the log line records the masked text.
 
 ```yaml
 ai:
@@ -56,10 +56,10 @@ class TokeoAiRedactGuard(TokeoAiGuard):
     """
     After-phase guard that masks secret-looking spans in a result.
 
-    Applies each configured pattern to ``invocation.result.text`` and replaces
-    every match with the ``replacement`` marker. It never changes the
-    ``decision``, so it is safe on every agent; when it masks anything it notes
-    the count on ``reason`` so the trace shows the result was shaped.
+    Applies each configured pattern to ```invocation.result.text``` and replaces
+    every match with the ```replacement``` marker. It never changes the
+    ```decision```, so it is safe on every agent; when it masks anything it notes
+    the count on ```reason``` so the trace shows the result was shaped.
 
     """
 
@@ -93,7 +93,7 @@ class TokeoAiRedactGuard(TokeoAiGuard):
         ### Args
 
         - **invocation** (Invocation): The completed tool call whose
-            ``result.text`` is masked in place when a pattern matches
+            ```result.text``` is masked in place when a pattern matches
 
         """
         if invocation.result is None:

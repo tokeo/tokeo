@@ -1,17 +1,17 @@
 """
-Built-in ``truncate`` guard for Tokeo applications.
+Built-in ```truncate``` guard for Tokeo applications.
 
 Caps the length of a tool's model-facing result text after the tool ran, so a
 call that returns a large blob (a long file read, a big retrieval) cannot blow
 the context budget or flood the trace and log. It runs in the after-phase and
-blocks nothing; it only shortens ``result.text``, appending a marker that
-records how much was cut. The structured ``result.data`` is left untouched, so
+blocks nothing; it only shortens ```result.text```, appending a marker that
+records how much was cut. The structured ```result.data``` is left untouched, so
 a ui or the trace can still reach the full detail.
 
-This is the ``result stage`` the ``ToolResult`` doc refers to, made an explicit,
-configurable guard rather than a hidden constant. List it after ``redact`` so a
+This is the ```result stage``` the ```ToolResult``` doc refers to, made an explicit,
+configurable guard rather than a hidden constant. List it after ```redact``` so a
 secret is masked across the whole text before any tail is removed, and before
-``audit`` so the log line records the shortened text.
+```audit``` so the log line records the shortened text.
 
 ```yaml
 ai:
@@ -35,10 +35,10 @@ class TokeoAiTruncateGuard(TokeoAiGuard):
     """
     After-phase guard that caps an over-long result text.
 
-    When ``result.text`` is longer than ``limit`` characters it keeps the head
-    and appends ``marker`` (with the cut count), so the model still sees the
+    When ```result.text``` is longer than ```limit``` characters it keeps the head
+    and appends ```marker``` (with the cut count), so the model still sees the
     start of a large output without the whole blob entering the history. It
-    never changes the ``decision`` and notes the cut on ``reason``.
+    never changes the ```decision``` and notes the cut on ```reason```.
 
     """
 
@@ -59,7 +59,7 @@ class TokeoAiTruncateGuard(TokeoAiGuard):
         ### Args
 
         - **invocation** (Invocation): The completed tool call whose
-            ``result.text`` is capped at ``limit`` characters when longer
+            ```result.text``` is capped at ```limit``` characters when longer
 
         """
         if invocation.result is None or not self._meta.limit:

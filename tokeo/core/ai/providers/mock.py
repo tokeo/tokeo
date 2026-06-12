@@ -10,7 +10,7 @@ relies on, so the loop can be shown and built without a real model:
 - a final answer once a tool result comes back.
 
 The reply is a pure function of the input, so the same messages always produce
-the same result, and the ``[mock]`` marker keeps it obvious that no real model
+the same result, and the ```[mock]``` marker keeps it obvious that no real model
 was involved.
 """
 
@@ -23,7 +23,7 @@ class TokeoAiMockProvider(TokeoAiProvider):
 
     ### Notes
 
-    - A trailing ``tool`` message makes the mock answer with the result, which
+    - A trailing ```tool``` message makes the mock answer with the result, which
         closes an agent loop
     - Otherwise, if the first word of the prompt names a provided tool, the
         mock requests that tool, filling its first declared parameter (a
@@ -112,7 +112,7 @@ class TokeoAiMockProvider(TokeoAiProvider):
     def _tool_arguments(self, tool, value):
         # fill the first declared parameter (a required one if any) with the
         # prompt remainder, so the mock drives any tool, not only one named
-        # ``input``; a parameterless tool is called with no arguments
+        # ```input```; a parameterless tool is called with no arguments
         names, required = self._tool_params(tool)
         key = required[0] if required else (names[0] if names else None)
         return {key: value} if key else {}

@@ -16,7 +16,7 @@ polling mechanism.
   (no global UI elements, per NiceGUI 3.x)
 - Integrates FastAPI for headless REST endpoints and custom OpenAPI docs
 - Hot-reloads during development via Watchdog file watching
-- Exposes a helper for arbitrary HTML elements via ``app.nicegui.ux``
+- Exposes a helper for arbitrary HTML elements via ```app.nicegui.ux```
 - Ships sensible configuration defaults for most use cases
 - Manages the full server lifecycle through Tokeo application hooks
 
@@ -273,16 +273,16 @@ class TokeoNicegui(MetaMixin):
 
     ### Notes
 
-    - Provides direct access to NiceGUI components via ``ui`` and ``fastapi_app``
+    - Provides direct access to NiceGUI components via ```ui``` and ```fastapi_app```
       attributes
     - Manages file monitoring for hot-reloading during development
     - Handles application configuration and startup/shutdown lifecycle
-    - Exposes a custom element helper ``ux`` for creating arbitrary HTML elements
+    - Exposes a custom element helper ```ux``` for creating arbitrary HTML elements
 
     ### Reminders
 
     .. warning::
-        Set a non-empty ``storage_secret`` in production. Without it the
+        Set a non-empty ```storage_secret``` in production. Without it the
         signed session and per-user storage is not protected and tampering
         becomes possible. Leave it unset only for local development.
 

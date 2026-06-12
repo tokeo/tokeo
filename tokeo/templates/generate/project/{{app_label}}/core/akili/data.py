@@ -4,20 +4,20 @@ Synthetic training data for the Spiral akili micro model.
 The calendar domain is closed, so the dataset is generated, not collected.
 Every example is a (request, plan-DSL) pair. The complete language -- every
 word and every sentence pattern the model is taught -- lives in
-``AKILI-LEX.yaml`` next to this module; this module holds the mechanics:
+```AKILI-LEX.yaml``` next to this module; this module holds the mechanics:
 loading and validating the lexicon, the mixture, and how patterns are
 filled and rendered into plans. Teaching akili new language is editing the
 lexicon and retraining.
 
 ### What the mixture teaches
 
-- ~15% abstentions mapped to ``<nomatch>`` (about 12% chatter and hard
+- ~15% abstentions mapped to ```<nomatch>``` (about 12% chatter and hard
     negatives, about 3% signed-count requests): without them the model
     would invent a plan for every input -- this is the anti-hallucination
     share. Negatives carry preambles and lead-ins too, so surrounding
     chatter alone never signals "calendar"; calendar-near hard negatives
     ("the date of christmas") keep the honesty close to the domain, and
-    a sign written onto a bare count is taught as ``<nomatch>`` too, in
+    a sign written onto a bare count is taught as ```<nomatch>``` too, in
     every phrasing -- bare ("plus -2 days") and consumer-wrapped ("the
     weekday of today plus -2 days") -- since a sign in the request is not
     part of the language, so the model echoes instead of inventing a digit
@@ -32,11 +32,11 @@ lexicon and retraining.
     picks the tool, signs included, day units get half the mass; a {c}
     in the pattern puts a consumer behind the shift -- the three-step
     share, e.g. "the weekday of today plus 2 days" ->
-    ``current();add_days(date=@1,days=2);weekday(date=@2)``.
+    ```current();add_days(date=@1,days=2);weekday(date=@2)```.
 - ~28% single-step requests for the non-shifting tools: recognition and
     exact slot filling (dates copied byte by byte, numbers as written).
 - Time words (today/now/current, heute/jetzt/aktuell) teach the bridge:
-    they put ``current()`` in front and reference its result via ``@1``.
+    they put ```current()``` in front and reference its result via ```@1```.
 - Day counts are half single-digit on purpose: short numbers must be
     copied exactly, not extended (2 is 2, never 26).
 - Offsets are signed: minus/before/ago wordings (minus/vor in German)
@@ -50,7 +50,7 @@ lexicon and retraining.
 
 The whole dataset is a pure function of its seed and the lexicon: same
 seed, same lexicon, same deduplicated pairs -- a training run is fully
-reproducible. Run ``python -m {{ app_label }}.core.akili.data`` to print samples.
+reproducible. Run ```python -m {{ app_label }}.core.akili.data``` to print samples.
 
 ### The lexicon
 
@@ -79,7 +79,7 @@ _REQUIRED = {
 
 def _load_lexicon():
     """
-    Load and validate ``AKILI-LEX.yaml``.
+    Load and validate ```AKILI-LEX.yaml```.
 
     The lexicon is data, so it is checked like data: tools must exist in
     the plan grammar, shifts must be integers, and every pattern group
@@ -164,7 +164,7 @@ def sample(rng, minus=True):
     chain, shift, or single-step), the second the language (about two
     thirds
     English); the helpers then pick a pattern from the lexicon, fill its
-    slots, and render the matching plan. With ``minus=False`` every
+    slots, and render the matching plan. With ```minus=False``` every
     backward wording is left out: the resulting dataset teaches a model
     without any notion of minus.
 
@@ -423,7 +423,7 @@ def dataset(count, seed=7, minus=True):
     - **count** (int): How many unique examples to return
     - **seed** (int): The rng seed; same seed and lexicon, same dataset
     - **minus** (bool): Include the backward wordings (minus/ago and the
-        backward relative words); ``False`` builds the ablation dataset
+        backward relative words); ```False``` builds the ablation dataset
         without any minus teaching
 
     ### Returns

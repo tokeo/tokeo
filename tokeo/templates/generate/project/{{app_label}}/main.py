@@ -241,7 +241,7 @@ def main():
         if app:
             app.exit_code = 0
 
-    # exit_on_close ends the process when the ``with`` exits normally; if setup
+    # exit_on_close ends the process when the ```with``` exits normally; if setup
     # or run raised, the error was handled above and the code is applied here
     sys.exit(app.exit_code if app else 9)
 

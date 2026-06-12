@@ -4,10 +4,10 @@ Moon-phase tool for the {{ app_name }} ai agent.
 Tells the moon phase of a date -- the one astronomy treat in the calendar
 toolset, computed from pure arithmetic (days since a known new moon over the
 mean synodic month), so it stays deterministic and needs no data source.
-Dates are strict ISO (``YYYY-MM-DD``).
+Dates are strict ISO (```YYYY-MM-DD```).
 
 This module is self-contained: it holds only the tool class. The project names
-it by its full dotted class path under ``ai.tools`` in the config, so it needs
+it by its full dotted class path under ```ai.tools``` in the config, so it needs
 no registration and no entry in the app extensions; the handler imports and
 instantiates it on demand.
 """
@@ -61,7 +61,7 @@ class TokeoAiMoonPhaseTool(TokeoAiTool):
 
         ### Args
 
-        - **date** (str): The date as ``YYYY-MM-DD``
+        - **date** (str): The date as ```YYYY-MM-DD```
 
         ### Returns
 

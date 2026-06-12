@@ -6,7 +6,7 @@ built-in mock provider. It evaluates a numeric expression with a restricted
 AST walk, so no arbitrary code runs.
 
 This module is self-contained: it holds only the tool class. The project names
-it by its full dotted class path under ``ai.tools`` in the config, so it needs
+it by its full dotted class path under ```ai.tools``` in the config, so it needs
 no registration and no entry in the app extensions; the handler imports and
 instantiates it on demand.
 """
@@ -44,8 +44,8 @@ class TokeoAiCalcTool(TokeoAiTool):
     """
     Demo tool that evaluates a simple arithmetic expression.
 
-    Shows tool calling end to end with the mock provider. The ``Meta``
-    description and parameters are what the model sees; ``exec`` does the work
+    Shows tool calling end to end with the mock provider. The ```Meta```
+    description and parameters are what the model sees; ```exec``` does the work
     with the safe evaluator above.
 
     """
@@ -69,7 +69,7 @@ class TokeoAiCalcTool(TokeoAiTool):
 
         ### Args
 
-        - **input** (str): The expression to evaluate, for example ``2 + 3``
+        - **input** (str): The expression to evaluate, for example ```2 + 3```
 
         ### Returns
 

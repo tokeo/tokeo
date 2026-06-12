@@ -57,7 +57,7 @@ def encode(text):
     ### Returns
 
     - **list**: The utf-8 byte values, each already a valid token id in
-        ``0..255``
+        ```0..255```
 
     """
     # utf-8 maps every character to one to four bytes; errors='replace'

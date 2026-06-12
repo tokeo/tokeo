@@ -1,17 +1,17 @@
 """
-Built-in ``validate`` guard for Tokeo applications.
+Built-in ```validate``` guard for Tokeo applications.
 
-Checks the arguments of a tool call against the tool's declared ``parameters``
+Checks the arguments of a tool call against the tool's declared ```parameters```
 schema before the tool runs, so a malformed call (a hallucinated argument, a
 missing required one, a wrong basic type) is denied with a precise reason
 instead of crashing the tool. The loop continues and the model sees the
-``denied: invalid arguments ...`` feedback, so it can correct the call
-(deny-and-continue). List it first in ``agent.guards`` so broken calls are
+```denied: invalid arguments ...``` feedback, so it can correct the call
+(deny-and-continue). List it first in ```agent.guards``` so broken calls are
 caught before the other before guards run.
 
-It covers the schema subset tool definitions actually use: ``required``
-names, declared ``properties`` (an undeclared argument is denied unless the
-schema sets ``additionalProperties: true``), and the basic ``type`` of each
+It covers the schema subset tool definitions actually use: ```required```
+names, declared ```properties``` (an undeclared argument is denied unless the
+schema sets ```additionalProperties: true```), and the basic ```type``` of each
 value. A tool without a declared schema is left unchecked.
 
 ```yaml
@@ -49,7 +49,7 @@ class TokeoAiValidateGuard(TokeoAiGuard):
     Before-phase guard that denies a tool call with invalid arguments.
 
     Validates against the schema the handler attached to the invocation
-    (``invocation.parameters``). All problems are collected into one reason,
+    (```invocation.parameters```). All problems are collected into one reason,
     so the model can fix the whole call at once. With no declared schema
     (no properties and no required names) the call passes unchecked.
 
@@ -68,7 +68,7 @@ class TokeoAiValidateGuard(TokeoAiGuard):
         ### Args
 
         - **invocation** (Invocation): The tool call to check; on a denial its
-            ``decision`` is set to ``deny`` with every problem in ``reason``
+            ```decision``` is set to ```deny``` with every problem in ```reason```
 
         """
         schema = invocation.parameters or {}

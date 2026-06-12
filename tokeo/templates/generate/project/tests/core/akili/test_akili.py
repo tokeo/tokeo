@@ -4,9 +4,9 @@ Real test cases for akili, the Spiral micro language model.
 Two layers, because akili is train-first. The data-contract tests run
 without weights and lock in what the synthetic data *teaches* -- bare time
 words, greetings, signed counts, plan legality, tool coverage. The model
-test needs ``weights.npz`` (skips until it exists) and checks the actual
-answers of the project's own trained model, under the ``guarded`` agent.
-Run from the project root, for example ``pytest tests/core/akili``.
+test needs ```weights.npz``` (skips until it exists) and checks the actual
+answers of the project's own trained model, under the ```guarded``` agent.
+Run from the project root, for example ```pytest tests/core/akili```.
 """
 
 import re

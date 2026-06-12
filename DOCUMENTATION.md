@@ -108,11 +108,11 @@ indent the body by four spaces.
 ### Code Formatting
 
 1. Use **bold** (double asterisks) for parameter names and return types: `**param_name**`
-2. Use double backticks for inline code: `` ``code`` ``. They are required for
-   dotted identifiers such as `` ``app.dramatiq.locks`` `` or `` ``ui.button`` ``:
+2. Use triple backticks for inline code:``` ```code``` ```. They are required for
+   dotted identifiers such as ``` ```app.dramatiq.locks``` ``` or ``` ```ui.button``` ```:
    with single backticks pdoc tries to resolve them as cross-references and
    emits a ReferenceWarning when they cannot be linked.
-3. Escape special characters with backslashes: `` `\_\_special\_\_` ``
+3. Escape special characters with backslashes: ``` `\_\_special\_\_` ```
 4. For multiple return types or parameter types, use the pipe symbol: `(str|int)`
 
 ### Property Documentation

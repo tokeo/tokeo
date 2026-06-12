@@ -2,17 +2,17 @@
 Akili plan DSL for the Spiral ai micro model.
 
 The trained akili model does one thing: it turns a request into a *plan*,
-written in a tiny deterministic language. One line, steps joined by ``;``,
-each step a tool call; ``@k`` references the result of step k; a request
-outside the domain becomes ``<nomatch>``::
+written in a tiny deterministic language. One line, steps joined by ```;```,
+each step a tool call; ```@k``` references the result of step k; a request
+outside the domain becomes ```<nomatch>```::
 
     current();add_days(date=@1,days=2);weekday(date=@2)
     date_diff(start=2026-06-07,end=2026-12-24)
     <nomatch>
 
-This module has three jobs. ``render`` serializes a plan to that line,
-``parse`` reads a line back into steps (validating as it goes), and the
-``Constrainer`` -- the important one -- is a byte-level grammar automaton:
+This module has three jobs. ```render``` serializes a plan to that line,
+```parse``` reads a line back into steps (validating as it goes), and the
+```Constrainer``` -- the important one -- is a byte-level grammar automaton:
 during decoding it answers, character by character, which next bytes are
 legal. The decoder may only emit accepted bytes, so the model can never
 produce a malformed plan, an unknown tool, or a tool the runtime did not
@@ -53,11 +53,11 @@ def render(plan):
 
     ### Args
 
-    - **plan** (list): Steps as ``(tool, {slot: value})`` tuples
+    - **plan** (list): Steps as ```(tool, {slot: value})``` tuples
 
     ### Returns
 
-    - **str**: The DSL line, or ``<nomatch>`` for an empty plan
+    - **str**: The DSL line, or ```<nomatch>``` for an empty plan
 
     """
     # an empty plan is the honest "no calendar action" answer
@@ -77,19 +77,19 @@ def parse(text):
     """
     Parse a DSL line back into a plan, validating every part.
 
-    Each ``raise`` here is a guardrail: at training time it catches a
+    Each ```raise``` here is a guardrail: at training time it catches a
     malformed target, at inference time it would catch a plan the grammar
     somehow let through (it never should). The checks are deliberately
     strict -- a plan is either exactly well-formed or rejected.
 
     ### Args
 
-    - **text** (str): The DSL line (``<nomatch>`` gives an empty plan)
+    - **text** (str): The DSL line (```<nomatch>``` gives an empty plan)
 
     ### Returns
 
-    - **list**: Steps as ``(tool, {slot: value})`` tuples; values stay
-        strings, including ``@k`` references
+    - **list**: Steps as ```(tool, {slot: value})``` tuples; values stay
+        strings, including ```@k``` references
 
     ### Raises
 
@@ -134,12 +134,12 @@ class Constrainer:
     Byte-level grammar automaton for constrained greedy decoding.
 
     It holds the partial DSL line emitted so far and, on demand, reports the
-    set of characters that may legally come next (or ``{'<eos>'}`` when the
+    set of characters that may legally come next (or ```{'<eos>'}``` when the
     line is complete). The decoder consults it before every character and
     picks the highest-scored *legal* one -- so the grammar, not luck, keeps
     the output well formed.
 
-    The ``active`` set is the runtime tie-in: only tools the profile and
+    The ```active``` set is the runtime tie-in: only tools the profile and
     agent activated are offered, so the model cannot plan a tool that is not
     available in this call even if it learned about it in training.
 
@@ -163,7 +163,7 @@ class Constrainer:
 
         ### Returns
 
-        - **set**: Single-character strings, or ``{'<eos>'}`` when the line
+        - **set**: Single-character strings, or ```{'<eos>'}``` when the line
             is a complete plan and may end
 
         """

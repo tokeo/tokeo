@@ -127,8 +127,8 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
         ### Args
 
-        - **path** (list): The config path, e.g. ``['dramatiq', 'rabbitmq',
-            'auth_password']``
+        - **path** (list): The config path, e.g. ```['dramatiq', 'rabbitmq',
+            'auth_password']```
 
         ### Returns
 
@@ -158,7 +158,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         overridden by an environment variable. A container is rebuilt only
         when a descendant actually changes; otherwise the original object is
         returned, so a plain read keeps its object identity and behaves as
-        before. Each scalar leaf is passed through ``_resolve_leaf``, which
+        before. Each scalar leaf is passed through ```_resolve_leaf```, which
         subclasses may override to transform it further.
 
         ### Args
@@ -204,9 +204,9 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
         Extends cement's section/key override so a nested value can be
         overridden too, by an environment variable whose name follows the full
-        path (for example ``<CONFIG_SECTION>_DRAMATIQ_RABBITMQ_AUTH_PASSWORD``).
+        path (for example ```<CONFIG_SECTION>_DRAMATIQ_RABBITMQ_AUTH_PASSWORD```).
         Overrides arrive as raw strings and are coerced like a yaml scalar (via
-        ``yaml.safe_load``), so ``true``, ``42`` or ``null`` become their proper
+        ```yaml.safe_load```), so ```true```, ```42``` or ```null``` become their proper
         types; values from a file are already typed by the yaml parser.
         Resolution is applied on a rebuilt copy only where a value actually
         changes, so a plain read returns the same object as before.
@@ -218,7 +218,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
         ### Keyword Args
 
-        - **kwargs**: Forwarded to the parser get (for example ``fallback``)
+        - **kwargs**: Forwarded to the parser get (for example ```fallback```)
 
         ### Returns
 
@@ -227,15 +227,15 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         ### Raises
 
         - **TokeoYamlConfigError**: If an environment override carries a yaml
-            tag (a leading ``!``); env overrides are plain values only
+            tag (a leading ```!```); env overrides are plain values only
 
         ### Notes
 
         - Quoting forces a string, exactly as in yaml: an env value of
-            ``"true"`` (with quotes) stays the string ``true`` while ``true``
+            ```"true"``` (with quotes) stays the string ```true``` while ```true```
             becomes a bool; the yaml "Norway" rule also makes
-            ``yes``/``no``/``on``/``off`` booleans
-        - Subclasses can transform individual leaves through ``_resolve_leaf``
+            ```yes```/```no```/```on```/```off``` booleans
+        - Subclasses can transform individual leaves through ```_resolve_leaf```
             (the vault handler uses this to decrypt secrets)
 
         """

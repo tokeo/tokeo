@@ -4,41 +4,41 @@ Training for the Spiral akili micro model.
 A from-scratch decoder-only transformer (a few hundred thousand parameters)
 learns one mapping: request bytes -> plan DSL bytes. Torch is a training-side
 tool only; the application runs the trained weights with plain NumPy (see
-``infer.py``). Run ``python -m {{ app_label }}.core.akili.train`` from the project
-root; the weights land in ``{{ app_label }}/core/akili/weights.npz``.
+```infer.py```). Run ```python -m {{ app_label }}.core.akili.train``` from the project
+root; the weights land in ```{{ app_label }}/core/akili/weights.npz```.
 
 ### The pipeline, step by step
 
-1. ``data.dataset()`` generates the synthetic (request, plan) pairs; the
+1. ```data.dataset()``` generates the synthetic (request, plan) pairs; the
     first 600 are held back for the final evaluation and never trained on.
-2. ``encode_pair``/``tensorize`` turn every pair into one fixed-length row
-    of byte tokens: ``request + SEP + plan + EOS``, padded with ``PAD``.
+2. ```encode_pair```/```tensorize``` turn every pair into one fixed-length row
+    of byte tokens: ```request + SEP + plan + EOS```, padded with ```PAD```.
 3. The loop samples random batches and minimizes cross-entropy on the
     next-token prediction -- but only on the plan side: every position
-    before ``SEP`` is masked out, so the model is never graded on
+    before ```SEP``` is masked out, so the model is never graded on
     predicting the request, only on producing the plan.
-4. ``evaluate`` decodes the held-out requests greedily and counts exact
+4. ```evaluate``` decodes the held-out requests greedily and counts exact
     plan-line matches -- the number printed as accuracy.
-5. ``save`` exports every parameter as a named float32 array into
-    ``weights.npz``, together with the architecture, so the NumPy runtime
+5. ```save``` exports every parameter as a named float32 array into
+    ```weights.npz```, together with the architecture, so the NumPy runtime
     can never load weights that do not fit its math.
 
 ### Command line
 
-- ``--no-minus``: train without the signed-offset wordings (minus/ago,
+- ```--no-minus```: train without the signed-offset wordings (minus/ago,
     minus/vor) -- an ablation switch: same architecture and budget, but
     the resulting model has no notion of minus days. Keep the flag
-    identical across resumed chunks (``AKILI_CKPT``), since the dataset
+    identical across resumed chunks (```AKILI_CKPT```), since the dataset
     and its held-out split are rebuilt from seed and flags on every
     invocation.
 
 ### Environment knobs
 
-- ``AKILI_STEPS`` (default 3000): optimizer steps of the full schedule
-- ``AKILI_BATCH`` (default 96): examples per step
-- ``AKILI_DATA`` (default 40000): generated examples (600 held out)
-- ``AKILI_CKPT``: path to a checkpoint file; enables resumable training
-- ``AKILI_CHUNK``: steps per invocation when checkpointing (call the
+- ```AKILI_STEPS``` (default 3000): optimizer steps of the full schedule
+- ```AKILI_BATCH``` (default 96): examples per step
+- ```AKILI_DATA``` (default 40000): generated examples (600 held out)
+- ```AKILI_CKPT```: path to a checkpoint file; enables resumable training
+- ```AKILI_CHUNK```: steps per invocation when checkpointing (call the
     module repeatedly until the full schedule is done)
 """
 
@@ -112,7 +112,7 @@ class AkiliNet(nn.Module):
 
     A byte embedding plus a learned position embedding feed a stack of
     blocks, a final layer norm, and a head that projects each position back
-    to ``vocab`` byte scores. The head *shares* its matrix with the
+    to ```vocab``` byte scores. The head *shares* its matrix with the
     embedding (tied weights): the one table both maps a byte id to a vector
     and maps a vector back to byte scores. That halves the parameters of the
     single largest layer and ties "what a byte means" to "what predicts that
@@ -162,9 +162,9 @@ class AkiliNet(nn.Module):
 
 def encode_pair(request, dsl, context):
     """
-    Encode one training example as ``request + SEP + plan + EOS`` tokens.
+    Encode one training example as ```request + SEP + plan + EOS``` tokens.
 
-    The request is clipped so at least ``PLAN_BUDGET`` token positions stay
+    The request is clipped so at least ```PLAN_BUDGET``` token positions stay
     free for the plan, matching exactly what the runtime reserves; the whole
     row is then clipped to the context length as a final guard.
 
@@ -202,7 +202,7 @@ def tensorize(examples, context):
 
     ### Returns
 
-    - **torch.Tensor**: A ``(len(examples), context)`` long tensor
+    - **torch.Tensor**: A ```(len(examples), context)``` long tensor
 
     """
     rows = []
@@ -216,14 +216,14 @@ def tensorize(examples, context):
 
 def main():
     """
-    Run the full training schedule and export ``weights.npz``.
+    Run the full training schedule and export ```weights.npz```.
 
-    The ``--no-minus`` switch builds the ablation dataset without signed day
+    The ```--no-minus``` switch builds the ablation dataset without signed day
     offsets; the choice is recorded in the exported metadata, so a weights
     file always tells what it was taught. Deterministic by construction:
     fixed seeds for torch and the data generator reproduce the same weights
-    from the same invocation. With ``AKILI_CKPT`` set, the run resumes from
-    the stored step and stops after ``AKILI_CHUNK`` steps, saving model,
+    from the same invocation. With ```AKILI_CKPT``` set, the run resumes from
+    the stored step and stops after ```AKILI_CHUNK``` steps, saving model,
     optimizer, schedule, and rng state; evaluation and export happen only
     once the final step of the schedule is reached.
 
@@ -364,9 +364,9 @@ def generate(model, request):
     """
     Greedy-decode the plan line for one request (training-side only).
 
-    This mirrors the runtime decoder in ``infer.py`` but without the grammar
+    This mirrors the runtime decoder in ```infer.py``` but without the grammar
     constraint and without the KV cache (clarity over speed -- it is only
-    used for evaluation). The same ``PLAN_BUDGET`` bounds it, so a long plan
+    used for evaluation). The same ```PLAN_BUDGET``` bounds it, so a long plan
     (a relative chain) is decoded in full instead of being cut off and
     wrongly counted as a miss.
 
@@ -396,11 +396,11 @@ def generate(model, request):
 
 def save(model, accuracy, minus=True):
     """
-    Export the trained model as ``weights.npz``.
+    Export the trained model as ```weights.npz```.
 
     One named float32 array per parameter (the names follow the torch state
-    dict, e.g. ``blocks.0.attn.in_proj_weight``), plus the architecture and
-    the achieved held-out accuracy as embedded json under ``__config__``.
+    dict, e.g. ```blocks.0.attn.in_proj_weight```), plus the architecture and
+    the achieved held-out accuracy as embedded json under ```__config__```.
     The NumPy runtime reads its dimensions from that json, so inference and
     weights can never drift apart: a weights file carries its own shape.
 

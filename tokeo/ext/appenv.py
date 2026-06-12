@@ -200,7 +200,7 @@ def load(app):
     ### Notes
 
     : Creates a new TokeoAppEnv instance and attaches it to the application
-        as ``app.env``, making environment information available throughout the app.
+        as ```app.env```, making environment information available throughout the app.
 
     """
     app.extend('env', TokeoAppEnv(app))

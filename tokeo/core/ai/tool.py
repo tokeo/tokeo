@@ -11,14 +11,14 @@ class TokeoAiTool(MetaMixin):
     """
     Base class for agent tools.
 
-    A tool's class is resolved from its ``ai.tools`` item ``type`` (a built-in
+    A tool's class is resolved from its ```ai.tools``` item ```type``` (a built-in
     short name or a dotted path) and instantiated with the application and the
-    item's ``options`` as Meta overrides by the ``app.ai`` handler, so it can
-    read configuration, use ``app.db``, the vault, and hold resources.
-    ``Meta`` declares the ``description`` and the JSON-schema ``parameters``
+    item's ```options``` as Meta overrides by the ```app.ai``` handler, so it can
+    read configuration, use ```app.db```, the vault, and hold resources.
+    ```Meta``` declares the ```description``` and the JSON-schema ```parameters```
     sent to the model, plus any setting of the tool's own (overridden per
-    item by its ``options``); a subclass overrides those keys and ``exec``
-    does the work. The handler reads them from ``_meta``.
+    item by its ```options```); a subclass overrides those keys and ```exec```
+    does the work. The handler reads them from ```_meta```.
 
     """
 

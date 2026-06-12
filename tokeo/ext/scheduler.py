@@ -790,7 +790,7 @@ class TokeoScheduler(MetaMixin):
 
         ### Notes
 
-        : This is equivalent to calling `reload --restart` and is provided
+        : This is equivalent to calling ```reload --restart``` and is provided
             as a convenience command for the common case of wanting to reload
             tasks and ensure the scheduler is running afterward.
 

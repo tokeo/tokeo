@@ -11,7 +11,7 @@ browse the generated HTML during development.
 - Module list resolution from config or the conventional triple
     (app label, tests, tokeo) when modules is unset
 - External docstring source: markdown files under templates/pdoc/docstrings
-    keyed by ``{group}/{identifier}`` so decorator and extension docs can
+    keyed by ```{group}/{identifier}``` so decorator and extension docs can
     live outside the source they describe
 - Warning filter that drops the noisy PEP-224 variable-docstring warning
     and lifts pdoc 'Error: ...' warnings to a visible ❗ line
@@ -219,7 +219,7 @@ class TokeoPdoc(MetaMixin):
         ### Notes
 
         - Searches in all registered docstrings directories for a matching file
-            with the path pattern `{dir}/{group}/{identifier}.md`
+            with the path pattern ```{dir}/{group}/{identifier}.md```
         - Caches results to avoid repeated file system access
         - Returns None if no matching docstring file is found
 
@@ -375,7 +375,7 @@ class TokeoPdoc(MetaMixin):
                     with open(fs.join(path, f'{page}.html'), 'w', encoding='utf8') as f:
                         f.write(html)
 
-            # Create a single base `index.html`
+            # Create a single base ```index.html```
             with open(fs.join(self._output_dir, 'index.html'), 'w', encoding='utf-8') as f:
                 f.write(pdoc._render_template('/html.mako', app=self.app, modules=((module.name, module.docstring) for module in modules)))
 
@@ -429,7 +429,7 @@ class TokeoPdoc(MetaMixin):
                         except Exception as err:
                             self.app.print(f'❗Error: Processing config file "{section}": {err}')
 
-                # Create a single base `config/index.html`
+                # Create a single base ```config/index.html```
                 fs.ensure_dir_exists(fs.join(self._output_dir, 'config'))
                 with open(fs.join(self._output_dir, 'config', 'index.html'), 'w', encoding='utf-8') as f:
                     f.write(pdoc._render_template('/html.mako', app=self.app, configdict=configdict))

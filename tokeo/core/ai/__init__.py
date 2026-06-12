@@ -2,8 +2,8 @@
 AI provider core for Tokeo applications.
 
 A small, dependency-light layer for talking to chat-completion LLMs. The
-design mirrors the vault: named profiles live in the ``ai`` config section,
-each profile selects a registered provider through its ``type``, and the
+design mirrors the vault: named profiles live in the ```ai``` config section,
+each profile selects a registered provider through its ```type```, and the
 remaining keys are provider specific.
 
 ```yaml
@@ -19,17 +19,17 @@ ai:
 ```
 
 A provider is a dumb transport: given an already-resolved profile it turns a
-list of messages into a normalized ``ChatResult``. Providers, tools and the
-other services are registered as classes; the ``app.ai`` handler instantiates
-them with the application. A ``type`` is either a short name from tokeo's
-registry or a dotted ``module.Class`` path imported on demand; the registry is
-reachable for inspection via ``app.ai.registry``. They keep no mutable per-call
+list of messages into a normalized ```ChatResult```. Providers, tools and the
+other services are registered as classes; the ```app.ai``` handler instantiates
+them with the application. A ```type``` is either a short name from tokeo's
+registry or a dotted ```module.Class``` path imported on demand; the registry is
+reachable for inspection via ```app.ai.registry```. They keep no mutable per-call
 state, so they are safe to use from several threads at once (for example
 dramatiq workers or scheduler jobs).
 
 ### Notes
 
-    : The local-first case points ``base_url`` at a server the user runs
+    : The local-first case points ```base_url``` at a server the user runs
         themselves (Ollama, llama.cpp, vLLM, MLX). Tokeo talks to that server
         but does not start or manage it.
 

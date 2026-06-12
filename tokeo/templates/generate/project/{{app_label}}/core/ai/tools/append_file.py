@@ -4,12 +4,12 @@ Append-file tool for the {{ app_name }} ai agent.
 Appends a line of text to one configured file below a configured base
 directory -- the writing half of the file pair, and so the natural target for
 a policy guard: an agent that may read should not silently write, and denying
-``append_file`` by name shows action-level governance on a tool that really
-exists. The target ``file`` and the ``base_dir`` are tool settings from the
+```append_file``` by name shows action-level governance on a tool that really
+exists. The target ```file``` and the ```base_dir``` are tool settings from the
 configuration; the model only supplies the text.
 
 This module is self-contained: it holds only the tool class. The project names
-it by its full dotted class path under ``ai.tools`` in the config, so it needs
+it by its full dotted class path under ```ai.tools``` in the config, so it needs
 no registration and no entry in the app extensions; the handler imports and
 instantiates it on demand.
 """
@@ -21,7 +21,7 @@ from tokeo.core.ai import TokeoAiError, TokeoAiTool
 
 def _resolve_below(base_dir, path):
     # resolve the requested path strictly below the base directory; an
-    # absolute path or a ``..`` traversal must never escape the sandbox the
+    # absolute path or a ```..``` traversal must never escape the sandbox the
     # configuration defines
     base = Path(base_dir).resolve()
     target = (base / str(path)).resolve()
@@ -34,9 +34,9 @@ class TokeoAiAppendFileTool(TokeoAiTool):
     """
     Tool that appends a line of text to the configured file.
 
-    The ``Meta`` description and parameters are what the model sees; the
-    ``base_dir`` and the target ``file`` are the tool's own settings,
-    overridden per item by its config ``options`` and read from ``_meta``.
+    The ```Meta``` description and parameters are what the model sees; the
+    ```base_dir``` and the target ```file``` are the tool's own settings,
+    overridden per item by its config ```options``` and read from ```_meta```.
 
     """
 

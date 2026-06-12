@@ -126,7 +126,7 @@ class GrpcCallController(Controller):
 
         ### Returns
 
-        - **grpc.Channel**: A context-manager-style channel; use in `with`
+        - **grpc.Channel**: A context-manager-style channel; use in ```with```
 
         ### Raises
 
@@ -186,7 +186,7 @@ class GrpcCallController(Controller):
         --password on self.app.pargs.
 
         Returns None when --user is not given so callers can pass
-        `metadata=self._grpc_metadata()` unconditionally.
+        ```metadata=self._grpc_metadata()``` unconditionally.
 
         ### Returns
 

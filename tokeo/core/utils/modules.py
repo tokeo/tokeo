@@ -19,7 +19,7 @@ def get_module_path(module):
     ### Returns
 
     - **str|None**: Absolute directory path of the module; for a package
-      that is its ``__path__`` directory, for a plain module the directory
+      that is its ```__path__``` directory, for a plain module the directory
       that contains its file. None when neither is available (e.g. a
       namespace package or a builtin without a file)
 

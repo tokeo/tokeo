@@ -2,15 +2,15 @@
 Tokeo ai extension.
 
 Wires the ai core into a Cement application: registers the built-in providers,
-exposes the ``app.ai`` handler, and adds the ``ai`` command group for the
+exposes the ```app.ai``` handler, and adds the ```ai``` command group for the
 agentic and ai-facing side. An extension registers its own provider, tool,
-agent, or guard via ``app.ai.register`` (for example in a ``post_setup`` hook).
+agent, or guard via ```app.ai.register``` (for example in a ```post_setup``` hook).
 
-The technical namespace and the command group are both ``ai`` (this module,
-the ``tokeo.core.ai`` package, and the ``ai`` config section).
+The technical namespace and the command group are both ```ai``` (this module,
+the ```tokeo.core.ai``` package, and the ```ai``` config section).
 
-Every configured component is an item in the uniform form ``{type, options}``:
-``type`` names the class (a built-in short name or a dotted path), ``options``
+Every configured component is an item in the uniform form ```{type, options}```:
+```type``` names the class (a built-in short name or a dotted path), ```options```
 carries the component's own settings. Profiles add their documented top-level
 params (purpose, tools, enabled) around that form.
 
@@ -47,8 +47,8 @@ ai:
 
 ### Notes
 
-    : With no selector given, ``app.ai`` uses ``ai.defaults.profile``, which
-        ships as the built-in ``mock`` profile, so ``ai ask`` answers out of
+    : With no selector given, ```app.ai``` uses ```ai.defaults.profile```, which
+        ships as the built-in ```mock``` profile, so ```ai ask``` answers out of
         the box without any model or server; there is no hard-coded code
         fallback.
 
@@ -96,17 +96,17 @@ from tokeo.core.ai.providers.mock import TokeoAiMockProvider
 
 class TokeoAi(MetaMixin):
     """
-    AI handler for Tokeo applications, reached through ``app.ai``.
+    AI handler for Tokeo applications, reached through ```app.ai```.
 
-    Resolves a profile from the ``ai`` config section (by name, or by a field
-    such as ``model`` or ``purpose``) and hands the resolved profile to the
+    Resolves a profile from the ```ai``` config section (by name, or by a field
+    such as ```model``` or ```purpose```) and hands the resolved profile to the
     selected provider. Holds no mutable per-call state, so it is safe to use
     from several threads at once (for example dramatiq workers or scheduler
     jobs).
 
     ### Notes
 
-    : The handler is registered as ``ai`` and is reached through ``app.ai``.
+    : The handler is registered as ```ai``` and is reached through ```app.ai```.
         It is a thin dispatcher over the registered providers, not a wrapper
         around any provider's full surface.
 
@@ -152,7 +152,7 @@ class TokeoAi(MetaMixin):
         Initialize the ai handler.
 
         Stores the application reference only; the configuration is merged in
-        the ``_setup`` method once the framework has loaded it.
+        the ```_setup``` method once the framework has loaded it.
 
         ### Args
 
@@ -165,7 +165,7 @@ class TokeoAi(MetaMixin):
         self.app = app
         # the ai component registry lives on the handler: kind -> {name: cls}.
         # built-ins register here at post_setup; a project or third-party class
-        # is named by a dotted ``type`` in the config and imported on demand.
+        # is named by a dotted ```type``` in the config and imported on demand.
         self._registry = {}
         # the handler instantiates resolved classes with the application on
         # first use and caches the (stateless) instances here
@@ -174,7 +174,7 @@ class TokeoAi(MetaMixin):
         self._agent_objs = {}
         self._guard_objs = {}
         self._sandbox_objs = {}
-        # an app-wide sandbox override set via ``set_sandbox``; when set it
+        # an app-wide sandbox override set via ```set_sandbox```; when set it
         # replaces the agent's sandbox chain for every tool (a deliberate,
         # process-global choice, e.g. force everything into a container)
         self._sandbox_override = None
@@ -184,7 +184,7 @@ class TokeoAi(MetaMixin):
         Set up the ai handler.
 
         Called by the framework after the configuration has been loaded.
-        Merges the default configuration so the ``ai`` section always exists,
+        Merges the default configuration so the ```ai``` section always exists,
         then reads the section into the handler once. After this the
         operational methods work off these attributes and never read the
         configuration again.
@@ -200,11 +200,11 @@ class TokeoAi(MetaMixin):
         self._profiles = self._config('profiles', fallback={}) or {}
         self._agents = self._config('agents', fallback={}) or {}
         self._guards = self._config('guards', fallback={}) or {}
-        # the ``ai.sandboxes`` map uses the uniform item form: a dict value is
+        # the ```ai.sandboxes``` map uses the uniform item form: a dict value is
         # a sandbox item ({type, tools, except, options}); there are no groups
-        # here (a sandbox lists tool/group names under its own ``tools``)
+        # here (a sandbox lists tool/group names under its own ```tools```)
         self._sandboxes = self._config('sandboxes', fallback={}) or {}
-        # the ``ai.tools`` map uses the uniform form: a dict value is an item
+        # the ```ai.tools``` map uses the uniform form: a dict value is an item
         # ({type, options}), a list value is a named group of member names.
         # split it once into the two maps the loop works with
         self._tool_items, self._tool_groups = {}, {}
@@ -218,14 +218,14 @@ class TokeoAi(MetaMixin):
         """
         Get a configuration value from the extension's config section.
 
-        A simple wrapper around the application's ``config.get`` that uses the
+        A simple wrapper around the application's ```config.get``` that uses the
         correct configuration section. Used only at setup time to read the
         configuration into the handler.
 
         ### Args
 
         - **key** (str): Configuration key to retrieve
-        - ****kwargs**: Additional arguments passed to ``config.get``
+        - ****kwargs**: Additional arguments passed to ```config.get```
 
         ### Returns
 
@@ -240,8 +240,8 @@ class TokeoAi(MetaMixin):
 
         ### Args
 
-        - **kind** (str): The component kind, e.g. ``provider`` or ``tool``
-        - **name** (str): The short ``type`` name that selects this class
+        - **kind** (str): The component kind, e.g. ```provider``` or ```tool```
+        - **name** (str): The short ```type``` name that selects this class
         - **cls** (type): The class; the handler instantiates it with the app
 
         """
@@ -249,16 +249,16 @@ class TokeoAi(MetaMixin):
 
     def resolve(self, kind, type_value):
         """
-        Resolve a config ``type`` to a class.
+        Resolve a config ```type``` to a class.
 
-        A dotted ``type`` (one containing a ``.``) is imported on demand, so a
+        A dotted ```type``` (one containing a ```.```) is imported on demand, so a
         project or third-party class needs no registration; a bare short name
         is looked up in the kind's registry (the built-ins tokeo ships).
 
         ### Args
 
-        - **kind** (str): The component kind, e.g. ``provider`` or ``tool``
-        - **type_value** (str): A short name or a dotted ``module.Class`` path
+        - **kind** (str): The component kind, e.g. ```provider``` or ```tool```
+        - **type_value** (str): A short name or a dotted ```module.Class``` path
 
         ### Returns
 
@@ -288,18 +288,18 @@ class TokeoAi(MetaMixin):
 
     def registry(self, kind=None):
         """
-        Inspect the ai component registry through ``app.ai``.
+        Inspect the ai component registry through ```app.ai```.
 
         ### Args
 
-        - **kind** (str | None): A single kind (``provider``, ``tool`` ...),
-            or ``None`` for the whole registry
+        - **kind** (str | None): A single kind (```provider```, ```tool``` ...),
+            or ```None``` for the whole registry
 
         ### Returns
 
-        - **dict**: A deep copy; ``{name: class}`` for one kind, or
-            ``{kind: {name: class}}`` for all kinds, so callers cannot mutate
-            the registry (classes are atomic to ``deepcopy``, values stay
+        - **dict**: A deep copy; ```{name: class}``` for one kind, or
+            ```{kind: {name: class}}``` for all kinds, so callers cannot mutate
+            the registry (classes are atomic to ```deepcopy```, values stay
             shared)
 
         """
@@ -311,14 +311,14 @@ class TokeoAi(MetaMixin):
         """
         The selectable names for the interactive chat shell.
 
-        Used to build the chat completer, so typing ``--profile`` offers the
-        profile names, ``--agent`` the agent names, and ``--model`` /
-        ``--purpose`` the distinct values across the enabled profiles.
+        Used to build the chat completer, so typing ```--profile``` offers the
+        profile names, ```--agent``` the agent names, and ```--model``` /
+        ```--purpose``` the distinct values across the enabled profiles.
 
         ### Returns
 
-        - **dict**: Lists under the keys ``profile``, ``agent``, ``model``,
-            and ``purpose``
+        - **dict**: Lists under the keys ```profile```, ```agent```, ```model```,
+            and ```purpose```
 
         """
 
@@ -362,14 +362,14 @@ class TokeoAi(MetaMixin):
 
         ### Args
 
-        - **key** (str): ``profile`` or ``name`` to match the profile name;
+        - **key** (str): ```profile``` or ```name``` to match the profile name;
             any other key matches that field at the profile top level or in
-            its ``options``
+            its ```options```
         - **value**: The value the key must equal
 
         ### Returns
 
-        - **tuple**: ``(name, profile)`` of the matching profile
+        - **tuple**: ```(name, profile)``` of the matching profile
 
         ### Raises
 
@@ -378,7 +378,7 @@ class TokeoAi(MetaMixin):
         ### Notes
 
         - On a field match the first enabled profile in config order wins
-        - A disabled profile (``enabled: false``) is skipped, so it is also
+        - A disabled profile (```enabled: false```) is skipped, so it is also
             not found by its name
 
         """
@@ -409,10 +409,10 @@ class TokeoAi(MetaMixin):
         return obj
 
     def _tool(self, name):
-        # instantiate the tool configured under ``ai.tools[name]`` once and
-        # reuse it; the item has the uniform form: ``type`` (a built-in short
+        # instantiate the tool configured under ```ai.tools[name]``` once and
+        # reuse it; the item has the uniform form: ```type``` (a built-in short
         # name or a full dotted path) resolves to a class, built with the
-        # application and the item's ``options`` as keyword arguments (the
+        # application and the item's ```options``` as keyword arguments (the
         # keys override the tool's Meta defaults, like an agent or a guard).
         # the same statelessness argument as for providers applies
         obj = self._tool_objs.get(name)
@@ -434,7 +434,7 @@ class TokeoAi(MetaMixin):
         return obj
 
     def _resolve_tools(self, names):
-        # expand group names (lists under ``ai.tools``) to their member items;
+        # expand group names (lists under ```ai.tools```) to their member items;
         # an item name passes through. recursion lets a group contain groups;
         # the path set guards against cycles; order is preserved and
         # duplicates dropped
@@ -476,10 +476,10 @@ class TokeoAi(MetaMixin):
         return specs
 
     def _agent(self, name):
-        # build the agent configured under ``ai.agents[name]`` once and reuse
-        # it; the entry has the uniform item form: ``type`` (a built-in short
+        # build the agent configured under ```ai.agents[name]``` once and reuse
+        # it; the entry has the uniform item form: ```type``` (a built-in short
         # name or a dotted path) resolves to an agent class, built with the
-        # application and the entry's ``options`` as keyword arguments (the
+        # application and the entry's ```options``` as keyword arguments (the
         # keys override the agent's Meta defaults)
         obj = self._agent_objs.get(name)
         if obj is None:
@@ -494,12 +494,12 @@ class TokeoAi(MetaMixin):
 
     def _agent_or_default(self, agent, profile=None):
         # resolve the agent to run, in order: an explicit call argument wins;
-        # else the selected profile's ``agent`` (which must be stated, even as
-        # null to opt out); else ``ai.defaults.agent``. with none bound there
+        # else the selected profile's ```agent``` (which must be stated, even as
+        # null to opt out); else ```ai.defaults.agent```. with none bound there
         # is no agent and, under the sandbox rules, a tool call is denied --
         # binding an agent is how a profile opts into running tools at all
         if agent is None and profile is not None and 'agent' in profile:
-            # an explicit ``agent: null`` on the profile opts out on purpose,
+            # an explicit ```agent: null``` on the profile opts out on purpose,
             # overriding defaults.agent; a present name selects that agent
             agent = profile.get('agent')
             if not agent:
@@ -531,10 +531,10 @@ class TokeoAi(MetaMixin):
         return [name for name in active if name not in denied]
 
     def _guard(self, name):
-        # build the guard configured under ``ai.guards[name]`` once and reuse
-        # it; the entry has the uniform item form: ``type`` (a built-in short
+        # build the guard configured under ```ai.guards[name]``` once and reuse
+        # it; the entry has the uniform item form: ```type``` (a built-in short
         # name or a dotted path) resolves to a guard class, built with the
-        # application and the entry's ``options`` as keyword arguments (the
+        # application and the entry's ```options``` as keyword arguments (the
         # keys override the guard's Meta defaults, like an agent). guards hold
         # no per-call state, so one cached instance is fine
         obj = self._guard_objs.get(name)
@@ -556,10 +556,10 @@ class TokeoAi(MetaMixin):
         return [self._guard(name) for name in agent_obj._meta.guards]
 
     def _sandbox(self, name):
-        # build the sandbox configured under ``ai.sandboxes[name]`` once and
-        # reuse it; the entry has the uniform item form: ``type`` (a built-in
+        # build the sandbox configured under ```ai.sandboxes[name]``` once and
+        # reuse it; the entry has the uniform item form: ```type``` (a built-in
         # short name or a dotted path) resolves to a sandbox class, built with
-        # the application and the entry's ``options`` as keyword arguments (the
+        # the application and the entry's ```options``` as keyword arguments (the
         # keys override the sandbox's Meta defaults). like a provider it holds
         # no per-call state, so one cached instance is fine
         obj = self._sandbox_objs.get(name)
@@ -579,11 +579,11 @@ class TokeoAi(MetaMixin):
 
         An app-wide override that replaces the agent's sandbox chain: a
         deliberate, global choice (for example, run everything in a container
-        regardless of the agent). It does not touch the agent's hard ``deny``.
+        regardless of the agent). It does not touch the agent's hard ```deny```.
 
         ### Args
 
-        - **name** (str | None): A configured sandbox name, or ``None`` to
+        - **name** (str | None): A configured sandbox name, or ```None``` to
             clear the override and return to the per-agent chain
 
         """
@@ -593,9 +593,9 @@ class TokeoAi(MetaMixin):
         self._sandbox_override = name
 
     def _sandbox_tools_contain(self, name, tool_name):
-        # do the tools of sandbox ``name`` contain ``tool_name``? ``tools`` is the
-        # keyword ``_all`` (every tool that reaches it) or a list of
-        # tool/group names (expanded like the agent's tools); its ``except``
+        # do the tools of sandbox ```name``` contain ```tool_name```? ```tools``` is the
+        # keyword ```_all``` (every tool that reaches it) or a list of
+        # tool/group names (expanded like the agent's tools); its ```except```
         # excludes members from THIS sandbox only -- not a ban, the chain
         # walks on for them
         item = self._sandboxes.get(name) or {}
@@ -613,7 +613,7 @@ class TokeoAi(MetaMixin):
         # choose the sandbox a tool runs in. the app-wide override wins; else
         # walk the agent's ordered chain and take the first sandbox whose
         # tools contain
-        # the tool (and does not ``except`` it). an exhausted chain returns
+        # the tool (and does not ```except``` it). an exhausted chain returns
         # None, which the caller turns into a deny -- no sandbox listing the tool
         # IS the deny-by-default
         if self._sandbox_override is not None:
@@ -633,9 +633,9 @@ class TokeoAi(MetaMixin):
 
     def _exec_in_sandbox(self, tool_name, arguments, agent_obj, profile=None, call_deny=None):
         # the seam: resolve the tool, choose its sandbox, and run the call
-        # through it. a hard ``deny`` or an exhausted chain raises, so the
+        # through it. a hard ```deny``` or an exhausted chain raises, so the
         # caller records a denial; otherwise the chosen sandbox contains the
-        # ``tool.exec``
+        # ```tool.exec```
         if self._denies(tool_name, agent_obj, profile, call_deny):
             raise TokeoAiError(f'tool {tool_name!r} is denied')
         tool = self._tool(tool_name)
@@ -683,7 +683,7 @@ class TokeoAi(MetaMixin):
 
     def chat(self, messages, deny=None, profile=None, model=None, purpose=None, agent=None, max_steps=None, max_loops=None):
         """
-        Run the agent loop and return the final ``ChatResult``.
+        Run the agent loop and return the final ```ChatResult```.
 
         Resolves a profile (the model), then calls the provider. The active
         tools come from the agent (the composition root, which also sets the
@@ -693,9 +693,9 @@ class TokeoAi(MetaMixin):
         degrades to a single, plain call.
 
         Two budgets bound the loop and abort it with an error when reached:
-        ``max_steps`` caps the tool rounds of one request, ``max_loops`` caps
+        ```max_steps``` caps the tool rounds of one request, ```max_loops``` caps
         the consecutive rounds without one successful call (a model stuck on
-        denied or failing calls). ``0`` means unlimited.
+        denied or failing calls). ```0``` means unlimited.
 
         ### Args
 
@@ -707,7 +707,7 @@ class TokeoAi(MetaMixin):
         - **model** (str | None): Select the first enabled profile by model
         - **purpose** (str | None): Select the first enabled profile by purpose
         - **agent** (str | None): Select an agent by name; defaults to the
-            configured ``ai.defaults.agent`` when one is set
+            configured ```ai.defaults.agent``` when one is set
         - **max_steps** (int | None): Maximum tool rounds, 0 for unlimited;
             defaults to the agent's budget, otherwise the framework default
         - **max_loops** (int | None): Maximum consecutive rounds without one
@@ -720,7 +720,7 @@ class TokeoAi(MetaMixin):
 
         ### Raises
 
-        - **TokeoAiError**: If no profile resolves or it carries no ``type``,
+        - **TokeoAiError**: If no profile resolves or it carries no ```type```,
             or when a budget aborts the execution
 
         """
@@ -831,7 +831,7 @@ class TokeoAi(MetaMixin):
         - **model** (str | None): Select the first enabled profile by model
         - **purpose** (str | None): Select the first enabled profile by purpose
         - **agent** (str | None): Select an agent by name; defaults to the
-            configured ``ai.defaults.agent`` when one is set
+            configured ```ai.defaults.agent``` when one is set
 
         ### Returns
 
@@ -847,16 +847,16 @@ class _ChatCompleter(Completer):
     """
     Completion for the interactive ai chat shell.
 
-    Unlike a ``NestedCompleter`` (which only completes from the start of the
+    Unlike a ```NestedCompleter``` (which only completes from the start of the
     line, against its first word), this completes the selector switches and
     their configured values *anywhere* in the line -- so they still pop up
-    after some prompt text, e.g. ``the weekday of today --agent gua|``. It
+    after some prompt text, e.g. ```the weekday of today --agent gua|```. It
     looks only at the word under the cursor and the word before it:
 
-    - the word before the cursor is a switch (``--profile`` / ``--agent`` /
-        ``--model`` / ``--purpose``) -> offer that switch's configured
+    - the word before the cursor is a switch (```--profile``` / ```--agent``` /
+        ```--model``` / ```--purpose```) -> offer that switch's configured
         values from the running config
-    - the word under the cursor starts with ``-`` -> offer the switch names
+    - the word under the cursor starts with ```-``` -> offer the switch names
     - otherwise (ordinary prompt text) -> offer nothing, so completion never
         gets in the way of typing a normal request
 
@@ -1120,7 +1120,7 @@ class AiController(Controller):
     )
     def lint(self):
         # report every form and reference problem at once, each with its
-        # ``ai.<section>.<name>`` path; exit non-zero on errors, and on
+        # ```ai.<section>.<name>``` path; exit non-zero on errors, and on
         # warnings too when --strict is given
         issues = TokeoAiLinter(self.app).lint()
         for issue in issues:
@@ -1137,12 +1137,12 @@ class AiController(Controller):
 
 def ai_extend_app(app):
     """
-    Cement post-setup hook: create ``app.ai`` and register the built-ins.
+    Cement post-setup hook: create ```app.ai``` and register the built-ins.
 
     Extends the application with the ai handler, registers the built-in
     providers on it, and sets it up, once every extension has been loaded and
     the configuration is available. A project or third-party provider/tool is
-    not registered here; it is named by a dotted ``type`` in the config and
+    not registered here; it is named by a dotted ```type``` in the config and
     imported on demand.
 
     ### Args
@@ -1154,14 +1154,14 @@ def ai_extend_app(app):
     # built-in provider, available by short name without any configuration:
     # mock is the neutral test double the framework needs for its own loop.
     # core ships no tools and no domain models; a project names its own
-    # tools and providers by a dotted ``type``
+    # tools and providers by a dotted ```type```
     app.ai.register('provider', 'mock', TokeoAiMockProvider)
-    # built-in agent: the standard composition root, the ``fundi`` type (the
+    # built-in agent: the standard composition root, the ```fundi``` type (the
     # master that wields the tools); a project configures its agents under
-    # ``ai.agents`` and selects one per call, via a profile, or defaults.agent
+    # ```ai.agents``` and selects one per call, via a profile, or defaults.agent
     app.ai.register('agent', 'fundi', TokeoAiFundiAgent)
     # built-in sandboxes: in_process (zero isolation, the catch-all with
-    # ``tools: _all``) and subprocess (fault/resource isolation via the worker)
+    # ```tools: _all```) and subprocess (fault/resource isolation via the worker)
     app.ai.register('sandbox', 'in_process', TokeoAiInProcessSandbox)
     app.ai.register('sandbox', 'subprocess', TokeoAiSubprocessSandbox)
     # built-in guard: the baseline audit guard; agents opt in via agent.guards
@@ -1181,10 +1181,10 @@ def ai_lint_on_run(app):
     """
     Cement pre-run hook: lint the ai configuration before an ai command.
 
-    Runs inside ``app.run`` (unlike ``post_setup``), so a typo in the ai config
+    Runs inside ```app.run``` (unlike ```post_setup```), so a typo in the ai config
     surfaces as a clean error through the application's own handler instead of a
-    traceback. It guards only ``ai`` commands and steps aside for ``ai lint``
-    and ``--help``, so the report and the help text stay reachable.
+    traceback. It guards only ```ai``` commands and steps aside for ```ai lint```
+    and ```--help```, so the report and the help text stay reachable.
 
     ### Args
 
@@ -1193,7 +1193,7 @@ def ai_lint_on_run(app):
     ### Raises
 
     - **TokeoAiError**: If the configuration has an error-level problem; the
-        message lists every issue (warnings included) and points at ``ai lint``
+        message lists every issue (warnings included) and points at ```ai lint```
 
     """
     argv = list(app.argv or [])
@@ -1219,12 +1219,12 @@ def load(app):
 
     ### Notes
 
-    - Registers a post_setup hook that creates ``app.ai``, registers the
+    - Registers a post_setup hook that creates ```app.ai```, registers the
         built-in providers on it, and sets it up once the configuration is
         available
     - Registers a pre_run hook that lints the ai configuration before an ai
         command, so a typo fails with a clean message rather than a traceback
-    - A project or third-party provider/tool is named by a dotted ``type`` in
+    - A project or third-party provider/tool is named by a dotted ```type``` in
         the config and imported on demand, so it needs no registration and no
         entry in the application extensions
 

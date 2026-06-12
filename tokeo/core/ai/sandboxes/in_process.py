@@ -3,7 +3,7 @@ The in-process sandbox: zero isolation, the lean default.
 
 It runs a tool call directly in the application process -- exactly what the
 loop did before the sandbox seam existed, so wrapping a call in this sandbox
-changes nothing observable. With ``tools: _all`` placed last in an agent's
+changes nothing observable. With ```tools: _all``` placed last in an agent's
 sandbox chain it is the opt-in catch-all that lets the remaining tools run in
 process; its absence from a chain is the deny-by-default.
 """
@@ -16,7 +16,7 @@ class TokeoAiInProcessSandbox(TokeoAiSandbox):
     Run a tool call in the application process, with no isolation.
 
     The honest baseline: full access to the running app, no overhead, no
-    containment. Caps in ``options`` are meaningless here and are ignored.
+    containment. Caps in ```options``` are meaningless here and are ignored.
     """
 
     def exec(self, tool, arguments):

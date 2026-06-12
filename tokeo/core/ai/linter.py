@@ -1,14 +1,14 @@
 """
 Linter for the ai extension configuration.
 
-Lints the ``ai`` configuration in one place, in two passes: a form pass
-(allowed keys and value kinds) and a reference pass (every ``type`` resolves on
-``app.ai``, and every name a profile or group points at exists). Nothing is
+Lints the ```ai``` configuration in one place, in two passes: a form pass
+(allowed keys and value kinds) and a reference pass (every ```type``` resolves on
+```app.ai```, and every name a profile or group points at exists). Nothing is
 raised; the caller decides what to do with the reported issues.
 
-It runs automatically when ``app.ai`` is set up, so a typo (a missing tool, an
-unresolved ``type``) fails fast at startup, and is also exposed as the
-``ai lint`` command, where ``--strict`` turns warnings into failures.
+It runs automatically when ```app.ai``` is set up, so a typo (a missing tool, an
+unresolved ```type```) fails fast at startup, and is also exposed as the
+```ai lint``` command, where ```--strict``` turns warnings into failures.
 """
 
 import difflib
@@ -18,9 +18,9 @@ from tokeo.core.utils.base import as_list
 from tokeo.core.ai import TokeoAiError
 
 
-# allowed keys per section, so an unknown key (a typo such as ``toolss``) is
+# allowed keys per section, so an unknown key (a typo such as ```toolss```) is
 # reported instead of being silently ignored. tools, agents, and guards share
-# the uniform item form ({type, options}); the ``defaults`` block is checked
+# the uniform item form ({type, options}); the ```defaults``` block is checked
 # here, agent option contents by the built-in element validators below
 _AI_KEYS = {'defaults', 'profiles', 'tools', 'agents', 'guards', 'sandboxes'}
 _DEFAULTS_KEYS = {'profile', 'agent'}
@@ -39,9 +39,9 @@ class AiLintIssue:
 
     ### Notes
 
-    - **path** (str): The ``ai.<section>.<name>`` location of the problem
+    - **path** (str): The ```ai.<section>.<name>``` location of the problem
     - **message** (str): What is wrong, with a hint where one applies
-    - **level** (str): ``error`` (breaks resolution) or ``warning`` (an
+    - **level** (str): ```error``` (breaks resolution) or ```warning``` (an
         ignored value, usually a typo)
 
     """
@@ -53,12 +53,12 @@ class AiLintIssue:
 
 class TokeoAiLinter:
     """
-    Lints the ``ai`` configuration against the live registries.
+    Lints the ```ai``` configuration against the live registries.
 
     ### Notes
 
-    - Construct it with the application, then call ``lint`` to get the issues
-    - Every ``type`` is resolved through ``app.ai``, so a broken reference is
+    - Construct it with the application, then call ```lint``` to get the issues
+    - Every ```type``` is resolved through ```app.ai```, so a broken reference is
         caught here rather than on first use
 
     """
@@ -69,8 +69,8 @@ class TokeoAiLinter:
 
         ### Args
 
-        - **app**: The application instance; its ``app.ai`` registries resolve
-            every ``type``
+        - **app**: The application instance; its ```app.ai``` registries resolve
+            every ```type```
 
         """
         self.app = app
@@ -86,20 +86,20 @@ class TokeoAiLinter:
 
     def add_validator(self, section, validator):
         """
-        Register a validation call for the elements of one ``ai`` section.
+        Register a validation call for the elements of one ```ai``` section.
 
         Every registered validator runs once per element of the section when
-        ``lint`` walks it, so a subclass or a project extends the linter
+        ```lint``` walks it, so a subclass or a project extends the linter
         without touching its internals.
 
         ### Args
 
-        - **section** (str): The ``ai`` section to validate (for example
-            ``agents`` or ``guards``)
-        - **validator** (callable): Called as ``validator(section, name,
-            value)`` per element; it returns an iterable of ``AiLintIssue``
-            entries (or ``None`` when it reports through the linter itself).
-            It may also raise: a ``TokeoAiError`` becomes an error issue with
+        - **section** (str): The ```ai``` section to validate (for example
+            ```agents``` or ```guards```)
+        - **validator** (callable): Called as ```validator(section, name,
+            value)``` per element; it returns an iterable of ```AiLintIssue```
+            entries (or ```None``` when it reports through the linter itself).
+            It may also raise: a ```TokeoAiError``` becomes an error issue with
             its message at the element, any other exception is reported as a
             failed validator -- the lint run itself never crashes
 
@@ -108,11 +108,11 @@ class TokeoAiLinter:
 
     def lint(self):
         """
-        Lint the ``ai`` configuration and return the issues found.
+        Lint the ```ai``` configuration and return the issues found.
 
         ### Returns
 
-        - **list**: ``AiLintIssue`` entries; an empty list means the
+        - **list**: ```AiLintIssue``` entries; an empty list means the
             configuration is sound
 
         """
@@ -154,8 +154,8 @@ class TokeoAiLinter:
 
     def _validate_item_form(self, section, name, item):
         # the uniform item form shared by agents and guards: a mapping with a
-        # resolvable ``type`` and the component's own settings under
-        # ``options``; settings keys inside options are the component's Meta
+        # resolvable ```type``` and the component's own settings under
+        # ```options```; settings keys inside options are the component's Meta
         # keys and stay unchecked here (a custom class declares its own)
         path = f'ai.{section}.{name}'
         if not isinstance(item, dict):
@@ -168,7 +168,7 @@ class TokeoAiLinter:
 
     def _validate_agent_options(self, section, name, item):
         # the base agent's known option keys: the tools selection points into
-        # ``ai.tools``, the guards selection into ``ai.guards``, and the
+        # ```ai.tools```, the guards selection into ```ai.guards```, and the
         # budgets are numbers; other keys may be a custom agent's own Meta keys
         if not isinstance(item, dict):
             return
@@ -191,7 +191,7 @@ class TokeoAiLinter:
             value = options.get(key)
             if value is not None and not isinstance(value, int):
                 self._add(f'{path}.{key}', 'must be a number (0 = unlimited)')
-        # the sandbox chain references ``ai.sandboxes`` by name, in order; an
+        # the sandbox chain references ```ai.sandboxes``` by name, in order; an
         # empty or absent chain means no sandbox lists a tool -> denied
         sandboxes = options.get('sandboxes')
         if sandboxes is not None:
@@ -206,11 +206,11 @@ class TokeoAiLinter:
         self._lint_names(f'{path}.deny', options.get('deny'), tool_names, 'tool or group')
 
     def _validate_sandbox(self, section, name, item):
-        # a sandbox item: a resolvable ``type``, the required ``tools``
-        # selection (the keyword ``_all`` or tool/group names), an
-        # optional ``except`` skip set (single or list), and the class's own
-        # ``options``. the option keys are validated by the class itself
-        # through ``validate_options`` -- the linter does not know them
+        # a sandbox item: a resolvable ```type```, the required ```tools```
+        # selection (the keyword ```_all``` or tool/group names), an
+        # optional ```except``` skip set (single or list), and the class's own
+        # ```options```. the option keys are validated by the class itself
+        # through ```validate_options``` -- the linter does not know them
         path = f'ai.{section}.{name}'
         if not isinstance(item, dict):
             self._add(path, 'must be an item (mapping with a "type")')
@@ -232,8 +232,8 @@ class TokeoAiLinter:
 
     def _validate_options_via_class(self, kind, path, item):
         # the class knows its allowed option keys; resolve it and call its
-        # ``validate_options`` hook. a resolution failure is already reported
-        # by ``_lint_type``; a hook that returns messages becomes lint errors
+        # ```validate_options``` hook. a resolution failure is already reported
+        # by ```_lint_type```; a hook that returns messages becomes lint errors
         options = item.get('options')
         if not isinstance(options, dict):
             return
@@ -254,9 +254,9 @@ class TokeoAiLinter:
             self._add(f'{path}.options', message)
 
     def _lint_names(self, path, selection, known, what):
-        # a single name or a list of names from ``known``; None is allowed
-        # (the field is absent). used for the agent ``deny`` and a sandbox
-        # ``except``/``tools``, which all accept one entry or many
+        # a single name or a list of names from ```known```; None is allowed
+        # (the field is absent). used for the agent ```deny``` and a sandbox
+        # ```except```/```tools```, which all accept one entry or many
         for entry in as_list(selection):
             if entry not in known:
                 self._add(path, _unknown(what, entry, known))
@@ -265,7 +265,7 @@ class TokeoAiLinter:
         self.issues.append(AiLintIssue(path, message, level))
 
     def _value(self, key):
-        # read one ``ai`` config value; a missing key raises in cement, so
+        # read one ```ai``` config value; a missing key raises in cement, so
         # swallow that and treat it as unset
         try:
             return self.app.config.get('ai', key)
@@ -273,7 +273,7 @@ class TokeoAiLinter:
             return None
 
     def _section_keys(self):
-        # the top-level keys present in the ``ai`` section, to spot typos
+        # the top-level keys present in the ```ai``` section, to spot typos
         try:
             return list(self.app.config.keys('ai'))
         except Exception:
@@ -286,14 +286,14 @@ class TokeoAiLinter:
                 self._add(f'{path}.{key}', _unknown('key', key, allowed), level)
 
     def _lint_options(self, path, item):
-        # ``options`` is optional, but when present it carries the component's
+        # ```options``` is optional, but when present it carries the component's
         # own settings and must be a mapping
         options = item.get('options')
         if options is not None and not isinstance(options, dict):
             self._add(f'{path}.options', 'must be a mapping')
 
     def _lint_type(self, kind, path, item):
-        # every item names a class by ``type``; resolving it on ``app.ai``
+        # every item names a class by ```type```; resolving it on ```app.ai```
         # imports a dotted path or looks up a built-in short name
         type_value = item.get('type')
         if not type_value:
@@ -375,7 +375,7 @@ class TokeoAiLinter:
                 self._add(f'{path}.enabled', 'must be true or false')
             # a profile binds the agent (composition); null opts out on
             # purpose, a name must exist. tools no longer live on a profile;
-            # instead a profile may ``deny`` tools/groups to carve out its own
+            # instead a profile may ```deny``` tools/groups to carve out its own
             # subset of a shared agent's tools
             agent = profile.get('agent')
             if agent is not None and agent not in agent_names:
@@ -383,8 +383,8 @@ class TokeoAiLinter:
             self._lint_names(f'{path}.deny', profile.get('deny'), tool_names, 'tool or group')
 
     def _lint_selection(self, path, selection, tool_names):
-        # a profile's ``tools`` is a selection list of item or group names from
-        # ``ai.tools``, never a section of its own
+        # a profile's ```tools``` is a selection list of item or group names from
+        # ```ai.tools```, never a section of its own
         if selection is None:
             return
         if not isinstance(selection, list):
@@ -395,7 +395,7 @@ class TokeoAiLinter:
                 self._add(f'{path}.tools', _unknown('tool or group', entry, tool_names))
 
     def _lint_defaults(self, defaults, profiles, agents):
-        # the ``defaults`` block names the profile (model) and the agent
+        # the ```defaults``` block names the profile (model) and the agent
         # (composition) used when a call selects none. both are optional, but
         # when set must name an existing entry; a missing block is a warning
         if not defaults:

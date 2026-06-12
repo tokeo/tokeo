@@ -2,14 +2,14 @@
 Read-file tool for the {{ app_name }} ai agent.
 
 Reads a text file strictly below a configured base directory, so an agent can
-look things up without roaming the file system: the ``base_dir`` is a tool
+look things up without roaming the file system: the ```base_dir``` is a tool
 setting from the configuration, and any path that escapes it (an absolute
-path or a ``..`` traversal) is rejected before anything is opened. Reading is
-the harmless half of the file pair; the writing ``append_file`` tool is the
+path or a ```..``` traversal) is rejected before anything is opened. Reading is
+the harmless half of the file pair; the writing ```append_file``` tool is the
 one a policy guard typically denies.
 
 This module is self-contained: it holds only the tool class. The project names
-it by its full dotted class path under ``ai.tools`` in the config, so it needs
+it by its full dotted class path under ```ai.tools``` in the config, so it needs
 no registration and no entry in the app extensions; the handler imports and
 instantiates it on demand.
 """
@@ -21,7 +21,7 @@ from tokeo.core.ai import TokeoAiError, TokeoAiTool
 
 def _resolve_below(base_dir, path):
     # resolve the requested path strictly below the base directory; an
-    # absolute path or a ``..`` traversal must never escape the sandbox the
+    # absolute path or a ```..``` traversal must never escape the sandbox the
     # configuration defines
     base = Path(base_dir).resolve()
     target = (base / str(path)).resolve()
@@ -34,9 +34,9 @@ class TokeoAiReadFileTool(TokeoAiTool):
     """
     Tool that reads a text file below the configured base directory.
 
-    The ``Meta`` description and parameters are what the model sees; the
-    ``base_dir`` is the tool's own setting, overridden per item by its config
-    ``options`` and read from ``_meta``.
+    The ```Meta``` description and parameters are what the model sees; the
+    ```base_dir``` is the tool's own setting, overridden per item by its config
+    ```options``` and read from ```_meta```.
 
     """
 

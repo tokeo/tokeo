@@ -1324,7 +1324,7 @@ class TokeoAutomate(MetaMixin):
                 kwprotected=kwprotected,
             )
             # Check for connection settings. The rule follows
-            # first if 'connections' exist, second a `use`
+            # first if 'connections' exist, second a ```use```
             # relation, third a 'hosts' section, last fallback
             # is local command
             if 'connection' in _config_task:

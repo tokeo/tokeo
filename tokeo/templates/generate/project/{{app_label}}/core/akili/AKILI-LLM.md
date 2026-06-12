@@ -1,6 +1,6 @@
 # akili -- the project's own micro language model
 
-`akili` is a real, trained language model that belongs to this application:
+```akili``` is a real, trained language model that belongs to this application:
 a few hundred thousand parameters learned from scratch on the project's own
 synthetic data, running in-process with plain NumPy -- no host to start, no
 network, no third-party weights. It does one thing, and does it exactly: it
@@ -8,19 +8,19 @@ turns a natural-language request (English or German) into a **plan** of tool
 calls over the project's calendar toolset, including nested requests like
 *"the weekday of today plus 2 days"*, which become real three-step chains.
 
-It complements the framework's built-in `mock` provider: `mock` is the
+It complements the framework's built-in ```mock``` provider: ```mock``` is the
 neutral, deliberately dumb test double that proves the machinery (loop,
-guards, budgets, trace) without any prerequisite; `akili` is the content --
+guards, budgets, trace) without any prerequisite; ```akili``` is the content --
 the proof that a generated project can own, train, and operate its model.
-The agents stay model-free compositions: the same `audited` or `guarded`
-agent runs against `mock`, `akili`, or a remote profile unchanged.
+The agents stay model-free compositions: the same ```audited``` or ```guarded```
+agent runs against ```mock```, ```akili```, or a remote profile unchanged.
 
 Train-first: the weights are a project asset created by you. Run
 
     python -m {{ app_label }}.core.akili.train
 
-once; it reports the held-out accuracy and writes `weights.npz` into this
-package. Until then the `akili` profile raises a clear hint and the akili
+once; it reports the held-out accuracy and writes ```weights.npz``` into this
+package. Until then the ```akili``` profile raises a clear hint and the akili
 test cases skip.
 
 ## What you can ask it
@@ -66,12 +66,12 @@ signed offsets. Small, but real tasks:
 
 Deadline calculators, release countdowns, week-number lookups, "x days of
 lead time before date y" -- deterministic, offline, tens of milliseconds,
-and fully audited under `--agent guarded`.
+and fully audited under ```--agent guarded```.
 
 ### A planner, not a texter
 
 The model's only learned output language is the plan DSL (plus
-`<nomatch>`). The answer you see (`[akili] weekday: Tuesday`) is always
+```<nomatch>```). The answer you see (```[akili] weekday: Tuesday```) is always
 the result of the last tool in the chain: the facts come from the
 computation, never from the model. That split is deliberate -- dates and
 arithmetic are exactly what language models, small or large, get wrong
@@ -79,17 +79,17 @@ when they memorize, and exactly what tools compute precisely. A 380k
 model could never store a million date facts, but it can learn perfectly
 *which computation is meant*. This is also why akili cannot hallucinate
 *form*: the plan grammar admits no invented tools or syntax, and what the
-model does not understand becomes an honest `<nomatch>`. It can still
+model does not understand becomes an honest ```<nomatch>```. It can still
 hallucinate *meaning* -- a well-formed plan for a question that was never
 asked -- typically where a request falls into the gap between the trained
-patterns and the trained refusals. ``AKILI-USE.md`` (act 3) demonstrates
+patterns and the trained refusals. ```AKILI-USE.md``` (act 3) demonstrates
 these limits on purpose, and why the fundi machinery around the model is
 there to catch them.
 
 So there are three kinds of answers: a **tool result** (the normal
-case), **honest ignorance** (`[akili] sing me a song` -- the labelled
+case), **honest ignorance** (```[akili] sing me a song``` -- the labelled
 echo marks "outside my domain"), and **explanations** when the guard
-pipeline reports `denied:` or `error:` ("not permitted: ..." instead of
+pipeline reports ```denied:``` or ```error:``` ("not permitted: ..." instead of
 retrying). Free-form text is not this model's job: where wording matters,
 the clean place is a remote profile behind the very same agents, guards,
 and tools -- the ladder mock -> akili -> remote model tells the full
@@ -101,7 +101,7 @@ below); the provider, guards, and agents stay untouched.
 A literal sign inside a request is not part of the language. Direction is
 carried by words -- minus, before, ago (vor, abziehen in German) -- the
 count is always written bare, and the sign lives in the plan. A sign
-written onto the count itself is taught as ``<nomatch>`` in every
+written onto the count itself is taught as ```<nomatch>``` in every
 phrasing -- bare ("today plus -2 days", "add +5 months") and
 consumer-wrapped ("the weekday of today plus -2 days") alike. The model
 answers with the honest labelled echo instead of inventing a digit or
@@ -197,7 +197,7 @@ a retry loop.
 
 Step 6 of the sequence above, zoomed in. This is everything that happens
 when the trained model is *used* -- pure NumPy over the matrices from
-`weights.npz`, one character at a time, with the grammar as a fence:
+```weights.npz```, one character at a time, with the grammar as a fence:
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#1f2937", "lineColor": "#64748b", "fontSize": "14px"}}}%%
@@ -246,40 +246,40 @@ from three separate, inspectable parts.
 
 ## The pieces in this package
 
-### `dsl.py` -- the plan language and its gatekeeper
+### ```dsl.py``` -- the plan language and its gatekeeper
 
-The tiny target language the model speaks: one line, steps joined by `;`,
+The tiny target language the model speaks: one line, steps joined by ```;```,
 for example
 
     current();add_days(date=@1,days=2);weekday(date=@2)
 
-where `@k` means "the result of step k", and `<nomatch>` marks a request
-outside the domain. The module holds `DOMAIN` (which tool has which slots,
-the single place that knows the toolset), `render`/`parse` (plan to line and
-back), and the `Constrainer`: a byte-level automaton that answers, for any
+where ```@k``` means "the result of step k", and ```<nomatch>``` marks a request
+outside the domain. The module holds ```DOMAIN``` (which tool has which slots,
+the single place that knows the toolset), ```render```/```parse``` (plan to line and
+back), and the ```Constrainer```: a byte-level automaton that answers, for any
 partial line, which characters are legal next -- only active tool names,
-only their slots, dates only as `YYYY-MM-DD` or `@k`, at most three steps.
+only their slots, dates only as ```YYYY-MM-DD``` or ```@k```, at most three steps.
 The decoder may only pick what the automaton allows, so the model can never
 emit a malformed plan or a tool outside the injection, no matter how it was
 trained.
 
-### `tokenizer.py` -- the byte vocabulary
+### ```tokenizer.py``` -- the byte vocabulary
 
-No trained vocabulary: the 256 byte values plus `PAD`, `SEP`, and `EOS`
+No trained vocabulary: the 256 byte values plus ```PAD```, ```SEP```, and ```EOS```
 (vocabulary size 259). Byte level is the decisive choice here -- dates and
 numbers consist of the same characters as the sentence, so the model can
 copy them character by character instead of treating them as unknown words.
 That property is what keeps a model this small exact.
 
-### `data.py` -- the synthetic data generator
+### ```data.py``` -- the synthetic data generator
 
 The calendar domain is closed, so the dataset is generated, not collected.
 Every example is a *(sentence, plan line)* pair, built from phrase templates
 per tool in English and German, nested compositions, time words
-(today/now/current and heute/jetzt/aktuell) that put a `current()` step in
+(today/now/current and heute/jetzt/aktuell) that put a ```current()``` step in
 front of the plan, distractor preambles and polite lead-ins (also in front
 of negatives, so chatter never becomes a positive signal by itself), and
-out-of-domain negatives that map to `<nomatch>` -- the anti-hallucination
+out-of-domain negatives that map to ```<nomatch>``` -- the anti-hallucination
 training. Day offsets are signed: plus/after/in wordings map to positive
 day values, minus/before/ago (minus/vor in German) to negative ones.
 Relative words (tomorrow, übermorgen, last week, next year ...) live in a
@@ -288,37 +288,37 @@ they chain ("tomorrow next year" is two shifts in order), and every
 shift shape speaks all units alike -- the unit word (days, months,
 years) picks the tool.
 Teaching a new word is adding a table line and retraining. A fixed seed makes the dataset reproducible at any time; run
-`python -m {{ app_label }}.core.akili.data` to print samples.
+```python -m {{ app_label }}.core.akili.data``` to print samples.
 
-### `AKILI-LEX.yaml` -- the editable language definition
+### ```AKILI-LEX.yaml``` -- the editable language definition
 
 The complete language of the training data as a richly commented yaml
 file in three parts: **words** (time words, relative words with their
 shift from today, the units with their declensions -- and a week is just
-an `add_days` unit with a factor of 7, since a week shift is a seven-day
-shift and there is no `add_weeks` tool -- consumer names), **chatter**
+an ```add_days``` unit with a factor of 7, since a week shift is a seven-day
+shift and there is no ```add_weeks``` tool -- consumer names), **chatter**
 (negatives, preambles, lead-ins), and **patterns** -- five
-groups (`single`, `shift`, `shift_minus`, `relative`, `relative_chain`),
-held together by one rule: *a `{c}` in any pattern means a consumer reads the
-result*. `data.py` loads and validates it at import time (unknown tools
+groups (```single```, ```shift```, ```shift_minus```, ```relative```, ```relative_chain```),
+held together by one rule: *a ```{c}``` in any pattern means a consumer reads the
+result*. ```data.py``` loads and validates it at import time (unknown tools
 and missing placeholders fail loudly), a weight-free test guards the
 format, and pdoc renders the whole file syntax-highlighted into the data
 module's page. One file to read what the model is taught -- and to
 extend it.
 
-### `train.py` -- the training tool (the only torch in the project)
+### ```train.py``` -- the training tool (the only torch in the project)
 
 A from-scratch decoder-only transformer: byte embeddings plus position
 embeddings, three blocks of multi-head attention and a small MLP, projected
 back against the embedding matrix (tied head) -- about 380k parameters. The
-training sequence is `sentence + SEP + plan + EOS`, and the loss only counts
+training sequence is ```sentence + SEP + plan + EOS```, and the loss only counts
 the plan side. AdamW with a one-cycle schedule, environment knobs
-(`AKILI_STEPS`, `AKILI_BATCH`, `AKILI_DATA`), and interruptible chunked runs
-via `AKILI_CKPT`/`AKILI_CHUNK`. At the end it evaluates exact-plan accuracy
-on held-out examples and saves `weights.npz`. Torch is a dev-side tool only;
+(```AKILI_STEPS```, ```AKILI_BATCH```, ```AKILI_DATA```), and interruptible chunked runs
+via ```AKILI_CKPT```/```AKILI_CHUNK```. At the end it evaluates exact-plan accuracy
+on held-out examples and saves ```weights.npz```. Torch is a dev-side tool only;
 the application never imports it.
 
-The `--no-minus` switch is a built-in ablation experiment:
+The ```--no-minus``` switch is a built-in ablation experiment:
 
     python -m {{ app_label }}.core.akili.train             # with minus teaching
     python -m {{ app_label }}.core.akili.train --no-minus  # without
@@ -329,13 +329,13 @@ and the resulting model has no notion of minus days (a request like
 *"today minus 2 days"* falls back to the nearest learned pattern). Training
 two weights files this way makes the central lesson of the lab tangible:
 capability lives in the data, not in the code. The choice is recorded in
-the exported metadata (`minus: true/false`), so a weights file always tells
+the exported metadata (```minus: true/false```), so a weights file always tells
 what it was taught; the sample printer takes the same switch
-(`python -m {{ app_label }}.core.akili.data --no-minus`).
+(```python -m {{ app_label }}.core.akili.data --no-minus```).
 
-### `infer.py` -- the runtime (plain NumPy)
+### ```infer.py``` -- the runtime (plain NumPy)
 
-Loads `weights.npz` and reruns the exact forward pass in NumPy (verified
+Loads ```weights.npz``` and reruns the exact forward pass in NumPy (verified
 bit-compatible with torch). Decoding is greedy and constrained: from the
 model's ranking, the best *legal* character wins. A KV cache makes it fast
 (the sentence is processed once, every generated character is a single-step
@@ -343,7 +343,7 @@ forward, in the order of tens of milliseconds per request), and if
 [numba](https://numba.pydata.org) is installed, the attention loop is
 JIT-compiled automatically -- without it the same numbers run as pure NumPy.
 
-### `weights.npz` -- the model itself
+### ```weights.npz``` -- the model itself
 
 A compressed archive of named float32 matrices, one per parameter, plus the
 architecture and the achieved accuracy as embedded metadata, so inference
@@ -351,57 +351,57 @@ and weights can never drift apart. Created exclusively by training.
 
 #### Anatomy of the weights -- every number accounted for
 
-The default architecture (`dim=128`, `layers=3`, `heads=4`, `ff=512`,
-`context=184`, `vocab=259`) produces exactly **651,776** trainable numbers.
+The default architecture (```dim=128```, ```layers=3```, ```heads=4```, ```ff=512```,
+```context=184```, ```vocab=259```) produces exactly **651,776** trainable numbers.
 Here is where each one lives:
 
 | part | matrix | shape | numbers |
 |---|---|---|---|
-| token meaning | `embed.weight` | 259 x 128 | 33,152 |
-| position meaning | `position.weight` | 184 x 128 | 23,552 |
-| per block: norm 1 | `ln1.weight` + `ln1.bias` | 128 + 128 | 256 |
-| per block: attention in | `attn.in_proj_weight` + bias | 384 x 128 + 384 | 49,536 |
-| per block: attention out | `attn.out_proj.weight` + bias | 128 x 128 + 128 | 16,512 |
-| per block: norm 2 | `ln2.weight` + `ln2.bias` | 128 + 128 | 256 |
-| per block: MLP up | `mlp.0.weight` + bias | 512 x 128 + 512 | 66,048 |
-| per block: MLP down | `mlp.2.weight` + bias | 128 x 512 + 128 | 65,664 |
+| token meaning | ```embed.weight``` | 259 x 128 | 33,152 |
+| position meaning | ```position.weight``` | 184 x 128 | 23,552 |
+| per block: norm 1 | ```ln1.weight``` + ```ln1.bias``` | 128 + 128 | 256 |
+| per block: attention in | ```attn.in_proj_weight``` + bias | 384 x 128 + 384 | 49,536 |
+| per block: attention out | ```attn.out_proj.weight``` + bias | 128 x 128 + 128 | 16,512 |
+| per block: norm 2 | ```ln2.weight``` + ```ln2.bias``` | 128 + 128 | 256 |
+| per block: MLP up | ```mlp.0.weight``` + bias | 512 x 128 + 512 | 66,048 |
+| per block: MLP down | ```mlp.2.weight``` + bias | 128 x 512 + 128 | 65,664 |
 | **one block** | (sum of the six rows above) | | **198,272** |
 | three blocks | 3 x 198,272 | | 594,816 |
-| final norm | `ln.weight` + `ln.bias` | 128 + 128 | 256 |
-| output head | tied to `embed.weight` | (shared) | 0 |
+| final norm | ```ln.weight``` + ```ln.bias``` | 128 + 128 | 256 |
+| output head | tied to ```embed.weight``` | (shared) | 0 |
 | **total** | | | **651,776** |
 
 Two details worth pausing on. The **output head adds zero parameters**: it
-reuses the embedding matrix transposed (`embed.weight.T`), so the same
+reuses the embedding matrix transposed (```embed.weight.T```), so the same
 33,152 numbers both map a byte to a vector and map a vector back to byte
 scores. And the **attention projection is the per-block heavyweight**
-(49,536 + 16,512): `in_proj` is three stacked 128 x 128 maps (query, key,
-value) plus bias, which is why widening `dim` grows the model roughly with
+(49,536 + 16,512): ```in_proj``` is three stacked 128 x 128 maps (query, key,
+value) plus bias, which is why widening ```dim``` grows the model roughly with
 its square. The whole file is float32, so 651,776 numbers are about 2.6 MB
 on disk -- small enough to read, ship, and reason about completely.
 
-One save-side footnote: because the head is tied, the exported `state_dict`
-lists `head.weight` as a second name for the same matrix, so the npz
+One save-side footnote: because the head is tied, the exported ```state_dict```
+lists ```head.weight``` as a second name for the same matrix, so the npz
 physically stores that 33,152-number table twice. The runtime only ever
-reads `embed.weight`; the duplicate is harmless and never counted as a
-parameter (`model.parameters()` reports the 651,776 unique numbers).
+reads ```embed.weight```; the duplicate is harmless and never counted as a
+parameter (```model.parameters()``` reports the 651,776 unique numbers).
 
 #### What the pipeline checks
 
 The lab fails loud rather than wrong. Every guard, and what it catches:
 
-- **lexicon validation** (`data._load_lexicon`, at import): an unknown
+- **lexicon validation** (```data._load_lexicon```, at import): an unknown
     tool or a pattern missing a required placeholder raises immediately --
-    a typo in `AKILI-LEX.yaml` can never train silently.
-- **grammar legality** (`dsl.Constrainer`): a generated plan can only be
+    a typo in ```AKILI-LEX.yaml``` can never train silently.
+- **grammar legality** (```dsl.Constrainer```): a generated plan can only be
     legal DSL over the active tools; a malformed plan is impossible to emit.
 - **the decoder budget guard** (a weight-free test): the longest plan the
-    data can produce must fit `PLAN_BUDGET`, with room for EOS -- so a new,
+    data can produce must fit ```PLAN_BUDGET```, with room for EOS -- so a new,
     longer pattern group surfaces in the tests instead of being truncated.
-- **byte-exact held-out evaluation** (`train.evaluate`): accuracy counts
+- **byte-exact held-out evaluation** (```train.evaluate```): accuracy counts
     only whole plan lines that match character for character, decoded
     without the grammar fence -- an honest lower bound on the raw model.
-- **the ablation invariant** (`--no-minus`): no example carries a backward
+- **the ablation invariant** (```--no-minus```): no example carries a backward
     wording, and no plan a negative value -- one variable changes, nothing
     else, so the two models differ only in what the data taught.
 
@@ -487,7 +487,7 @@ first with large turns, then fine ones (the OneCycle schedule). The
 held-out 600 never enter that loop, which is what makes the final
 accuracy an honest number. And the weights box is the whole model: no
 code, no rules ship with it -- the named matrices plus the embedded
-architecture are everything `infer.py` needs, which is why inference
+architecture are everything ```infer.py``` needs, which is why inference
 can be plain NumPy and why weights and runtime can never drift apart.
 
 What ends up in the weights is **no rule, no word list, no if-then** -- only
@@ -497,7 +497,7 @@ are learned gazes (when writing a date slot, look back at the date
 characters in the sentence -- which is why copies are exact; other heads
 attend to intent words like *weekday* or *wochentag*); the MLPs combine what
 was seen into patterns (*time word present, so the plan starts with*
-`current()`). The knowledge lives distributed across all of them; no single
+```current()```). The knowledge lives distributed across all of them; no single
 number means anything, only their interplay does. That is why it shows real
 (small) language-model behavior -- it generalizes over phrasings never seen
 verbatim -- and why its competence honestly ends where the data generator's
@@ -506,9 +506,9 @@ and the grammar automaton -- same sentence, same plan, every time.
 
 ## Extending the model
 
-The path is always the same: teach it in `data.py` (new templates, new
-tools in `DOMAIN`, more phrasings, more languages), retrain with
-`python -m {{ app_label }}.core.akili.train`, and check the reported accuracy
-plus the project's test suite. The provider (`core/ai/providers/akili.py`), the
+The path is always the same: teach it in ```data.py``` (new templates, new
+tools in ```DOMAIN```, more phrasings, more languages), retrain with
+```python -m {{ app_label }}.core.akili.train```, and check the reported accuracy
+plus the project's test suite. The provider (```core/ai/providers/akili.py```), the
 guards, and the agents need no change -- the plan grammar adapts to the
 active tools at runtime.

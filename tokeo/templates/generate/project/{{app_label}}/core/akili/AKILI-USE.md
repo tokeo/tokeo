@@ -9,12 +9,12 @@ micro model behind the very same governance, and act 3 -- on purpose --
 shows where the model breaks, and why. Every command sits in its own
 shell block, so each one is a single copy away from your terminal.
 
-`AKILI-LLM.md` explains how the model works; this file shows what it does.
+```AKILI-LLM.md``` explains how the model works; this file shows what it does.
 
 ## Before the show
 
 Train the weights once. They are a project asset (gitignored), built from
-the synthetic data in `AKILI-LEX.yaml` in a few minutes on a CPU:
+the synthetic data in ```AKILI-LEX.yaml``` in a few minutes on a CPU:
 
 ```shell
 python -m {{ app_label }}.core.akili.train
@@ -28,7 +28,7 @@ echo "fundi wields the tools, akili plans them" > tmp/notes.txt
 
 ## Act 1 -- the fundi agent (the mock model as a deterministic driver)
 
-The built-in `mock` provider is the test driver: it makes a tool call
+The built-in ```mock``` provider is the test driver: it makes a tool call
 whenever the first word of the prompt names an active tool, otherwise it
 echoes. Deterministic, offline, perfect for demos -- everything in this
 act runs before any model is trained.
@@ -39,10 +39,10 @@ act runs before any model is trained.
 {{ app_label }} ai ask "calc 2 + 3" --agent guarded
 ```
 
-Expected: `Done. The tool returned: 5` (plus an audit log line). The
+Expected: ```Done. The tool returned: 5``` (plus an audit log line). The
 point is *where* it ran: the guarded agent's sandbox chain is
-`jailed -> allow`, and `jailed` (a subprocess sandbox) lists the
-`mathematics` group -- so the calculator executed in a fresh interpreter
+```jailed -> allow```, and ```jailed``` (a subprocess sandbox) lists the
+```mathematics``` group -- so the calculator executed in a fresh interpreter
 with a wall-clock timeout, not in your application process.
 
 ### 2. The chain walks: current falls through to in-process
@@ -51,9 +51,9 @@ with a wall-clock timeout, not in your application process.
 {{ app_label }} ai ask "current" --agent guarded
 ```
 
-Expected: the current timestamp. `current` is not listed by `jailed`, so
-the chain walks on to `allow` (`in_process`, `tools: _all`) -- same
-agent, different "where". Remove `allow` from the chain and unlisted
+Expected: the current timestamp. ```current``` is not listed by ```jailed```, so
+the chain walks on to ```allow``` (```in_process```, ```tools: _all```) -- same
+agent, different "where". Remove ```allow``` from the chain and unlisted
 tools would be denied instead: the chain is the single truth.
 
 ### 3. Reading is permitted
@@ -70,7 +70,7 @@ Expected: the note's content. The readonly policy guard lets reads pass.
 {{ app_label }} ai ask "append_file hello" --agent guarded
 ```
 
-Expected: `denied: tool 'append_file' is not permitted by policy`. The
+Expected: ```denied: tool 'append_file' is not permitted by policy```. The
 guard pipeline records the denial, audits it, and feeds it back to the
 model as text -- deny-and-continue, no crash, no retry storm.
 
@@ -80,7 +80,7 @@ model as text -- deny-and-continue, no crash, no retry storm.
 {{ app_label }} ai ask "calc 2 + 3" --agent audited
 ```
 
-Expected: a plain `[mock] calc 2 + 3` echo. The `audited` agent carries
+Expected: a plain ```[mock] calc 2 + 3``` echo. The ```audited``` agent carries
 no tools, so the very same prompt executes nothing. Switching the agent
 swaps the whole composition -- tools, guards, sandboxes, budgets.
 
@@ -100,7 +100,7 @@ and the token usage. Nothing about the call is hidden.
 {{ app_label }} ai lint
 ```
 
-Expected: `ai config ok`. Unknown tools, dangling sandbox names, or
+Expected: ```ai config ok```. Unknown tools, dangling sandbox names, or
 options a sandbox cannot enforce surface here, not at runtime.
 
 ## Act 2 -- the akili model (a real, self-trained micro model)
@@ -136,17 +136,17 @@ byte tokenizer at work -- no subword vocabulary to mangle a date).
 {{ app_label }} ai ask "calc 2 + 3" --profile akili --json
 ```
 
-Expected: no calculation. The akili profile shares the `guarded` agent
-(same guards, same sandbox chain) but denies the `mathematics` and
-`filesystem` groups -- look at the specs in the JSON: the calculator is
+Expected: no calculation. The akili profile shares the ```guarded``` agent
+(same guards, same sandbox chain) but denies the ```mathematics``` and
+```filesystem``` groups -- look at the specs in the JSON: the calculator is
 simply not offered. One agent, several profiles, each carving out only
-the tools it needs: `agent.tools - agent.deny - profile.deny`.
+the tools it needs: ```agent.tools - agent.deny - profile.deny```.
 
 ## Act 3 -- where akili breaks, and why (limits, on purpose)
 
-`AKILI-LLM.md` explains why akili cannot hallucinate *form*: the plan
+```AKILI-LLM.md``` explains why akili cannot hallucinate *form*: the plan
 grammar admits no invented tools, and ~15% of the training mixture maps
-off-domain requests to an honest `<nomatch>`. But abstention is a trained
+off-domain requests to an honest ```<nomatch>```. But abstention is a trained
 pattern like any other -- and patterns have edges. *Meaning* can still go
 wrong: a well-formed plan for a question that was never asked, exactly
 where a request falls into the gap between the trained patterns and the
@@ -174,7 +174,7 @@ your stage.
 
 Expected: three honest labelled echoes. All three are in-distribution
 refusals -- plain chatter, a calendar-near hard negative, and a signed
-count (signs on a bare count are taught as `<nomatch>` in every
+count (signs on a bare count are taught as ```<nomatch>``` in every
 phrasing). So far the abstention training holds. Now the edges.
 
 ### Break 1 -- keyword hijack: pattern completion beats intent
@@ -183,7 +183,7 @@ phrasing). So far the abstention training holds. Now the edges.
 {{ app_label }} ai ask "erinnere mich in 3 tagen an annas geburtstag" --profile akili
 ```
 
-Expected failure: a confident date answer (an `add_days(+3)` plan) to a
+Expected failure: a confident date answer (an ```add_days(+3)``` plan) to a
 reminder request akili cannot serve at all. Why: this prompt is neither a
 trained positive (there is no reminder pattern) nor a trained negative --
 the negatives are deliberately kept free of calendar words, so "in 3
@@ -218,7 +218,7 @@ the grammar even proves it must fail.**
 ```
 
 Expected failure: the weekday of *today* -- the explicit negation is
-steamrolled (depending on your run it may also tip into `<nomatch>`;
+steamrolled (depending on your run it may also tip into ```<nomatch>```;
 both are demonstrable). Why: not a single training pattern contains
 negation, and "heute" and "morgen" are both strong cues. The model
 weighs surface patterns; it has no mechanism to read "not X but Y" as a
@@ -248,7 +248,7 @@ The hallucinated plan is right there in the trace -- arguments, schema,
 decision, result. And this closes the circle back to act 1: *because*
 models break like this, the fundi machinery exists. The validate guard
 checks arguments against the schema, deny and the sandbox chain bound
-what a wrong plan can touch, `max_loops` stops a model stuck on
+what a wrong plan can touch, ```max_loops``` stops a model stuck on
 refusals, and the trace makes every step inspectable. **The model may be
 wrong -- the architecture makes the error visible, bounded, and cheap.**
 

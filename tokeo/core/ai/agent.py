@@ -16,24 +16,24 @@ class TokeoAiAgent(MetaMixin):
     and how many model calls the loop may take. The model itself is not part
     of the agent; it is bound late through the selected profile, so the same
     agent can run against the mock, a local model, or a hosted one. The class
-    is resolved from the ``ai.agents`` item ``type`` (a built-in short name or
-    a dotted path) by the ``app.ai`` handler, which passes the agent's
+    is resolved from the ```ai.agents``` item ```type``` (a built-in short name or
+    a dotted path) by the ```app.ai``` handler, which passes the agent's
     configuration entry as keyword arguments.
 
-    This base is declarative only: it carries the composition (``Meta``) and
+    This base is declarative only: it carries the composition (```Meta```) and
     the lifecycle, and is not used directly. tokeo ships exactly one concrete
-    agent, ``TokeoAiFundiAgent`` (the ``fundi`` type); a project may add its
-    own by subclassing this. The agent loop itself lives in the ``app.ai``
+    agent, ```TokeoAiFundiAgent``` (the ```fundi``` type); a project may add its
+    own by subclassing this. The agent loop itself lives in the ```app.ai```
     handler, not on the agent, so an agent only varies the composition, not
     the orchestration.
 
     ### Notes
 
-    : ``Meta`` declares the configurable keys (``tools``, ``guards``,
-        ``sandboxes``, ``deny``, ``max_steps``, ``max_loops``) with neutral
-        defaults; the ``options`` of the ``ai.agents`` entry override them at
+    : ```Meta``` declares the configurable keys (```tools```, ```guards```,
+        ```sandboxes```, ```deny```, ```max_steps```, ```max_loops```) with neutral
+        defaults; the ```options``` of the ```ai.agents``` entry override them at
         build time (the cement Meta keyword override), and they are read from
-        ``_meta``.
+        ```_meta```.
 
     """
 
@@ -48,12 +48,12 @@ class TokeoAiAgent(MetaMixin):
 
         # the ordered sandbox chain (sandbox names): a tool runs in the first
         # sandbox whose tools contain it; when none does the call is denied,
-        # so an ``in_process`` sandbox with ``tools: _all`` placed last is the
+        # so an ```in_process``` sandbox with ```tools: _all``` placed last is the
         # opt-in catch-all that lets the remaining tools run in process
         sandboxes = []
 
         # tools (item or group names) this agent forbids outright, before any
-        # sandbox lookup; a hard exclusion, unlike a sandbox ``except``
+        # sandbox lookup; a hard exclusion, unlike a sandbox ```except```
         deny = []
 
         # per-agent cap on tool rounds (0 = unlimited); None means use the
@@ -72,7 +72,7 @@ class TokeoAiAgent(MetaMixin):
 
         - **app**: The Tokeo application instance
         - ***args**: Positional arguments for the parent initializer
-        - ****kw**: The agent's config entry; keys matching ``Meta`` override
+        - ****kw**: The agent's config entry; keys matching ```Meta``` override
             its defaults
 
         """
@@ -93,15 +93,15 @@ class TokeoAiAgent(MetaMixin):
 
 class TokeoAiFundiAgent(TokeoAiAgent):
     """
-    The standard agent, registered as the ``fundi`` type.
+    The standard agent, registered as the ```fundi``` type.
 
     fundi (Swahili for master/craftsman) is the composition root that wields
-    the tools: it inherits the declarative composition of ``TokeoAiAgent`` and
+    the tools: it inherits the declarative composition of ```TokeoAiAgent``` and
     is the one concrete agent tokeo ships. It adds no behaviour of its own --
-    the loop lives in the ``app.ai`` handler, the agent only composes which
+    the loop lives in the ```app.ai``` handler, the agent only composes which
     tools, guards, and sandboxes that loop uses. A project that needs a
-    different composition configures another ``ai.agents`` entry of this type;
-    a project that needs a different orchestration subclasses ``TokeoAiAgent``.
+    different composition configures another ```ai.agents``` entry of this type;
+    a project that needs a different orchestration subclasses ```TokeoAiAgent```.
 
     """
 

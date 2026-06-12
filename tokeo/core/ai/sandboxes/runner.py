@@ -2,10 +2,10 @@
 Generic, tool-agnostic sandbox job runner.
 
 A subprocess sandbox (and later a docker one) runs a tool call in a fresh
-interpreter through this module: it is started as ``python -m
-tokeo.core.ai.sandboxes.runner``, reads a single JSON job from stdin, applies the
+interpreter through this module: it is started as ```python -m
+tokeo.core.ai.sandboxes.runner```, reads a single JSON job from stdin, applies the
 resource caps BEFORE importing the tool, runs the tool, and writes the
-``ToolResult`` back as JSON on stdout. It never reaches back into the parent;
+```ToolResult``` back as JSON on stdout. It never reaches back into the parent;
 the only contract across the boundary is JSON in and JSON out.
 
 The job has the shape::
@@ -17,14 +17,14 @@ The job has the shape::
       "caps": { "memory_mb": 256 }   # caps to enforce in this process
     }
 
-The reply is ``{"text": "...", "data": ...}`` on success, or ``{"error":
-"..."}`` on failure -- a short message, never a traceback, so nothing leaks
+The reply is ```{"text": "...", "data": ...}``` on success, or ```{"error":
+"..."}``` on failure -- a short message, never a traceback, so nothing leaks
 across the boundary.
 
 ### Notes
 
-: The worker builds the tool with ``app=None``. A tool that needs an app
-    builds it in its own ``__init__`` (the uniformity rule); the live parent
+: The worker builds the tool with ```app=None```. A tool that needs an app
+    builds it in its own ```__init__``` (the uniformity rule); the live parent
     app is not available in a child process and must not be relied on.
 """
 
@@ -93,7 +93,7 @@ def main():
     """
     Read one job from stdin, run the tool, write the result to stdout.
 
-    Wraps everything so any failure becomes a clean ``{"error": ...}`` reply
+    Wraps everything so any failure becomes a clean ```{"error": ...}``` reply
     with a non-zero exit, instead of a traceback crossing the boundary.
     """
     try:

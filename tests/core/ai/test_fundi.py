@@ -1,11 +1,11 @@
 """
 Tests for the fundi agent and the sandbox layer (tokeo core).
 
-Covers the sandbox seam end to end through ``app.ai``: the ``in_process`` and
-``subprocess`` sandboxes, the per-agent selection rule (``tools``/``_all``,
-``except``, the ordered chain, the hard ``deny``, deny-by-default), the
-``set_sandbox`` override, the env expansion helper, and the linter's coverage
-of the new ``ai.sandboxes`` section and agent fields. The full LLM loop is
+Covers the sandbox seam end to end through ```app.ai```: the ```in_process``` and
+```subprocess``` sandboxes, the per-agent selection rule (```tools```/```_all```,
+```except```, the ordered chain, the hard ```deny```, deny-by-default), the
+```set_sandbox``` override, the env expansion helper, and the linter's coverage
+of the new ```ai.sandboxes``` section and agent fields. The full LLM loop is
 exercised by the Spiral tests; here the focus is the mechanics in isolation.
 """
 
@@ -401,7 +401,7 @@ def test_subprocess_resolves_registry_shortname_tools():
 def test_subprocess_refuses_classes_a_child_cannot_import():
     # a nested class has no top-level module path the child could import;
     # the sandbox refuses early with the reason (a script's __main__ case
-    # fails the same guard; ``python -m`` resolves via the module spec)
+    # fails the same guard; ```python -m``` resolves via the module spec)
     from tests.core.ai.tools import EchoTool
     Ghost = type('GhostTool', (EchoTool,), {'__qualname__': 'Outer.GhostTool'})
     with FundiTest(config_defaults=ai_config()) as app:

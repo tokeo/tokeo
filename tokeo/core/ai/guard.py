@@ -10,16 +10,16 @@ class TokeoAiGuard(MetaMixin):
     """
     Base class for guards in the tool-call pipeline.
 
-    A guard inspects, and may shape, a tool call as an ``Invocation`` travels
-    through the pipeline. ``Meta.phase`` decides when it runs: a ``before``
-    guard runs pre-exec and may deny the call (set ``decision``/``reason``); an
-    ``after`` guard runs post-exec and sees the ``result`` or ``error`` (and
+    A guard inspects, and may shape, a tool call as an ```Invocation``` travels
+    through the pipeline. ```Meta.phase``` decides when it runs: a ```before```
+    guard runs pre-exec and may deny the call (set ```decision```/```reason```); an
+    ```after``` guard runs post-exec and sees the ```result``` or ```error``` (and
     always runs, so it records a denial too). Guards are selected per agent
-    (``agent.guards``); with none selected the loop calls the tool directly.
+    (```agent.guards```); with none selected the loop calls the tool directly.
 
-    Its class is resolved from the ``ai.guards`` item ``type`` (a built-in
+    Its class is resolved from the ```ai.guards``` item ```type``` (a built-in
     short name or a dotted path) and instantiated with the application and the
-    item's ``options`` as Meta overrides by the ``app.ai`` handler. Like a
+    item's ```options``` as Meta overrides by the ```app.ai``` handler. Like a
     provider, it holds no mutable per-call state.
 
     """
@@ -62,8 +62,8 @@ class TokeoAiGuard(MetaMixin):
         ### Args
 
         - **invocation** (Invocation): The tool call passing through the
-            pipeline; a before guard may set ``decision``/``reason`` to deny
-            it, an after guard may read or adjust ``result``/``error``
+            pipeline; a before guard may set ```decision```/```reason``` to deny
+            it, an after guard may read or adjust ```result```/```error```
 
         """
         raise NotImplementedError

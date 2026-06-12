@@ -3,11 +3,11 @@ Current tool for the {{ app_name }} ai agent.
 
 A tiny information tool that returns the current date and time. It takes no
 arguments, so it also demonstrates the simplest possible tool schema, and its
-output format is a tool setting (``Meta.format``), overridable per item by the
-``options`` in the configuration.
+output format is a tool setting (```Meta.format```), overridable per item by the
+```options``` in the configuration.
 
 This module is self-contained: it holds only the tool class. The project names
-it by its full dotted class path under ``ai.tools`` in the config, so it needs
+it by its full dotted class path under ```ai.tools``` in the config, so it needs
 no registration and no entry in the app extensions; the handler imports and
 instantiates it on demand.
 """
@@ -21,9 +21,9 @@ class TokeoAiCurrentTool(TokeoAiTool):
     """
     Tool that returns the current date and time.
 
-    The ``Meta`` description and parameters are what the model sees; the
-    ``format`` is the tool's own setting, overridden per item by its config
-    ``options`` and read from ``_meta``.
+    The ```Meta``` description and parameters are what the model sees; the
+    ```format``` is the tool's own setting, overridden per item by its config
+    ```options``` and read from ```_meta```.
 
     """
 

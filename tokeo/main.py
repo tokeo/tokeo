@@ -114,7 +114,7 @@ def main():
 
     ### Notes
 
-    - Returns nothing; the process exit code is set on ``app.exit_code`` and
+    - Returns nothing; the process exit code is set on ```app.exit_code``` and
         applied on close via the app's exit_on_close behavior
     - AssertionError and TokeoError are caught and reported with exit code 1;
         a CaughtSignal (SIGINT/SIGTERM) is caught and exits with code 0
@@ -156,7 +156,7 @@ def main():
         if app:
             app.exit_code = 0
 
-    # exit_on_close ends the process when the ``with`` exits normally; if setup
+    # exit_on_close ends the process when the ```with``` exits normally; if setup
     # or run raised, the error was handled above and the code is applied here
     sys.exit(app.exit_code if app else 9)
 

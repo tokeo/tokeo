@@ -2,12 +2,12 @@
 Vault helpers for Tokeo applications.
 
 A small framework for keeping secrets out of plaintext config. Encrypted
-values are marked in yaml with a ``!vault:<profile>`` tag and loaded as opaque
-``VaultRef`` objects, so the parsed configuration never holds a decrypted
-secret. A ``VaultRef`` is turned into plaintext only on demand, at the point
+values are marked in yaml with a ```!vault:<profile>``` tag and loaded as opaque
+```VaultRef``` objects, so the parsed configuration never holds a decrypted
+secret. A ```VaultRef``` is turned into plaintext only on demand, at the point
 of use, by a vault handler selected through the referenced profile.
 
-A profile lives in the ``vault`` config section and binds a handler:
+A profile lives in the ```vault``` config section and binds a handler:
 
 ```yaml
 vault:
@@ -16,8 +16,8 @@ vault:
     env: VAULT_MASTER1
 ```
 
-The ``type`` selects a registered handler (for example the built-in ``enc``
-or ``scrypt`` handlers); the remaining keys are handler specific.
+The ```type``` selects a registered handler (for example the built-in ```enc```
+or ```scrypt``` handlers); the remaining keys are handler specific.
 
 ### Reminders
 
@@ -43,11 +43,11 @@ class VaultRef:
 
     Holds the name of the vault profile that can decrypt the value and the
     encrypted payload as stored in the configuration. The plaintext is never
-    kept here; it is produced only when ``resolve`` is called.
+    kept here; it is produced only when ```resolve``` is called.
 
     ### Args
 
-    - **profile** (str): Name of the vault profile in the ``vault`` config
+    - **profile** (str): Name of the vault profile in the ```vault``` config
         section used to decrypt the payload
     - **ciphertext** (str): The encrypted value as written in the config
 
@@ -64,15 +64,15 @@ class VaultRef:
     @classmethod
     def from_yaml(cls, loader, tag_suffix, node):
         """
-        Build a ``VaultRef`` from a ``!vault:<profile> <ciphertext>`` scalar.
+        Build a ```VaultRef``` from a ```!vault:<profile> <ciphertext>``` scalar.
 
-        Used as the multi-constructor for the ``!vault:`` yaml tag: the
+        Used as the multi-constructor for the ```!vault:``` yaml tag: the
         profile rides in the tag suffix, the ciphertext is the scalar value.
 
         ### Args
 
         - **loader**: The yaml loader constructing the node
-        - **tag_suffix** (str): The part after ``!vault:`` (the profile name)
+        - **tag_suffix** (str): The part after ```!vault:``` (the profile name)
         - **node**: The yaml scalar node holding the ciphertext
 
         ### Returns
@@ -88,8 +88,8 @@ class Vault:
     Base interface for vault handlers.
 
     A handler turns an encrypted payload into plaintext and back, using key
-    material that a profile points to. Subclasses implement ``encrypt`` and
-    ``decrypt``; both receive the profile dict so they can locate their key.
+    material that a profile points to. Subclasses implement ```encrypt``` and
+    ```decrypt```; both receive the profile dict so they can locate their key.
 
     """
 
@@ -99,12 +99,12 @@ class Vault:
 
         ### Args
 
-        - **profile** (dict): The vault profile from the ``vault`` config
+        - **profile** (dict): The vault profile from the ```vault``` config
         - **plaintext** (str): The value to encrypt
 
         ### Returns
 
-        - **str**: The encrypted payload, suitable as a ``!vault`` value
+        - **str**: The encrypted payload, suitable as a ```!vault``` value
 
         """
         raise NotImplementedError
@@ -115,7 +115,7 @@ class Vault:
 
         ### Args
 
-        - **profile** (dict): The vault profile from the ``vault`` config
+        - **profile** (dict): The vault profile from the ```vault``` config
         - **ciphertext** (str): The encrypted payload to decrypt
 
         ### Returns
@@ -142,13 +142,13 @@ class Vault:
 
         ### Args
 
-        - **name** (str): The profile name to scaffold under the ``vault``
+        - **name** (str): The profile name to scaffold under the ```vault```
             section
 
         ### Returns
 
-        - **dict**: ``profile`` (the yaml fields for the profile) and
-            ``secrets`` (a list of ``name``/``value``/``quote`` env entries)
+        - **dict**: ```profile``` (the yaml fields for the profile) and
+            ```secrets``` (a list of ```name```/```value```/```quote``` env entries)
 
         ### Raises
 

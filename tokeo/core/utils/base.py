@@ -350,16 +350,16 @@ def as_list(value):
     Normalize a single value or a sequence into a list.
 
     Lets a config key or an argument accept one entry or many: a list or
-    tuple comes back as a list, ``None`` as an empty list, and any other
-    single value wrapped as ``[value]``.
+    tuple comes back as a list, ```None``` as an empty list, and any other
+    single value wrapped as ```[value]```.
 
     ### Args
 
-    - **value**: A single value, a list/tuple of values, or ``None``
+    - **value**: A single value, a list/tuple of values, or ```None```
 
     ### Returns
 
-    - **list**: The values as a list (empty for ``None``)
+    - **list**: The values as a list (empty for ```None```)
 
     """
     if value is None:

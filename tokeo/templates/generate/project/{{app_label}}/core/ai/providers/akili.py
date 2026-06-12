@@ -1,9 +1,9 @@
 """
 Akili ai provider for the {{ app_name }} application.
 
-``akili`` is the project's own micro language model: a few hundred thousand
+```akili``` is the project's own micro language model: a few hundred thousand
 parameters trained from scratch on the project's synthetic calendar data (the
-lab lives in ``{{ app_label }}/core/akili``), running in-process with plain NumPy -- no
+lab lives in ```{{ app_label }}/core/akili```), running in-process with plain NumPy -- no
 host to start, no network, deterministic. It plans tool chains, including
 nested requests like "the weekday of today plus 2 days", as a constrained
 plan DSL decoded greedily over the active tools, so it can never emit a
@@ -12,15 +12,15 @@ malformed plan or a tool outside the injection.
 Its capability is small but clearly defined: the calendar domain it was
 trained for, in English and German. Outside that domain it answers with a
 labelled echo instead of guessing, it never invents arguments, and on
-``denied:`` or ``error:`` feedback it explains instead of retrying. The
+```denied:``` or ```error:``` feedback it explains instead of retrying. The
 weights are a project asset, to create (or improve) run:
-``python -m {{ app_label }}.core.akili.train``. This will create or update
-``{{ app_label }}/core/akili/weights.npz``; without them this provider raises a clear
-error and the neutral ``mock`` stays available.
+```python -m {{ app_label }}.core.akili.train```. This will create or update
+```{{ app_label }}/core/akili/weights.npz```; without them this provider raises a clear
+error and the neutral ```mock``` stays available.
 
 This module is self-contained: it holds only the provider class. The project
-names it by its full dotted class path as the ``type`` of a profile under
-``ai.profiles``, so it needs no registration and no entry in the app
+names it by its full dotted class path as the ```type``` of a profile under
+```ai.profiles```, so it needs no registration and no entry in the app
 extensions; the handler imports and instantiates it on demand.
 """
 
@@ -39,9 +39,9 @@ class TokeoAiAkiliProvider(TokeoAiProvider):
 
     ### Notes
 
-    : Replies are labelled (``[akili] ...``), so it stays obvious which
+    : Replies are labelled (```[akili] ...```), so it stays obvious which
         model answered. The plan the model decided is inspectable in the
-        result's ``raw`` payload next to the answer.
+        result's ```raw``` payload next to the answer.
 
     """
 

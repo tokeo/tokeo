@@ -58,7 +58,7 @@ class ToolResult:
     ### Notes
 
     : A tool may also return a plain string, which is treated as
-        ``ToolResult(text=that_string)``.
+        ```ToolResult(text=that_string)```.
 
     """
 
@@ -77,12 +77,12 @@ class ChatResult:
         only requests tool calls
     - **reasoning** (str): The model's reasoning/thinking, when available;
         kept separate from the answer text
-    - **tool_calls** (list): The ``ToolCall`` entries the model requested
+    - **tool_calls** (list): The ```ToolCall``` entries the model requested
     - **usage** (Usage | None): Token usage, when the provider reports it
     - **finish_reason** (str | None): Why the model stopped, when reported
     - **raw** (dict | None): The unmodified provider response, kept so a
         caller can always inspect exactly what came back
-    - **trace** (list): The ``Invocation`` records of the tool calls the loop
+    - **trace** (list): The ```Invocation``` records of the tool calls the loop
         ran, in order; empty when no guard pipeline was active
 
     """
@@ -102,10 +102,10 @@ class Invocation:
     A single tool call as it travels through the guard pipeline.
 
     Built by the handler for each requested tool call, then passed to the
-    guards: the before-phase guards may set ``decision``/``reason`` to block
+    guards: the before-phase guards may set ```decision```/```reason``` to block
     it, the tool runs unless denied, and the after-phase guards see the
-    ``result`` or ``error``. The object is mutable on purpose, so a guard can
-    adjust the outcome (a later redact/truncate guard rewrites ``result``).
+    ```result``` or ```error```. The object is mutable on purpose, so a guard can
+    adjust the outcome (a later redact/truncate guard rewrites ```result```).
 
     ### Args
 
@@ -114,8 +114,8 @@ class Invocation:
     - **arguments** (dict): The parsed arguments for the call
     - **parameters** (dict | None): The called tool's declared parameters
         schema, attached by the handler so a before guard can validate the
-        arguments; ``None`` when the tool is unknown
-    - **decision** (str): ``allow`` or ``deny``; a before guard may set it
+        arguments; ```None``` when the tool is unknown
+    - **decision** (str): ```allow``` or ```deny```; a before guard may set it
     - **reason** (str | None): Why a guard denied or flagged the call
     - **result** (ToolResult | None): The tool's result when it ran
     - **error** (str | None): The error text when the tool raised

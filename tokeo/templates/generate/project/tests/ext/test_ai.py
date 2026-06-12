@@ -1,11 +1,11 @@
 """
 Real test cases for the {{ app_name }} ai setup.
 
-Verifies the project's own tools, the ``guarded`` agent, and the guard
+Verifies the project's own tools, the ```guarded``` agent, and the guard
 pipeline against the real shipped configuration (the testing environment
-merges ``testing.d/ai.yaml`` over ``base.d/ai.yaml``, pointing the file tools
-below ``tmp/tests``). Run from the project root, for example with
-``pytest tests/ext/ai/test_{{ app_label }}_ai.py``.
+merges ```testing.d/ai.yaml``` over ```base.d/ai.yaml```, pointing the file tools
+below ```tmp/tests```). Run from the project root, for example with
+```pytest tests/ext/ai/test_{{ app_label }}_ai.py```.
 """
 
 import logging

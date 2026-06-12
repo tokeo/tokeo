@@ -1,31 +1,31 @@
 """
 NumPy inference for the Spiral akili micro model.
 
-The application runs the trained weights (``weights.npz``, created by
-``python -m {{ app_label }}.core.akili.train``) with plain NumPy -- no torch, no
+The application runs the trained weights (```weights.npz```, created by
+```python -m {{ app_label }}.core.akili.train```) with plain NumPy -- no torch, no
 server. This file is the *runtime*: it re-implements the same forward pass
-``train.py`` defines in torch, then decodes a plan greedily and
+```train.py``` defines in torch, then decodes a plan greedily and
 grammar-constrained. At every step the next byte must be legal plan DSL over
 the currently active tools, so the model can never emit a malformed plan or
-a tool outside the runtime injection (see ``dsl``).
+a tool outside the runtime injection (see ```dsl```).
 
-If `numba <https://numba.pydata.org>`_ is installed, the hot attention loop
+If ```numba <https://numba.pydata.org>```_ is installed, the hot attention loop
 is JIT-compiled automatically; without it the pure NumPy path runs the same
 numbers (the model is matmul-dominated, so BLAS does the heavy lifting
 either way).
 
 ### How a plan is decoded
 
-1. The request bytes plus the ``SEP`` token run through the net once; the
+1. The request bytes plus the ```SEP``` token run through the net once; the
     keys and values of every layer are kept (the KV cache).
-2. The output logits rank all bytes; the ``Constrainer`` says which
+2. The output logits rank all bytes; the ```Constrainer``` says which
     characters are legal at this point of the plan grammar -- the best
     legal one wins (greedy), so the result is deterministic.
 3. The chosen byte runs as a single-position forward against the cache,
     yielding the next logits; repeat until the grammar allows the end.
 
 The weights file carries its architecture as embedded metadata, read at
-load time -- the runtime adapts to whatever ``train.py`` exported, so the
+load time -- the runtime adapts to whatever ```train.py``` exported, so the
 two can never disagree about dimensions.
 """
 
@@ -69,7 +69,7 @@ def _attend(scores, values):   # pragma: no cover - numba compiles this
     length = scores.shape[0]
     out = numpy.zeros_like(values)
     for row in range(length):
-        # only positions 0..row are visible to query `row` (causality)
+        # only positions 0..row are visible to query ```row``` (causality)
         line = scores[row, : row + 1]
         # numerically stable softmax: subtract the max before exp
         line = numpy.exp(line - line.max())
@@ -84,8 +84,8 @@ class AkiliModel:
     """
     The trained micro model: weights, forward pass, constrained decoding.
 
-    Construction loads ``weights.npz`` once: the named float32 arrays become
-    the weight dict, and the embedded ``__config__`` json becomes the
+    Construction loads ```weights.npz``` once: the named float32 arrays become
+    the weight dict, and the embedded ```__config__``` json becomes the
     architecture the forward pass reads its dimensions from.
 
     """
@@ -113,7 +113,7 @@ class AkiliModel:
 
         ### Returns
 
-        - **str**: A valid DSL line (or ``<nomatch>``)
+        - **str**: A valid DSL line (or ```<nomatch>```)
 
         """
         context = self._config['context']
@@ -158,7 +158,7 @@ class AkiliModel:
             constrainer.feed(chr(chosen))
             logits = self._step(chosen, len(tokens) - 1, cache)
         # the decoded bytes are already only the plan (SEP was not appended
-        # to `out`); decode them back to the DSL line
+        # to ```out```); decode them back to the DSL line
         return tokenizer.decode(out) or ''
 
     def _forward(self, tokens, cache=None):

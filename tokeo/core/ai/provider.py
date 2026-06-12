@@ -9,9 +9,9 @@ class TokeoAiProvider:
     Base class for ai providers.
 
     A provider receives an already-resolved profile and returns a
-    ``ChatResult``. Its class is resolved from the profile ``type`` (a built-in
+    ```ChatResult```. Its class is resolved from the profile ```type``` (a built-in
     short name or a dotted path) and instantiated with the application by the
-    ``app.ai`` handler. It must not keep mutable per-call state, so that it can
+    ```app.ai``` handler. It must not keep mutable per-call state, so that it can
     be called concurrently without locking.
 
     """
@@ -46,8 +46,8 @@ class TokeoAiProvider:
 
         ### Args
 
-        - **profile** (dict): The resolved profile; carries ``model`` and any
-            provider-specific keys (such as ``base_url`` and ``key``)
+        - **profile** (dict): The resolved profile; carries ```model``` and any
+            provider-specific keys (such as ```base_url``` and ```key```)
         - **messages** (list): Chat messages as plain OpenAI-style dicts
         - **tools** (list|None): Optional tool definitions for the call
 

@@ -29,9 +29,9 @@ For timed job execution, a background and interactive [APScheduler](https://apsc
 
 Expose your values and functions via [NiceGUI](https://nicegui.io/) web-based API and pages.
 
-Secrets stay encrypted at rest: the `tokeo.ext.vault` config handler resolves `!vault:` tagged values transparently on read -- your YAML never holds a plaintext credential.
+Secrets stay encrypted at rest: the ```tokeo.ext.vault``` config handler resolves ```!vault:``` tagged values transparently on read -- your YAML never holds a plaintext credential.
 
-And with `tokeo.ext.ai`, your application speaks to AI providers through one governed runtime: typed contracts, guarded tool execution, full traces -- the same agent pipeline from a 1.5 MB local micro model up to any large provider.
+And with ```tokeo.ext.ai```, your application speaks to AI providers through one governed runtime: typed contracts, guarded tool execution, full traces -- the same agent pipeline from a 1.5 MB local micro model up to any large provider.
 
 Kickstart your EDA projects with **tokeo** and experience a seamless development cycle.
 
@@ -48,15 +48,15 @@ Tom
 Tokeo is a robust CLI framework for task automation, message queues, and web interfaces, making it ideal for Python backend projects. Key features include:
 
 - **Integrated EDA Stack**: Combines Dramatiq, RabbitMQ, and gRPC for efficient task processing and external access, plus APScheduler for scheduled jobs.
-- **Governed AI Agents**: A provider-agnostic AI runtime (`tokeo.ext.ai`) with typed contracts, profiles, and agents as plain configuration -- every tool call passes a guard pipeline (validate, policy, audit) and leaves a full trace.
-- **Encrypted Secrets in Config**: The vault extension (`tokeo.ext.vault`) keeps credentials encrypted inside your YAML (`!vault:<profile>` tags, built-in `enc` and `scrypt` handlers, keys from the environment) and decrypts them transparently at the leaf -- consumer code never changes, plaintext never lands in the config.
-- **Flexible Task Automation**: Use Fabric-based tools (`tokeo.ext.automate`) to define and run local or remote tasks, with flexible configuration via YAML and CLI overrides.
+- **Governed AI Agents**: A provider-agnostic AI runtime (```tokeo.ext.ai```) with typed contracts, profiles, and agents as plain configuration -- every tool call passes a guard pipeline (validate, policy, audit) and leaves a full trace.
+- **Encrypted Secrets in Config**: The vault extension (```tokeo.ext.vault```) keeps credentials encrypted inside your YAML (```!vault:<profile>``` tags, built-in ```enc``` and ```scrypt``` handlers, keys from the environment) and decrypts them transparently at the leaf -- consumer code never changes, plaintext never lands in the config.
+- **Flexible Task Automation**: Use Fabric-based tools (```tokeo.ext.automate```) to define and run local or remote tasks, with flexible configuration via YAML and CLI overrides.
 - **Extensible CLI**: Built on Cement, Tokeo supports custom commands and plugins, simplifying complex workflows with minimal setup.
-- **Developer-Friendly Tools**: The `Makefile` provides one-liners for formatting (`fmt`), linting (`lint`), testing (`test`), and packaging (`sdist`, `wheel`), speeding up development.
-- **DiskCache** by `tokeo.ext.diskcache` enhances performance with disk-based caching for frequently accessed data, reducing load times and improving efficiency.
-- **Manage task execution rates** using `temper` and `throttle` to prevent overloading with rate-limiting tools, ensuring stable and controlled processing.
+- **Developer-Friendly Tools**: The ```Makefile``` provides one-liners for formatting (```fmt```), linting (```lint```), testing (```test```), and packaging (```sdist```, ```wheel```), speeding up development.
+- **DiskCache** by ```tokeo.ext.diskcache``` enhances performance with disk-based caching for frequently accessed data, reducing load times and improving efficiency.
+- **Manage task execution rates** using ```temper``` and ```throttle``` to prevent overloading with rate-limiting tools, ensuring stable and controlled processing.
 - **SMTP with Jinja2 Templates**: Send emails with precise, individualized content using Jinja2 templates, supporting text, HTML, inline images, and attachments for dynamic communications.
-- **Simple debugging** when using `app.inspect`. Provides basic debugging tools to inspect application state of vars and objects.
+- **Simple debugging** when using ```app.inspect```. Provides basic debugging tools to inspect application state of vars and objects.
 - **Web Interface**: Create beautiful UIs with the built-in NiceGUI extension to visualize data and interact with your application.
 
 Whether you're building microservices, automating workflows, or prototyping, Tokeo provides the structure and flexibility to get started quickly.
@@ -206,29 +206,29 @@ your_app cache get counter
 
 The newest part of Tokeo is a complete, small AI agent runtime -- built on one conviction: **the model plans, the pipeline governs, the tools compute**. No step is implicit, every step is inspectable. It is deliberately compact, fully typed, and tested end to end: the same suite drives the mock provider, the guard pipeline, and a real trained model.
 
-- **Contracts first**: Messages, tool calls, results, and traces are typed values (`tokeo.core.ai`), independent of any provider SDK.
-- **Agents are configuration**: An agent is a named guard chain in YAML. `audited` records everything and forbids nothing; `guarded` adds validation and policy (e.g. a readonly filesystem). Lean by default: with `agent: null` requests run plain and untraced -- you opt into governance.
+- **Contracts first**: Messages, tool calls, results, and traces are typed values (```tokeo.core.ai```), independent of any provider SDK.
+- **Agents are configuration**: An agent is a named guard chain in YAML. ```audited``` records everything and forbids nothing; ```guarded``` adds validation and policy (e.g. a readonly filesystem). Lean by default: with ```agent: null``` requests run plain and untraced -- you opt into governance.
 - **Tools are plain functions**: Registered with a spec, activated in groups (calendar, filesystem, mathematics) per profile. The provider never executes anything itself; results return as feedback through the guards.
-- **Late binding, honestly tested**: Providers are resolved by class path. The built-in `mock` provider makes the whole pipeline testable without any external service -- the contracts are the product.
+- **Late binding, honestly tested**: Providers are resolved by class path. The built-in ```mock``` provider makes the whole pipeline testable without any external service -- the contracts are the product.
 
 ### akili -- the train-first micro LLM lab
 
-[Spiral](https://github.com/tokeo/spiral) ships `akili`, a complete and teachable micro language model that plans calendar tool calls -- small enough to read in an afternoon, real enough to prove the contracts end to end:
+[Spiral](https://github.com/tokeo/spiral) ships ```akili```, a complete and teachable micro language model that plans calendar tool calls -- small enough to read in an afternoon, real enough to prove the contracts end to end:
 
 - **378,240 parameters, ~1.5 MB** -- byte-level tokenizer, 3 transformer blocks, NumPy-only inference in tens of milliseconds, no GPU and no service.
-- **Train first, no shipped weights**: `python -m spiral.core.akili.train` creates the model on your machine (CPU is fine) with an honest held-out evaluation.
-- **The language is data**: every word and sentence pattern lives in `AKILI-LEX.yaml` -- teaching the model new language (English and German today) is editing a file and retraining. An ablation switch (`--no-minus`) demonstrates the core lesson live: capability lives in the data, not in the code.
+- **Train first, no shipped weights**: ```python -m spiral.core.akili.train``` creates the model on your machine (CPU is fine) with an honest held-out evaluation.
+- **The language is data**: every word and sentence pattern lives in ```AKILI-LEX.yaml``` -- teaching the model new language (English and German today) is editing a file and retraining. An ablation switch (```--no-minus```) demonstrates the core lesson live: capability lives in the data, not in the code.
 - **Grammar-constrained planning**: a byte-level automaton makes malformed plans impossible -- the model chooses *which* legal continuation, never *whether* to be legal.
-- **Taught, not just documented**: `AKILI-LLM.md` explains training, the anatomy of the weights, and constrained decoding with detailed diagrams.
+- **Taught, not just documented**: ```AKILI-LLM.md``` explains training, the anatomy of the weights, and constrained decoding with detailed diagrams.
 
 ### The road ahead
 
 The runtime is deliberately provider-shaped: the contracts you write against today are the contracts the next stages plug into.
 
-1. **OpenAI-compatible provider** -- cloud endpoints and local runtimes (Ollama, LM Studio) behind the very same agents and guards; switching providers becomes editing a profile, not a refactor -- with the API key `!vault:` encrypted right inside it.
+1. **OpenAI-compatible provider** -- cloud endpoints and local runtimes (Ollama, LM Studio) behind the very same agents and guards; switching providers becomes editing a profile, not a refactor -- with the API key ```!vault:``` encrypted right inside it.
 2. **Response guards** -- redact and truncate as after-guards: governance for what comes back, not only for what gets called.
 3. **Sandboxed tool execution** -- tools run isolated (subprocess first, stronger isolation opt-in), so even a misbehaving tool stays inside its fence.
-4. **Code mode** -- a `python_exec` tool that lets agents compose vetted tool calls as Python instead of many chat round-trips.
+4. **Code mode** -- a ```python_exec``` tool that lets agents compose vetted tool calls as Python instead of many chat round-trips.
 
 The contracts stay; the providers scale.
 
@@ -281,17 +281,17 @@ make docker
 
 When you create a new project with Tokeo, you get a clean, modular structure:
 
-- `config/` - Configuration files for prod, stage, dev and test environments
-- `your_app/core/logic` - Space for your core application logic
-- `your_app/core/tasks/` - Implementations of actors, agents, automations, operations, performers etc.
-- `your_app/core/ai/` - Your AI providers and plain-function tools behind the guarded contracts
-- `your_app/core/akili/` - The train-first micro LLM lab: model, lexicon (`AKILI-LEX.yaml`), teaching docs
-- `your_app/core/grpc/` - gRPC service definitions and implementations
-- `your_app/core/utils/` - A place to put your overall tools and helper functions
-- `your_app/controllers/` - Command-line interface controllers
-- `your_app/site/` - Web interface pages and apis
-- `your_app/templates/` - Templates for rendering content
-- `tests/` - Test suite to ensure reliability
+- ```config/``` - Configuration files for prod, stage, dev and test environments
+- ```your_app/core/logic``` - Space for your core application logic
+- ```your_app/core/tasks/``` - Implementations of actors, agents, automations, operations, performers etc.
+- ```your_app/core/ai/``` - Your AI providers and plain-function tools behind the guarded contracts
+- ```your_app/core/akili/``` - The train-first micro LLM lab: model, lexicon (```AKILI-LEX.yaml```), teaching docs
+- ```your_app/core/grpc/``` - gRPC service definitions and implementations
+- ```your_app/core/utils/``` - A place to put your overall tools and helper functions
+- ```your_app/controllers/``` - Command-line interface controllers
+- ```your_app/site/``` - Web interface pages and apis
+- ```your_app/templates/``` - Templates for rendering content
+- ```tests/``` - Test suite to ensure reliability
 
 <br/>
 

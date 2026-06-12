@@ -180,7 +180,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes
 
         - Merges the default configuration with any user-provided configuration
-            and initializes the PocketBase client, stored in the ``pb``
+            and initializes the PocketBase client, stored in the ```pb```
             attribute and used by all other methods
         - A https url enables tls, verified against the system ca store by
             default; the tls options build a custom ssl context that is
@@ -385,7 +385,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         - **collection_id_or_name** (str): The ID or name of the collection
         - **id_** (str): The ID of the record to retrieve
         - **sort** (str, optional): Sort expression passed through to the
-            SDK (format: ``field,-field``). Has no practical effect when
+            SDK (format: ```field,-field```). Has no practical effect when
             fetching a single record by id; kept for SDK passthrough and
             symmetry with get_list
         - **cache** (bool): Whether to use cached results if available
@@ -432,7 +432,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         - **page** (int): The page number to retrieve (1-based)
         - **perPage** (int): Number of records per page (default: 20)
         - **filter** (str): Filter expression to apply (PocketBase filter syntax)
-        - **sort** (str, optional): Sort expression (format: `field,-field`)
+        - **sort** (str, optional): Sort expression (format: ```field,-field```)
         - **cache** (bool): Whether to use cached results if available
         - **q** (dict): Additional query parameters to pass to PocketBase
 
@@ -530,7 +530,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Notes
 
         : When creating users or other records with passwords, be sure to include
-            both the ``password`` and ``passwordConfirm`` fields with identical
+            both the ```password``` and ```passwordConfirm``` fields with identical
             values as required by PocketBase.
 
         """

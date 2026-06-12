@@ -2,8 +2,8 @@
 The subprocess sandbox: fault and resource isolation, not a jail.
 
 It runs a tool call in a fresh interpreter through the generic runner
-(``python -m tokeo.core.ai.sandboxes.runner``), feeding the job as JSON on stdin and
-reading the ``ToolResult`` as JSON on stdout. The child gets its own
+(```python -m tokeo.core.ai.sandboxes.runner```), feeding the job as JSON on stdin and
+reading the ```ToolResult``` as JSON on stdout. The child gets its own
 interpreter, a wall-clock timeout (then SIGKILL), an enforced memory cap
 (RLIMIT_AS, with RLIMIT_DATA as fallback; current macos rejects caps below
 the already-mapped virtual size -- gigabytes at interpreter start -- so a
@@ -15,10 +15,10 @@ or network isolation needs a container, VM, or WASM backend the user supplies.
 
 ### Notes
 
-: The tool is rebuilt in the child from its dotted ``type`` and ``options``
-    (carried on the instance by the handler), with ``app=None`` -- a child has
+: The tool is rebuilt in the child from its dotted ```type``` and ```options```
+    (carried on the instance by the handler), with ```app=None``` -- a child has
     no live parent app, and the uniformity rule means a tool that needs an app
-    builds it itself. Only JSON-able arguments and the ``ToolResult``
+    builds it itself. Only JSON-able arguments and the ```ToolResult```
     text/data cross the boundary.
 """
 
@@ -35,7 +35,7 @@ def _importable_path(cls, what):
     # it, so it must be reachable by module path in a fresh interpreter
     module = cls.__module__
     if module == '__main__':
-        # WHY: under ``python -m pkg.mod`` the defining module RUNS as
+        # WHY: under ```python -m pkg.mod``` the defining module RUNS as
         # __main__ but stays importable under its real name; PEP 451 keeps
         # that name on the spec. only the name is taken -- re-importing in
         # the parent would execute the module twice
@@ -53,17 +53,17 @@ def _importable_path(cls, what):
 
 def expand_env(spec):
     """
-    Build the child environment from a spec, expanding ``${NAME}``.
+    Build the child environment from a spec, expanding ```${NAME}```.
 
-    The result is scrubbed: only the keys listed in ``spec`` are present (the
+    The result is scrubbed: only the keys listed in ```spec``` are present (the
     host environment is a resolution source, not the child's environment). A
-    ``${NAME}`` reference resolves against the keys already built in this pass,
-    then the host ``os.environ``, then the empty string -- shell-like, with no
-    error on an unknown name. A bare ``$`` is literal.
+    ```${NAME}``` reference resolves against the keys already built in this pass,
+    then the host ```os.environ```, then the empty string -- shell-like, with no
+    error on an unknown name. A bare ```$``` is literal.
 
     ### Args
 
-    - **spec** (dict | None): The ``options.env`` mapping, in definition order
+    - **spec** (dict | None): The ```options.env``` mapping, in definition order
 
     ### Returns
 
@@ -94,9 +94,9 @@ class TokeoAiSubprocessSandbox(TokeoAiSandbox):
     """
     Run a tool call in a fresh interpreter via the generic runner.
 
-    Enforced caps: ``timeout`` (wall-clock, then SIGKILL) and ``memory_mb``
-    (the child's address-space rlimit). ``cwd`` steers relative paths
-    (advisory). ``env`` is scrubbed and ``${NAME}``-expanded. Path and network
+    Enforced caps: ```timeout``` (wall-clock, then SIGKILL) and ```memory_mb```
+    (the child's address-space rlimit). ```cwd``` steers relative paths
+    (advisory). ```env``` is scrubbed and ```${NAME}```-expanded. Path and network
     caps are intentionally absent -- they cannot be promised here.
     """
 
@@ -127,7 +127,7 @@ class TokeoAiSubprocessSandbox(TokeoAiSandbox):
 
         - **tool** (TokeoAiTool): The instantiated tool; the child rebuild
             imports by the canonical path of its class (registry shortnames
-            work too) and reuses its ``_tokeo_parent_instance_options``
+            work too) and reuses its ```_tokeo_parent_instance_options```
         - **arguments** (dict): The parsed, JSON-able call arguments
 
         ### Returns
@@ -204,16 +204,16 @@ class TokeoAiSubprocessSandbox(TokeoAiSandbox):
         Validate the subprocess options for the linter.
 
         Accepts only the keys this sandbox can act on, so a typo or an
-        unenforceable cap (e.g. ``net``) surfaces as a lint error instead of a
+        unenforceable cap (e.g. ```net```) surfaces as a lint error instead of a
         silently ignored setting.
 
         ### Args
 
-        - **options** (dict): The item's ``options`` block
+        - **options** (dict): The item's ```options``` block
 
         ### Returns
 
-        - **list[str] | None**: Error messages, or ``None`` when valid
+        - **list[str] | None**: Error messages, or ```None``` when valid
 
         """
         allowed = {'timeout', 'memory_mb', 'cwd', 'env'}
