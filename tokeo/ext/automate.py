@@ -1041,6 +1041,9 @@ class TokeoAutomate(MetaMixin):
                     hosts_list.append(self._validate_host_or_connection_entry(entry))
                 elif isinstance(entry, str):
                     hosts_list.append(self._get_host_dict_from_str(None, host))
+                elif isinstance(host, str):
+                    # bare strings are ad-hoc host specs (ip or user:pass@host:port)
+                    hosts_list.append(self._get_host_dict_from_str(None, host))
                 else:
                     raise TokeoAutomateError(f"Can't create or find a valid entry for host [{host}]")
         # make dict list of hosts unique
