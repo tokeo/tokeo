@@ -10,6 +10,7 @@ exercised by the Spiral tests; here the focus is the mechanics in isolation.
 """
 
 import os
+import sys
 import pytest
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
@@ -23,6 +24,13 @@ from tokeo.core.ai.linter import TokeoAiLinter
 ECHO = 'tests.core.ai.tools.EchoTool'
 CWD = 'tests.core.ai.tools.CwdTool'
 ENV = 'tests.core.ai.tools.EnvTool'
+
+# the jailed options every platform can enforce; the memory cap is added on
+# linux only: macos cannot bind RLIMIT_AS/DATA below the already mapped
+# address space and the runner refuses sham caps by design
+JAILED_OPTIONS = dict(timeout=5, cwd='tmp/sbx')
+if sys.platform == 'linux':
+    JAILED_OPTIONS['memory_mb'] = 256
 SLEEP = 'tests.core.ai.tools.SleepTool'
 
 
@@ -58,7 +66,7 @@ def ai_config():
             'jailed': dict(
                 type='subprocess',
                 tools=['echo', 'cwd', 'env', 'sleep'],
-                options=dict(timeout=5, memory_mb=256, cwd='tmp/sbx'),
+                options=dict(JAILED_OPTIONS),
             ),
             # lists the bundle but excepts cwd, so the chain must walk on for it
             'partial': dict(type='subprocess', tools=['bundle'], **{'except': ['cwd']}),
