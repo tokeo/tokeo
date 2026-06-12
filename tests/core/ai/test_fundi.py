@@ -9,6 +9,7 @@ of the new ``ai.sandboxes`` section and agent fields. The full LLM loop is
 exercised by the Spiral tests; here the focus is the mechanics in isolation.
 """
 
+import os
 import pytest
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
@@ -383,3 +384,38 @@ def test_runner_memory_cap_refuses_a_sham_setting(monkeypatch):
     # a configured cap that cannot be kept must error, not silently skip
     with pytest.raises(RuntimeError, match='not enforceable'):
         runner._set_caps({'memory_mb': 64})
+
+
+def test_subprocess_resolves_registry_shortname_tools():
+    # the import path crosses the boundary as the canonical path of the
+    # LOADED class, so a registry shortname in the config simply works
+    from tests.core.ai.tools import EchoTool
+    cfg = ai_config()
+    cfg['ai']['tools']['shorty'] = dict(type='echo_short')
+    cfg['ai']['sandboxes']['jailed']['tools'].append('shorty')
+    with FundiTest(config_defaults=cfg) as app:
+        app.ai.register('tool', 'echo_short', EchoTool)
+        assert run(app, 'shorty', 'mixed', text='hi') == 'hi'
+
+
+def test_subprocess_refuses_classes_a_child_cannot_import():
+    # a nested class has no top-level module path the child could import;
+    # the sandbox refuses early with the reason (a script's __main__ case
+    # fails the same guard; ``python -m`` resolves via the module spec)
+    from tests.core.ai.tools import EchoTool
+    Ghost = type('GhostTool', (EchoTool,), {'__qualname__': 'Outer.GhostTool'})
+    with FundiTest(config_defaults=ai_config()) as app:
+        tool = Ghost(None)
+        sandbox = app.ai._sandbox('jailed')
+        with pytest.raises(TokeoAiError, match='not importable by module path'):
+            sandbox.exec(tool, {'text': 'hi'})
+
+
+def test_subprocess_keeps_a_user_pythonpath_in_the_lead():
+    # env tool reports a variable; a PYTHONPATH listed in options.env must
+    # survive the parent-path injection (user first, parent appended)
+    cfg = ai_config()
+    cfg['ai']['sandboxes']['jailed']['options']['env'] = {'PYTHONPATH': '/user/extra'}
+    with FundiTest(config_defaults=cfg) as app:
+        out = run(app, 'env', 'mixed', name='PYTHONPATH')
+        assert out.startswith('/user/extra' + os.pathsep)

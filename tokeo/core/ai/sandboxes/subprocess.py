@@ -30,6 +30,27 @@ import subprocess
 from tokeo.core.ai import TokeoAiSandbox, TokeoAiError, ToolResult
 
 
+def _importable_path(cls, what):
+    # the canonical import path of a loaded class; the child rebuilds from
+    # it, so it must be reachable by module path in a fresh interpreter
+    module = cls.__module__
+    if module == '__main__':
+        # WHY: under ``python -m pkg.mod`` the defining module RUNS as
+        # __main__ but stays importable under its real name; PEP 451 keeps
+        # that name on the spec. only the name is taken -- re-importing in
+        # the parent would execute the module twice
+        spec = getattr(sys.modules.get('__main__'), '__spec__', None)
+        if spec is not None and spec.name:
+            module = spec.name
+    if module == '__main__' or '.' in cls.__qualname__:
+        raise TokeoAiError(
+            f'subprocess sandbox cannot rebuild the {what} in a child: '
+            f'{cls.__qualname__!r} is not importable by module path '
+            '(defined in a script __main__ or not at module top level)'
+        )
+    return f'{module}.{cls.__qualname__}'
+
+
 def expand_env(spec):
     """
     Build the child environment from a spec, expanding ``${NAME}``.
@@ -104,9 +125,9 @@ class TokeoAiSubprocessSandbox(TokeoAiSandbox):
 
         ### Args
 
-        - **tool** (TokeoAiTool): The instantiated tool (carries its dotted
-            ``_tokeo_parent_instance_type`` and
-            ``_tokeo_parent_instance_options`` for the child rebuild)
+        - **tool** (TokeoAiTool): The instantiated tool; the child rebuild
+            imports by the canonical path of its class (registry shortnames
+            work too) and reuses its ``_tokeo_parent_instance_options``
         - **arguments** (dict): The parsed, JSON-able call arguments
 
         ### Returns
@@ -115,17 +136,13 @@ class TokeoAiSubprocessSandbox(TokeoAiSandbox):
 
         ### Raises
 
-        - **TokeoAiError**: On timeout, a non-JSON reply, or a worker error
+        - **TokeoAiError**: On timeout, a non-JSON reply, or a runner error
 
         """
-        dotted = getattr(tool, '_tokeo_parent_instance_type', None)
-        if not dotted:
-            # WHY: the runner rebuilds the tool from its dotted path; a tool
-            # without one (e.g. built ad hoc) cannot cross the boundary
-            raise TokeoAiError(
-                'subprocess sandbox needs a tool with a dotted type; '
-                f'{type(tool).__name__} has none'
-            )
+        # WHY canonical path: the child imports by module path. deriving it
+        # from the loaded class (not the config string) lets a registry
+        # shortname cross the boundary too -- the parent already resolved it
+        dotted = _importable_path(type(tool), 'tool')
         job = json.dumps(dict(
             tool=dotted,
             arguments=arguments or {},
@@ -138,13 +155,14 @@ class TokeoAiSubprocessSandbox(TokeoAiSandbox):
         env = expand_env(self._meta.env)
         # WHY: options.env shapes the TOOL's environment and is scrubbed, but
         # the runner interpreter must still import tokeo and the tool module.
-        # carry the parent's import path as PYTHONPATH so the child can boot
+        # carry the parent's import path in PYTHONPATH so the child can boot
         # regardless of what the user listed -- this is sandbox mechanics, not
-        # the tool's environment. make entries absolute so a changed cwd does
-        # not break a relative path
-        env['PYTHONPATH'] = os.pathsep.join(
-            os.path.abspath(p) for p in sys.path if p
-        )
+        # the tool's environment. a PYTHONPATH the user set in env keeps the
+        # lead; the parent's entries are appended (absolute, so a changed cwd
+        # does not break a relative path)
+        parent_paths = [os.path.abspath(p) for p in sys.path if p]
+        user_paths = [p for p in (env.get('PYTHONPATH') or '').split(os.pathsep) if p]
+        env['PYTHONPATH'] = os.pathsep.join(user_paths + parent_paths)
         cwd = self._meta.cwd or None
         if cwd:
             # WHY: cwd is the sandbox scratch dir; create it on demand so a

@@ -69,3 +69,16 @@ class SleepTool(TokeoAiTool):
     def exec(self, **arguments):
         time.sleep(float(arguments.get('seconds', 0)))
         return ToolResult(text='slept')
+
+
+class AppProbeTool(TokeoAiTool):
+    """Report the class name of the app this tool was built with."""
+
+    class Meta:
+        description = 'report the app class name'
+        parameters = {'type': 'object', 'properties': {}}
+
+    def exec(self, **arguments):
+        # 'no-app' when built app-less (the agreed child convention);
+        # the live app's class name when the handler passed one in
+        return ToolResult(text=type(self.app).__name__ if self.app is not None else 'no-app')

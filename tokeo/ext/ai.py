@@ -424,10 +424,11 @@ class TokeoAi(MetaMixin):
             obj = self.resolve('tool', item['type'])(self.app, **settings)
             obj._setup(self.app)
             # WHY: a sandbox that runs the tool in another process (subprocess,
-            # docker) must rebuild it there from its dotted path and options;
-            # carry both on the instance so the in-process tool and its worker
-            # twin are built the same way (the uniformity rule)
-            obj._tokeo_parent_instance_type = item['type']
+            # docker) rebuilds it there. the import path comes from the tool's
+            # class itself (so a registry shortname in the config crosses the
+            # boundary too); only the configured options must travel -- carry
+            # them on the instance so both twins are built the same way (the
+            # uniformity rule)
             obj._tokeo_parent_instance_options = dict(settings)
             self._tool_objs[name] = obj
         return obj

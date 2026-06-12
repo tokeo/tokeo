@@ -2,7 +2,7 @@
 ###
 ### Named profiles for chat-completion models. {{ app_name }} talks to an
 ### OpenAI-compatible endpoint that you run yourself (Ollama, llama.cpp, vLLM,
-### MLX); the project's own trained akili micro model (core/ai/akili.py
+### MLX); the project's own trained akili micro model (core/ai/providers/akili.py
 ### and core/akili) needs no server at all. A profile is selected by name,
 ### or by a field such as model or purpose; a profile with "enabled: false"
 ### is hidden for the session.
@@ -249,7 +249,7 @@ ai:
     ###   {{ app_label }} ai ask "wochentag von heute plus 14 tage" --profile akili
     ###   {{ app_label }} ai ask "weekday of 2026-12-24" --profile akili --json
     akili:
-      type: {{ app_label }}.core.ai.akili.TokeoAiAkiliProvider
+      type: {{ app_label }}.core.ai.providers.akili.TokeoAiAkiliProvider
       purpose: calendar
       ### shares the guarded agent (its guard pipeline and jailed -> allow
       ### sandbox chain) but adds no tools of its own and "deny"s the ones it

@@ -509,6 +509,6 @@ and the grammar automaton -- same sentence, same plan, every time.
 The path is always the same: teach it in `data.py` (new templates, new
 tools in `DOMAIN`, more phrasings, more languages), retrain with
 `python -m {{ app_label }}.core.akili.train`, and check the reported accuracy
-plus the project's test suite. The provider (`core/ai/akili.py`), the
+plus the project's test suite. The provider (`core/ai/providers/akili.py`), the
 guards, and the agents need no change -- the plan grammar adapts to the
 active tools at runtime.

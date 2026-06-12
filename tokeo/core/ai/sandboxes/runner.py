@@ -1,5 +1,5 @@
 """
-Generic, tool-agnostic sandbox worker.
+Generic, tool-agnostic sandbox job runner.
 
 A subprocess sandbox (and later a docker one) runs a tool call in a fresh
 interpreter through this module: it is started as ``python -m
