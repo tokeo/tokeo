@@ -27,9 +27,7 @@ _WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
 
 # a sign written immediately after a shift keyword is the signed-count
 # wording (the {n} slot); the dashes inside an iso date never match this
-_SIGNED = re.compile(
-    r'(plus|add|to|after|minus|subtract|from|before|nach|vor|auf|ab|off|addiere|ziehe|in)\s+[-+]\d'
-)
+_SIGNED = re.compile(r'(plus|add|to|after|minus|subtract|from|before|nach|vor|auf|ab|off|addiere|ziehe|in)\s+[-+]\d')
 
 
 class {{ app_class_name }}AiTestApp({{ app_class_name }}Test):
@@ -54,13 +52,14 @@ def test_{{ app_label }}_akili_lexicon_loads():
     # without weights and catches lexicon edits before a training run
     from {{ app_label }}.core.akili.data import _LEXICON
     from {{ app_label }}.core.akili.dsl import DOMAIN
+
     for language in ('en', 'de'):
         assert _LEXICON['time_words'][language]
         assert _LEXICON['relative_words'][language]
         assert _LEXICON['units'][language]
         for group in ('single', 'shift', 'shift_minus', 'relative', 'relative_chain'):
             pool = _LEXICON['patterns'][group]
-            assert (pool[language] if language in pool else all(pool[tool][language] for tool in pool))
+            assert pool[language] if language in pool else all(pool[tool][language] for tool in pool)
     assert _LEXICON['negatives'] and _LEXICON['preambles'] and _LEXICON['leadins']
     for tool in _LEXICON['consumers']:
         assert tool in DOMAIN
@@ -69,6 +68,7 @@ def test_{{ app_label }}_akili_lexicon_loads():
     # otherwise be silently truncated at inference time
     from {{ app_label }}.core.akili.data import dataset
     from {{ app_label }}.core.akili.infer import PLAN_BUDGET
+
     longest = max(len(d) for _, d in dataset(8000, seed=7) if d != '<nomatch>')
     assert longest + 1 <= PLAN_BUDGET, (longest, PLAN_BUDGET)
 
@@ -80,6 +80,7 @@ def test_{{ app_label }}_akili_data_contract():
     # training run, and without needing any weights
     from {{ app_label }}.core.akili.data import dataset, _LEXICON
     from {{ app_label }}.core.akili.dsl import DOMAIN, NOMATCH, Constrainer, parse
+
     pairs = dataset(12000, seed=7)
 
     # a bare time word, standing on its own, must resolve to current(); the
@@ -87,9 +88,7 @@ def test_{{ app_label }}_akili_data_contract():
     # without the bare-now slice 'today'/'now' were out of distribution and
     # produced spurious shifts, so this is the regression lock for that fix
     for word in _LEXICON['time_words']['en'] + _LEXICON['time_words']['de']:
-        assert any(
-            r.split() and r.split()[-1] == word and d == 'current()' for r, d in pairs
-        ), word
+        assert any(r.split() and r.split()[-1] == word and d == 'current()' for r, d in pairs), word
 
     # short greetings and pleasantries are negatives, so a bare greeting
     # echoes honestly instead of being answered with a date
@@ -102,9 +101,7 @@ def test_{{ app_label }}_akili_data_contract():
     assert not any(_SIGNED.search(r) for r, d in pairs if d != NOMATCH)
     assert any(_SIGNED.search(r) and d == NOMATCH for r, d in pairs)
     consumers = [names[lang] for names in _LEXICON['consumers'].values() for lang in ('en', 'de')]
-    assert any(
-        _SIGNED.search(r) and d == NOMATCH and any(c in r for c in consumers) for r, d in pairs
-    )
+    assert any(_SIGNED.search(r) and d == NOMATCH and any(c in r for c in consumers) for r, d in pairs)
 
     # every generated plan is legal under the grammar automaton (each
     # character is accepted in turn) and round-trips through parse; ending
@@ -173,6 +170,7 @@ def test_{{ app_label }}_ai_akili_model():
         # are flaky -- so fail here with a clear message instead of on some
         # borderline wording. retrain with more steps to lift it
         from {{ app_label }}.core.akili.infer import AkiliModel
+
         accuracy = AkiliModel().config.get('accuracy', 0.0)
         assert accuracy >= _MIN_ACCURACY, (
             f'akili held-out accuracy {accuracy:.4f} < {_MIN_ACCURACY}; '

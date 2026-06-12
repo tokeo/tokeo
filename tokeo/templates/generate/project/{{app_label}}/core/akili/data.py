@@ -411,7 +411,7 @@ def _typo(rng, request):
     i = rng.choice(spots)
     if rng.random() < 0.5:
         return request[:i] + request[i] + request[i:]
-    return request[:i] + request[i + 1] + request[i] + request[i + 2:]
+    return request[:i] + request[i + 1] + request[i] + request[i + 2 :]  # noqa E203
 
 
 def dataset(count, seed=7, minus=True):

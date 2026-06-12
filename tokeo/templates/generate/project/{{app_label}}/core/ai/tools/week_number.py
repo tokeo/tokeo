@@ -48,4 +48,5 @@ class TokeoAiWeekNumberTool(TokeoAiTool):
 
         """
         from datetime import date as date_type
+
         return str(date_type.fromisoformat(str(date)).isocalendar().week)

@@ -129,9 +129,7 @@ class AkiliNet(nn.Module):
         # row p is the learned meaning of "being at position p in the line"
         self.position = nn.Embedding(config['context'], config['dim'])
         # the stack of transformer blocks (depth = config['layers'])
-        self.blocks = nn.ModuleList(
-            Block(config['dim'], config['heads'], config['ff']) for _ in range(config['layers'])
-        )
+        self.blocks = nn.ModuleList(Block(config['dim'], config['heads'], config['ff']) for _ in range(config['layers']))
         # a final normalization before scoring stabilizes the logits
         self.ln = nn.LayerNorm(config['dim'])
         # the output head: vector -> one score per byte id, no bias
@@ -182,12 +180,7 @@ def encode_pair(request, dsl, context):
     # layout: request bytes, the SEP boundary, the plan bytes, then EOS.
     # the request keeps its leading context-PLAN_BUDGET characters, leaving
     # room for the plan; tokens[:context] is the final hard cap
-    tokens = (
-        tokenizer.encode(request)[: context - PLAN_BUDGET]
-        + [tokenizer.SEP]
-        + tokenizer.encode(dsl)
-        + [tokenizer.EOS]
-    )
+    tokens = tokenizer.encode(request)[: context - PLAN_BUDGET] + [tokenizer.SEP] + tokenizer.encode(dsl) + [tokenizer.EOS]
     return tokens[:context]
 
 
@@ -257,9 +250,7 @@ def main():
     # the OneCycle schedule below makes safe: warm up over the first 5% of
     # steps, then anneal down -- fast, stable convergence for a short run
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-3, weight_decay=0.01)
-    schedule = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr=3e-3, total_steps=steps, pct_start=0.05
-    )
+    schedule = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=3e-3, total_steps=steps, pct_start=0.05)
     # cross-entropy on the next byte; ignore_index=PAD means padded target
     # positions contribute no loss and no gradient
     loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer.PAD)
@@ -391,7 +382,7 @@ def generate(model, request):
             break
         tokens.append(token)
     # return only the plan side: the bytes after the SEP boundary
-    return tokenizer.decode(tokens[tokens.index(tokenizer.SEP) + 1:])
+    return tokenizer.decode(tokens[tokens.index(tokenizer.SEP) + 1 :])  # noqa E203
 
 
 def save(model, accuracy, minus=True):
@@ -413,10 +404,7 @@ def save(model, accuracy, minus=True):
     """
     # every parameter becomes a named float32 array (float32 keeps the file
     # ~1.5 MB and is all the NumPy forward pass needs)
-    weights = {
-        name: parameter.detach().numpy().astype(numpy.float32)
-        for name, parameter in model.state_dict().items()
-    }
+    weights = {name: parameter.detach().numpy().astype(numpy.float32) for name, parameter in model.state_dict().items()}
     # the architecture + provenance ride along as json bytes under a reserved
     # name, so loading can rebuild the exact math and report what it was
     weights['__config__'] = numpy.frombuffer(

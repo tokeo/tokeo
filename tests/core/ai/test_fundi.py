@@ -273,13 +273,15 @@ def test_set_sandbox_rejects_unknown():
 
 def test_expand_env_scrubs_and_expands(monkeypatch):
     monkeypatch.setenv('FUNDI_HOST_VAR', 'host-value')
-    out = expand_env({
-        'A': 'literal',
-        'B': '${FUNDI_HOST_VAR}/sub',
-        'C': '${A}-${B}',
-        'D': '${MISSING_VAR}x',
-        'E': 'price is $5',
-    })
+    out = expand_env(
+        {
+            'A': 'literal',
+            'B': '${FUNDI_HOST_VAR}/sub',
+            'C': '${A}-${B}',
+            'D': '${MISSING_VAR}x',
+            'E': 'price is $5',
+        }
+    )
     assert out == {
         'A': 'literal',
         'B': 'host-value/sub',
@@ -330,6 +332,7 @@ def test_linter_flags_unknown_subprocess_option():
 def test_runner_memory_cap_falls_back_per_platform(monkeypatch):
     import resource as res_mod
     from tokeo.core.ai.sandboxes import runner
+
     attempts = []
 
     def fake_getrlimit(res):
@@ -351,6 +354,7 @@ def test_runner_memory_cap_falls_back_per_platform(monkeypatch):
 def test_runner_memory_cap_soft_only_when_hard_is_refused(monkeypatch):
     import resource as res_mod
     from tokeo.core.ai.sandboxes import runner
+
     calls = []
 
     def fake_getrlimit(res):
@@ -390,6 +394,7 @@ def test_subprocess_resolves_registry_shortname_tools():
     # the import path crosses the boundary as the canonical path of the
     # LOADED class, so a registry shortname in the config simply works
     from tests.core.ai.tools import EchoTool
+
     cfg = ai_config()
     cfg['ai']['tools']['shorty'] = dict(type='echo_short')
     cfg['ai']['sandboxes']['jailed']['tools'].append('shorty')
@@ -403,6 +408,7 @@ def test_subprocess_refuses_classes_a_child_cannot_import():
     # the sandbox refuses early with the reason (a script's __main__ case
     # fails the same guard; ```python -m``` resolves via the module spec)
     from tests.core.ai.tools import EchoTool
+
     Ghost = type('GhostTool', (EchoTool,), {'__qualname__': 'Outer.GhostTool'})
     with FundiTest(config_defaults=ai_config()) as app:
         tool = Ghost(None)

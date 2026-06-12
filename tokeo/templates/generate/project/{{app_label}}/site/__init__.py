@@ -8,8 +8,8 @@ routing, isolated page rendering, REST API endpoints, and shared UI components.
 
 This package strictly adheres to a stateless, multi-user safe architecture:
 
-- **No Global UI State**: UI elements (```ui.label```, ```ui.button```, etc.) are never
-  instantiated in the global scope of any file
+- **No Global UI State**: UI elements (```ui.label```, ```ui.button```, etc.)
+  are never instantiated in the global scope of any file
 - **Isolated Contexts**: All pages and structural components are defined as
   pure functions and only execute when a user routes to them
 - **Programmatic Routing**: Routes are mapped dynamically in module

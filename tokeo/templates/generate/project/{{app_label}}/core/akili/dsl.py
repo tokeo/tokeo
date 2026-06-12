@@ -31,12 +31,12 @@ NOMATCH = '<nomatch>'
 # this order. adding a tool here (and to the lexicon + the project's tool
 # classes) is how the language grows; the slot list IS the tool's schema
 DOMAIN = {
-    'current': [],                          # zero args: just "what day is it"
-    'date_diff': ['start', 'end'],          # two dates in, a day count out
-    'add_days': ['date', 'days'],           # shift a date by a signed count
+    'current': [],  # zero args: just "what day is it"
+    'date_diff': ['start', 'end'],  # two dates in, a day count out
+    'add_days': ['date', 'days'],  # shift a date by a signed count
     'add_months': ['date', 'months'],
     'add_years': ['date', 'years'],
-    'weekday': ['date'],                    # consumers: one date in, a fact out
+    'weekday': ['date'],  # consumers: one date in, a fact out
     'week_number': ['date'],
     'moon_phase': ['date'],
 }
@@ -183,7 +183,7 @@ def _starts(prefix, options):
             complete = True
         elif option.startswith(prefix):
             # the next character that would extend toward this option
-            chars.add(option[len(prefix):][0])
+            chars.add(option[len(prefix) :][0])  # noqa E203
     return chars, complete
 
 

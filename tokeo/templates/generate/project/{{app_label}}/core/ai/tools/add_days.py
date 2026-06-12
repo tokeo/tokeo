@@ -53,4 +53,5 @@ class TokeoAiAddDaysTool(TokeoAiTool):
 
         """
         from datetime import date as date_type
+
         return (date_type.fromisoformat(str(date)) + timedelta(days=int(days))).isoformat()

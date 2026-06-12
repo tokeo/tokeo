@@ -1,6 +1,5 @@
 import os
 import sys
-import signal
 import tokeo.core.utils.strict  # noqa: F401
 from cement import App, TestApp
 from cement.core.exc import CaughtSignal

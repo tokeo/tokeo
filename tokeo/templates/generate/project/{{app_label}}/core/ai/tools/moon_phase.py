@@ -69,6 +69,7 @@ class TokeoAiMoonPhaseTool(TokeoAiTool):
 
         """
         from datetime import date as date_type
+
         age = (date_type.fromisoformat(str(date)) - _KNOWN_NEW_MOON).days % _SYNODIC_DAYS
         index = int((age / _SYNODIC_DAYS) * 8 + 0.5) % 8
         return _PHASES[index]

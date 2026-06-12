@@ -25,8 +25,14 @@ from tokeo.core.ai import TokeoAiError
 _AI_KEYS = {'defaults', 'profiles', 'tools', 'agents', 'guards', 'sandboxes'}
 _DEFAULTS_KEYS = {'profile', 'agent'}
 _PROFILE_KEYS = {
-    'type', 'purpose', 'agent', 'deny', 'enabled',
-    'native_tools_call', 'tools_parser', 'options',
+    'type',
+    'purpose',
+    'agent',
+    'deny',
+    'enabled',
+    'native_tools_call',
+    'tools_parser',
+    'options',
 }
 _ITEM_KEYS = {'type', 'options'}
 _SANDBOX_KEYS = {'type', 'tools', 'except', 'options'}
@@ -344,7 +350,7 @@ class TokeoAiLinter:
 
         def walk(name, chain):
             if name in chain:
-                for member in chain[chain.index(name):]:
+                for member in chain[chain.index(name) :]:  # noqa E203
                     if member not in reported:
                         reported.add(member)
                         self._add(f'ai.tools.{member}', 'group has a cyclic membership')

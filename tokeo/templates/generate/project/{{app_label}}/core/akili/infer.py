@@ -42,7 +42,7 @@ try:
     # jit-compiled; if not, this fallback makes @njit a no-op decorator so
     # the pure-numpy path is the only dependency
     from numba import njit
-except ImportError:   # pragma: no cover
+except ImportError:  # pragma: no cover
 
     def njit(function=None, **kwargs):
         return function if function is not None else (lambda inner: inner)
@@ -61,7 +61,7 @@ PLAN_BUDGET = 80
 
 
 @njit(cache=True)
-def _attend(scores, values):   # pragma: no cover - numba compiles this
+def _attend(scores, values):  # pragma: no cover - numba compiles this
     # causal softmax-attention over one head, written as explicit loops so
     # numba can compile it; for each query row, softmax over the keys up to
     # and including itself (the causal cut at row+1), then take that weighted
@@ -189,7 +189,7 @@ class AkiliModel:
         for layer in range(config['layers']):
             hidden = self._block(hidden, layer, cache, step=True)
         hidden = _layer_norm(hidden, weights['ln.weight'], weights['ln.bias'])
-        return (hidden[-1] @ weights['embed.weight'].T)
+        return hidden[-1] @ weights['embed.weight'].T
 
     def _block(self, hidden, layer, cache=None, step=False):
         # one transformer block, the numpy twin of train.py's Block:
@@ -255,4 +255,4 @@ def _gelu(x):
     # the tanh approximation of GELU, matching torch's nn.GELU default well
     # enough for inference; a smooth gate that lets the MLP express
     # nonlinear combinations of features
-    return 0.5 * x * (1.0 + numpy.tanh(numpy.sqrt(2.0 / numpy.pi) * (x + 0.044715 * x ** 3)))
+    return 0.5 * x * (1.0 + numpy.tanh(numpy.sqrt(2.0 / numpy.pi) * (x + 0.044715 * x**3)))

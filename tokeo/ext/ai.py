@@ -328,9 +328,7 @@ class TokeoAi(MetaMixin):
             return profile[key] if key in profile else (profile.get('options') or {}).get(key)
 
         enabled = [
-            (name, profile)
-            for name, profile in self._profiles.items()
-            if isinstance(profile, dict) and bool(profile.get('enabled', True))
+            (name, profile) for name, profile in self._profiles.items() if isinstance(profile, dict) and bool(profile.get('enabled', True))
         ]
         return {
             'profile': [name for name, _ in enabled],
@@ -465,14 +463,16 @@ class TokeoAi(MetaMixin):
                 tool = self._tool(name)
             except TokeoAiError:
                 continue
-            specs.append(dict(
-                type='function',
-                function=dict(
-                    name=name,
-                    description=tool._meta.description,
-                    parameters=tool._meta.parameters,
-                ),
-            ))
+            specs.append(
+                dict(
+                    type='function',
+                    function=dict(
+                        name=name,
+                        description=tool._meta.description,
+                        parameters=tool._meta.parameters,
+                    ),
+                )
+            )
         return specs
 
     def _agent(self, name):
@@ -593,8 +593,8 @@ class TokeoAi(MetaMixin):
         self._sandbox_override = name
 
     def _sandbox_tools_contain(self, name, tool_name):
-        # do the tools of sandbox ```name``` contain ```tool_name```? ```tools``` is the
-        # keyword ```_all``` (every tool that reaches it) or a list of
+        # do the tools of sandbox ```name``` contain ```tool_name```? ```tools```
+        # is the keyword ```_all``` (every tool that reaches it) or a list of
         # tool/group names (expanded like the agent's tools); its ```except```
         # excludes members from THIS sandbox only -- not a ban, the chain
         # walks on for them

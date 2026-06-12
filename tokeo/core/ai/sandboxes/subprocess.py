@@ -2,9 +2,9 @@
 The subprocess sandbox: fault and resource isolation, not a jail.
 
 It runs a tool call in a fresh interpreter through the generic runner
-(```python -m tokeo.core.ai.sandboxes.runner```), feeding the job as JSON on stdin and
-reading the ```ToolResult``` as JSON on stdout. The child gets its own
-interpreter, a wall-clock timeout (then SIGKILL), an enforced memory cap
+(```python -m tokeo.core.ai.sandboxes.runner```), feeding the job as JSON on
+stdin and reading the ```ToolResult``` as JSON on stdout. The child gets its
+own interpreter, a wall-clock timeout (then SIGKILL), an enforced memory cap
 (RLIMIT_AS, with RLIMIT_DATA as fallback; current macos rejects caps below
 the already-mapped virtual size -- gigabytes at interpreter start -- so a
 realistic cap errors the call there instead of silently running uncapped),
@@ -79,7 +79,7 @@ def expand_env(spec):
             if text[i] == '$' and i + 1 < len(text) and text[i + 1] == '{':
                 end = text.find('}', i + 2)
                 if end != -1:
-                    name = text[i + 2:end]
+                    name = text[i + 2 : end]  # noqa E203
                     # already-built keys win, then the host env, then ''
                     result.append(out.get(name, os.environ.get(name, '')))
                     i = end + 1
@@ -143,12 +143,14 @@ class TokeoAiSubprocessSandbox(TokeoAiSandbox):
         # from the loaded class (not the config string) lets a registry
         # shortname cross the boundary too -- the parent already resolved it
         dotted = _importable_path(type(tool), 'tool')
-        job = json.dumps(dict(
-            tool=dotted,
-            arguments=arguments or {},
-            options=getattr(tool, '_tokeo_parent_instance_options', {}) or {},
-            caps=dict(memory_mb=self._meta.memory_mb),
-        ))
+        job = json.dumps(
+            dict(
+                tool=dotted,
+                arguments=arguments or {},
+                options=getattr(tool, '_tokeo_parent_instance_options', {}) or {},
+                caps=dict(memory_mb=self._meta.memory_mb),
+            )
+        )
         # a fresh interpreter running the generic runner module; stdin carries
         # the job, stdout the reply, both as a single JSON document
         cmd = [sys.executable, '-m', 'tokeo.core.ai.sandboxes.runner']
@@ -181,10 +183,7 @@ class TokeoAiSubprocessSandbox(TokeoAiSandbox):
                 timeout=self._meta.timeout,
             )
         except subprocess.TimeoutExpired:
-            raise TokeoAiError(
-                f'tool {dotted!r} timed out after {self._meta.timeout}s in the '
-                'subprocess sandbox'
-            )
+            raise TokeoAiError(f'tool {dotted!r} timed out after {self._meta.timeout}s in the ' 'subprocess sandbox')
         reply = self._decode(proc, dotted)
         if 'error' in reply:
             raise TokeoAiError(f'tool {dotted!r} failed in the subprocess sandbox: {reply["error"]}')
@@ -219,9 +218,5 @@ class TokeoAiSubprocessSandbox(TokeoAiSandbox):
         allowed = {'timeout', 'memory_mb', 'cwd', 'env'}
         unknown = sorted(set(options or {}) - allowed)
         if unknown:
-            return [
-                f'subprocess sandbox does not support option {key!r} '
-                f'(allowed: {", ".join(sorted(allowed))})'
-                for key in unknown
-            ]
+            return [f'subprocess sandbox does not support option {key!r} ' f'(allowed: {", ".join(sorted(allowed))})' for key in unknown]
         return None

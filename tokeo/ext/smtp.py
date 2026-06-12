@@ -267,7 +267,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         ### Returns
 
-        - **bool**: ```True``` if message is sent successfully, ```False``` otherwise
+        - **bool**: ```True``` if message is sent successfully, ```False```
+          otherwise
 
         ### Raises
 

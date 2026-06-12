@@ -50,4 +50,5 @@ class TokeoAiWeekdayTool(TokeoAiTool):
 
         """
         from datetime import date as date_type
+
         return calendar.day_name[date_type.fromisoformat(str(date)).weekday()]

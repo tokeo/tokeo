@@ -138,16 +138,10 @@ class GrpcCallController(Controller):
 
         # cert and key are paired for mTLS
         if bool(pargs.cert) != bool(pargs.key):
-            raise {{ app_class_name }}Error(
-                '--cert and --key must both be given for mTLS'
-            )
+            raise {{ app_class_name }}Error('--cert and --key must both be given for mTLS')
 
         # any of these turns tls on; --tls alone is plain tls without mTLS/auth
-        tls_enabled = (
-            pargs.tls or pargs.insecure
-            or pargs.cert is not None
-            or pargs.user is not None
-        )
+        tls_enabled = pargs.tls or pargs.insecure or pargs.cert is not None or pargs.user is not None
 
         if not tls_enabled:
             return grpc.insecure_channel(target)
@@ -204,9 +198,7 @@ class GrpcCallController(Controller):
             return None
         # empty password is allowed; the interceptor decides what to do with it
         password = pargs.password if pargs.password is not None else ''
-        token = base64.b64encode(
-            f'{pargs.user}:{password}'.encode()
-        ).decode()
+        token = base64.b64encode(f'{pargs.user}:{password}'.encode()).decode()
         return (('authorization', f'Basic {token}'),)
 
     @ex(

@@ -206,8 +206,8 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         overridden too, by an environment variable whose name follows the full
         path (for example ```<CONFIG_SECTION>_DRAMATIQ_RABBITMQ_AUTH_PASSWORD```).
         Overrides arrive as raw strings and are coerced like a yaml scalar (via
-        ```yaml.safe_load```), so ```true```, ```42``` or ```null``` become their proper
-        types; values from a file are already typed by the yaml parser.
+        ```yaml.safe_load```), so ```true```, ```42``` or ```null``` become their
+        proper types; values from a file are already typed by the yaml parser.
         Resolution is applied on a rebuilt copy only where a value actually
         changes, so a plain read returns the same object as before.
 
