@@ -40,7 +40,11 @@ class TokeoAiAuditGuard(TokeoAiGuard):
         if invocation.decision == 'deny':
             self.app.log.info(f'ai audit: tool {invocation.name!r} denied: {invocation.reason}')
         elif invocation.error is not None:
-            self.app.log.info(f'ai audit: tool {invocation.name!r} errored: {invocation.error}')
+            # name WHERE it ran when a sandbox was reached (a denied call never
+            # reaches one, so sandbox stays None there)
+            where = f' in sandbox {invocation.sandbox!r}' if invocation.sandbox else ''
+            self.app.log.info(f'ai audit: tool {invocation.name!r} errored{where}: {invocation.error}')
         else:
+            where = f' in sandbox {invocation.sandbox!r}' if invocation.sandbox else ''
             text = invocation.result.text if invocation.result is not None else ''
-            self.app.log.info(f'ai audit: tool {invocation.name!r} returned: {text!r}')
+            self.app.log.info(f'ai audit: tool {invocation.name!r} ran{where}, returned: {text!r}')

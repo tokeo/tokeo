@@ -4,8 +4,9 @@ One sentence carries the whole design: **fundi** (the master) wields the
 tools, **akili** (the mind) plans them, and **tokeo** (the result) is what
 they produce together. This document is the stage script for showing that
 live: act 1 demonstrates the fundi agent (guards, sandboxes, denials) with
-the deterministic mock model, act 2 puts the real, self-trained akili
-micro model behind the very same governance, and act 3 -- on purpose --
+the deterministic mock model -- including a step where that same mock WRITES
+code and runs it in the wasm sandbox -- act 2 puts the real, self-trained
+akili micro model behind the very same governance, and act 3 -- on purpose --
 shows where the model breaks, and why. Every command sits in its own
 shell block, so each one is a single copy away from your terminal.
 
@@ -94,7 +95,58 @@ Expected: the full machine-readable result -- every invocation with its
 arguments, the tool's declared schema, the guard decision, the result,
 and the token usage. Nothing about the call is hidden.
 
-### 7. Governance starts before the first call
+### 7. The codermock agent: the mock model as a code writer
+
+Same deterministic mock, one new trick: a plain keyword makes it WRITE a
+small Python snippet and run it in the wasm sandbox -- the model produces
+code, the sandbox isolates it. This is the CodeAct pattern in miniature:
+real isolation for code the model wrote, not the user.
+
+A word of honesty about this agent. The ```codermock``` is **not** a
+reasoning model and **not** recursive. It is a coding mock: it recognises a
+fixed keyword (```text``` plus ```upper```/```reverse```/```len```, with a
+few German synonyms) and fills a code template with the rest of the line. It
+does not parse intent, it does not resolve nested requests, and it does not
+chain tools the way the akili model does in Act 2. It exists to demonstrate
+the wasm execution path and the audit trail, not language understanding.
+
+It is opt-in: it needs the wasm extra and a user-built ```python.wasm``` (the
+one-time ```./wasm``` install is in ```core/ai/sandboxes/WASM.md```). Without
+that build the call returns a clear "wasm runtime path does not exist" error
+instead of a result -- the synthesis and the audit still run, only the guest
+does not.
+
+### 7a. The mock writes code, the sandbox runs it
+
+```shell
+{{ app_label }} ai ask "text upper der wochentag von heute" --profile codermock
+```
+
+Expected: the uppercased sentence, computed inside the wasm guest. The mock
+turned the keyword into ```result = 'der wochentag von heute'.upper()``` and
+never asked you for Python.
+
+### 7b. A reversed string, the synthesized code in the trace
+
+```shell
+{{ app_label }} ai ask "text reverse otto" --profile codermock --json
+```
+
+Expected: the result plus the full trace -- and in it the synthesized
+```code``` argument and ```sandbox: coded```, so you can read exactly what
+ran and WHERE it ran.
+
+### 7c. A length, where the value comes from a computation
+
+```shell
+{{ app_label }} ai ask "text len wir sehen uns in 7 tagen" --profile codermock
+```
+
+Expected: ```24``` -- the character count of the sentence, computed in the
+guest. The audit line names the sandbox: ```ai audit: tool 'coding' ran in
+sandbox 'coded', returned: '24'```.
+
+### 8. Governance starts before the first call
 
 ```shell
 {{ app_label }} ai lint
@@ -110,7 +162,7 @@ Now the same governance, but the plan comes from a real language model:
 calendar data, running in plain NumPy -- no server, no API key. The
 model plans, the tools compute: facts never come from the weights.
 
-### 8. A nested request, in German
+### 9. A nested request, in German
 
 ```shell
 {{ app_label }} ai ask "wochentag von heute plus 14 tage" --profile akili
@@ -120,7 +172,7 @@ Expected: the weekday two weeks from now. The model emitted a chain --
 resolve today, shift it, read its weekday -- and every step was executed
 as a real tool call under the guarded agent.
 
-### 9. The plan, made visible
+### 10. The plan, made visible
 
 ```shell
 {{ app_label }} ai ask "weekday of 2026-12-24" --profile akili --json
@@ -130,7 +182,7 @@ Expected: the trace shows the tool chain the model planned, step by
 step, with the exact date copied byte-for-byte into the arguments (the
 byte tokenizer at work -- no subword vocabulary to mangle a date).
 
-### 10. Shared governance, own subset: profile deny
+### 11. Shared governance, own subset: profile deny
 
 ```shell
 {{ app_label }} ai ask "calc 2 + 3" --profile akili --json

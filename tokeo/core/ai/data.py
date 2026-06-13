@@ -119,6 +119,10 @@ class Invocation:
     - **reason** (str | None): Why a guard denied or flagged the call
     - **result** (ToolResult | None): The tool's result when it ran
     - **error** (str | None): The error text when the tool raised
+    - **sandbox** (str | None): The configured name of the sandbox the tool
+        ran in (e.g. ```in_process```, ```jailed```, ```wasm_untrusted```), so
+        the trace shows WHERE each call executed -- the honest-tier record.
+        ```None``` until the call reaches a sandbox (a denied call never does)
 
     """
 
@@ -130,3 +134,4 @@ class Invocation:
     reason: str | None = None
     result: ToolResult | None = None
     error: str | None = None
+    sandbox: str | None = None

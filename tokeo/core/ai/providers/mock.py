@@ -29,6 +29,10 @@ class TokeoAiMockProvider(TokeoAiProvider):
         mock requests that tool, filling its first declared parameter (a
         required one if any) with the rest of the prompt; if not, it replies
         in plain text
+    - As a codeact demo, the keyword ```text``` plus an operation word
+        (upper/reverse/len, with a few language synonyms) and a sentence makes
+        the mock SYNTHESIZE python that computes the value and call the
+        untrusted exec tool with it -- but only when that tool is on offer
 
     """
 
@@ -57,6 +61,13 @@ class TokeoAiMockProvider(TokeoAiProvider):
         for message in messages:
             if isinstance(message, dict) and message.get('role') == 'user':
                 prompt = message.get('content') or ''
+        # codeact demo: a plain ```text <op> <sentence>``` keyword makes the mock
+        # SYNTHESIZE python that computes the value and call the untrusted exec
+        # tool with it -- the model writes code, the sandbox runs it. only
+        # active when that tool is actually offered to this agent
+        synth = self._codeact_synthesis(prompt, tools)
+        if synth is not None:
+            return self._result('', tool_calls=[synth], finish_reason='tool_calls')
         # if the prompt names an available tool, request that tool with its
         # first declared parameter filled from the rest of the prompt
         match = self._match_tool(prompt, tools)
@@ -72,6 +83,54 @@ class TokeoAiMockProvider(TokeoAiProvider):
         if prompt.strip().lower() == 'ping':
             return self._result('pong')
         return self._result(f'[mock] {prompt}' if prompt else '[mock] (no prompt)')
+
+    # the codeact keyword: ```text``` plus an operation word, then the sentence.
+    # each operation maps (with a few language synonyms) to a python expression
+    # template, filled with the sentence as a literal. deterministic on purpose
+    _CODEACT_OPS = {
+        'upper': '{s!r}.upper()',
+        'gross': '{s!r}.upper()',
+        'groß': '{s!r}.upper()',
+        'reverse': '{s!r}[::-1]',
+        'umkehr': '{s!r}[::-1]',
+        'gedreht': '{s!r}[::-1]',
+        'len': 'len({s!r})',
+        'length': 'len({s!r})',
+        'laenge': 'len({s!r})',
+        'länge': 'len({s!r})',
+    }
+
+    def _codeact_synthesis(self, prompt, tools):
+        # recognise ```text <op> <sentence>``` and, when a code-running tool is
+        # on offer, build a tool call whose code computes the value. returns a
+        # ToolCall or None (so the normal tool/echo paths still apply). the tool
+        # is matched by SHAPE -- it takes a single ```code``` parameter -- not by
+        # a fixed name, since the config alias is the project's to choose
+        if not prompt or not tools:
+            return None
+        coder = self._code_tool(tools)
+        if coder is None:
+            return None
+        head, _, rest = prompt.strip().partition(' ')
+        if head.lower() != 'text':
+            return None
+        op, _, sentence = rest.partition(' ')
+        template = self._CODEACT_OPS.get(op.lower())
+        if template is None or not sentence.strip():
+            return None
+        # the synthesized snippet: assign the computed value to ```result```,
+        # which the exec tool returns. the sentence is embedded as a literal
+        code = f'result = {template.format(s=sentence.strip())}'
+        return ToolCall(id='call_1', name=self._tool_name(coder), arguments={'code': code})
+
+    def _code_tool(self, tools):
+        # the code-running tool is the one whose only/first parameter is
+        # ```code``` -- a stable shape, independent of the config alias name
+        for tool in tools:
+            names, _ = self._tool_params(tool)
+            if names and names[0] == 'code':
+                return tool
+        return None
 
     def _match_tool(self, prompt, tools):
         # the first word of the prompt selects a tool when it matches one of

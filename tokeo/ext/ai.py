@@ -570,6 +570,10 @@ class TokeoAi(MetaMixin):
             settings = item.get('options') or {}
             obj = self.resolve('sandbox', item['type'])(self.app, **settings)
             obj._setup(self.app)
+            # the object carries its configured name (the ```ai.sandboxes``` key,
+            # e.g. ```jailed```, ```wasm_untrusted```) so callers can record
+            # WHERE a tool ran without threading the name alongside the object
+            obj._configured_name = name
             self._sandbox_objs[name] = obj
         return obj
 
@@ -615,7 +619,8 @@ class TokeoAi(MetaMixin):
         # tools contain
         # the tool (and does not ```except``` it). an exhausted chain returns
         # None, which the caller turns into a deny -- no sandbox listing the tool
-        # IS the deny-by-default
+        # IS the deny-by-default. the returned object carries its configured
+        # name (```_configured_name```), so the caller needs nothing more
         if self._sandbox_override is not None:
             return self._sandbox(self._sandbox_override)
         if agent_obj is None:
@@ -631,17 +636,20 @@ class TokeoAi(MetaMixin):
         # so a model calling a carved-out tool is refused here too
         return tool_name in self._deny_set(agent_obj, profile, call_deny)
 
-    def _exec_in_sandbox(self, tool_name, arguments, agent_obj, profile=None, call_deny=None):
+    def _exec_in_sandbox(self, tool_name, arguments, agent_obj, profile=None, call_deny=None, invocation=None):
         # the seam: resolve the tool, choose its sandbox, and run the call
         # through it. a hard ```deny``` or an exhausted chain raises, so the
         # caller records a denial; otherwise the chosen sandbox contains the
-        # ```tool.exec```
+        # ```tool.exec```. when an invocation is passed, record WHERE it ran
+        # (the configured sandbox name) so the trace and audit can show it
         if self._denies(tool_name, agent_obj, profile, call_deny):
             raise TokeoAiError(f'tool {tool_name!r} is denied')
         tool = self._tool(tool_name)
         sandbox = self._sandbox_for(tool_name, agent_obj)
         if sandbox is None:
             raise TokeoAiError(f'tool {tool_name!r} has no sandbox in the agent chain (denied)')
+        if invocation is not None:
+            invocation.sandbox = getattr(sandbox, '_configured_name', None)
         return sandbox.exec(tool, arguments or {})
 
     def _exec_guarded(self, call, before_guards, after_guards, trace, agent_obj, profile, call_deny=None):
@@ -665,7 +673,7 @@ class TokeoAi(MetaMixin):
             try:
                 # the seam: the agent's sandbox chain contains the exec (a hard
                 # deny or an exhausted chain raises and is recorded as an error)
-                output = self._exec_in_sandbox(invocation.name, invocation.arguments, agent_obj, profile, call_deny)
+                output = self._exec_in_sandbox(invocation.name, invocation.arguments, agent_obj, profile, call_deny, invocation)
                 invocation.result = output if isinstance(output, ToolResult) else ToolResult(text=str(output))
             except Exception as err:
                 # the pipeline is resilient: a failing tool is recorded and the

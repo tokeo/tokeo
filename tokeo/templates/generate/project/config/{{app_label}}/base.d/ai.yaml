@@ -76,6 +76,14 @@ ai:
       - weekday
       - week_number
       - moon_phase
+    ### the codeact tool for the wasm demo: it runs model-generated python in
+    ### the wasm guest. DANGER -- it executes arbitrary code, so it is only
+    ### safe behind the wasm sandbox (or a hardened container), never
+    ### in-process. not registered by default, so it is named by its full
+    ### dotted class path. paired with the "coded" sandbox and "codermock"
+    ### agent below, driven by the mock's "text upper|reverse|len <sentence>"
+    coding:
+      type: tokeo.core.ai.tools.python_untrusted_exec.TokeoAiPythonUntrustedExecTool
 
   ### guards form the tool-call pipeline of an agent: a before guard may
   ### deny a call ahead of execution, an after guard observes the outcome
@@ -151,6 +159,25 @@ ai:
         # memory_mb: 256
         ### scratch working directory (steers relative writes)
         cwd: tmp/sandbox
+    ### real isolation for model-generated code: a webassembly guest with no
+    ### network, only explicit mounts, and a hard memory cap on every platform
+    ### -- the safe home for the python_untrusted_exec tool. opt-in: it needs
+    ### the tokeo[wasm] extra and a user-built python.wasm; see the wasm doc
+    ### at core/ai/sandboxes/WASM.md for the one-time ./wasm install. wasm and
+    ### the python-exec tools are not registered by default, so the type is the
+    ### full dotted class path (resolved on demand)
+    coded:
+      type: tokeo.core.ai.sandboxes.wasm.TokeoAiWasmSandbox
+      tools:
+        - coding
+      options:
+        ### point these at your ./wasm build (see WASM.md); the demo only runs
+        ### once they exist, otherwise the call errors with a clear message
+        runtime: ./wasm/python.wasm
+        stdlib: ./wasm/lib/python3.13
+        ### a hard, platform-independent memory cap and a wall-clock timeout
+        memory_mb: 256
+        timeout: 10
 
   ### agents are the composition root: an agent binds the tools, the guards,
   ### and the sandbox chain for a task and sets the step budget. the model is
@@ -219,6 +246,28 @@ ai:
           - jailed
           - allow
 
+    ### the codeact demo: the mock turns a "text upper|reverse|len <sentence>"
+    ### prompt into model-generated python, and this agent runs it in the wasm
+    ### guest -- real isolation for code the model wrote. opt-in: it needs the
+    ### ./wasm build (see core/ai/sandboxes/WASM.md). every call is audited, so
+    ### the log shows the synthesized code ran in sandbox "coded". try:
+    ###   {{ app_label }} ai ask "text upper der wochentag von heute" --agent codermock
+    ###   {{ app_label }} ai ask "text reverse otto" --agent codermock
+    ###   {{ app_label }} ai ask "text len wir sehen uns in 7 tagen" --agent codermock
+    codermock:
+      type: fundi
+      options:
+        ### only this agent offers the coding tool, so the mock's codeact
+        ### synthesis activates only here -- the other agents never run code
+        tools:
+          - coding
+        guards:
+          - audit
+        ### the coding tool runs in the wasm guest; nothing falls through to
+        ### in-process, so any other tool would be denied by default
+        sandboxes:
+          - coded
+
   ### named profiles in the uniform form: top-level params (type, purpose,
   ### tools, enabled) plus an "options" block carrying the provider's
   ### connection settings (model, base_url, key). a profile is an item; its
@@ -259,6 +308,19 @@ ai:
       deny:
         - mathematics
         - filesystem
+
+    ### the codeact demo profile: the deterministic mock provider against the
+    ### codermock agent. a "text upper|reverse|len <sentence>" prompt makes the
+    ### mock synthesize python, which runs in the wasm guest -- the model
+    ### writes code, the sandbox isolates it. opt-in: needs the ./wasm build
+    ### (core/ai/sandboxes/WASM.md). use --json to see the synthesized code and
+    ### the sandbox in the trace:
+    ###   {{ app_label }} ai ask "text upper der wochentag von heute" --profile codermock
+    ###   {{ app_label }} ai ask "text reverse otto" --profile codermock --json
+    codermock:
+      type: mock
+      purpose: codeact
+      agent: codermock
 
     ### a local, OpenAI-compatible server you run yourself
     # assistant:
