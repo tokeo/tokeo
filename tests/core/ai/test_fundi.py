@@ -15,8 +15,9 @@ import pytest
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
 from tokeo.core.ai import TokeoAiError, ToolResult, TokeoAiFundiAgent, TokeoAiAgent
+from tokeo.core.ai.sandboxes._common import expand_env
 from tokeo.core.ai.sandboxes.in_process import TokeoAiInProcessSandbox
-from tokeo.core.ai.sandboxes.subprocess import TokeoAiSubprocessSandbox, expand_env
+from tokeo.core.ai.sandboxes.subprocess import TokeoAiSubprocessSandbox
 from tokeo.core.ai.linter import TokeoAiLinter
 
 

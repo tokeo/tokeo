@@ -122,3 +122,19 @@ variables:
     default: "Y"
     requires:
       feature_ai: "Y"
+
+  - name: feature_ai_wasm
+    prompt: "Enable ai wasm sandbox [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    requires:
+      feature_ai: "Y"
+
+  - name: feature_ai_docker
+    prompt: "Enable ai docker sandbox [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    requires:
+      feature_ai: "Y"

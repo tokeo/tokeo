@@ -65,6 +65,9 @@ dependencies = [
     "numba",
     "torch",
 {% endif -%}
+{% if feature_ai == "Y" and feature_ai_wasm == "Y" %}
+    "wasmtime",
+{% endif -%}
 ]
 
 [project.optional-dependencies]
