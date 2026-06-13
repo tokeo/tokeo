@@ -355,23 +355,73 @@ The default architecture (```dim=128```, ```layers=3```, ```heads=4```, ```ff=51
 ```context=184```, ```vocab=259```) produces exactly **651,776** trainable numbers.
 Here is where each one lives:
 
-| part | matrix | shape | numbers |
-|---|---|---|---|
-| token meaning | ```embed.weight``` | 259 x 128 | 33,152 |
-| position meaning | ```position.weight``` | 184 x 128 | 23,552 |
-| per block: norm 1 | ```ln1.weight``` + ```ln1.bias``` | 128 + 128 | 256 |
-| per block: attention in | ```attn.in_proj_weight``` + bias | 384 x 128 + 384 | 49,536 |
-| per block: attention out | ```attn.out_proj.weight``` + bias | 128 x 128 + 128 | 16,512 |
-| per block: norm 2 | ```ln2.weight``` + ```ln2.bias``` | 128 + 128 | 256 |
-| per block: MLP up | ```mlp.0.weight``` + bias | 512 x 128 + 512 | 66,048 |
-| per block: MLP down | ```mlp.2.weight``` + bias | 128 x 512 + 128 | 65,664 |
-| **one block** | (sum of the six rows above) | | **198,272** |
-| three blocks | 3 x 198,272 | | 594,816 |
-| final norm | ```ln.weight``` + ```ln.bias``` | 128 + 128 | 256 |
-| output head | tied to ```embed.weight``` | (shared) | 0 |
-| **total** | | | **651,776** |
+Every number sits in one of a few jobs. The **embeddings** turn input into
+meaning: ```embed.weight``` holds one 128-number vector per possible byte (the
+model's whole vocabulary), and ```position.weight``` holds one per slot in the
+context window, so the model knows both *what* each token is and *where* it
+sits. The three **transformer blocks** are where thinking happens, and each
+block does the same two moves: **attention** lets every token look at the other
+tokens and pull in what is relevant, then the **MLP** processes what each token
+gathered. The two **layer norms** per block keep the numbers in a stable range
+so the stack can be trained deep. The **tail** is a final norm plus the output
+step that turns the last vectors back into a score for every possible next
+byte.
 
-Two details worth pausing on. The **output head adds zero parameters**: it
+The total splits into shared embeddings, three identical transformer blocks
+(the bulk), and a tiny tail. Each block is the sum of six parts:
+
+```mermaid
+flowchart TD
+    total["<b>akili LLM — 651,776 params</b><br/>dim=128, layers=3, heads=4, ff=512"]
+
+    total --> emb["<b>shared embeddings</b><br/>56,704"]
+    total --> blk3["<b>3 × transformer block</b><br/>594,816"]
+    total --> tail["<b>tail</b><br/>256"]
+
+    emb --> tok["token meaning<br/>embed.weight · 259×128<br/><b>33,152</b>"]
+    emb --> pos["position meaning<br/>position.weight · 184×128<br/><b>23,552</b>"]
+
+    blk3 --> blk1["<b>one block — 198,272</b>"]
+
+    blk1 --> n1["norm 1 · ln1.weight + ln1.bias<br/>128 + 128 · <b>256</b>"]
+    blk1 --> ain["attention in · attn.in_proj_weight + bias<br/>384×128 + 384 · <b>49,536</b>"]
+    blk1 --> aout["attention out · attn.out_proj.weight + bias<br/>128×128 + 128 · <b>16,512</b>"]
+    blk1 --> n2["norm 2 · ln2.weight + ln2.bias<br/>128 + 128 · <b>256</b>"]
+    blk1 --> up["MLP up · mlp.0.weight + bias<br/>512×128 + 512 · <b>66,048</b>"]
+    blk1 --> down["MLP down · mlp.2.weight + bias<br/>128×512 + 128 · <b>65,664</b>"]
+
+    tail --> fn["final norm · ln.weight + ln.bias<br/>128 + 128 · <b>256</b>"]
+    tail --> oh["output head · tied to embed.weight<br/>shared · <b>0</b>"]
+```
+
+The same numbers, laid out as a table -- every matrix, its shape, and the count
+it contributes (the numbers column is right-aligned so the magnitudes line up):
+
+| part                     | matrix                        |      shape      |     numbers |
+|--------------------------|-------------------------------|:---------------:|------------:|
+| token meaning            | embed.weight                  |    259 x 128    |      33,152 |
+| position meaning         | position.weight               |    184 x 128    |      23,552 |
+| per block: norm 1        | ln1.weight + ln1.bias         |    128 + 128    |         256 |
+| per block: attention in  | attn.in_proj_weight + bias    | 384 x 128 + 384 |      49,536 |
+| per block: attention out | attn.out_proj.weight + bias   | 128 x 128 + 128 |      16,512 |
+| per block: norm 2        | ln2.weight + ln2.bias         |    128 + 128    |         256 |
+| per block: MLP up        | mlp.0.weight + bias           | 512 x 128 + 512 |      66,048 |
+| per block: MLP down      | mlp.2.weight + bias           | 128 x 512 + 128 |      65,664 |
+| **one block**            | _sum of the six rows above_   |                 | **198,272** |
+| three blocks             | _3 x one block_               |                 |     594,816 |
+| final norm               | ln.weight + ln.bias           |    128 + 128    |         256 |
+| output head              | _tied to_ embed.weight        |    (shared)     |           0 |
+| **total**                |                               |                 | **651,776** |
+
+How a shape becomes a count: a weight matrix that maps an *in*-sized vector to
+an *out*-sized one is an ```out x in``` grid of numbers, plus one bias per
+output. So ```mlp.0.weight``` (the MLP-up step) widens 128 to 512 -- that is
+512 x 128 = 65,536 weights plus 512 biases = 66,048 -- and ```mlp.2.weight```
+narrows it back, 128 x 512 + 128 = 65,664. The norms are cheap because they only
+scale and shift each of the 128 features: one weight and one bias each, 256 in
+total. Read the table top to bottom and you are reading the forward pass: look
+up meaning and position, then three times over attend-and-process, then project
+back to byte scores. The **output head adds zero parameters**: it
 reuses the embedding matrix transposed (```embed.weight.T```), so the same
 33,152 numbers both map a byte to a vector and map a vector back to byte
 scores. And the **attention projection is the per-block heavyweight**
