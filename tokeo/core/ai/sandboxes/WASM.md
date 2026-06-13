@@ -8,7 +8,7 @@ you explicitly mount, runs under a hard memory cap that holds on every
 platform, and is interrupted by an epoch timeout. It is an opt-in extension
 (```tokeo[wasm]```) and needs a user-supplied CPython-WASI build.
 
-This document covers when to use it, the two built-in ```python-exec``` tools, how
+This document covers when to use it, the two ```python-exec``` tools, how
 to install a WASI Python build into a project's ```./wasm``` folder, every option,
 the file-bridge mechanics, the two trust models, the WASI standard-library
 shims, and troubleshooting.
@@ -172,6 +172,15 @@ The ```stdlib``` directory name must match the interpreter's version: a 3.13
 
 ## Configuration
 
+The wasm sandbox and the two python-exec tools are **not registered by
+default** -- the core extension registers only the framework built-ins
+(```in_process```, ```subprocess```, the guards, ```fundi```, ```mock```).
+Optional and security-sensitive components like these are referenced by their
+full dotted class path in ```type```, which the resolver imports on demand. (A
+project that uses them often can register a short name itself in a
+```post_setup``` hook; the examples here use the dotted path so they work
+without that.)
+
 A minimal configuration that wires both tools, each behind its own wasm
 sandbox, and exposes them through two agents:
 
@@ -179,14 +188,14 @@ sandbox, and exposes them through two agents:
 ai:
   tools:
     run_untrusted:
-      type: python_untrusted_exec
+      type: tokeo.core.ai.tools.python_untrusted_exec.TokeoAiPythonUntrustedExecTool
     run_trusted:
-      type: python_trusted_exec
+      type: tokeo.core.ai.tools.python_trusted_exec.TokeoAiPythonTrustedExecTool
 
   sandboxes:
     # untrusted: total isolation, the guest sees only its stdlib
     wasm_untrusted:
-      type: wasm
+      type: tokeo.core.ai.sandboxes.wasm.TokeoAiWasmSandbox
       tools:
         - run_untrusted
       options:
@@ -198,7 +207,7 @@ ai:
     # trusted: the tool is rebuilt in the guest, so it needs the framework,
     # the app, and the dependencies mounted read-only and put on PYTHONPATH
     wasm_trusted:
-      type: wasm
+      type: tokeo.core.ai.sandboxes.wasm.TokeoAiWasmSandbox
       tools:
         - run_trusted
       options:
