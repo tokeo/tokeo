@@ -22,8 +22,19 @@ from tokeo.core.ai import TokeoAiError
 # reported instead of being silently ignored. tools, agents, and guards share
 # the uniform item form ({type, options}); the ```defaults``` block is checked
 # here, agent option contents by the built-in element validators below
-_AI_KEYS = {'defaults', 'profiles', 'tools', 'agents', 'guards', 'sandboxes'}
-_DEFAULTS_KEYS = {'profile', 'agent'}
+_AI_KEYS = {
+    'defaults',
+    'profiles',
+    'tools',
+    'agents',
+    'guards',
+    'sandboxes',
+    'gates',
+}
+_DEFAULTS_KEYS = {
+    'profile',
+    'agent',
+}
 _PROFILE_KEYS = {
     'type',
     'purpose',
@@ -35,8 +46,16 @@ _PROFILE_KEYS = {
     'model_params',
     'options',
 }
-_ITEM_KEYS = {'type', 'options'}
-_SANDBOX_KEYS = {'type', 'tools', 'except', 'options'}
+_ITEM_KEYS = {
+    'type',
+    'options',
+}
+_SANDBOX_KEYS = {
+    'type',
+    'tools',
+    'except',
+    'options',
+}
 
 
 @dataclass
@@ -90,6 +109,9 @@ class TokeoAiLinter:
         self.add_validator('agents', self._validate_agent_options)
         self.add_validator('guards', self._validate_item_form)
         self.add_validator('sandboxes', self._validate_sandbox)
+        # a gate item shares the uniform {type, options} form; the gate is named
+        # by a dotted path (no built-ins), the options belong to its bound rule
+        self.add_validator('gates', self._validate_item_form)
 
     def add_validator(self, section, validator):
         """
@@ -194,6 +216,17 @@ class TokeoAiLinter:
                 for entry in guards:
                     if entry not in known:
                         self._add(f'{path}.guards', _unknown('guard', entry, known))
+        # the gate selection references ```ai.gates``` by name; a prompt gate
+        # runs before a model call, a tool gate before a tool runs
+        gates = options.get('gates')
+        if gates is not None:
+            if not isinstance(gates, list):
+                self._add(f'{path}.gates', 'must be a list of gate names')
+            else:
+                known = set(self._value('gates') or {})
+                for entry in gates:
+                    if entry not in known:
+                        self._add(f'{path}.gates', _unknown('gate', entry, known))
         for key in ('max_steps', 'max_loops'):
             value = options.get(key)
             if value is not None and not isinstance(value, int):

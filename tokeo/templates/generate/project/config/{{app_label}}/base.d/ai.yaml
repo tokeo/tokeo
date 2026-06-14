@@ -179,12 +179,35 @@ ai:
         memory_mb: 256
         timeout: 10
 
+  ### gates are human-in-the-loop checkpoints, selected per agent like guards.
+  ### a guard is automatic policy around a tool call; a gate can stop the loop
+  ### and decide, with a default, a timeout and (later) learned consent. there
+  ### are two placements: a "prompt" gate runs before a model call and judges
+  ### the outbound messages (a deny stops the turn before it is sent); a "tool"
+  ### gate runs before a tool runs and judges the call (a deny is fed back to
+  ### the model as "denied: ...", like a guard deny). a tool gate runs AFTER the
+  ### before guards, so the user is not asked about a call the policy already
+  ### denied. with "agent: null" there is no pipeline and so no gate -- talking
+  ### to a model raw means no validation of inputs or outputs, and no confirm.
+  ###
+  ### no gate ships as a built-in: a gate is named by its full dotted class
+  ### path, like the wasm sandbox -- stopping or refusing a step should be a
+  ### deliberate choice. the only gate shipped now is the deny gate (always
+  ### refuses); confirm and pattern gates are future rules on the same wiring.
+  # gates:
+  #   ### block every tool call this agent makes (it may talk, never act)
+  #   no_tools:
+  #     type: tokeo.core.ai.gates.deny.TokeoAiToolDenyGate
+  #   ### block every model call (mostly a hard off switch / a wiring check)
+  #   no_model:
+  #     type: tokeo.core.ai.gates.deny.TokeoAiPromptDenyGate
+
   ### agents are the composition root: an agent binds the tools, the guards,
   ### and the sandbox chain for a task and sets the step budget. the model is
   ### not part of the agent -- it is bound late through the selected profile,
   ### so one agent runs against any model. an agent is an item in the uniform
   ### form: "type" is a built-in short name ("fundi", the standard agent) or a
-  ### full dotted class path, and the agent's settings (tools, guards,
+  ### full dotted class path, and the agent's settings (tools, guards, gates,
   ### sandboxes, deny, budgets) live under "options". the active tools of a
   ### call are the agent's tools
   agents:
@@ -368,6 +391,6 @@ ai:
       #   max_tokens: 1024
       ### optional free-form selector, usable via "ai ask --purpose"
       purpose: assistant
-      ### the agent (composition) this profile runs; coder runs model-written
-      ### code in the wasm sandbox
-      agent: coder
+      ### the agent (composition) this profile runs; use --agent coder
+      ### to run model-written code in the wasm sandbox
+      agent: guarded

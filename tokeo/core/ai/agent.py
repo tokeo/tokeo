@@ -46,6 +46,12 @@ class TokeoAiAgent(MetaMixin):
         # the guard selection (guard names) for the tool-call pipeline
         guards = []
 
+        # the gate selection (gate names): human-in-the-loop checkpoints, each
+        # selected by name from ```ai.gates```. a prompt gate runs before a
+        # model call, a tool gate before a tool runs; with no agent there is no
+        # pipeline and so no gate (the deliberate raw path)
+        gates = []
+
         # the ordered sandbox chain (sandbox names): a tool runs in the first
         # sandbox whose tools contain it; when none does the call is denied,
         # so an ```in_process``` sandbox with ```tools: _all``` placed last is the

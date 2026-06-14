@@ -78,9 +78,11 @@ from prompt_toolkit.completion import Completer, Completion
 from tokeo.ext.argparse import Controller
 from tokeo.core.utils.base import as_list
 from tokeo.core.ai.utils import parse_model_params
+from tokeo.core.ai.gate import PromptContext, ToolContext
 from tokeo.core.ai import (
     TokeoAiError,
     ToolResult,
+    ChatResult,
     Invocation,
     TokeoAiFundiAgent,
 )
@@ -175,6 +177,7 @@ class TokeoAi(MetaMixin):
         self._tool_objs = {}
         self._agent_objs = {}
         self._guard_objs = {}
+        self._gate_objs = {}
         self._sandbox_objs = {}
         # an app-wide sandbox override set via ```set_sandbox```; when set it
         # replaces the agent's sandbox chain for every tool (a deliberate,
@@ -202,6 +205,11 @@ class TokeoAi(MetaMixin):
         self._profiles = self._config('profiles', fallback={}) or {}
         self._agents = self._config('agents', fallback={}) or {}
         self._guards = self._config('guards', fallback={}) or {}
+        # the ```ai.gates``` map uses the uniform item form: a dict value is a
+        # gate item ({type, options}); the agent references gates by name. a
+        # gate is named by a dotted path (no built-ins ship), like the wasm
+        # sandbox -- refusing or interrupting a step is a deliberate choice
+        self._gates = self._config('gates', fallback={}) or {}
         # the ```ai.sandboxes``` map uses the uniform item form: a dict value is
         # a sandbox item ({type, tools, except, options}); there are no groups
         # here (a sandbox lists tool/group names under its own ```tools```)
@@ -557,6 +565,55 @@ class TokeoAi(MetaMixin):
             return []
         return [self._guard(name) for name in agent_obj._meta.guards]
 
+    def _gate(self, name):
+        # build the gate configured under ```ai.gates[name]``` once and reuse it;
+        # the entry has the uniform item form: ```type``` (a dotted path; no gate
+        # built-ins ship) resolves to a gate class, built with the application
+        # and the entry's ```options``` as keyword arguments (the options flow on
+        # to the gate's bound rule). gates hold no per-call state, so one cached
+        # instance is fine
+        obj = self._gate_objs.get(name)
+        if obj is None:
+            item = self._gates.get(name)
+            if not isinstance(item, dict) or not item.get('type'):
+                raise TokeoAiError(f'ai gate {name!r} is not configured under ai.gates')
+            settings = item.get('options') or {}
+            obj = self.resolve('gate', item['type'])(self.app, **settings)
+            obj._setup(self.app)
+            self._gate_objs[name] = obj
+        return obj
+
+    def _resolve_gates(self, agent_obj):
+        # the gates are selected on the agent, like guards; with no agent there
+        # is no pipeline and so no gate (the deliberate raw path). returns the
+        # gates split by phase: prompt gates run before a model call, tool gates
+        # before a tool runs
+        if agent_obj is None:
+            return [], []
+        gates = [self._gate(name) for name in agent_obj._meta.gates]
+        prompt_gates = [gate for gate in gates if gate._meta.phase == 'prompt']
+        tool_gates = [gate for gate in gates if gate._meta.phase == 'tool']
+        return prompt_gates, tool_gates
+
+    def _prompt_gate_stop(self, prompt_gates, messages):
+        # run the prompt gates before a model call; the first deny wins (like
+        # the before guards). returns a ChatResult carrying the refusal when a
+        # gate stops the call -- there is no model to react, so the turn ends --
+        # or None when every gate admits and the call may proceed
+        for gate in prompt_gates:
+            verdict = gate.admit(PromptContext(messages=messages, tokens=self._estimate_tokens(messages)))
+            if not verdict.admit:
+                reason = verdict.reason or 'blocked by a gate'
+                return ChatResult(text='', refusal=f'model call stopped: {reason}')
+        return None
+
+    def _estimate_tokens(self, messages):
+        # a rough token estimate for the prompt gate's context: ~4 chars per
+        # token over the message contents. deliberately approximate -- it is a
+        # hint for a human deciding whether to send, not an accounting figure
+        chars = sum(len(str(message.get('content') or '')) for message in messages)
+        return chars // 4
+
     def _sandbox(self, name):
         # build the sandbox configured under ```ai.sandboxes[name]``` once and
         # reuse it; the entry has the uniform item form: ```type``` (a built-in
@@ -654,7 +711,7 @@ class TokeoAi(MetaMixin):
             invocation.sandbox = getattr(sandbox, '_configured_name', None)
         return sandbox.exec(tool, arguments or {})
 
-    def _exec_guarded(self, call, before_guards, after_guards, trace, agent_obj, profile, call_deny=None):
+    def _exec_guarded(self, call, before_guards, after_guards, trace, agent_obj, profile, call_deny=None, tool_gates=None):
         # run one tool call through the guard pipeline: the before guards may
         # deny it, the tool runs (inside its sandbox) unless denied, and the
         # after guards always run (so a denial is recorded too). every outcome
@@ -671,6 +728,17 @@ class TokeoAi(MetaMixin):
             guard.check(invocation)
             if invocation.decision == 'deny':
                 break
+        # a tool gate runs AFTER the before guards (so the user is not asked
+        # about a call the automatic policy already denied) and BEFORE the exec.
+        # a deny here behaves like a guard deny: the tool does not run and the
+        # model sees a ```denied: ...``` result it can react to
+        if invocation.decision != 'deny':
+            for gate in tool_gates or []:
+                verdict = gate.admit(ToolContext(invocation=invocation))
+                if not verdict.admit:
+                    invocation.decision = 'deny'
+                    invocation.reason = verdict.reason or 'blocked by a gate'
+                    break
         if invocation.decision != 'deny':
             try:
                 # the seam: the agent's sandbox chain contains the exec (a hard
@@ -781,10 +849,20 @@ class TokeoAi(MetaMixin):
         guards = self._resolve_guards(agent_obj)
         before_guards = [guard for guard in guards if guard._meta.phase == 'before']
         after_guards = [guard for guard in guards if guard._meta.phase == 'after']
+        # gates (selected on the agent) are human-in-the-loop checkpoints: a
+        # prompt gate may stop a model call, a tool gate may stop a tool call.
+        # with no agent there are none, so the raw path is unchanged
+        prompt_gates, tool_gates = self._resolve_gates(agent_obj)
         trace = []
         messages = list(messages)
         steps = 0
         failed_loops = 0
+        # a prompt gate runs before the model call; a deny stops the turn before
+        # the request goes out, with no model to react, so the loop ends here
+        # and the refusal carries the reason
+        stopped = self._prompt_gate_stop(prompt_gates, messages)
+        if stopped is not None:
+            return stopped
         result = provider.chat(profile, messages, tools=specs, model_params=model_params)
         while result.tool_calls:
             # max_steps caps the tool rounds of one request; 0 is unlimited.
@@ -794,8 +872,11 @@ class TokeoAi(MetaMixin):
             messages.append(self._assistant_turn(result))
             succeeded = False
             for call in result.tool_calls:
-                if guards:
-                    content = self._exec_guarded(call, before_guards, after_guards, trace, agent_obj, profile, deny)
+                if guards or tool_gates:
+                    # the guarded path also carries the tool gates; it runs when
+                    # there are guards or gates, so a gate is never skipped just
+                    # because an agent declared no guards
+                    content = self._exec_guarded(call, before_guards, after_guards, trace, agent_obj, profile, deny, tool_gates)
                     last = trace[-1]
                     ok = last.decision != 'deny' and last.error is None
                 else:
@@ -822,6 +903,12 @@ class TokeoAi(MetaMixin):
             failed_loops = 0 if succeeded else failed_loops + 1
             if max_loops and failed_loops >= max_loops:
                 raise TokeoAiError(f'ai max_loops ({max_loops}) reached, execution aborted')
+            # the prompt gate runs again before each follow-up model call: a
+            # deny stops the loop here, keeping the trace gathered so far
+            stopped = self._prompt_gate_stop(prompt_gates, messages)
+            if stopped is not None:
+                stopped.trace = trace
+                return stopped
             result = provider.chat(profile, messages, tools=specs, model_params=model_params)
         result.trace = trace
         return result
