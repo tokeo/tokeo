@@ -80,7 +80,7 @@ ai:
     ### the wasm guest. DANGER -- it executes arbitrary code, so it is only
     ### safe behind the wasm sandbox (or a hardened container), never
     ### in-process. not registered by default, so it is named by its full
-    ### dotted class path. paired with the "coded" sandbox and "codermock"
+    ### dotted class path. paired with the "coded" sandbox and "coder"
     ### agent below, driven by the mock's "text upper|reverse|len <sentence>"
     coding:
       type: tokeo.core.ai.tools.python_untrusted_exec.TokeoAiPythonUntrustedExecTool
@@ -246,19 +246,21 @@ ai:
           - jailed
           - allow
 
-    ### the codeact demo: the mock turns a "text upper|reverse|len <sentence>"
-    ### prompt into model-generated python, and this agent runs it in the wasm
-    ### guest -- real isolation for code the model wrote. opt-in: it needs the
-    ### ./wasm build (see core/ai/sandboxes/WASM.md). every call is audited, so
-    ### the log shows the synthesized code ran in sandbox "coded". try:
-    ###   {{ app_label }} ai ask "text upper der wochentag von heute" --agent codermock
-    ###   {{ app_label }} ai ask "text reverse otto" --agent codermock
-    ###   {{ app_label }} ai ask "text len wir sehen uns in 7 tagen" --agent codermock
-    codermock:
+    ### the coder agent: it offers the coding tool and runs whatever code the
+    ### model writes in the wasm guest -- real isolation for model-written code.
+    ### the agent is generic (any profile may drive it); the codermock profile
+    ### below pairs it with the mock for a deterministic demo, while a real
+    ### model can drive it via --agent coder. opt-in: it needs the ./wasm build
+    ### (see core/ai/sandboxes/WASM.md). every call is audited, so the log shows
+    ### the code ran in sandbox "coded". try the mock demo with:
+    ###   {{ app_label }} ai ask "text upper der wochentag von heute" --agent coder
+    ###   {{ app_label }} ai ask "text reverse otto" --agent coder
+    ###   {{ app_label }} ai ask "text len wir sehen uns in 7 tagen" --agent coder
+    coder:
       type: fundi
       options:
-        ### only this agent offers the coding tool, so the mock's codeact
-        ### synthesis activates only here -- the other agents never run code
+        ### only this agent offers the coding tool, so code execution (the
+        ### mock's synthesis, or a real model's) activates only here
         tools:
           - coding
         guards:
@@ -310,7 +312,7 @@ ai:
         - filesystem
 
     ### the codeact demo profile: the deterministic mock provider against the
-    ### codermock agent. a "text upper|reverse|len <sentence>" prompt makes the
+    ### coder agent. a "text upper|reverse|len <sentence>" prompt makes the
     ### mock synthesize python, which runs in the wasm guest -- the model
     ### writes code, the sandbox isolates it. opt-in: needs the ./wasm build
     ### (core/ai/sandboxes/WASM.md). use --json to see the synthesized code and
@@ -320,43 +322,52 @@ ai:
     codermock:
       type: mock
       purpose: codeact
-      agent: codermock
+      agent: coder
 
-    ### a local or remote OpenAI-compatible server you run yourself
-    # assistant:
-    #   ### provider type; "oai_compat" speaks the OpenAI-compatible chat
-    #   ### completions protocol -- the one ollama, vllm, llama.cpp, mlx and
-    #   ### the commercial apis all share, so one provider serves them all
-    #   type: oai_compat
-    #   ### provider connection settings live under "options"
-    #   options:
-    #     ### model name as your server exposes it
-    #     model: qwen2.5
-    #     ### base url of the running server (ollama 11434, vllm 8000, mlx 8080)
-    #     base_url: http://localhost:11434/v1
-    #     ### optional bearer token for a secured api. local servers usually
-    #     ### ignore it; for a real key, use the normal config resolution --
-    #     ### plain text, a ${ENV_VAR} expansion, or a vault-backed value --
-    #     ### so the secret need never sit here in clear text
-    #     # key: ${OPENAI_API_KEY}
-    #     ### seconds before the call gives up (inference is slow; default 120)
-    #     # timeout: 120
-    #   ### model parameters passed straight through to the endpoint (no
-    #   ### validation here -- the endpoint owns the valid ranges, which vary
-    #   ### by model). a hook may override any of these per call. common keys:
-    #   ###   temperature      randomness/creativity, ~0.0-2.0 (lower = focused)
-    #   ###   top_p            nucleus sampling cutoff, 0.0-1.0
-    #   ###   max_tokens       cap on the generated answer length
-    #   ###   frequency_penalty / presence_penalty   damp repetition, ~-2.0-2.0
-    #   ###   stop             string or list that ends generation
-    #   ###   seed             fixed value for (mostly) reproducible output
-    #   ###   response_format  e.g. {type: json_object} for structured output
-    #   ###   tool_choice      auto/none/required, or a named function
-    #   # model_params:
-    #   #   temperature: 0.2
-    #   #   top_p: 0.9
-    #   #   max_tokens: 1024
-    #   ### optional free-form selector, usable via "ai ask --purpose"
-    #   purpose: general
-    #   ### the agent (composition) this profile runs
-    #   agent: guarded
+    ### a local or remote OpenAI-compatible server you run yourself. wired to
+    ### the coder agent, so the real model writes python that runs in the wasm
+    ### guest. set <modelname> to the id your server exposes (check it with:
+    ### curl http://localhost:8000/v1/models). then try:
+    ###   {{ app_label }} ai ask "berechne die summe von 1 bis 100" --profile assistant
+    ###   {{ app_label }} ai ask "hauptstadt von frankreich" --profile assistant --json
+    assistant:
+      ### provider type; "oai_compat" speaks the OpenAI-compatible chat
+      ### completions protocol -- the one ollama, vllm, llama.cpp, mlx and
+      ### the commercial apis all share, so one provider serves them all
+      type: oai_compat
+      ### provider connection settings live under "options"
+      options:
+        ### model name as your server exposes it; replace the placeholder
+        model: "<modelname>"
+        ### base url of the running server (vllm 8000, ollama 11434, mlx 8080)
+        base_url: http://localhost:8000/v1
+        ### optional bearer token for a secured api. local servers usually
+        ### ignore it; for a real key, use the normal config resolution --
+        ### plain text, a ${ENV_VAR} expansion, or a vault-backed value --
+        ### so the secret need never sit here in clear text
+        # key: ${OPENAI_API_KEY}
+        ### seconds before the call gives up (inference is slow; default 120)
+        # timeout: 120
+      ### model parameters passed straight through to the endpoint (no
+      ### validation here -- the endpoint owns the valid ranges, which vary
+      ### by model). override any of these per call with --model_param key=value
+      ### (repeatable); --model_param key=null removes a key for that call.
+      ### common keys:
+      ###   temperature      randomness/creativity, ~0.0-2.0 (lower = focused)
+      ###   top_p            nucleus sampling cutoff, 0.0-1.0
+      ###   max_tokens       cap on the generated answer length
+      ###   frequency_penalty / presence_penalty   damp repetition, ~-2.0-2.0
+      ###   stop             string or list that ends generation
+      ###   seed             fixed value for (mostly) reproducible output
+      ###   response_format  e.g. {type: json_object} for structured output
+      ###   tool_choice      auto/none/required, or a named function
+      ###   model            overrides the model above for that call only
+      # model_params:
+      #   temperature: 0.2
+      #   top_p: 0.9
+      #   max_tokens: 1024
+      ### optional free-form selector, usable via "ai ask --purpose"
+      purpose: assistant
+      ### the agent (composition) this profile runs; coder runs model-written
+      ### code in the wasm sandbox
+      agent: coder

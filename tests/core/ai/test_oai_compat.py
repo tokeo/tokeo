@@ -197,6 +197,22 @@ def test_oai_compat_call_params_override_profile(monkeypatch):
     assert seen['body']['top_p'] == 0.9
 
 
+def test_oai_compat_model_param_overrides_profile_model(monkeypatch):
+    seen = {}
+
+    def handler(request):
+        seen['body'] = json.loads(request.content)
+        return httpx.Response(200, json={'choices': [{'message': {'content': 'ok'}}]})
+
+    profile = {'options': {'base_url': 'http://x/v1', 'model': 'from-profile'}}
+    provider = _provider_with(handler, monkeypatch)
+    # a model key in model_params targets a different model on the same endpoint
+    provider.chat(profile, [{'role': 'user', 'content': 'hi'}], model_params={'model': 'override-model'})
+    assert seen['body']['model'] == 'override-model'
+    # model appears once, not duplicated, and messages stay intact
+    assert seen['body']['messages'] == [{'role': 'user', 'content': 'hi'}]
+
+
 def test_oai_compat_maps_refusal(monkeypatch):
     def handler(request):
         return httpx.Response(200, json={'choices': [{'message': {'refusal': 'I cannot help with that'}, 'finish_reason': 'stop'}]})

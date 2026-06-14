@@ -77,6 +77,7 @@ from prompt_toolkit.completion import Completer, Completion
 
 from tokeo.ext.argparse import Controller
 from tokeo.core.utils.base import as_list
+from tokeo.core.ai.utils import parse_model_params
 from tokeo.core.ai import (
     TokeoAiError,
     ToolResult,
@@ -897,12 +898,15 @@ class _ChatCompleter(Completer):
 
     """
 
-    def __init__(self, names, switches):
+    def __init__(self, names, switches, extra_switches=None):
         # names: {'profile': [...], 'agent': [...], 'model': [...],
         # 'purpose': [...]} from the handler; switches: {'--profile':
-        # 'profile', ...} mapping the flag to its names key
+        # 'profile', ...} mapping the flag to its names key. extra_switches:
+        # flag names offered for completion but carrying a free value (no
+        # configured names to suggest), such as --model_param
         self._names = names
         self._switches = switches
+        self._extra_switches = list(extra_switches or [])
 
     def get_completions(self, document, complete_event):
         text = document.text_before_cursor
@@ -923,8 +927,9 @@ class _ChatCompleter(Completer):
                 if name.startswith(current):
                     yield Completion(name, start_position=-len(current))
         elif current.startswith('-'):
-            # completing a switch name itself
-            for switch in self._switches:
+            # completing a switch name itself (selectors plus the free-value
+            # switches such as --model_param)
+            for switch in list(self._switches) + self._extra_switches:
                 if switch.startswith(current):
                     yield Completion(switch, start_position=-len(current))
 
@@ -950,6 +955,14 @@ class AiController(Controller):
             (['--model'], dict(help='select an ai profile by model', dest='model')),
             (['--purpose'], dict(help='select an ai profile by purpose', dest='purpose')),
             (['--agent'], dict(help='select an ai agent by name', dest='agent')),
+            (
+                ['--model_param'],
+                dict(
+                    help='per-call model parameter as key=value (repeatable; key=null removes it)',
+                    action='append',
+                    dest='model_param',
+                ),
+            ),
             (['--json'], dict(help='print the full result as json', action='store_true', dest='as_json')),
         ],
     )
@@ -959,12 +972,14 @@ class AiController(Controller):
         prompt = ' '.join(self.app.pargs.prompt or [])
         if not prompt:
             raise TokeoAiError('no prompt given; usage: ai ask "your question"')
+        model_params = parse_model_params(self.app.pargs.model_param)
         result = self.app.ai.chat(
             [{'role': 'user', 'content': prompt}],
             profile=self.app.pargs.profile,
             model=self.app.pargs.model,
             purpose=self.app.pargs.purpose,
             agent=self.app.pargs.agent,
+            model_params=model_params or None,
         )
         if self.app.pargs.as_json:
             self.app.print(json.dumps(asdict(result), indent=2))
@@ -978,6 +993,14 @@ class AiController(Controller):
             (['--model'], dict(help='select an ai profile by model', dest='model')),
             (['--purpose'], dict(help='select an ai profile by purpose', dest='purpose')),
             (['--agent'], dict(help='select an ai agent by name', dest='agent')),
+            (
+                ['--model_param'],
+                dict(
+                    help='per-call model parameter as key=value (repeatable; key=null removes it)',
+                    action='append',
+                    dest='model_param',
+                ),
+            ),
         ],
     )
     def chat(self):
@@ -1001,6 +1024,7 @@ class AiController(Controller):
             'agent': self.app.pargs.agent,
             'model': self.app.pargs.model,
             'purpose': self.app.pargs.purpose,
+            'model_params': parse_model_params(self.app.pargs.model_param),
         }
         messages = []
         completer = self._chat_completer()
@@ -1032,12 +1056,15 @@ class AiController(Controller):
                     if changed and not text:
                         # a pure switch line: confirm the new selection and
                         # wait for the next prompt, no model call
+                        params = session['model_params']
+                        shown = ' '.join(f'{k}={v}' for k, v in params.items()) if params else '-'
                         self.app.print(
                             'ai chat - '
                             f"profile={session['profile'] or '-'} "
                             f"agent={session['agent'] or '-'} "
                             f"model={session['model'] or '-'} "
-                            f"purpose={session['purpose'] or '-'}"
+                            f"purpose={session['purpose'] or '-'} "
+                            f'model_params={shown}'
                         )
                         continue
                     if not text:
@@ -1050,6 +1077,7 @@ class AiController(Controller):
                             model=session['model'],
                             purpose=session['purpose'],
                             agent=session['agent'],
+                            model_params=session['model_params'] or None,
                         )
                     except TokeoAiError as err:
                         # a selector or provider problem from the handler
@@ -1101,8 +1129,9 @@ class AiController(Controller):
     def _chat_completer(self):
         # a position-independent completer built from the running config, so
         # "--" offers the four switches and a switch then offers its values
-        # no matter where in the line they are typed
-        return _ChatCompleter(self.app.ai.selectors(), self._CHAT_SWITCHES)
+        # no matter where in the line they are typed. --model_param is offered
+        # as a free-value switch (its key=value has no configured names)
+        return _ChatCompleter(self.app.ai.selectors(), self._CHAT_SWITCHES, ['--model_param'])
 
     def _chat_switches(self, line, session):
         # pull any "--flag value" pairs out of the line, validate each value
@@ -1110,7 +1139,10 @@ class AiController(Controller):
         # only if all are valid. returns (residual_prompt, changed, error);
         # a normal prompt has none of these tokens and passes through
         # untouched. validation here (plus the completer) is what stops a
-        # typo such as "--agent guardedsss" from silently doing nothing
+        # typo such as "--agent guardedsss" from silently doing nothing.
+        # --model_param is handled apart from the four selectors: it is
+        # repeatable and carries a key=value (not a validated single value), so
+        # it merges into the session's model_params (null/empty removes a key)
         try:
             tokens = shlex.split(line)
         except ValueError:
@@ -1119,10 +1151,15 @@ class AiController(Controller):
             tokens = line.split()
         names = self.app.ai.selectors()
         pending = []
+        param_pairs = []
         rest = []
         index = 0
         while index < len(tokens):
             token = tokens[index]
+            if token == '--model_param' and index + 1 < len(tokens):
+                param_pairs.append(tokens[index + 1])
+                index += 2
+                continue
             if token in self._CHAT_SWITCHES and index + 1 < len(tokens):
                 key = self._CHAT_SWITCHES[token]
                 value = tokens[index + 1]
@@ -1135,10 +1172,28 @@ class AiController(Controller):
                 continue
             rest.append(token)
             index += 1
-        if not pending:
+        if not pending and not param_pairs:
             # nothing changed: return the original line so a normal prompt's
             # punctuation and spacing survive exactly
             return line, False, None
+        # apply model_param changes by merging onto the running session params,
+        # so a key set earlier survives and a null/empty value drops just that
+        # key. a malformed pair (no "=") reports an error and changes nothing
+        if param_pairs:
+            merged = dict(session.get('model_params') or {})
+            try:
+                update = parse_model_params(param_pairs)
+            except TokeoAiError as err:
+                return line, False, str(err)
+            for pair in param_pairs:
+                key = pair.partition('=')[0].strip()
+                if key in update:
+                    merged[key] = update[key]
+                else:
+                    # null/empty: parse_model_params dropped it, so remove it
+                    # from the running session params too
+                    merged.pop(key, None)
+            session['model_params'] = merged
         for key, value in pending:
             if key in self._CHAT_EXCLUSIVE:
                 # keep the three profile selectors mutually exclusive

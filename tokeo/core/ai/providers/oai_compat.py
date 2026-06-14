@@ -94,10 +94,16 @@ class TokeoAiOaiCompatProvider(TokeoAiProvider):
         if model_params:
             params.update(model_params)
 
+        # model is the one fixed key a param may override: a call can target a
+        # different model on the same endpoint without a second profile. it is
+        # pulled out of params so it does not appear twice in the body; messages
+        # and tools stay fixed and can never be shadowed by a stray param
+        use_model = params.pop('model', None) or model
+
         # the request body: the chat-completions shape. params are spread in
-        # first, then the fixed keys, so model/messages/tools can never be
-        # shadowed by a stray param. tools travel only when offered
-        body = {**params, 'model': model, 'messages': messages or []}
+        # first, then the fixed keys, so messages/tools can never be shadowed.
+        # tools travel only when offered
+        body = {**params, 'model': use_model, 'messages': messages or []}
         if tools:
             body['tools'] = tools
         headers = {'Content-Type': 'application/json'}
