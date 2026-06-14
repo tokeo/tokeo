@@ -76,10 +76,20 @@ class ChatResult:
     - **text** (str): Assistant message content; may be empty on a turn that
         only requests tool calls
     - **reasoning** (str): The model's reasoning/thinking, when available;
-        kept separate from the answer text
+        kept separate from the answer text. A non-standard field that only some
+        endpoints (DeepSeek-R1, QwQ and similar local reasoning models) report
+        under ```reasoning```/```reasoning_content```; empty when absent, so it
+        is harvested when present, never required
+    - **refusal** (str): The model's explicit refusal message, when it declines
+        rather than answers (structured-outputs ```refusal``` field); empty
+        otherwise. Distinct from an empty ```text```, so a caller can tell
+        "declined" from "no content"
     - **tool_calls** (list): The ```ToolCall``` entries the model requested
     - **usage** (Usage | None): Token usage, when the provider reports it
     - **finish_reason** (str | None): Why the model stopped, when reported
+    - **system_fingerprint** (str | None): The backend configuration fingerprint
+        the endpoint reports, when present; with a fixed seed it identifies the
+        exact backend state, so a changed value explains differing outputs
     - **raw** (dict | None): The unmodified provider response, kept so a
         caller can always inspect exactly what came back
     - **trace** (list): The ```Invocation``` records of the tool calls the loop
@@ -89,9 +99,11 @@ class ChatResult:
 
     text: str = ''
     reasoning: str = ''
+    refusal: str = ''
     tool_calls: list = field(default_factory=list)
     usage: Usage | None = None
     finish_reason: str | None = None
+    system_fingerprint: str | None = None
     raw: dict | None = None
     trace: list = field(default_factory=list)
 

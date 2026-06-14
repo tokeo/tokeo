@@ -32,6 +32,7 @@ _PROFILE_KEYS = {
     'enabled',
     'native_tools_call',
     'tools_parser',
+    'model_params',
     'options',
 }
 _ITEM_KEYS = {'type', 'options'}

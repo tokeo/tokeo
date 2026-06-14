@@ -60,6 +60,9 @@ dependencies = [
     "invoke>=2.1.4",
     "paramiko>=2.7,<4",
 {% endif -%}
+{% if feature_ai == "Y" %}
+    "httpx",
+{% endif -%}
 {% if feature_ai == "Y" and feature_ai_akili == "Y" %}
     "numpy",
     "numba",

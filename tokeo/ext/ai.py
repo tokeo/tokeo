@@ -92,6 +92,7 @@ from tokeo.core.ai.sandboxes.in_process import TokeoAiInProcessSandbox
 from tokeo.core.ai.sandboxes.subprocess import TokeoAiSubprocessSandbox
 from tokeo.core.ai.linter import TokeoAiLinter
 from tokeo.core.ai.providers.mock import TokeoAiMockProvider
+from tokeo.core.ai.providers.oai_compat import TokeoAiOaiCompatProvider
 
 
 class TokeoAi(MetaMixin):
@@ -689,7 +690,18 @@ class TokeoAi(MetaMixin):
             return f'error: {invocation.error}'
         return invocation.result.text if invocation.result is not None else ''
 
-    def chat(self, messages, deny=None, profile=None, model=None, purpose=None, agent=None, max_steps=None, max_loops=None):
+    def chat(
+        self,
+        messages,
+        deny=None,
+        profile=None,
+        model=None,
+        model_params=None,
+        purpose=None,
+        agent=None,
+        max_steps=None,
+        max_loops=None,
+    ):
         """
         Run the agent loop and return the final ```ChatResult```.
 
@@ -713,6 +725,10 @@ class TokeoAi(MetaMixin):
             the agent's tool set, never extend it
         - **profile** (str | None): Select a profile by name
         - **model** (str | None): Select the first enabled profile by model
+        - **model_params** (dict | None): Per-call model parameters (temperature,
+            top_p, ...) that override the profile's ```model_params``` for this
+            request only; passed to the provider, which spreads them into the
+            request. Providers without a configurable model ignore them
         - **purpose** (str | None): Select the first enabled profile by purpose
         - **agent** (str | None): Select an agent by name; defaults to the
             configured ```ai.defaults.agent``` when one is set
@@ -768,7 +784,7 @@ class TokeoAi(MetaMixin):
         messages = list(messages)
         steps = 0
         failed_loops = 0
-        result = provider.chat(profile, messages, tools=specs)
+        result = provider.chat(profile, messages, tools=specs, model_params=model_params)
         while result.tool_calls:
             # max_steps caps the tool rounds of one request; 0 is unlimited.
             # reaching it aborts loudly: a silent empty answer hides the cause
@@ -805,7 +821,7 @@ class TokeoAi(MetaMixin):
             failed_loops = 0 if succeeded else failed_loops + 1
             if max_loops and failed_loops >= max_loops:
                 raise TokeoAiError(f'ai max_loops ({max_loops}) reached, execution aborted')
-            result = provider.chat(profile, messages, tools=specs)
+            result = provider.chat(profile, messages, tools=specs, model_params=model_params)
         result.trace = trace
         return result
 
@@ -825,7 +841,16 @@ class TokeoAi(MetaMixin):
             ],
         }
 
-    def ask(self, prompt, deny=None, profile=None, model=None, purpose=None, agent=None):
+    def ask(
+        self,
+        prompt,
+        deny=None,
+        profile=None,
+        model=None,
+        model_params=None,
+        purpose=None,
+        agent=None,
+    ):
         """
         Send a single user prompt through the loop and return the reply text.
 
@@ -837,6 +862,8 @@ class TokeoAi(MetaMixin):
             the agent's tool set, never extend it
         - **profile** (str | None): Select a profile by name
         - **model** (str | None): Select the first enabled profile by model
+        - **model_params** (dict | None): Per-call model parameters that override
+            the profile's ```model_params``` for this request only
         - **purpose** (str | None): Select the first enabled profile by purpose
         - **agent** (str | None): Select an agent by name; defaults to the
             configured ```ai.defaults.agent``` when one is set
@@ -847,7 +874,7 @@ class TokeoAi(MetaMixin):
 
         """
         messages = [{'role': 'user', 'content': prompt}]
-        result = self.chat(messages, deny=deny, profile=profile, model=model, purpose=purpose, agent=agent)
+        result = self.chat(messages, deny=deny, profile=profile, model=model, model_params=model_params, purpose=purpose, agent=agent)
         return result.text
 
 
@@ -1164,6 +1191,7 @@ def ai_extend_app(app):
     # core ships no tools and no domain models; a project names its own
     # tools and providers by a dotted ```type```
     app.ai.register('provider', 'mock', TokeoAiMockProvider)
+    app.ai.register('provider', 'oai_compat', TokeoAiOaiCompatProvider)
     # built-in agent: the standard composition root, the ```fundi``` type (the
     # master that wields the tools); a project configures its agents under
     # ```ai.agents``` and selects one per call, via a profile, or defaults.agent

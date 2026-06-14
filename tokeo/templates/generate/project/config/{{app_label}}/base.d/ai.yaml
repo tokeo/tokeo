@@ -322,19 +322,40 @@ ai:
       purpose: codeact
       agent: codermock
 
-    ### a local, OpenAI-compatible server you run yourself
+    ### a local or remote OpenAI-compatible server you run yourself
     # assistant:
-    #   ### provider type; "openai" speaks the OpenAI-compatible chat api
-    #   type: openai
+    #   ### provider type; "oai_compat" speaks the OpenAI-compatible chat
+    #   ### completions protocol -- the one ollama, vllm, llama.cpp, mlx and
+    #   ### the commercial apis all share, so one provider serves them all
+    #   type: oai_compat
     #   ### provider connection settings live under "options"
     #   options:
-    #     ### model name as your local server exposes it
+    #     ### model name as your server exposes it
     #     model: qwen2.5
     #     ### base url of the running server (ollama 11434, vllm 8000, mlx 8080)
     #     base_url: http://localhost:11434/v1
-    #     ### optional api key; local servers usually ignore it, vault-backed
-    #     ### with a !vault:<profile> tag when a real key is needed
-    #     # key: not-needed
+    #     ### optional bearer token for a secured api. local servers usually
+    #     ### ignore it; for a real key, use the normal config resolution --
+    #     ### plain text, a ${ENV_VAR} expansion, or a vault-backed value --
+    #     ### so the secret need never sit here in clear text
+    #     # key: ${OPENAI_API_KEY}
+    #     ### seconds before the call gives up (inference is slow; default 120)
+    #     # timeout: 120
+    #   ### model parameters passed straight through to the endpoint (no
+    #   ### validation here -- the endpoint owns the valid ranges, which vary
+    #   ### by model). a hook may override any of these per call. common keys:
+    #   ###   temperature      randomness/creativity, ~0.0-2.0 (lower = focused)
+    #   ###   top_p            nucleus sampling cutoff, 0.0-1.0
+    #   ###   max_tokens       cap on the generated answer length
+    #   ###   frequency_penalty / presence_penalty   damp repetition, ~-2.0-2.0
+    #   ###   stop             string or list that ends generation
+    #   ###   seed             fixed value for (mostly) reproducible output
+    #   ###   response_format  e.g. {type: json_object} for structured output
+    #   ###   tool_choice      auto/none/required, or a named function
+    #   # model_params:
+    #   #   temperature: 0.2
+    #   #   top_p: 0.9
+    #   #   max_tokens: 1024
     #   ### optional free-form selector, usable via "ai ask --purpose"
     #   purpose: general
     #   ### the agent (composition) this profile runs

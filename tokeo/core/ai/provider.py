@@ -40,7 +40,7 @@ class TokeoAiProvider:
         """
         pass
 
-    def chat(self, profile, messages, tools=None):
+    def chat(self, profile, messages, tools=None, model_params=None):
         """
         Send messages to the model and return a normalized result.
 
@@ -50,6 +50,10 @@ class TokeoAiProvider:
             provider-specific keys (such as ```base_url``` and ```key```)
         - **messages** (list): Chat messages as plain OpenAI-style dicts
         - **tools** (list|None): Optional tool definitions for the call
+        - **model_params** (dict|None): Per-call model parameters that override
+            the profile's ```model_params``` (temperature, top_p, ...); a hook
+            may pass adjusted values without touching the config. Providers that
+            do not drive a configurable model (mock, akili) ignore it
 
         ### Returns
 

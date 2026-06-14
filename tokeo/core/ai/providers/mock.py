@@ -36,7 +36,7 @@ class TokeoAiMockProvider(TokeoAiProvider):
 
     """
 
-    def chat(self, profile, messages, tools=None):
+    def chat(self, profile, messages, tools=None, model_params=None):
         """
         Return a deterministic reply, tool call, or final answer.
 

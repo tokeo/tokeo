@@ -56,6 +56,11 @@ dev = [
     "pocketbase",
     "invoke>=2.2.1",
     "paramiko>=2.7,<4",
+    "httpx",
+    "numpy",
+    "numba",
+    "torch",
+    "wasmtime",
 ]
 
 [project.scripts]
