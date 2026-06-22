@@ -105,6 +105,11 @@ Other admonition types follow the same form: `.. note::`, `.. tip::`,
 `.. important::`, `.. caution::`. Leave a blank line after the directive and
 indent the body by four spaces.
 
+Do not place a horizontal rule (`---`) directly after an admonition or between
+an admonition and the next section heading. The admonition box already closes
+the block visually; a rule on top of it reads as a double divider. Let the next
+heading follow after a blank line instead.
+
 ### Code Formatting
 
 1. Use **bold** (double asterisks) for parameter names and return types: `**param_name**`
@@ -136,6 +141,26 @@ not a bold marketing label:
 
 Do not lead a bullet with a bold noun phrase; describe what the code does,
 starting with a verb where possible.
+
+### Linter Interactions
+
+Docstrings are checked by the same lint pass as code, so a few interactions
+matter:
+
+1. **Triple backticks count toward W505.** flake8 with `--max-doc-length 84`
+   counts the backtick characters of an inline `` ```identifier``` `` span. A
+   docstring line with a long dotted path in backticks can exceed 84 even though
+   the prose is short — rephrase to keep the long identifier out of the running
+   text, or break the line.
+2. **A docstring containing a regex needs an `r"""` prefix.** Backslash escapes
+   in a normal `"""` docstring raise W605 / a SyntaxWarning (and the compile
+   check runs with `-W error::SyntaxWarning`). Use a raw docstring `r"""…"""`
+   whenever the text shows a regex or other backslashes.
+3. **Template sources are not valid Python.** A file under
+   `templates/generate/` contains `{{ }}` placeholders, so flake8/compile/pyink
+   cannot read it as Python. Lint and format the GENERATED output instead, and
+   exclude the template tree from pyink with
+   `--force-exclude '/templates/generate/'`.
 
 ### Additional Best Practices
 

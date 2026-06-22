@@ -12,22 +12,22 @@
 ### settings from the previous ones:
 ### </p>
 ###
-### 1. Base configuration: `config/{{ app_label }}.yaml`
-### 1. Environment-specific configuration: `config/{{ app_label }}.[environment].yaml`
-### 1. Local environment-specific configuration: `config/{{ app_label }}.[environment].local.yaml`
-### 1. Directory based configuration: `config/{{ app_label }}/base.yaml`
-### 1. Directory splitted configuration: `config/{{ app_label }}/base.d/function.yaml`
-### 1. Directory splitted environment-specific configuration: `config/{{ app_label }}/development.d/function.yaml`
+### 1. Base configuration: ```config/{{ app_label }}.yaml```
+### 1. Environment-specific configuration: ```config/{{ app_label }}.[environment].yaml```
+### 1. Local environment-specific configuration: ```config/{{ app_label }}.[environment].local.yaml```
+### 1. Directory based configuration: ```config/{{ app_label }}/base.yaml```
+### 1. Directory splitted configuration: ```config/{{ app_label }}/base.d/function.yaml```
+### 1. Directory splitted environment-specific configuration: ```config/{{ app_label }}/development.d/function.yaml```
 ###
 ### <p>
-### Where `[environment]` can be one of:
+### Where ```[environment]``` can be one of:
 ### </p>
 ###
-### - ``development`` - Used during development
-### - ``testing`` - Used for testing environments
-### - ``production`` - Used in production deployments
+### - ```development``` - Used during development
+### - ```testing``` - Used for testing environments
+### - ```production``` - Used in production deployments
 ###
-### - ``base`` - Used for Standard on directory based configurations
+### - ```base``` - Used for Standard on directory based configurations
 ###
 ### ### Overloading Configuration:
 ###
@@ -49,9 +49,9 @@
 ### ### Extende Local Configuration Files:
 ###
 ### <p>
-### Local configuration files (ending with ``.local.yaml``) are used for environment-specific
+### Local configuration files (ending with ```.local.yaml```) are used for environment-specific
 ### secrets and settings that should not be checked into source control. These files should
-### be left added to ``.gitignore``.
+### be left added to ```.gitignore```.
 ### </p>
 ---
 

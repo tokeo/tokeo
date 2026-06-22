@@ -8,7 +8,7 @@ functionality to clients, connecting web interfaces with core business logic.
 ### Features
 
 - **Isolated endpoint functions**: Prevents global state pollution
-- **Business logic integration**: Seamless connection with ``core.tasks``
+- **Business logic integration**: Seamless connection with ```core.tasks```
 - **JSON data exchange**: For frontend/backend interaction
 - **API documentation** through automatically generated OpenAPI specs
 
@@ -16,13 +16,13 @@ functionality to clients, connecting web interfaces with core business logic.
 
 Endpoints are defined as pure asynchronous functions. Instead of using
 decorators directly in this file, these functions are imported and mapped
-programmatically inside ``site/routes.py``.
+programmatically inside ```site/routes.py```.
 
 ### Usage
 
 Define a new API endpoint as a pure function:
 
-##### create ``site/apis/products.py``
+##### create ```site/apis/products.py```
 
 ```python
 from myapp.core.tasks import performers
@@ -55,7 +55,7 @@ async def search_products(request: ProductRequest):
     return products
 ```
 
-##### register it in ``site/routes.py``
+##### register it in ```site/routes.py```
 
 ```python
 def apis_map():
@@ -74,7 +74,7 @@ The APIs module can interact with various parts of the application:
 
 ### Notes
 
-- Keep business logic in ``core.*`` modules, not in the API handlers
+- Keep business logic in ```core.*``` modules, not in the API handlers
 - Use FastAPI's typing system for request/response validation
 - Implement proper error handling and status codes
 - Consider authentication and authorization requirements

@@ -85,7 +85,7 @@
         <dl id="index-module-list">
         % for name, desc in modules:
             <div class="module-card">
-            <dt><a href="${link_prefix}${name}">${name}</a></dt>
+            <dt><a href="${link_prefix}${name.replace('.', '/')}">${name}</a></dt>
             <dd>${desc | glimpse, to_html}</dd>
             </div>
         % endfor
@@ -247,12 +247,35 @@
 
     <header>
         % if breadcrumbs:
+            <%
+                # count how many levels were actually rendered: walk the
+                # supermodule chain up from this module. its top (supermodule
+                # is None) is the root of THIS render selection, so anything
+                # above it in the dotted name was never rendered and must not
+                # be linked (a selective render of e.g. tokeo.core.utils has no
+                # index.html for tokeo or tokeo.core)
+                rendered_depth = 0
+                _m = module
+                while _m is not None:
+                    rendered_depth += 1
+                    _m = _m.supermodule
+                parts = module.name.split('.')
+                # the lowest `rendered_depth` levels exist; the parents above
+                # them (the first len(parts) - rendered_depth) do not
+                first_rendered = len(parts) - rendered_depth
+            %>
             <nav class="breadcrumbs">
                 <a href="/">All packages</a>
-                <% parts = module.name.split('.')[:-1] %>
-                % for i, m in enumerate(parts):
-                    <% parent = '.'.join(parts[:i+1]) %>
-                    :: <a href="/${parent.replace('.', '/')}/">${parent}</a>
+                % for i, m in enumerate(parts[:-1]):
+                    <%
+                        parent = '.'.join(parts[:i+1])
+                        parent_path = parent.replace('.', '/')
+                    %>
+                    % if i >= first_rendered:
+                    :: <a href="/${parent_path}/">${parent}</a>
+                    % else:
+                    :: <span>${parent}</span>
+                    % endif
                 % endfor
             </nav>
         % endif

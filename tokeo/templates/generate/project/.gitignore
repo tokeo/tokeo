@@ -30,6 +30,15 @@
 !/{{app_label}}/
 !/{{app_label}}/**
 
+{% if feature_ai == "Y" and feature_ai_akili == "Y" %}
+# excluded to prevent accidental distribution.
+# code in this directory and deeper is subject
+# to a commercial-restricted license, not MIT.
+/{{app_label}}/core/ai/akili
+/{{app_label}}/core/ai/akili/**
+
+{% endif -%}
+
 !/public/
 !/public/**
 

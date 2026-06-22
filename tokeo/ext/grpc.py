@@ -62,7 +62,7 @@ class TokeoGrpc(MetaMixin):
     ### Notes
 
     - The server is lazily initialized when first accessed through
-        the ``server`` property
+        the ```server``` property
     - Server configuration is drawn from the application's 'grpc' config section
     - Provides methods for startup, shutdown, and serving (blocking mode)
     - Supports dynamic loading of servicer implementations

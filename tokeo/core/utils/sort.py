@@ -20,7 +20,7 @@ def sort_key_by_lex_and_num_ordered(x):
 
     ### Notes
 
-    : Intended for use as the ``key`` argument of sorted() or list.sort()
+    : Intended for use as the ```key``` argument of sorted() or list.sort()
 
     """
     return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', x)]

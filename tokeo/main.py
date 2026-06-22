@@ -1,5 +1,5 @@
 import os
-import signal
+import sys
 import tokeo.core.utils.strict  # noqa: F401
 from cement import App, TestApp
 from cement.core.exc import CaughtSignal
@@ -113,48 +113,51 @@ def main():
 
     ### Notes
 
-    - Returns nothing; the process exit code is set on ``app.exit_code`` and
+    - Returns nothing; the process exit code is set on ```app.exit_code``` and
         applied on close via the app's exit_on_close behavior
     - AssertionError and TokeoError are caught and reported with exit code 1;
         a CaughtSignal (SIGINT/SIGTERM) is caught and exits with code 0
 
     """
-    with Tokeo() as app:
-        try:
+    app = None
+    try:
+        app = Tokeo()
+        with app:
             app.run()
 
-        except AssertionError as e:
-            print(f'AssertionError > {e.args[0]}')
+    except (TokeoError, AssertionError) as e:
+        # a clean message for any error from setup or run; app is already bound,
+        # so the application logger is used when it is available
+        if app and app.log and app.log.error:
+            app.log.error(f'{type(e).__name__}:')
+            app.log.error(e.args[0] if e.args else str(e))
+        else:
+            print(f'{type(e).__name__}:')
+            print(e.args[0] if e.args else str(e))
+
+        if app:
             app.exit_code = 1
 
-            if app.debug is True:
-                import traceback
+        if app and app.debug is True:
+            import traceback
 
-                traceback.print_exc()
+            traceback.print_exc()
 
-        except TokeoError as e:
-            if app and app.log and app.log.error:
-                app.log.error(type(e).__name__)
-                app.log.error(e.args[0] if e.args else str(e))
-            else:
-                print(type(e).__name__)
-                print(e.args[0] if e.args else str(e))
-            app.exit_code = 1
+    except CaughtSignal as e:
+        # Default Cement signals are SIGINT and SIGTERM, exit 0 (non-error)
+        if e.signum == 2:
+            print('\nstopped by Ctrl-C')
+        elif e.signum == 15:
+            print('\nterminated by SIGTERM')
+        else:
+            print(f'\n{e}')
 
-            if app.debug is True:
-                import traceback
-
-                traceback.print_exc()
-
-        except CaughtSignal as e:
-            # cement turns SIGINT and SIGTERM into CaughtSignal; exit 0 (non-error)
-            if e.signum == signal.SIGINT:
-                print('\nstopped by Ctrl-C')
-            elif e.signum == signal.SIGTERM:
-                print('\nterminated by SIGTERM')
-            else:
-                print(f'\n{e}')
+        if app:
             app.exit_code = 0
+
+    # exit_on_close ends the process when the ```with``` exits normally; if setup
+    # or run raised, the error was handled above and the code is applied here
+    sys.exit(app.exit_code if app else 9)
 
 
 if __name__ == '__main__':

@@ -1,8 +1,8 @@
 """
-Built-in ``scrypt`` vault handler for Tokeo applications.
+Built-in ```scrypt``` vault handler for Tokeo applications.
 
 Derives the Fernet key from a passphrase using scrypt, a memory-hard key
-derivation function, then reuses the Fernet encrypt/decrypt of the ``enc``
+derivation function, then reuses the Fernet encrypt/decrypt of the ```enc```
 handler. The passphrase comes from an environment variable; the salt and cost
 parameters live in the profile and are not secret, so they can be committed
 with the configuration.
@@ -20,8 +20,8 @@ vault:
     parallelization: 1
 ```
 
-The cost parameters are optional; ``cost`` (scrypt's N, a power of two),
-``block_size`` (scrypt's r) and ``parallelization`` (scrypt's p) default to
+The cost parameters are optional; ```cost``` (scrypt's N, a power of two),
+```block_size``` (scrypt's r) and ```parallelization``` (scrypt's p) default to
 sensible values when omitted.
 
 """
@@ -39,7 +39,7 @@ class ScryptVault(EncVault):
     """
     Vault handler that derives its Fernet key from a passphrase via scrypt.
 
-    The profile names an environment variable (``env``) holding the passphrase
+    The profile names an environment variable (```env```) holding the passphrase
     and carries the scrypt salt and cost parameters. scrypt is memory-hard,
     which makes brute-forcing the passphrase on GPUs or ASICs expensive.
 
@@ -76,11 +76,11 @@ class ScryptVault(EncVault):
 
     def create(self, name):
         """
-        Build a ``scrypt`` profile scaffold with a fresh salt.
+        Build a ```scrypt``` profile scaffold with a fresh salt.
 
         The salt is generated and is not secret, so it is part of the profile.
         The passphrase is the user's own memorable secret and is shown only as
-        a placeholder for the ``VAULT_<NAME>_PASSPHRASE`` variable, to be
+        a placeholder for the ```VAULT_<NAME>_PASSPHRASE``` variable, to be
         replaced before use.
 
         ### Args

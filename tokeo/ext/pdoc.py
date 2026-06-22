@@ -11,7 +11,7 @@ browse the generated HTML during development.
 - Module list resolution from config or the conventional triple
     (app label, tests, tokeo) when modules is unset
 - External docstring source: markdown files under templates/pdoc/docstrings
-    keyed by ``{group}/{identifier}`` so decorator and extension docs can
+    keyed by ```{group}/{identifier}``` so decorator and extension docs can
     live outside the source they describe
 - Warning filter that drops the noisy PEP-224 variable-docstring warning
     and lifts pdoc 'Error: ...' warnings to a visible ❗ line
@@ -163,18 +163,13 @@ class TokeoPdoc(MetaMixin):
         self._templates = self._config('templates')
         # identify modules to document and unique them
         if self._config('modules', fallback=None) is None:
-            mods = [self.app._meta.label, 'tests', 'tokeo']
+            self._config_modules = [self.app._meta.label, 'tests', 'tokeo']
         elif isinstance(self._config('modules'), str):
-            mods = self._config('modules').split(',')
+            self._config_modules = self._config('modules').split(',')
         elif isinstance(self._config('modules'), (list, tuple)):
-            mods = self._config('modules')
+            self._config_modules = self._config('modules')
         else:
             raise TokeoPdocError('To define modules for rendering pdoc it must be from type str or list')
-        # make list unique but ordered by given list
-        self._modules = []
-        for mod in mods:
-            if mod not in self._modules:
-                self._modules.append(mod)
         # rewrite the pdoc._get_config to primary load from tokeo
         pdoc._get_config = _get_config
         # return self as reference
@@ -199,6 +194,14 @@ class TokeoPdoc(MetaMixin):
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
+    def unique_modules(self, modules):
+        # make list unique but ordered by given list
+        _modules = []
+        for mod in modules:
+            if mod not in _modules:
+                _modules.append(mod)
+        return _modules
+
     def docstrings(self, group, identifier):
         """
         Retrieve a docstring from external Markdown files.
@@ -219,7 +222,7 @@ class TokeoPdoc(MetaMixin):
         ### Notes
 
         - Searches in all registered docstrings directories for a matching file
-            with the path pattern `{dir}/{group}/{identifier}.md`
+            with the path pattern ```{dir}/{group}/{identifier}.md```
         - Caches results to avoid repeated file system access
         - Returns None if no matching docstring file is found
 
@@ -242,6 +245,46 @@ class TokeoPdoc(MetaMixin):
 
         # not found
         return None
+
+    def docstring_for_module_from_md(self, mod):
+        # the docstring rule for a module's package dir(s):
+        #   __init__.py present  -> its docstring wins (return None here)
+        #   only __init__.md      -> use its content as the docstring
+        #   both present          -> __init__.py wins, but flag it loudly
+        #   __init__.md in >1 distinct namespace dir -> pick one, flag it loudly
+        # a namespace __path__ can list the SAME dir more than once (editable
+        # installs add both a .pth root and a finder hook), so dedupe first --
+        # the same dir twice is not a conflict
+        dirs = []
+        for d in getattr(mod.obj, '__path__', []) or []:
+            if d not in dirs:
+                dirs.append(d)
+        py_dirs = [d for d in dirs if isfile(fs.join(d, '__init__.py'))]
+        md_dirs = [d for d in dirs if isfile(fs.join(d, '__init__.md'))]
+
+        # both a real package init and a markdown override is a conflict
+        if py_dirs and md_dirs:
+            self.app.print(
+                # fmt: skip
+                f'❗ Error: {mod.name}: both __init__.py and __init__.md present; '
+                f'using __init__.py and ignoring __init__.md'
+            )
+            return None
+        # a real __init__.py governs the docstring; nothing to inject
+        if py_dirs:
+            return None
+        # no markdown either: let the caller fall back to healing
+        if not md_dirs:
+            return None
+        # more than one namespace dir carries an __init__.md: ambiguous source
+        if len(md_dirs) > 1:
+            self.app.print(
+                # fmt: skip
+                f'❗ Error: {mod.name}: __init__.md found in several namespace dirs '
+                f'{md_dirs!r}; using an arbitrary one'
+            )
+        with open(fs.join(md_dirs[0], '__init__.md'), 'r', encoding='utf8') as f:
+            return f.read()
 
     def showwarning(self, message, *args, **kwargs):
         """
@@ -266,11 +309,11 @@ class TokeoPdoc(MetaMixin):
         if re.match(r'Couldn\'t read PEP-224 variable docstrings', f'{message}', re.IGNORECASE):
             pass
         elif re.match(r'Error', f'{message}', re.IGNORECASE):
-            self.app.print(f'❗{message}')
+            self.app.print(f'❗ {message}')
         else:
-            self.app.print(f'⚠️ {message}')
+            self.app.print(f'⚠️  {message}')
 
-    def render(self, clean=False):
+    def render(self, clean=False, with_modules=None):
         """
         Generate HTML documentation for the configured modules.
 
@@ -332,7 +375,7 @@ class TokeoPdoc(MetaMixin):
             # try/except handles that and drops the entire module, the
             # remaining ones are still rendered
             modules = []
-            for mod in self._modules:
+            for mod in self.unique_modules(with_modules if with_modules else self._config_modules):
                 try:
                     pmod = pdoc.Module(mod, context=context, skip_errors=True)
                     modules.append(pmod)
@@ -348,15 +391,27 @@ class TokeoPdoc(MetaMixin):
                 # but pdoc kept the shell); mod.html() would crash on that,
                 # so we synthesize __file__ and a docstring to keep the
                 # render going. The user sees ⚠️ markers per module so the
-                # gap in real docs is visible
+                # gap in real docs is visible.
+                #
+                # if a namespace package (no __init__.py) has no __file__ and no
+                # docstring; try an __init__.md in its package dir before any
+                # bland healing fallback
+                md_docstring = self.docstring_for_module_from_md(mod)
+
                 if not hasattr(mod.obj, '__file__'):
-                    self.app.print(f'⚠️ Warning: Healing import error for "{mod.name}"')
-                    mod.docstring = f'.. error:: Module "{mod.name}" had errors when processed by pdoc'
                     mod.obj.__file__ = mod.name
+                    if md_docstring:
+                        mod.docstring = md_docstring
+                    else:
+                        self.app.print(f'⚠️  Warning: Healing import error for "{mod.name}"')
+                        mod.docstring = f'.. error:: Module "{mod.name}" had errors when processed by pdoc'
 
                 if mod.docstring is None or mod.docstring == '':
-                    self.app.print(f'⚠️ Warning: Healing empty docstring for "{mod.name}"')
-                    mod.docstring = f'Documentation of module "{mod.name}"'
+                    if md_docstring:
+                        mod.docstring = md_docstring
+                    else:
+                        self.app.print(f'⚠️  Warning: Healing empty docstring for "{mod.name}"')
+                        mod.docstring = f'Documentation of module "{mod.name}"'
 
                 path = mod.name.split('.')
                 page = 'index' if mod.obj.__file__ is None or basename(mod.obj.__file__).lower() == '__init__.py' else path.pop()
@@ -375,7 +430,7 @@ class TokeoPdoc(MetaMixin):
                     with open(fs.join(path, f'{page}.html'), 'w', encoding='utf8') as f:
                         f.write(html)
 
-            # Create a single base `index.html`
+            # Create a single base ```index.html```
             with open(fs.join(self._output_dir, 'index.html'), 'w', encoding='utf-8') as f:
                 f.write(pdoc._render_template('/html.mako', app=self.app, modules=((module.name, module.docstring) for module in modules)))
 
@@ -427,9 +482,9 @@ class TokeoPdoc(MetaMixin):
                                 )
 
                         except Exception as err:
-                            self.app.print(f'❗Error: Processing config file "{section}": {err}')
+                            self.app.print(f'❗ Error: Processing config file "{section}": {err}')
 
-                # Create a single base `config/index.html`
+                # Create a single base ```config/index.html```
                 fs.ensure_dir_exists(fs.join(self._output_dir, 'config'))
                 with open(fs.join(self._output_dir, 'config', 'index.html'), 'w', encoding='utf-8') as f:
                     f.write(pdoc._render_template('/html.mako', app=self.app, configdict=configdict))
@@ -639,6 +694,13 @@ class TokeoPdocController(Controller):
                     help='serve the documentation after rendering',
                 ),
             ),
+            (
+                ['modules'],
+                dict(
+                    nargs='*',
+                    help='modules to render; overrides the configured modules when given (e.g. tokeo.core.ai tests)',
+                ),
+            ),
         ],
     )
     def render(self):
@@ -651,7 +713,7 @@ class TokeoPdocController(Controller):
         """
         controller_log_info_help(self)
         # Generate the documentation
-        self.app.pdoc.render(clean=self.app.pargs.clean)
+        self.app.pdoc.render(clean=self.app.pargs.clean, with_modules=self.app.pargs.modules)
         # Print success message
         self.app.log.info(f'Documentation generated in: {self.app.pdoc._output_dir}')
         # Start server
