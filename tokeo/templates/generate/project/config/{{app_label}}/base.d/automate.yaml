@@ -24,9 +24,9 @@ automate:
       protect: null
       ### ensure to sanitize values and keys before calling shell commands
       sanitize: true
-    ### simplest ``count_words`` task configuration by just an empty dict
+    ### simplest ```count_words``` task configuration by just an empty dict
     count_words: {}
-    ### ``uname`` task configuration with arguments config
+    ### ```uname``` task configuration with arguments config
     uname:
       kwargs:
         flags:

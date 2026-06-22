@@ -11,9 +11,9 @@ rendering templates.
 
 ### Features
 
-- ``app.print()`` replaces Python's built-in print with a framework-aware
+- ```app.print()``` replaces Python's built-in print with a framework-aware
     version that routes through the output handler
-- ``app.inspect()`` renders a detailed inspection of objects
+- ```app.inspect()``` renders a detailed inspection of objects
 - output handlers for different rendering styles:
     - Print - basic text output with hooks
     - Print Dict - key-value rendering for dictionaries
@@ -182,8 +182,8 @@ class TokeoPrintOutputHandler(output.OutputHandler):
         label = 'print'
         """The string identifier of this handler."""
 
-        #: Whether or not to include ``print`` as an available choice
-        #: to override the ``output_handler`` via command line options.
+        #: Whether or not to include ```print``` as an available choice
+        #: to override the ```output_handler``` via command line options.
         overridable = False
 
     _meta: Meta  # type: ignore
@@ -322,8 +322,8 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
         label = 'print_dict'
         """The string identifier of this handler."""
 
-        #: Whether or not to include ``json`` as an available choice
-        #: to override the ``output_handler`` via command line options.
+        #: Whether or not to include ```json``` as an available choice
+        #: to override the ```output_handler``` via command line options.
         overridable = False
 
     _meta: Meta  # type: ignore
@@ -402,8 +402,8 @@ class TokeoInspectOutputHandler(output.OutputHandler):
         label = 'inspect'
         """The string identifier of this handler."""
 
-        #: Whether or not to include ``json`` as an available choice
-        #: to override the ``output_handler`` via command line options.
+        #: Whether or not to include ```json``` as an available choice
+        #: to override the ```output_handler``` via command line options.
         overridable = False
 
     _meta: Meta  # type: ignore

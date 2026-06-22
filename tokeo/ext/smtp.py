@@ -36,7 +36,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
     This class implements the Cement framework's mail interface and extends it with
     additional features for comprehensive email communication. The implementation
-    is based on the Python standard library's ``smtplib`` module.
+    is based on the Python standard library's ```smtplib``` module.
 
     The handler supports various email types including plain text, HTML,
     multipart messages with attachments, and inline images. It also provides
@@ -267,7 +267,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         ### Returns
 
-        - **bool**: ``True`` if message is sent successfully, ``False`` otherwise
+        - **bool**: ```True``` if message is sent successfully, ```False```
+          otherwise
 
         ### Raises
 
@@ -619,9 +620,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         : The method looks for the following template files:
 
-            - ``{template}.title.jinja2``: For subject line (optional)
-            - ``{template}.plain.jinja2``: For plain text body (optional)
-            - ``{template}.html.jinja2``: For HTML body (optional)
+            - ```{template}.title.jinja2```: For subject line (optional)
+            - ```{template}.plain.jinja2```: For plain text body (optional)
+            - ```{template}.html.jinja2```: For HTML body (optional)
 
         : At least one of plain text or HTML templates should exist.
             The mail_params context variable is provided to templates

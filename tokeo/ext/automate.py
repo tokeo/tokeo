@@ -1001,7 +1001,7 @@ class TokeoAutomate(MetaMixin):
         # drop 'use' attribute if was defined
         connection.pop('use', None)
         # merge with default but drop sub 'connections' structs
-        connection = self.Meta.config_defaults['connections'] | self.connections['_defaults'] | connection
+        connection = self.Meta.config_defaults['connections']['_defaults'] | self.connections['_defaults'] | connection
         connection.pop('connections', None)
         # expand list of hosts to list of host_dicts
         hosts_list = []
@@ -1041,6 +1041,9 @@ class TokeoAutomate(MetaMixin):
                     hosts_list.append(self._validate_host_or_connection_entry(entry))
                 elif isinstance(entry, str):
                     hosts_list.append(self._get_host_dict_from_str(None, host))
+                elif isinstance(host, str):
+                    # bare strings are ad-hoc host specs (ip or user:pass@host:port)
+                    hosts_list.append(self._get_host_dict_from_str(None, host))
                 else:
                     raise TokeoAutomateError(f"Can't create or find a valid entry for host [{host}]")
         # make dict list of hosts unique
@@ -1050,8 +1053,8 @@ class TokeoAutomate(MetaMixin):
                 unique_hosts_list[host['id']] = host
         # replace the fullfilled hosts
         connection['hosts'] = tuple(unique_hosts_list.values())
-        # return with fullfilled connection
-        return connection
+        # return with fullfilled and validated connection
+        return self._get_connection_dict(None, connection)
 
     @property
     def hosts(self):
@@ -1178,11 +1181,10 @@ class TokeoAutomate(MetaMixin):
         # read config sections
         _config_connections = self._config('connections', fallback={})
         # start and take the base fields as _defaults connection
-        _defaults = dict(self._meta.config_defaults['connections']['_defaults'])
-        connection = self._get_connection_dict('_defaults', _config_connections.get('_defaults', {}))
-        connection = self._overrule_host_dict(_defaults, connection)
-        # add the composed entry
-        self._connections['_defaults'] = connection
+        _meta_connections_defaults = dict(self._meta.config_defaults['connections']['_defaults'])
+        _connections_defaults = self._get_connection_dict('_defaults', _config_connections.get('_defaults', {}))
+        # add the composed _defaults entry
+        self._connections['_defaults'] = copy.deepcopy(_meta_connections_defaults) | _connections_defaults
         # loop and add additional connections
         for key in _config_connections:
             # do not add _defaults again if exist
@@ -1324,7 +1326,7 @@ class TokeoAutomate(MetaMixin):
                 kwprotected=kwprotected,
             )
             # Check for connection settings. The rule follows
-            # first if 'connections' exist, second a `use`
+            # first if 'connections' exist, second a ```use```
             # relation, third a 'hosts' section, last fallback
             # is local command
             if 'connection' in _config_task:

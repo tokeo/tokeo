@@ -12,17 +12,17 @@
 ### settings from the previous ones:
 ### </p>
 ###
-### 1. Base configuration: `config/tokeo.yaml`
-### 1. Environment-specific configuration: `config/tokeo.[environment].yaml`
-### 1. Local environment-specific configuration: `config/tokeo.[environment].local.yaml`
+### 1. Base configuration: ```config/tokeo.yaml```
+### 1. Environment-specific configuration: ```config/tokeo.[environment].yaml```
+### 1. Local environment-specific configuration: ```config/tokeo.[environment].local.yaml```
 ###
 ### <p>
-### Where `[environment]` can be one of:
+### Where ```[environment]``` can be one of:
 ### </p>
 ###
-### - ``development`` - Used during development
-### - ``testing`` - Used for testing environments
-### - ``production`` - Used in production deployments
+### - ```development``` - Used during development
+### - ```testing``` - Used for testing environments
+### - ```production``` - Used in production deployments
 ###
 ### ### Overloading Configuration:
 ###
@@ -44,9 +44,9 @@
 ### ### Extende Local Configuration Files:
 ###
 ### <p>
-### Local configuration files (ending with ``.local.yaml``) are used for environment-specific
+### Local configuration files (ending with ```.local.yaml```) are used for environment-specific
 ### secrets and settings that should not be checked into source control. These files should
-### be left added to ``.gitignore``.
+### be left added to ```.gitignore```.
 ### </p>
 ---
 
@@ -112,7 +112,7 @@ log.colorlog:
   level: info
   ### Whether or not to log to console
   to_console: true
-  ### Whether or not to rotate the log file when it reaches `max_bytes`
+  ### Whether or not to rotate the log file when it reaches ```max_bytes```
   # rotate: false
   ### Max size in bytes that a log file can grow until it is rotated.
   # max_bytes: 512000

@@ -10,8 +10,8 @@ The module handles the OpenAPI schema and provides pure FastAPI endpoints
 to serve both Swagger UI and ReDoc HTML documentation. In alignment with
 the application's strict routing architecture, these endpoints bypass the
 NiceGUI UI engine entirely and are registered programmatically. The default
-pathes are `/_/openapi/info` for Swagger UI and `/_/openapi/docs` for ReDoc
-documentation pages. The OpenAPI schema is at `/_/openapi/openapi.json`.
+pathes are ```/_/openapi/info``` for Swagger UI and ```/_/openapi/docs``` for ReDoc
+documentation pages. The OpenAPI schema is at ```/_/openapi/openapi.json```.
 
 ### Notes
 

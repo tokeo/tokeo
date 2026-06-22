@@ -1,10 +1,10 @@
 """
-Built-in ``enc`` vault handler for Tokeo applications.
+Built-in ```enc``` vault handler for Tokeo applications.
 
 Encrypts and decrypts values with Fernet (AES-128-CBC plus an HMAC-SHA256
 authentication tag), using a ready-made Fernet key taken from an environment
 variable named by the profile. This is the base handler; other handlers (for
-example ``scrypt``) reuse its Fernet core and only change how the key is
+example ```scrypt```) reuse its Fernet core and only change how the key is
 obtained.
 
 A profile for this handler:
@@ -29,8 +29,8 @@ class EncVault(Vault):
     """
     Fernet vault handler that reads a ready Fernet key from the environment.
 
-    The profile names an environment variable (``env``) holding a Fernet key,
-    a 32-byte url-safe base64 string as produced by ``vault create``.
+    The profile names an environment variable (```env```) holding a Fernet key,
+    a 32-byte url-safe base64 string as produced by ```vault create```.
 
     """
 
@@ -62,7 +62,7 @@ class EncVault(Vault):
 
         ### Returns
 
-        - **str**: The Fernet token to store as a ``!vault`` value
+        - **str**: The Fernet token to store as a ```!vault``` value
 
         """
         return self._fernet(profile).encrypt(plaintext.encode()).decode()
@@ -92,11 +92,11 @@ class EncVault(Vault):
 
     def create(self, name):
         """
-        Build an ``enc`` profile scaffold with a fresh Fernet key.
+        Build an ```enc``` profile scaffold with a fresh Fernet key.
 
-        The key is the secret for an ``enc`` profile and belongs in the
+        The key is the secret for an ```enc``` profile and belongs in the
         environment, never in the config, so it is reported for the
-        ``VAULT_<NAME>_KEY`` variable the profile points to.
+        ```VAULT_<NAME>_KEY``` variable the profile points to.
 
         ### Args
 
@@ -120,7 +120,7 @@ def generate_fernet_key():
 
     ### Returns
 
-    - **str**: A new Fernet key, suitable as an ``enc`` profile secret
+    - **str**: A new Fernet key, suitable as an ```enc``` profile secret
 
     """
     return Fernet.generate_key().decode()

@@ -88,7 +88,7 @@ def load(app_to_share):
     Set the global shared app object.
 
     This function is called during application initialization to store
-    the Cement app object that will be accessible through the global `app`
+    the Cement app object that will be accessible through the global ```app```
     instance.
 
     ### Args

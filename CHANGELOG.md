@@ -1,5 +1,5 @@
 # The Tokeo Change History
 
-## 1.1.6
+## 1.3.0
 
-Initial stable release.
+Enables superpower by extensions.

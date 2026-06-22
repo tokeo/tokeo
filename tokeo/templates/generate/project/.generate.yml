@@ -1,10 +1,11 @@
 ---
 
 exclude:
-  - '^(.*)[\/\\\\]project[\/\\\\]{{ app_label }}[\/\\\\]templates[\/\\\\](.*)$'
   - '^.*\.(jpg|png|ico)$'
+  - '^.*\.npz$'
 
 ignore:
+  - '^(.*)\.DS_Store$'
   - '^(.*)pyc(.*)$'
   - '^(.*)pyo(.*)$'
   - '^(.*)__pycache__(.*)$'
@@ -31,7 +32,7 @@ variables:
 
   - name: app_copyright
     prompt: "App copyright hint"
-    default: "©2025 ACME Inc."
+    default: "©2026 ACME Inc."
 
   - name: creator_name
     prompt: "Creator Name"
@@ -55,44 +56,152 @@ variables:
     case: "upper"
     default: "Y"
 
-  - name: feature_diskcache
-    prompt: "Enable diskcache [(Y)es/(N)o]"
+  - name: feature_vault
+    prompt: "Enable vault [(Y)es/(N)o]"
     validate: "^[YN]$"
     case: "upper"
     default: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/config/{{app_label}}/([^/]*)/vault.yaml$'
 
-  - name: feature_dramatiq
-    prompt: "Enable dramatiq [(Y)es/(N)o]"
+  - name: feature_ai
+    prompt: "Enable ai [(Y)es/(N)o]"
     validate: "^[YN]$"
     case: "upper"
     default: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/{{app_label}}/core/ai$'
+          - '^(.*)/{{app_label}}/core/ai/(.*)$'
+          - '^(.*)/config/{{app_label}}/([^/]*)/ai.yaml$'
+          - '^(.*)/tests/core/ai$'
+          - '^(.*)/tests/core/ai/(.*)$'
+          - '^(.*)/tests/ext/ai$'
+          - '^(.*)/tests/ext/ai/(.*)$'
+          - '^(.*)/{{app_label}}/core/akili$'
+          - '^(.*)/{{app_label}}/core/akili/(.*)$'
+          - '^(.*)/tests/core/akili$'
+          - '^(.*)/tests/core/akili/(.*)$'
 
-  - name: feature_grpc
-    prompt: "Enable grpc [(Y)es/(N)o]"
+  - name: feature_ai_akili
+    prompt: "Enable ai akili llm [(Y)es/(N)o]"
     validate: "^[YN]$"
     case: "upper"
     default: "Y"
+    requires:
+      feature_ai: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/{{app_label}}/core/akili$'
+          - '^(.*)/{{app_label}}/core/akili/(.*)$'
+          - '^(.*)/tests/core/akili$'
+          - '^(.*)/tests/core/akili/(.*)$'
+
+  - name: feature_ai_wasm
+    prompt: "Enable ai wasm sandbox [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    requires:
+      feature_ai: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/tests/core/ai/(.*)wasm(.*)$'
+
+  - name: feature_ai_docker
+    prompt: "Enable ai docker sandbox [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    requires:
+      feature_ai: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/tests/core/ai/(.*)docker(.*)$'
 
   - name: feature_apscheduler
     prompt: "Enable apscheduler [(Y)es/(N)o]"
     validate: "^[YN]$"
     case: "upper"
     default: "Y"
-
-  - name: feature_nicegui
-    prompt: "Enable nicegui [(Y)es/(N)o]"
-    validate: "^[YN]$"
-    case: "upper"
-    default: "Y"
-
-  - name: feature_pocketbase
-    prompt: "Enable pocketbase [(Y)es/(N)o]"
-    validate: "^[YN]$"
-    case: "upper"
-    default: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/{{app_label}}/core/tasks/agents(.*)$'
+          - '^(.*)/config/{{app_label}}/([^/]*)/scheduler.yaml$'
 
   - name: feature_automate
     prompt: "Enable automate [(Y)es/(N)o]"
     validate: "^[YN]$"
     case: "upper"
     default: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/{{app_label}}/core/tasks/automate(.*)$'
+          - '^(.*)/config/{{app_label}}/([^/]*)/automate.yaml$'
+
+  - name: feature_diskcache
+    prompt: "Enable diskcache [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/config/{{app_label}}/([^/]*)/diskcache.yaml$'
+
+  - name: feature_dramatiq
+    prompt: "Enable dramatiq [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/{{app_label}}/controllers/emit(.*)$'
+          - '^(.*)/{{app_label}}/core/tasks/actors(.*)$'
+          - '^(.*)/config/{{app_label}}/([^/]*)/dramatiq.yaml$'
+
+  - name: feature_grpc
+    prompt: "Enable grpc [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/{{app_label}}/controllers/grpc(.*)$'
+          - '^(.*)/{{app_label}}/core/grpc$'
+          - '^(.*)/{{app_label}}/core/grpc/(.*)$'
+          - '^(.*)/config/{{app_label}}/([^/]*)/grpc.yaml$'
+          - '^(.*)/tests/core/grpc$'
+          - '^(.*)/tests/core/grpc/(.*)$'
+
+  - name: feature_nicegui
+    prompt: "Enable nicegui [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/{{app_label}}/site$'
+          - '^(.*)/{{app_label}}/site/(.*)$'
+          - '^(.*)/config/{{app_label}}/([^/]*)/nicegui.yaml$'
+
+  - name: feature_pocketbase
+    prompt: "Enable pocketbase [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/config/{{app_label}}/([^/]*)/pocketbase.yaml$'

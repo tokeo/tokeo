@@ -9,7 +9,7 @@ task processors that can handle asynchronous workloads through message passing.
 
 - Keeps actor definitions in one place for maintainable organization
 - Processes work from queues with configurable timeouts and retries
-- Rate-limits via the ``app.dramatiq.locks`` interface
+- Rate-limits via the ```app.dramatiq.locks``` interface
 - Calls app-specific business logic through the application context
 
 ### Usage

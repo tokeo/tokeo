@@ -1,0 +1,15 @@
+### ### The {{ app_name }} Testing Configuration Settings (ai)
+### - Settings will be merged into Application Configuration.
+---
+
+ai:
+  ### during tests the file tools work below the test scratch directory, so
+  ### test runs never touch the regular tmp files
+  tools:
+    read_file:
+      options:
+        base_dir: tmp/tests
+    append_file:
+      options:
+        base_dir: tmp/tests
+        file: notes.txt

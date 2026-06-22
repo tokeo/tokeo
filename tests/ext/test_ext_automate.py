@@ -52,6 +52,13 @@ def defaults_automate_hosts(validate=False):
         d['host2']['id'] = 'host2'
         d['host3']['id'] = 'host3'
         d['host3']['name'] = 'host3'
+        # the extension normalizes a scalar sudo to its full dict form
+        d['host1']['sudo'] = dict(
+            password='sudo1',
+            mode='eq',
+            match='password:',
+            tail=100,
+        )
     # return the dict
     return d
 
@@ -142,8 +149,6 @@ def defaults_automate_connections(validate=False):
         lookup_keys=None,
         allow_agent=False,
         forward_agent=False,
-        forward_local=None,
-        forward_remote=None,
         known_hosts=None,
     )
     # define connections
@@ -168,8 +173,6 @@ def defaults_automate_connections(validate=False):
             known_hosts='known_hosts_con1',
             connect_timeout=30,
             forward_agent=False,
-            forward_local=None,
-            forward_remote=None,
         ),
         con2=dict(
             name='A short connection',
@@ -180,23 +183,34 @@ def defaults_automate_connections(validate=False):
     )
     # define config defaults
     if not validate:
-        d = dict(
-            **b,
-            connections=c,
-        )
+        # the extension reads base values from the _defaults key of the section
+        d = dict(_defaults=b, **c)
     else:
         # add _defaults
         b['id'] = '_defaults'
         b['name'] = '_defaults'
+        # meta-only fields the user section does not set
+        b['hosts'] = None
+        b['connections'] = {}
+        # the extension normalizes a scalar sudo to its full dict form
+        b['sudo'] = dict(
+            password='sudo_connect_base',
+            mode='eq',
+            match='password:',
+            tail=100,
+        )
         c['_defaults'] = b
         # add same fullfiller
         c['con1']['id'] = 'con1'
         c['con2']['id'] = 'con2'
-        # return as expanded dict
-
-        d = dict(
-            connections=c,
+        c['con1']['sudo'] = dict(
+            password='sudo_con1',
+            mode='eq',
+            match='password:',
+            tail=100,
         )
+        # the connections property returns the composed mapping itself
+        d = c
     # return the dict
     return d
 
@@ -205,7 +219,9 @@ def defaults_automate_tasks(validate=False):
     if not validate:
         # define config defaults
         d = dict(
-            module='tests.ext.test_ext_automate',
+            _defaults=dict(
+                module='tests.ext.test_ext_automate',
+            ),
             task1=dict(
                 module='tests.ext.test_ext_automate',
             ),
@@ -224,8 +240,6 @@ def defaults_automate_tasks(validate=False):
                     identity='identity_task1',
                     connect_timeout=30,
                     forward_agent=False,
-                    forward_local=None,
-                    forward_remote=None,
                     known_hosts='known_hosts_task1',
                 ),
             ),
@@ -239,7 +253,12 @@ def defaults_automate_tasks(validate=False):
             task1=dict(
                 id='task1',
                 name='task1',
-                timeout=None,
+                kwprotected=dict(
+                    env={},
+                    protect='strict',
+                    pty=False,
+                    sanitize=True,
+                ),
                 kwargs={},
                 connection=dict(
                     id='_defaults',
@@ -256,21 +275,29 @@ def defaults_automate_tasks(validate=False):
                     port=22,
                     user='user_connect_base',
                     password='password_connect_base',
-                    sudo='sudo_connect_base',
+                    sudo=dict(
+                        password='sudo_connect_base',
+                        mode='eq',
+                        match='password:',
+                        tail=100,
+                    ),
                     identity=None,
                     connect_timeout=30,
                     lookup_keys=None,
                     allow_agent=False,
                     forward_agent=False,
-                    forward_local=None,
-                    forward_remote=None,
                     known_hosts=None,
                 ),
             ),
             task2=dict(
                 id='task2',
                 name='Ping our hosts',
-                timeout=None,
+                kwprotected=dict(
+                    env={},
+                    protect='strict',
+                    pty=False,
+                    sanitize=True,
+                ),
                 kwargs=dict(
                     url='https://github.com',
                 ),
@@ -291,7 +318,12 @@ def defaults_automate_tasks(validate=False):
                                 port=22,
                                 user='user1',
                                 password='password1',
-                                sudo='sudo1',
+                                sudo=dict(
+                                    password='sudo1',
+                                    mode='eq',
+                                    match='password:',
+                                    tail=100,
+                                ),
                                 identity='identity1',
                                 host_key='host_key1',
                             ),
@@ -318,21 +350,29 @@ def defaults_automate_tasks(validate=False):
                     port=22,
                     user='user_task1',
                     password='password_task1',
-                    sudo='sudo_task1',
+                    sudo=dict(
+                        password='sudo_task1',
+                        mode='eq',
+                        match='password:',
+                        tail=100,
+                    ),
                     identity='identity_task1',
                     connect_timeout=30,
                     lookup_keys=None,
                     allow_agent=False,
                     forward_agent=False,
-                    forward_local=None,
-                    forward_remote=None,
                     known_hosts='known_hosts_task1',
                 ),
             ),
             task3=dict(
                 id='task3',
                 name='task3',
-                timeout=None,
+                kwprotected=dict(
+                    env={},
+                    protect='strict',
+                    pty=False,
+                    sanitize=True,
+                ),
                 kwargs={},
                 connection=dict(
                     id='_defaults',
@@ -349,14 +389,17 @@ def defaults_automate_tasks(validate=False):
                     port=22,
                     user='user_connect_base',
                     password='password_connect_base',
-                    sudo='sudo_connect_base',
+                    sudo=dict(
+                        password='sudo_connect_base',
+                        mode='eq',
+                        match='password:',
+                        tail=100,
+                    ),
                     identity=None,
                     connect_timeout=30,
                     lookup_keys=None,
                     allow_agent=False,
                     forward_agent=False,
-                    forward_local=None,
-                    forward_remote=None,
                     known_hosts=None,
                 ),
             ),
@@ -472,6 +515,39 @@ def test_tasks_task1(rando):
         app.inspect(result, divider='*')
         # app.inspect(result.ok, divider='*')
         # app.inspect(result.stdout, divider='*')
+
+
+def test_tasks_local_default_resolves_without_local_host(rando):
+    """
+    Without a hosts "local" entry the task default resolves to the bare local host
+    """
+    test_defaults = init_defaults('automate')
+    test_defaults['automate']['tasks'] = dict(
+        _defaults=dict(module='tests.ext.test_ext_automate'),
+        task1=dict(),
+    )
+
+    with AutomateTest(config_defaults=test_defaults) as app:
+
+        hosts = app.automate.tasks['task1']['connection']['hosts']
+        assert hosts == tuple((dict(id='local', name='local', host='local'),))
+
+
+def test_tasks_local_default_resolves_with_local_host(rando):
+    """
+    With a configured hosts "local" entry the task default to local resolves
+    """
+    test_defaults = init_defaults('automate')
+    test_defaults['automate']['hosts'] = dict(local=dict(shell='/bin/sh'))
+    test_defaults['automate']['tasks'] = dict(
+        _defaults=dict(module='tests.ext.test_ext_automate'),
+        task1=dict(),
+    )
+
+    with AutomateTest(config_defaults=test_defaults) as app:
+
+        hosts = app.automate.tasks['task1']['connection']['hosts']
+        assert hosts == tuple((dict(id='local', name='local', host='local', shell='/bin/sh'),))
 
 
 def test_automate_result(rando):

@@ -26,8 +26,8 @@ def page_root():
     ### Notes
 
     - Creates a dashboard view with introductory content
-    - Uses the standard page layout from the `blocks` module
-    - Must not be called directly; it is orchestrated by `site/routes.py`
+    - Uses the standard page layout from the ```blocks``` module
+    - Must not be called directly; it is orchestrated by ```site/routes.py```
 
     """
     with blocks.page(title='This is the {{ app_name }} dashboard'):

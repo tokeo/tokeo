@@ -1,0 +1,453 @@
+### ### {{ app_name }} AI / Fundi configuration
+###
+### Named profiles for chat-completion models. {{ app_name }} talks to an
+### OpenAI-compatible endpoint that you run yourself (Ollama, llama.cpp, vLLM,
+### MLX); the project's own trained akili micro model (core/ai/providers/akili.py
+### and core/akili) needs no server at all. A profile is selected by name,
+### or by a field such as model or purpose; a profile with "enabled: false"
+### is hidden for the session.
+ai:
+  ### the app-wide base loop budgets, the home of the default numbers. they
+  ### resolve in three levels, nearest wins: a chat() call argument, then the
+  ### selected agent's option (see an agent's max_steps / max_loops below),
+  ### then this base. an agent that sets none falls through to here
+  ### maximum tool rounds for one request (0 = unlimited)
+  # max_steps: 0
+  ### consecutive rounds without one successful call before the execution is
+  ### aborted (0 = unlimited)
+  # max_loops: 3
+  ### whether a run records its step history (the trace). true by default; set
+  ### false to skip building the trace -- the typed views (messages, tool calls,
+  ### results) still fill, so guards keep working, but result.trace stays empty
+  ### and "ai ask --trace" has nothing to show. only safe when no active guard
+  ### reads the trace itself (guards read the views, not the history)
+  # trace: true
+
+  ### selection used when a command (for example "ai ask") names none:
+  ### "profile" is the model, "agent" the composition (tools, and later
+  ### guards). either may be omitted; a call can still pick one explicitly
+  defaults:
+    profile: mock
+    agent: null
+
+  ### the configured toolset, in the uniform form used across the ai config:
+  ### a dict value is an item ("type" names the class -- a built-in short
+  ### name or a full dotted class path -- plus optional "options"); a list
+  ### value is a named group of members (tools or other groups). a profile
+  ### then activates a single item or a whole group
+  tools:
+    ### a project tool, named by its full dotted class path: no registration,
+    ### no entry in main.py -- the handler imports it on demand
+    calc:
+      type: {{ app_label }}.core.ai.tools.calc.TokeoAiCalcTool
+    ### a second house tool that always answers 42 whatever the expression.
+    ### the deliberate counterpart to calc: it shows a project tool's result
+    ### flowing through the loop and being reported as-is, because its
+    ### description tells the model the value is authoritative. paired with
+    ### the "answer42" agent below
+    answer42:
+      type: {{ app_label }}.core.ai.tools.calc42.TokeoAiAnswer42Tool
+    ### the simplest schema: no arguments; its reply format is a tool
+    ### setting (Meta key), overridable here under "options"
+    current:
+      type: {{ app_label }}.core.ai.tools.current.TokeoAiCurrentTool
+    ### reads text files strictly below base_dir (a tool setting); paths
+    ### that escape it are rejected inside the tool
+    read_file:
+      type: {{ app_label }}.core.ai.tools.read_file.TokeoAiReadFileTool
+      options:
+        base_dir: tmp
+    ### appends a line to the configured file below base_dir -- the writing
+    ### tool, and so the one the "readonly" policy guard below denies
+    append_file:
+      type: {{ app_label }}.core.ai.tools.append_file.TokeoAiAppendFileTool
+      options:
+        base_dir: tmp
+        file: notes.txt
+    ### a named group that bundles math-related tools
+    mathematics:
+      - calc
+    ### the calendar toolset the akili micro model drives; every tool takes
+    ### strict iso dates (YYYY-MM-DD) -- understanding looser language is
+    ### the model's job, not the tool's
+    date_diff:
+      type: {{ app_label }}.core.ai.tools.date_diff.TokeoAiDateDiffTool
+    add_days:
+      type: {{ app_label }}.core.ai.tools.add_days.TokeoAiAddDaysTool
+    add_months:
+      type: {{ app_label }}.core.ai.tools.add_months.TokeoAiAddMonthsTool
+    add_years:
+      type: {{ app_label }}.core.ai.tools.add_years.TokeoAiAddYearsTool
+    weekday:
+      type: {{ app_label }}.core.ai.tools.weekday.TokeoAiWeekdayTool
+    week_number:
+      type: {{ app_label }}.core.ai.tools.week_number.TokeoAiWeekNumberTool
+    moon_phase:
+      type: {{ app_label }}.core.ai.tools.moon_phase.TokeoAiMoonPhaseTool
+    ### a named group that bundles the file tools
+    filesystem:
+      - read_file
+      - append_file
+    ### a named group that bundles the calendar tools (current resolves the
+    ### time words today/now for the akili model)
+    calendar:
+      - current
+      - date_diff
+      - add_days
+      - add_months
+      - add_years
+      - weekday
+      - week_number
+      - moon_phase
+    ### the codeact tool for the wasm demo: it runs model-generated python in
+    ### the wasm guest. DANGER -- it executes arbitrary code, so it is only
+    ### safe behind the wasm sandbox (or a hardened container), never
+    ### in-process. not registered by default, so it is named by a dotted
+    ### class path -- the tools package re-exports its classes, so the short
+    ### package path is enough. paired with the "coded" sandbox and "coder"
+    ### agent below, driven by the mock's "text upper|reverse|len <sentence>"
+    coding:
+      type: tokeo.core.ai.tools.TokeoAiPythonUntrustedExecTool
+
+  ### guards form the tool-call pipeline of an agent: a before guard may
+  ### deny a call ahead of execution, an after guard observes the outcome
+  ### (it always runs, so a denial is recorded too). a denied call is not
+  ### executed; the loop continues and the model sees "denied: <reason>",
+  ### so it can correct itself (deny-and-continue). a guard is an item in
+  ### the uniform form: "type" is a built-in short name (tool_schema_validate,
+  ### tool_policy, trace_audit, regex_redact) or a full dotted class path, its
+  ### settings live under "options"
+  guards:
+    ### checks a call's arguments against the tool's parameters schema
+    ### before it runs (missing required, unknown names, wrong basic types)
+    tool_schema_validate:
+      type: tool_schema_validate
+    ### allow/deny tool calls by name: "deny" always wins; "allow", when
+    ### set, restricts calls to its members. here it shapes what the agent
+    ### may do with the file pair: read yes, write no
+    readonly:
+      type: tool_policy
+      options:
+        deny:
+          - append_file
+    ### logs every step at every stage (begin, prompt, answer, call, return,
+    ### close) to the app log and blocks nothing; makes the whole chain visible.
+    ### the structured trace is on the ChatResult
+    trace_audit:
+      type: trace_audit
+    ### masks secret-looking spans at the tool stages -- the call arguments
+    ### and the result text (bearer tokens, sk- keys, aws key ids,
+    ### password:/token: assignments). "options.patterns" is required: there is
+    ### no built-in list, and a missing or non-compiling pattern aborts the run.
+    ### list it before truncate
+    regex_redact:
+      type: regex_redact
+      options:
+        patterns:
+          - '(?i)\bbearer\s+[A-Za-z0-9._\-]{8,}'
+          - '\bsk-[A-Za-z0-9]{16,}\b'
+          - '\bAKIA[0-9A-Z]{16}\b'
+          - '(?i)\b(?:api[_-]?key|secret|password|token)\b\s*[:=]\s*\S+'
+    ### caps over-long text so a big blob cannot blow the context budget;
+    ### keeps the head and appends a "[truncated N chars]" marker. this is a
+    ### project example (see core/ai/guards/truncate.py), named by its full
+    ### dotted class path -- the core ships only the derivable type. the class
+    ### implements two stages (on_return, on_close); a composition can run it at
+    ### all its stages (bare name) or at named ones (e.g. "truncate: [on_close]")
+    truncate:
+      type: {{ app_label }}.core.ai.guards.truncate.{{ app_class_name }}AiTruncateGuard
+      options:
+        limit: 500
+
+  ### sandboxes contain a tool's execution -- a guard decides if a call may
+  ### run, a sandbox is the wall it runs behind. an agent lists a sandbox
+  ### chain; a tool runs in the first sandbox whose "tools" contain it (a
+  ### selection of tool/group names, or "_all" for every tool that
+  ### reaches it). a sandbox "except" skips that sandbox for the named tools
+  ### so the chain walks on. when no sandbox lists a tool the call is denied,
+  ### so the "allow" sandbox (in_process, tools: _all) placed last is the
+  ### opt-in catch-all. a sandbox is an item: "type" is a built-in short name
+  ### (in_process, subprocess) or a full dotted class path, its settings live
+  ### under "options"
+  sandboxes:
+    ### the catch-all: zero isolation, runs in the app process. put it last
+    ### in a chain to let the remaining tools run in-process; without it an
+    ### unlisted tool is denied
+    allow:
+      type: in_process
+      ### "_all" is the reserved keyword for "every tool that reaches me"
+      tools: _all
+    ### fault and resource isolation in a fresh interpreter: own memory cap
+    ### and wall-clock timeout, then SIGKILL. NOT a jail against hostile code
+    ### (no path or network isolation -- that needs a container or wasm). here
+    ### it contains the calculator
+    jailed:
+      type: subprocess
+      tools:
+        - mathematics
+      options:
+        ### wall-clock seconds before the run is killed -- enforced on every
+        ### platform (the parent kills the child), the universal stop
+        timeout: 10
+        ### memory cap in MB, enforced via rlimit on linux. current macos
+        ### rejects caps below the process's already-mapped virtual space
+        ### (gigabytes on apple silicon), so realistic values error the
+        ### call there by design (no sham caps) -- enable on linux
+        # memory_mb: 256
+        ### scratch working directory (steers relative writes)
+        cwd: tmp/sandbox
+    ### real isolation for model-generated code: a webassembly guest with no
+    ### network, only explicit mounts, and a hard memory cap on every platform
+    ### -- the safe home for the python_untrusted_exec tool. opt-in: it needs
+    ### the tokeo[wasm] extra and a user-built python.wasm; see the wasm doc
+    ### at core/ai/sandboxes/WASM.md for the one-time ./wasm install. wasm and
+    ### the python-exec tools are not registered by default, so the type is a
+    ### dotted class path; the packages re-export their classes, so the short
+    ### package path is enough (resolved on demand)
+    coded:
+      type: tokeo.core.ai.sandboxes.TokeoAiWasmSandbox
+      tools:
+        - coding
+      options:
+        ### point these at your ./wasm build (see WASM.md); the demo only runs
+        ### once they exist, otherwise the call errors with a clear message
+        runtime: ./wasm/python.wasm
+        stdlib: ./wasm/lib/python3.13
+        ### a hard, platform-independent memory cap and a wall-clock timeout
+        memory_mb: 256
+        timeout: 10
+
+  ### agents are the composition root: an agent binds the tools, the guards,
+  ### and the sandbox chain for a task and sets the step budget. the model is
+  ### not part of the agent -- it is bound late through the selected profile,
+  ### so one agent runs against any model. an agent is an item in the uniform
+  ### form: "type" is a built-in short name ("fundi", the standard agent) or a
+  ### full dotted class path, and the agent's settings (tools, guards,
+  ### sandboxes, deny, budgets) live under "options". the active tools of a
+  ### call are the agent's tools
+  agents:
+    ### the default composition root, selected via defaults.agent above:
+    ### it governs nothing, but it observes everything -- the audit guard
+    ### gives every request the "ai trace: ..." log lines and the full
+    ### structured trace on the ChatResult, with honest semantics (a
+    ### pipeline ran; one that denies nothing)
+    audited:
+      ### built-in agent type ("fundi", the standard agent); no custom class
+      type: fundi
+      ### the agent's settings (its Meta keys)
+      options:
+        ### guards forming this agent's tool-call pipeline (see ai.guards)
+        guards:
+          - trace_audit
+        ### the sandbox chain: with the catch-all "allow" any tool this agent
+        ### gains runs in-process; drop it and an unlisted tool is denied
+        sandboxes:
+          - allow
+        ### further settings an agent may take:
+        ### tools this agent contributes (the active tools of a call)
+        # tools:
+        #   - mathematics
+        ### tools or groups this agent forbids outright (single or list),
+        ### before any sandbox lookup -- a hard ban, unlike a sandbox except
+        # deny:
+        #   - append_file
+        ### the loop budgets resolve in three levels, nearest wins: a chat()
+        ### call argument, then this agent option, then the ai-section base
+        ### (ai.max_steps / ai.max_loops below). set one here to override the
+        ### base for this agent; leave it out to use the base
+        ### maximum tool rounds for one request (0 = unlimited)
+        # max_steps: 0
+        ### consecutive rounds without one successful call before the
+        ### execution is aborted (0 = unlimited)
+        # max_loops: 3
+
+    ### the guarded composition around the project tools: it may calculate,
+    ### tell the time, and read files, but the policy denies writing; tool
+    ### results are redacted and capped, and every outcome is audited. the
+    ### calculator runs in the "jailed" subprocess sandbox, everything else
+    ### falls through to "allow" (in-process). try, and watch the denial:
+    ###   {{ app_label }} ai ask "current" --agent guarded
+    ###   {{ app_label }} ai ask "read_file notes.txt" --agent guarded
+    ###   {{ app_label }} ai ask "append_file hello" --agent guarded   # denied
+    guarded:
+      type: fundi
+      options:
+        tools:
+          - mathematics
+          - calendar
+          - filesystem
+        guards:
+          - readonly
+          - tool_schema_validate
+          - regex_redact
+          - truncate
+          - trace_audit
+        ### ordered chain: "jailed" (subprocess) lists calc, the rest
+        ### is not, so it falls through to the "allow" catch-all (in-process)
+        sandboxes:
+          - jailed
+          - allow
+
+    ### the coder agent: it offers the coding tool and runs whatever code the
+    ### model writes in the wasm guest -- real isolation for model-written code.
+    ### the agent is generic (any profile may drive it); the codermock profile
+    ### below pairs it with the mock for a deterministic demo, while a real
+    ### model can drive it via --agent coder. opt-in: it needs the ./wasm build
+    ### (see core/ai/sandboxes/WASM.md). every call is audited, so the log shows
+    ### the code ran in sandbox "coded". try the mock demo with:
+    ###   {{ app_label }} ai ask "text upper der wochentag von heute" --agent coder
+    ###   {{ app_label }} ai ask "text reverse otto" --agent coder
+    ###   {{ app_label }} ai ask "text len wir sehen uns in 7 tagen" --agent coder
+    coder:
+      type: fundi
+      options:
+        ### only this agent offers the coding tool, so code execution (the
+        ### mock's synthesis, or a real model's) activates only here
+        tools:
+          - coding
+        guards:
+          - trace_audit
+        ### the coding tool runs in the wasm guest; nothing falls through to
+        ### in-process, so any other tool would be denied by default
+        sandboxes:
+          - coded
+
+    ### showcase: the project's own truncate guard (core/ai/guards/truncate.py)
+    ### scoped to the final answer. the guard's class implements two stages --
+    ### on_return (the tool result) and on_close (the run's final text) -- and
+    ### the "truncate: [on_close]" stage list runs it at on_close only, leaving
+    ### on_return off. this is the composition stage-list notation: a bare
+    ### name runs all the class's stages, a "[stages]" list runs only those.
+    ### try a long answer and watch only the final text capped:
+    ###   {{ app_label }} ai ask "tell me a longer story" --agent showcase
+    showcase:
+      type: fundi
+      options:
+        tools:
+          - mathematics
+          - calendar
+        guards:
+          ### the truncate guard at on_close only (its on_return stage is left
+          ### out by naming just on_close in the stage list)
+          - truncate: [on_close]
+          - trace_audit
+        sandboxes:
+          - allow
+
+    ### the house-tool demo: it offers only "answer42" (not calc), the tool
+    ### that always returns 42. ask it to compute something and watch the
+    ### trace -- the tool returns 42 and, because the tool description says
+    ### the result is authoritative, the model reports 42 rather than its own
+    ### arithmetic. try:
+    ###   {{ app_label }} ai ask "divide 5 by 2 with our tool" --agent answer42
+    answer42:
+      type: fundi
+      options:
+        tools:
+          - answer42
+        guards:
+          - trace_audit
+        sandboxes:
+          - allow
+
+  ### named profiles in the uniform form: top-level params (type, purpose,
+  ### tools, enabled) plus an "options" block carrying the provider's
+  ### connection settings (model, base_url, key). a profile is an item; its
+  ### "type" is a provider short name or a full dotted class path
+  profiles:
+    ### the built-in local model; deterministic, no server, no network. it is
+    ### the universal test/demo driver, so it keeps all of the guarded agent's
+    ### tools (it makes a tool call when the first prompt word names one):
+    ###   {{ app_label }} ai ask "calc 2 + 3" --agent guarded
+    ###   {{ app_label }} ai ask "current" --agent guarded
+    mock:
+      ### provider type; "mock" is the application's own local model and
+      ### needs no options (it ignores model and server)
+      type: mock
+      ### optional free-form selector, usable via "ai ask --purpose"
+      purpose: mocking
+      ### the agent (composition) this profile runs. a profile must state its
+      ### agent, even as null to run without one
+      agent: guarded
+
+    ### the project's own micro language model (the lab and the weights
+    ### live in {{ app_label }}/core/akili): trained from scratch on the project's
+    ### synthetic calendar data, it plans real tool chains -- also nested
+    ### requests like "the weekday of today plus 2 days" -- and runs
+    ### in-process with plain numpy, no server. train-first: create the
+    ### weights once with "python -m {{ app_label }}.core.akili.train",
+    ### then try ({{ app_label }}/core/akili/AKILI-USE.md walks all demos):
+    ###   {{ app_label }} ai ask "wochentag von heute plus 14 tage" --profile akili
+    ###   {{ app_label }} ai ask "weekday of 2026-12-24" --profile akili --json
+    akili:
+      type: {{ app_label }}.core.ai.providers.akili.TokeoAiAkiliProvider
+      purpose: calendar
+      ### shares the guarded agent (its guard pipeline and jailed -> allow
+      ### sandbox chain) but adds no tools of its own and "deny"s the ones it
+      ### does not need, keeping only the calendar tools. the active tools are
+      ### agent.tools minus agent.deny minus this profile.deny
+      agent: guarded
+      deny:
+        - mathematics
+        - filesystem
+
+    ### the codeact demo profile: the deterministic mock provider against the
+    ### coder agent. a "text upper|reverse|len <sentence>" prompt makes the
+    ### mock synthesize python, which runs in the wasm guest -- the model
+    ### writes code, the sandbox isolates it. opt-in: needs the ./wasm build
+    ### (core/ai/sandboxes/WASM.md). use --json to see the synthesized code and
+    ### the sandbox in the trace:
+    ###   {{ app_label }} ai ask "text upper der wochentag von heute" --profile codermock
+    ###   {{ app_label }} ai ask "text reverse otto" --profile codermock --json
+    codermock:
+      type: mock
+      purpose: codeact
+      agent: coder
+
+    ### a local or remote OpenAI-compatible server you run yourself. wired to
+    ### the coder agent, so the real model writes python that runs in the wasm
+    ### guest. set <modelname> to the id your server exposes (check it with:
+    ### curl http://localhost:8000/v1/models). then try:
+    ###   {{ app_label }} ai ask "berechne die summe von 1 bis 100" --profile assistant
+    ###   {{ app_label }} ai ask "hauptstadt von frankreich" --profile assistant --json
+    assistant:
+      ### provider type; "oai_compat" speaks the OpenAI-compatible chat
+      ### completions protocol -- the one ollama, vllm, llama.cpp, mlx and
+      ### the commercial apis all share, so one provider serves them all
+      type: oai_compat
+      ### provider connection settings live under "options"
+      options:
+        ### model name as your server exposes it; replace the placeholder
+        model: "<modelname>"
+        ### base url of the running server (vllm 8000, ollama 11434, mlx 8080)
+        base_url: http://localhost:8000/v1
+        ### optional bearer token for a secured api. local servers usually
+        ### ignore it; for a real key, use the normal config resolution --
+        ### plain text, a ${ENV_VAR} expansion, or a vault-backed value --
+        ### so the secret need never sit here in clear text
+        # key: ${OPENAI_API_KEY}
+        ### seconds before the call gives up (inference is slow; default 120)
+        # timeout: 120
+      ### model parameters passed straight through to the endpoint (no
+      ### validation here -- the endpoint owns the valid ranges, which vary
+      ### by model). override any of these per call with --model_param key=value
+      ### (repeatable); --model_param key=null removes a key for that call.
+      ### common keys:
+      ###   temperature      randomness/creativity, ~0.0-2.0 (lower = focused)
+      ###   top_p            nucleus sampling cutoff, 0.0-1.0
+      ###   max_tokens       cap on the generated answer length
+      ###   frequency_penalty / presence_penalty   damp repetition, ~-2.0-2.0
+      ###   stop             string or list that ends generation
+      ###   seed             fixed value for (mostly) reproducible output
+      ###   response_format  e.g. {type: json_object} for structured output
+      ###   tool_choice      auto/none/required, or a named function
+      ###   model            overrides the model above for that call only
+      # model_params:
+      #   temperature: 0.2
+      #   top_p: 0.9
+      #   max_tokens: 1024
+      ### optional free-form selector, usable via "ai ask --purpose"
+      purpose: assistant
+      ### the agent (composition) this profile runs; use --agent coder
+      ### to run model-written code in the wasm sandbox
+      agent: guarded

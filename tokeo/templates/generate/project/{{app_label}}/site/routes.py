@@ -7,7 +7,7 @@ paths using NiceGUI and FastAPI's programmatic routers.
 
 ### Route Structure
 
-Routes are defined as pure, stateless functions in the ``pages/`` and ``apis/``
+Routes are defined as pure, stateless functions in the ```pages/``` and ```apis/```
 directories, and are mapped to URL paths in this file via dictionaries or
 direct programmatic calls.
 
@@ -15,9 +15,9 @@ direct programmatic calls.
 
 To add a new page or API endpoint to your application:
 
-1. Create a pure function in ``site/pages/`` or ``site/apis/``.
+1. Create a pure function in ```site/pages/``` or ```site/apis/```.
 2. Import it into this module.
-3. Add it to the ``pages`` mapping dictionary or API registry.
+3. Add it to the ```pages``` mapping dictionary or API registry.
 
 ### Example of adding a new page dynamically
 
@@ -36,16 +36,16 @@ def pages_map():
 
 ### Notes
 
-- ``ui.page()`` and ``fastapi_app.get()`` are used as programmatic wrappers in a
+- ```ui.page()``` and ```fastapi_app.get()``` are used as programmatic wrappers in a
   loop, not as decorators
-- The ``routes()`` function is invoked by the ``TokeoNicegui`` engine during
+- The ```routes()``` function is invoked by the ```TokeoNicegui``` engine during
   startup
 
 ### Attention
 
 .. danger::
-    **(NiceGUI 3.x Architecture):** Absolutely no UI elements (``ui.label``,
-    ``ui.button``, etc.) may be instantiated in the global scope of this file.
+    **(NiceGUI 3.x Architecture):** Absolutely no UI elements (```ui.label```,
+    ```ui.button```, etc.) may be instantiated in the global scope of this file.
     All UI construction must happen strictly inside the registered page functions
     to prevent memory leaks and cross-session state contamination.
 
