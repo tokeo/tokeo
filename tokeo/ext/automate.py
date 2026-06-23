@@ -61,7 +61,7 @@ from cement.core.foundation import SIGNALS
 from cement.core.exc import CaughtSignal
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.base import hasprops, getprop, default_when_blank
-from tokeo.core.utils.json import jsonDump, jsonTokeoEncoder
+from tokeo.core.utils.json import json_dump, TokeoJsonUnknownNoneEncoder
 from tokeo.core.utils import sanitize
 from tokeo.ext.argparse import Controller
 
@@ -522,27 +522,36 @@ class TokeoInvokeRemoteContext(invoke.Context):
             self.client = None
 
 
-def jsonTokeoAutomateEncoder(obj):
+class TokeoJsonAutomateEncoder(TokeoJsonUnknownNoneEncoder):
     """
-    Internal custom JSON encoder for TokeoAutomateResult objects.
+    JSON encoder that renders a TokeoAutomateResult as its fields.
 
-    Converts TokeoAutomateResult objects to dictionaries for JSON serialization.
-
-    ### Args
-
-    - **obj** (any): The object to encode
-
-    ### Returns
-
-    - **any**: A serializable representation of the object
+    Extends the None encoder; a TokeoAutomateResult becomes a dict of its
+    attributes, anything else falls through to the base (an unknown object
+    as null).
 
     """
-    # test for automate result
-    if isinstance(obj, TokeoAutomateResult):
-        return vars(obj)
-    # continue with tokeo encoder
-    return jsonTokeoEncoder(obj)
 
+    def encode(self, obj):
+        """
+        Encode a TokeoAutomateResult, else defer to the base encoder.
+
+        ### Args
+
+        - **obj** (any): The object json could not serialize itself
+
+        ### Returns
+
+        - **dict|str|None**: A dict of the result's fields for a
+            TokeoAutomateResult; otherwise whatever the base encoder returns
+            (None for an unknown object, since this extends the None encoder)
+
+        """
+        # test for automate result
+        if isinstance(obj, TokeoAutomateResult):
+            return vars(obj)
+        # continue with tokeo encoder
+        return super().encode(obj)
 
 class TokeoAutomateResult:
     """
@@ -2079,9 +2088,9 @@ class TokeoAutomateShell:
             )
         if args.as_json:
             self.app.print(
-                jsonDump(
+                json_dump(
                     res['results'],
-                    default=jsonTokeoAutomateEncoder,
+                    encoder=TokeoJsonAutomateEncoder(),
                     encoding=None,
                 )
             )
@@ -2473,9 +2482,9 @@ class TokeoAutomateController(Controller):
         # check for json and encoding
         if self.app.pargs.as_json:
             self.app.print(
-                jsonDump(
+                json_dump(
                     res['results'],
-                    default=jsonTokeoAutomateEncoder,
+                    encoder=TokeoJsonAutomateEncoder(),
                     encoding='utf-8' if self.app.pargs.encode_utf8 else None,
                 )
             )

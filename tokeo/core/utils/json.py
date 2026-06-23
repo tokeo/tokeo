@@ -1,35 +1,20 @@
 import json
 import datetime
 import dataclasses
-import functools
 from . import date
 
 
-def jsonTokeoEncoder(obj, ignore_unknown=True):
+class TokeoJsonEncoder:
     """
-    Custom JSON encoder function for Tokeo types.
+    Base JSON encoder for Tokeo types.
 
-    The ```default``` hook for ```json.dumps```: json calls it for any value it
-    cannot serialize itself. It converts dates to standardized strings and
-    unpacks a dataclass to a dict (so json walks its fields). For any other
-    object it either returns ```None``` -- the default, letting json render it as
-    ```null``` -- or, when ```ignore_unknown``` is ```False```, the object's type
-    name as a readable fallback.
+    Holds the ```default``` hook for ```json.dumps``` in ```encode```: json calls
+    it for any value it cannot serialize itself. The base converts dates to
+    standardized strings and unpacks a dataclass to a dict (so json walks its
+    fields), and returns ```None``` for anything else (json renders ```null```).
 
-    ### Args
-
-    - **obj** (any): The object to encode
-    - **ignore_unknown** (bool): For an object this encoder does not handle,
-        return ```None``` (json renders ```null```) when ```True``` (the
-        default), or its type name as a string when ```False```. Set ```False```
-        when a readable placeholder is wanted (e.g. a trace step's ```origin```
-        handler/guard, which is an attribution, not data)
-
-    ### Returns
-
-    - **str|dict|None**: A string for a date/datetime; a dict for a dataclass; a
-        type-name string or ```None``` for any other object, per
-        ```ignore_unknown```
+    Subclasses change only the unknown-object case by overriding ```encode```
+    and falling back to ```super().encode(obj)``` for the handled types.
 
     ### Notes
 
@@ -41,55 +26,105 @@ def jsonTokeoEncoder(obj, ignore_unknown=True):
         dies on a field holding a live object (such as a trace step's origin)
 
     """
-    # check datetime before date: datetime is a subclass of date, so a
-    # date-first test would also catch datetimes and drop their time part
-    if isinstance(obj, datetime.datetime):
-        return date.to_utc_timestring(obj)
-    # a plain date carries no time or tzinfo, so format it directly; routing
-    # it through as_utc() would raise since as_utc only accepts str/datetime
-    if isinstance(obj, datetime.date):
-        return obj.strftime('%Y-%m-%d')
-    # a dataclass: hand json a shallow dict of its fields so json recurses
-    # through them (not asdict, which deepcopies and dies on a live origin)
-    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
-        return dict(obj.__dict__)
-    # an unknown object: None by default (json renders null), or a readable
-    # type name when ignore_unknown is off
-    return None if ignore_unknown else type(obj).__name__
+
+    def encode(self, obj):
+        """
+        Encode one Tokeo type for json, or signal it is unknown.
+
+        ### Args
+
+        - **obj** (any): The object json could not serialize itself
+
+        ### Returns
+
+        - **str|dict|None**: A string for a date/datetime; a shallow dict for a
+            dataclass; ```None``` for any other object (json renders ```null```)
+
+        """
+        # check datetime before date: datetime is a subclass of date, so a
+        # date-first test would also catch datetimes and drop their time part
+        if isinstance(obj, datetime.datetime):
+            return date.to_utc_timestring(obj)
+        # a plain date carries no time or tzinfo, so format it directly; routing
+        # it through as_utc() would raise since as_utc only accepts str/datetime
+        if isinstance(obj, datetime.date):
+            return obj.strftime('%Y-%m-%d')
+        # a dataclass: hand json a shallow dict of its fields so json recurses
+        # through them (not asdict, which deepcopies and dies on a live origin)
+        if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+            return dict(obj.__dict__)
+        # an unknown object: None, so json renders it as null
+        return None
 
 
-def jsonDump(obj, default=jsonTokeoEncoder, encoding=None, ignore_unknown=True, **kwargs):
+class TokeoJsonUnknownNoneEncoder(TokeoJsonEncoder):
     """
-    Serialize object to JSON string with Tokeo-specific type handling.
+    Encoder that renders an unknown object as ```null``` (the default).
 
-    This is a wrapper around json.dumps() that uses the jsonTokeoEncoder
-    by default and provides optional encoding to bytes.
+    Identical to ```TokeoJsonEncoder```; named for use as the explicit default
+    in ```json_dump``` and to make the unknown-object policy readable at the
+    call site.
+
+    """
+
+    pass
+
+
+class TokeoJsonUnknownNameEncoder(TokeoJsonEncoder):
+    """
+    Encoder that renders an unknown object as its type name.
+
+    For a readable placeholder instead of ```null``` -- e.g. a trace step's
+    ```origin``` (a handler or guard), which is an attribution, not data, so its
+    type name says more than ```null```.
+
+    """
+
+    def encode(self, obj):
+        """
+        Encode like the base, but name an unknown object instead of nulling it.
+
+        ### Args
+
+        - **obj** (any): The object json could not serialize itself
+
+        ### Returns
+
+        - **str|dict**: As the base for a handled type; the object's type name
+            (a string) for any other object
+
+        """
+        # the base returns None exactly for an object it does not handle; check
+        # for None (not falsiness), so a handled but falsy value like an empty
+        # dataclass dict stays itself instead of being replaced by a type name
+        result = super().encode(obj)
+        return result if result is not None else type(obj).__name__
+
+
+def json_dump(obj, encoder=None, encoding=None, **kwargs):
+    """
+    Serialize an object to a JSON string with Tokeo-specific type handling.
+
+    A wrapper around ```json.dumps``` that routes unserializable values through
+    a ```TokeoJsonEncoder```, so dates and dataclasses survive, and optionally
+    encodes the result to bytes.
 
     ### Args
 
-    - **obj** (any): The object to serialize to JSON
-    - **default** (callable, optional): A function that gets called for
-        objects that can't be serialized. Defaults to jsonTokeoEncoder.
-    - **encoding** (str, optional): If provided, the resulting JSON string
-        will be encoded to bytes using this encoding (e.g., 'utf-8')
-    - **ignore_unknown** (bool): Passed to the default jsonTokeoEncoder: when
-        ```False```, render an unhandled object as its type name instead of
-        ```null```. Has no effect when a custom ```default``` is given. Default
-        ```True```
-    - ****kwargs**: Forwarded to json.dumps (e.g. indent, sort_keys)
+    - **obj** (any): The object to serialize
+    - **encoder** (TokeoJsonEncoder, optional): The encoder whose ```encode``` is
+        the json ```default``` hook; defaults to ```TokeoJsonUnknownNoneEncoder```
+        (an unknown object becomes ```null```). Pass the name encoder for
+        type-name placeholders, or a custom subclass
+    - **encoding** (str, optional): If given, encode the JSON string to bytes
+        with this encoding (e.g. 'utf-8')
+    - ****kwargs**: Forwarded to ```json.dumps``` (e.g. indent, sort_keys)
 
     ### Returns
 
-    - **str|bytes**: JSON string or bytes if encoding is specified
-
-    ### Notes
-
-    : This function maintains proper serialization of Tokeo-specific types like
-        dates and datetimes by using the jsonTokeoEncoder as the default encoder.
+    - **str|bytes**: The JSON string, or bytes when ```encoding``` is given
 
     """
-    # only the built-in encoder takes the flag; a custom default is used as is
-    if default is jsonTokeoEncoder and not ignore_unknown:
-        default = functools.partial(jsonTokeoEncoder, ignore_unknown=False)
-    j = json.dumps(obj, default=default, **kwargs)
+    encoder = encoder if encoder else TokeoJsonUnknownNoneEncoder()
+    j = json.dumps(obj, default=encoder.encode, **kwargs)
     return j.encode(encoding) if encoding else j
