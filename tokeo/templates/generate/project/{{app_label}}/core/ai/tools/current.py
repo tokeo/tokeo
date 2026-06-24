@@ -1,10 +1,9 @@
 """
 Current tool for the {{ app_name }} ai agent.
 
-A tiny information tool that returns the current date and time. It takes no
-arguments, so it also demonstrates the simplest possible tool schema, and its
-output format is a tool setting (```Meta.format```), overridable per item by the
-```options``` in the configuration.
+A tiny information tool that returns the current UTC date and time as a
+timestring. It takes no arguments, so it also demonstrates the simplest
+possible tool schema.
 
 This module is self-contained: it holds only the tool class. The project names
 it by its full dotted class path under ```ai.tools``` in the config, so it needs
@@ -12,23 +11,22 @@ no registration and no entry in the app extensions; the handler imports and
 instantiates it on demand.
 """
 
-from datetime import datetime
-
 from tokeo.core.ai import TokeoAiTool
+from tokeo.core.ai.tool import create_tool_result
+from tokeo.core.utils.date import utc_now, to_utc_timestring
 
 
 class TokeoAiCurrentTool(TokeoAiTool):
     """
-    Tool that returns the current date and time.
+    Tool that returns the current UTC date and time.
 
-    The ```Meta``` description and parameters are what the model sees; the
-    ```format``` is the tool's own setting, overridden per item by its config
-    ```options``` and read from ```_meta```.
+    The ```Meta``` description and parameters are what the model sees; ```exec```
+    reads the clock and formats the reply as a UTC timestring.
 
     """
 
     class Meta:
-        """Tool meta-data sent to the model, plus the tool's own settings."""
+        """Tool meta-data sent to the model."""
 
         # Short description the model sees
         description = 'return the current date and time'
@@ -39,16 +37,17 @@ class TokeoAiCurrentTool(TokeoAiTool):
             properties=dict(),
         )
 
-        # strftime format of the reply; a tool setting, not model-facing
-        format = '%Y-%m-%d %H:%M:%S'
-
     def exec(self):
         """
-        Return the current local date and time as text.
+        Return the current UTC date and time.
 
         ### Returns
 
-        - **str**: The formatted current date and time
+        - **ToolResult**: The current datetime as the value; as_str is the UTC
+            timestring ```YYYY-MM-DD HH:MM:SS.MMMZ```
 
         """
-        return datetime.now().strftime(self._meta.format)
+        now = utc_now()
+        # the value is the datetime itself, so the trace keeps the full instant;
+        # the model sees the UTC timestring as the as_str
+        return create_tool_result(now, as_str=to_utc_timestring(now))

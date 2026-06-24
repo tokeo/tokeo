@@ -11,8 +11,10 @@ instantiates it on demand.
 """
 
 import calendar
+from datetime import datetime as datetime_type
 
 from tokeo.core.ai import TokeoAiTool
+from tokeo.core.utils.date import to_utc
 
 
 class TokeoAiWeekdayTool(TokeoAiTool):
@@ -42,13 +44,15 @@ class TokeoAiWeekdayTool(TokeoAiTool):
 
         ### Args
 
-        - **date** (str): The date as ```YYYY-MM-DD```
+        - **date** (str): The date as ```YYYY-MM-DD``` or a timestring
 
         ### Returns
 
         - **str**: The English weekday name (Monday ... Sunday)
 
         """
-        from datetime import date as date_type
-
-        return calendar.day_name[date_type.fromisoformat(str(date)).weekday()]
+        d = to_utc(date, auto_type=True)
+        # a timestring still has a single calendar day; reduce to it
+        day = d.date() if isinstance(d, datetime_type) else d
+        # return the name itself: a plain string the loop wraps as is
+        return calendar.day_name[day.weekday()]

@@ -16,7 +16,7 @@ instantiates it on demand.
 from datetime import datetime as datetime_type, timedelta
 from tokeo.core.ai import TokeoAiTool
 from tokeo.core.ai.tool import create_tool_result
-from tokeo.core.utils.date import parse_datetimestring_as_utc, to_utc_datestring, to_utc_timestring
+from tokeo.core.utils.date import to_utc, to_utc_datestring, to_utc_timestring
 
 
 class TokeoAiAddDaysTool(TokeoAiTool):
@@ -64,7 +64,7 @@ class TokeoAiAddDaysTool(TokeoAiTool):
         # the shift to apply, forward or (for a negative number) back
         td = timedelta(days=int(days))
         # parse with grain detection, then keep that grain across the shift
-        d = parse_datetimestring_as_utc(date, auto_type=True) + td
+        d = to_utc(date, auto_type=True) + td
         # a datetime renders as a timestring, a date as a date string
         as_str = to_utc_timestring(d) if isinstance(d, datetime_type) else to_utc_datestring(d)
         return create_tool_result(d, as_str=as_str)

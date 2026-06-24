@@ -71,7 +71,7 @@ class TokeoAiCalcTool(TokeoAiTool):
 
     def exec(self, input):
         """
-        Evaluate the expression and return the result as text.
+        Evaluate the expression and return the result.
 
         ### Args
 
@@ -79,17 +79,19 @@ class TokeoAiCalcTool(TokeoAiTool):
 
         ### Returns
 
-        - **str**: The numeric result
+        - **int | float**: The numeric result
 
         ### Raises
 
         - **TokeoAiError**: If the expression is not a plain arithmetic term
 
         """
-        # a plain string is accepted by the loop as the model-facing result
         try:
-            return str(_eval(ast.parse(str(input), mode='eval').body))
+            number = _eval(ast.parse(str(input), mode='eval').body)
         except TokeoAiError:
             raise
         except Exception:
             raise TokeoAiError(f'calc cannot evaluate {input!r}')
+        # return the number itself: the loop wraps a plain value into a result,
+        # so the number stays the structured value and its text the as_str
+        return number

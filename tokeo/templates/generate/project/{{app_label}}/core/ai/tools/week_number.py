@@ -10,7 +10,10 @@ no registration and no entry in the app extensions; the handler imports and
 instantiates it on demand.
 """
 
+from datetime import datetime as datetime_type
+
 from tokeo.core.ai import TokeoAiTool
+from tokeo.core.utils.date import to_utc
 
 
 class TokeoAiWeekNumberTool(TokeoAiTool):
@@ -40,13 +43,16 @@ class TokeoAiWeekNumberTool(TokeoAiTool):
 
         ### Args
 
-        - **date** (str): The date as ```YYYY-MM-DD```
+        - **date** (str): The date as ```YYYY-MM-DD``` or a timestring
 
         ### Returns
 
-        - **str**: The ISO week number (1 ... 53)
+        - **int**: The ISO week number (1 ... 53)
 
         """
-        from datetime import date as date_type
-
-        return str(date_type.fromisoformat(str(date)).isocalendar().week)
+        d = to_utc(date, auto_type=True)
+        # a timestring still has a single calendar day; reduce to it
+        day = d.date() if isinstance(d, datetime_type) else d
+        # return the number itself: its str() is exactly the model-facing form,
+        # so let the loop wrap the plain value rather than restate as_str here
+        return day.isocalendar().week

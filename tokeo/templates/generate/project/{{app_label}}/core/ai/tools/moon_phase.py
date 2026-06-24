@@ -12,9 +12,12 @@ no registration and no entry in the app extensions; the handler imports and
 instantiates it on demand.
 """
 
-from datetime import date
+import math
+from datetime import date as date_type
 
 from tokeo.core.ai import TokeoAiTool
+from tokeo.core.ai.tool import create_tool_result
+from tokeo.core.utils.date import to_utc
 
 
 # the eight common phase names, one per eighth of the synodic cycle
@@ -30,7 +33,7 @@ _PHASES = (
 )
 
 # a well-known new moon (2000-01-06) and the mean synodic month in days
-_KNOWN_NEW_MOON = date(2000, 1, 6)
+_KNOWN_NEW_MOON = date_type(2000, 1, 6)
 _SYNODIC_DAYS = 29.530588853
 
 
@@ -59,17 +62,39 @@ class TokeoAiMoonPhaseTool(TokeoAiTool):
         """
         Tell the moon phase of the date.
 
+        The value carries the phase plus the figures it is derived from, for a
+        ui or a follow-up step; the model sees only the phase name as the
+        as_str. All figures use the mean synodic month, so they are an
+        approximation, not an ephemeris.
+
         ### Args
 
-        - **date** (str): The date as ```YYYY-MM-DD```
+        - **date** (str): The date as ```YYYY-MM-DD``` or a timestring
 
         ### Returns
 
-        - **str**: One of the eight common phase names
+        - **ToolResult**: A dict value with the phase name, its index (0-7),
+            the moon's age in days, the cycle fraction and lit fraction (both
+            0-1), and whether it is waxing; as_str is the phase name
 
         """
-        from datetime import date as date_type
-
-        age = (date_type.fromisoformat(str(date)) - _KNOWN_NEW_MOON).days % _SYNODIC_DAYS
-        index = int((age / _SYNODIC_DAYS) * 8 + 0.5) % 8
-        return _PHASES[index]
+        d = to_utc(date, auto_type=False)
+        # age is the days since the last new moon: total days since a known new
+        # moon, with whole cycles dropped, so only the position in the current
+        # cycle remains
+        age = (d.date() - _KNOWN_NEW_MOON).days % _SYNODIC_DAYS
+        fraction = age / _SYNODIC_DAYS
+        index = int(fraction * 8 + 0.5) % 8
+        # lit fraction of the disc from the phase geometry: 0 at new, 1 at full
+        illumination = (1 - math.cos(2 * math.pi * fraction)) / 2
+        result = dict(
+            phase=_PHASES[index],
+            index=index,
+            age_days=round(age, 4),
+            fraction=round(fraction, 4),
+            illumination=round(illumination, 4),
+            waxing=fraction < 0.5,
+        )
+        # the model sees the phase name; the dict rides along for the trace or
+        # a follow-up step
+        return create_tool_result(result, as_str=result['phase'])
