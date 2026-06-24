@@ -17,6 +17,8 @@ instantiates it on demand.
 from pathlib import Path
 
 from tokeo.core.ai import TokeoAiError, TokeoAiTool
+from tokeo.core.ai.tool import create_tool_result
+from tokeo.core.utils.date import to_utc, to_utc_timestring
 
 
 def _resolve_below(base_dir, path):
@@ -62,13 +64,19 @@ class TokeoAiAppendFileTool(TokeoAiTool):
         """
         Append the text as one line to the configured file.
 
+        The value carries the write outcome -- the file name, its byte size
+        before and after, whether it was newly created, and its filesystem
+        timestamps; the model sees only true/false (success) as the as_str.
+
         ### Args
 
         - **text** (str): The text line to append
 
         ### Returns
 
-        - **str**: A short confirmation naming the file
+        - **ToolResult**: A dict value with the file name, size_before and
+            size_after in bytes, created (true if the file was new),
+            created_at and updated_at as UTC timestrings; as_str is true/false
 
         ### Raises
 
@@ -76,6 +84,24 @@ class TokeoAiAppendFileTool(TokeoAiTool):
 
         """
         target = _resolve_below(self._meta.base_dir, self._meta.file)
+        # check existence and size BEFORE the append: a missing file is created
+        # by append mode, so this is the only point that can tell new from empty
+        created = not target.is_file()
+        size_before = 0 if created else target.stat().st_size
         with open(target, 'a') as handle:
             handle.write(str(text).rstrip('\n') + '\n')
-        return f'appended to {self._meta.file!r}'
+        # read the filesystem timestamps after the write; st_birthtime is the
+        # real creation time where the platform has it (mac/bsd), st_ctime the
+        # best fallback elsewhere (on linux it is the inode change time)
+        stat = target.stat()
+        created_at = getattr(stat, 'st_birthtime', stat.st_ctime)
+        result = dict(
+            file=self._meta.file,
+            size_before=size_before,
+            size_after=stat.st_size,
+            created=created,
+            created_at=to_utc_timestring(to_utc(created_at)),
+            updated_at=to_utc_timestring(to_utc(stat.st_mtime)),
+        )
+        # the model sees the success flag; the dict rides along for a follow-up
+        return create_tool_result(result, as_str='true')

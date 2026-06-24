@@ -11,12 +11,11 @@ no registration and no entry in the app extensions; the handler imports and
 instantiates it on demand.
 """
 
-from datetime import date
-
 from tokeo.core.ai import TokeoAiTool
+from tokeo.core.utils.date import to_utc
 
 
-class TokeoAiDateDiffTool(TokeoAiTool):
+class TokeoAiDateDayDiffTool(TokeoAiTool):
     """
     Tool that counts the days between two ISO dates.
 
@@ -44,12 +43,16 @@ class TokeoAiDateDiffTool(TokeoAiTool):
 
         ### Args
 
-        - **start** (str): The first date as ```YYYY-MM-DD```
-        - **end** (str): The second date as ```YYYY-MM-DD```
+        - **start** (str): The first date as ```YYYY-MM-DD``` or a timestring
+        - **end** (str): The second date as ```YYYY-MM-DD``` or a timestring
 
         ### Returns
 
-        - **str**: The signed number of days
+        - **int**: The signed number of days
 
         """
-        return str((date.fromisoformat(str(end)) - date.fromisoformat(str(start))).days)
+        s = to_utc(start, auto_type=False)
+        e = to_utc(end, auto_type=False)
+        # return the number itself: its str() is exactly the model-facing form,
+        # so let the loop wrap the plain value rather than restate as_str here
+        return (e.date() - s.date()).days

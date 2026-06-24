@@ -12,7 +12,7 @@ no registration and no entry in the app extensions; the handler imports and
 instantiates it on demand.
 """
 
-from tokeo.core.ai import TokeoAiError, TokeoAiTool
+from tokeo.core.ai import TokeoAiTool
 
 
 class TokeoAiAnswer42Tool(TokeoAiTool):
@@ -55,17 +55,10 @@ class TokeoAiAnswer42Tool(TokeoAiTool):
 
         ### Returns
 
-        - **int**: The house answer, 42
-
-        ### Raises
-
-        - **TokeoAiError**: If the answer cannot be produced
+        - **int**: The house answer 42
 
         """
-        # a plain value is accepted by the loop as the model-facing result
-        try:
-            return 42
-        except TokeoAiError:
-            raise
-        except Exception:
-            raise TokeoAiError(f'answer42 cannot evaluate {input!r}')
+        answer = 42
+        # return the number itself: its str() is exactly the model-facing form,
+        # so let the loop wrap the plain value rather than restate as_str here
+        return answer

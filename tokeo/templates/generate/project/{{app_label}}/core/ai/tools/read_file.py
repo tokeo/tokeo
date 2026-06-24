@@ -78,4 +78,5 @@ class TokeoAiReadFileTool(TokeoAiTool):
         target = _resolve_below(self._meta.base_dir, path)
         if not target.is_file():
             raise TokeoAiError(f'no such file: {str(path)!r}')
+        # the value is the file content; as_str defaults to the same text
         return target.read_text()
