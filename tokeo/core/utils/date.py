@@ -14,36 +14,69 @@ def utc_now():
     return datetime_type.now(timezone.utc)
 
 
-def to_utc(date):
+def to_utc(date, auto_type=False):
     """
-    Convert a date or datetime to a UTC datetime.
+    Convert a date, datetime, string, or epoch timestamp to a UTC datetime.
 
-    A datetime is converted via astimezone(), so the source timezone is
-    respected and the wall clock time is shifted accordingly; a naive datetime
-    is assumed to be in the local timezone. A date carries no time and no zone,
-    so it is lifted to a datetime at midnight UTC.
+    Every input is brought to the same UTC instant: a datetime is converted via
+    astimezone(), so its source timezone is respected and the wall clock time
+    is shifted accordingly (a naive datetime is assumed to be local time); a
+    date is lifted to midnight UTC, as it carries no time or zone; a string is
+    parsed as ISO 8601 and shifted by its offset (a naive string is taken as
+    local time, so its result depends on the server's timezone); an epoch
+    timestamp (seconds since 1970, int or float) is read directly as UTC, since
+    an epoch is an absolute instant.
+
+    With auto_type the result follows the input's grain: a date input or a
+    date-only string (length <= 10) yields a date, everything else a datetime.
+    Without it the result is always a datetime.
 
     ### Args
 
-    - **date** (date | datetime): The value to convert
+    - **date** (date | datetime | str | int | float): The value to convert; a
+        string is an ISO 8601 timestring, a number a POSIX epoch in seconds
+    - **auto_type** (bool): When True, return a date for a date or a date-only
+        string; otherwise always return a datetime
 
     ### Returns
 
-    - **datetime**: A UTC datetime; the same instant for a datetime input,
-        midnight for a date input
+    - **date | datetime**: A UTC datetime carrying tzinfo, or a date when
+        auto_type is set and the input carried no time
+
+    ### Raises
+
+    - **ValueError**: If the input type is none of the above, or the string is
+        not a supported ISO 8601 form
 
     ### Notes
 
-    : Use this to convert a datetime across timezones. To merely label a
-        datetime as UTC without shifting it, use as_utc() instead
+    : Use this to bring any supported value to UTC. To merely label a datetime
+        as UTC without shifting it, use as_utc() instead
 
     """
     if isinstance(date, datetime_type):
         return date.astimezone(tz=timezone.utc)
     elif isinstance(date, date_type):
-        return datetime_type.combine(date, time_type(0, 0), tzinfo=timezone.utc)
+        d = datetime_type.combine(date, time_type(0, 0), tzinfo=timezone.utc)
+        # with auto_type a date input stays a date
+        return d if not auto_type else d.date()
+    elif isinstance(date, str) and len(date) >= 8:
+        # parse the ISO string, then bring it to UTC inline (a recursive to_utc
+        # call is avoided by handling the parsed datetime or date here)
+        parsed = fromisoformat(date)
+        if isinstance(parsed, datetime_type):
+            d = parsed.astimezone(tz=timezone.utc)
+        elif isinstance(parsed, date_type):
+            d = datetime_type.combine(parsed, time_type(0, 0), tzinfo=timezone.utc)
+        else:
+            raise ValueError('Wrong string given as a date.')
+        # a datetime, except auto_type with a date-only string yields a date
+        return d if not auto_type or len(date) > 10 else d.date()
+    elif isinstance(date, (int, float)) and not isinstance(date, bool):
+        # an epoch is an absolute instant, so read it straight as UTC
+        return datetime_type.fromtimestamp(date, tz=timezone.utc)
     else:
-        raise ValueError('Wrong type given as a date.')
+        raise ValueError('Wrong type or data given as a date.')
 
 
 def to_utc_timestring(date):
@@ -91,72 +124,65 @@ def to_utc_datestring(date):
     return date_str[0:10]
 
 
-def as_utc(date):
+def as_utc(date, auto_type=False):
     """
-    Interpret a string, date, or datetime as UTC.
+    Interpret a date, datetime, string, or epoch timestamp as already UTC.
 
-    A string is parsed via parse_datetimestring_as_utc(). A datetime is
-    labelled UTC via replace(tzinfo=utc), keeping its wall clock time as-is (an
-    aware datetime in another timezone is therefore relabelled, not converted).
-    A date carries no time and no zone, so it is lifted to a datetime at
-    midnight UTC (via to_utc).
+    The wall clock time is kept and merely labelled UTC, the source offset is
+    dropped, not converted: a datetime is relabelled via replace(tzinfo=utc), so
+    14:00+02:00 becomes 14:00 UTC; a string is parsed and its wall clock time
+    relabelled the same way; a date is lifted to midnight UTC, as it carries no
+    time or zone; an epoch timestamp (seconds since 1970, int or float) is an
+    absolute instant, so it is read directly as UTC (here relabelling and
+    converting coincide).
+
+    With auto_type the result follows the input's grain: a date input or a
+    date-only string (length <= 10) yields a date, everything else a datetime.
+    Without it the result is always a datetime.
 
     ### Args
 
-    - **date** (str | date | datetime): The value to interpret as UTC
+    - **date** (date | datetime | str | int | float): The value to interpret as
+        UTC; a string is an ISO 8601 timestring, a number a POSIX epoch
+    - **auto_type** (bool): When True, return a date for a date or a date-only
+        string; otherwise always return a datetime
 
     ### Returns
 
-    - **datetime**: A UTC datetime; the same wall clock time for a datetime
-        input, parsed for a string, midnight for a date input
+    - **date | datetime**: A UTC datetime keeping the input's wall clock time,
+        or a date when auto_type is set and the input carried no time
 
     ### Raises
 
-    - **ValueError**: If the input type is none of str, date, or datetime
+    - **ValueError**: If the input type is none of the above, or the string is
+        not a supported ISO 8601 form
 
     ### Notes
 
-    : This assumes the value already represents UTC. To convert a datetime
-        from another timezone into UTC, use to_utc() instead
+    : This assumes the value already represents UTC. To convert a datetime from
+        another timezone into UTC, use to_utc() instead
 
     """
-    if isinstance(date, str):
-        return parse_datetimestring_as_utc(date, auto_type=False)
-    elif isinstance(date, datetime_type):
+    if isinstance(date, datetime_type):
         return date.replace(tzinfo=timezone.utc)
     elif isinstance(date, date_type):
-        return to_utc(date)
+        d = datetime_type.combine(date, time_type(0, 0), tzinfo=timezone.utc)
+        # with auto_type a date input stays a date
+        return d if not auto_type else d.date()
+    elif isinstance(date, str) and len(date) >= 8:
+        # parse the ISO string, then relabel its wall clock time as UTC, so the
+        # source offset is dropped rather than converted
+        parsed = fromisoformat(date)
+        if isinstance(parsed, datetime_type):
+            d = parsed.replace(tzinfo=timezone.utc)
+        elif isinstance(parsed, date_type):
+            d = datetime_type.combine(parsed, time_type(0, 0), tzinfo=timezone.utc)
+        else:
+            raise ValueError('Wrong string given as a date.')
+        # a datetime, except auto_type with a date-only string yields a date
+        return d if not auto_type or len(date) > 10 else d.date()
+    elif isinstance(date, (int, float)) and not isinstance(date, bool):
+        # an epoch is an absolute instant, so read it straight as UTC
+        return datetime_type.fromtimestamp(date, tz=timezone.utc)
     else:
-        raise ValueError('Wrong type given for as utc date.')
-
-
-def parse_datetimestring_as_utc(datetime_str, auto_type=False):
-    """
-    Parse an ISO 8601 string into a UTC datetime, or a date.
-
-    Accepts any ISO 8601 form fromisoformat handles. With auto_type the result
-    follows the input's grain: a date-only string (length <= 10) yields a date,
-    anything with a time yields a datetime. Without it a datetime is always
-    returned. The value is read via to_utc, so an aware string is converted to
-    UTC and a naive string is taken as local time (and thus depends on the
-    server's timezone).
-
-    ### Args
-
-    - **datetime_str** (str): The ISO 8601 string to parse
-    - **auto_type** (bool): When True, return a date for a date-only input;
-        otherwise always return a datetime
-
-    ### Returns
-
-    - **date | datetime**: A datetime carrying UTC tzinfo, or a date when
-        auto_type is set and the input carried no time
-
-    ### Raises
-
-    - **ValueError**: If the input is not a string, is empty, or does not
-        match a supported ISO 8601 form
-
-    """
-    d = to_utc(fromisoformat(datetime_str))
-    return d if not auto_type or len(datetime_str) > 10 else d.date()
+        raise ValueError('Wrong type or data given as a date.')
