@@ -14,7 +14,7 @@ import os
 
 import pytest
 from cement.utils.misc import init_defaults
-from tokeo.core.ai import ToolResult, TokeoAiError
+from tokeo.core.ai import TokeoAiError
 from tokeo.core.ai.tools.python_untrusted_exec import TokeoAiPythonUntrustedExecTool
 from tokeo.core.ai.tools.python_trusted_exec import TokeoAiPythonTrustedExecTool
 from {{ app_label }}.main import {{ app_class_name }}Test
@@ -180,7 +180,8 @@ def test_{{ app_label }}_untrusted_exec_in_wasm_guest():
             dict(code='import statistics\nresult = statistics.median([5, 1, 9, 3, 7])'),
             agent,
         )
-        text = out.text if isinstance(out, ToolResult) else str(out)
+        # value is None when the tool returned nothing, so guard the access
+        text = out.value.as_str if out.value else ''
         assert text == '5'
 
 
@@ -198,7 +199,8 @@ def test_{{ app_label }}_trusted_exec_in_wasm_guest():
             dict(code='import {{ app_label }}\nresult = bool({{ app_label }}.__name__)'),
             agent,
         )
-        text = out.text if isinstance(out, ToolResult) else str(out)
+        # value is None when the tool returned nothing, so guard the access
+        text = out.value.as_str if out.value else ''
         assert text == 'True'
 
 
