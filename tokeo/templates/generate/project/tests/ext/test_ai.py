@@ -12,7 +12,8 @@ import logging
 from pathlib import Path
 
 import pytest
-from tokeo.core.ai import Invocation, ToolResult, ChatResult, ChatMessage, TraceStep, TokeoAiError
+from tokeo.core.ai import Invocation, ChatResult, ChatMessage, TraceStep, TokeoAiError
+from tokeo.core.ai.tool import create_tool_result
 from tokeo.core.ai.linter import TokeoAiLinter
 from tokeo.core.ai.guards.validate import TokeoAiToolSchemaValidator
 from tokeo.core.ai.guards.redact import TokeoAiRegexRedactGuard, TokeoAiRedactGuardError
@@ -188,10 +189,10 @@ def test_{{ app_label }}_ai_redact_guard_masks_secrets():
         guard._setup(app)
         # on_return: a secret in the returned text is masked
         invocation = Invocation(id='t1', name='read_file', arguments={})
-        invocation.result = ToolResult(text='the page said Bearer abc123DEF456ghi789 here')
+        invocation.result = create_tool_result('the page said Bearer abc123DEF456ghi789 here')
         guard.on_return(None, invocation)
-        assert 'abc123DEF456ghi789' not in invocation.result.text
-        assert '[redacted]' in invocation.result.text
+        assert 'abc123DEF456ghi789' not in invocation.result.value.as_str
+        assert '[redacted]' in invocation.result.value.as_str
         assert 'redacted' in (invocation.reason or '')
         assert invocation.decision == 'allow'
         # on_call: a secret in a string argument is masked in place
@@ -213,7 +214,7 @@ def test_{{ app_label }}_ai_redact_guard_raises_on_missing_pattern():
         guard = TokeoAiRegexRedactGuard(app)
         guard._setup(app)
         invocation = Invocation(id='t1', name='read_file', arguments={})
-        invocation.result = ToolResult(text='Bearer abc123DEF456ghi789')
+        invocation.result = create_tool_result('Bearer abc123DEF456ghi789')
         with pytest.raises(TokeoAiRedactGuardError, match='missing or invalid pattern'):
             guard.on_return(None, invocation)
 
@@ -227,9 +228,9 @@ def test_{{ app_label }}_ai_truncate_guard_caps_long_results():
         guard._declaration = dict(options=dict(limit=10))
         # on_return caps the tool result text and notes the cut on reason
         invocation = Invocation(id='t1', name='read_file', arguments={})
-        invocation.result = ToolResult(text='x' * 50)
+        invocation.result = create_tool_result('x' * 50)
         guard.on_return(None, invocation)
-        assert invocation.result.text == 'x' * 10 + '... [truncated 40 chars]'
+        assert invocation.result.value.as_str == 'x' * 10 + '... [truncated 40 chars]'
         assert 'truncated 40 chars' in (invocation.reason or '')
         # on_close caps the run's final answer text
         result = ChatResult(text='y' * 50)
