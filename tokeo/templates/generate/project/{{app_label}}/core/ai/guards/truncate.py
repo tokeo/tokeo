@@ -7,8 +7,8 @@ was cut; it blocks nothing and never changes a ```decision```.
 
 This is a worked example, derived from the core ```TokeoAiTruncateGuard``` type.
 It acts at two stages: ```on_return``` caps a completed tool call's
-```result.text``` (a big file read, a large retrieval), and ```on_close``` caps
-the run's final ```result.text```. Each stage reads its own settings via
+```result.value.as_str``` (a big file read, a large retrieval), and ```on_close```
+caps the run's final ```ChatResult.text```. Each stage reads its own settings via
 ```_config(stage)```, so the config can set a different ```limit```/```marker```
 per stage (an ```on_return```/```on_close``` options block) or one shared default.
 
@@ -94,15 +94,21 @@ class {{ app_class_name }}AiTruncateGuard(TokeoAiTruncateGuard):
 
         - **ctx** (TokeoAiContext): The running state
         - **invocation** (Invocation): The completed tool call whose
-            ```result.text``` is capped when longer than ```limit```
+            ```result.value.as_str``` (the model-facing view) is capped when
+            longer than ```limit```; the structured views are left untouched
 
         """
-        if invocation.result is None:
+        if invocation.result is None or invocation.result.value is None:
             return
-        capped, cut = self._cap(invocation.result.text or '', GUARD_STAGE_ON_RETURN)
+        capped, cut = self._cap(invocation.result.value.as_str or '', GUARD_STAGE_ON_RETURN)
         if not cut:
             return
-        invocation.result.text = capped
+        # cap only as_str, the model-facing view: truncate shrinks what the model
+        # reads to protect the budget, it hides nothing -- so the structured views
+        # (as_json, as_data) keep the full output for the trace. coherence across
+        # the three views is not needed here, unlike a redact guard that must not
+        # leave a secret in an unmasked view
+        invocation.result.value.as_str = capped
         note = f'truncated {cut} chars'
         invocation.reason = f'{invocation.reason}; {note}' if invocation.reason else note
 
