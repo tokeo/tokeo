@@ -62,13 +62,17 @@ def test_{{ app_label }}_ai_tools_exec(scratch):
     # the project tools work when called directly, and the file tools stay
     # strictly below their configured base directory
     with {{ app_class_name }}AiTestApp() as app:
-        assert app.ai._tool('calc').exec(input='2 + 3') == '5'
-        assert len(app.ai._tool('current').exec()) == 19  # YYYY-mm-dd HH:MM:SS
+        # calc and read_file hand back a raw value; the date tools and the file
+        # writer hand back a ToolResult whose as_str the model would see, so the
+        # test reads each according to what the tool returns
+        assert app.ai._tool('calc').exec(input='2 + 3') == 5
+        assert len(app.ai._tool('current').exec().value.as_str) == 24  # YYYY-mm-dd HH:MM:SS.MMMZ
         assert app.ai._tool('read_file').exec(path='sample.txt') == 'buy milk\n'
-        assert app.ai._tool('append_file').exec(text='hello') == "appended to 'notes.txt'"
-        assert app.ai._tool('add_months').exec(date='2026-01-31', months=1) == '2026-02-28'  # day clamps
-        assert app.ai._tool('add_months').exec(date='2026-06-08', months=-4) == '2026-02-08'
-        assert app.ai._tool('add_years').exec(date='2024-02-29', years=1) == '2025-02-28'  # leap clamps
+        appended = app.ai._tool('append_file').exec(text='hello')
+        assert appended.value.as_str == 'true' and appended.value.as_data['file'] == 'notes.txt'
+        assert app.ai._tool('add_months').exec(date='2026-01-31', months=1).value.as_str == '2026-02-28'
+        assert app.ai._tool('add_months').exec(date='2026-06-08', months=-4).value.as_str == '2026-02-08'
+        assert app.ai._tool('add_years').exec(date='2024-02-29', years=1).value.as_str == '2025-02-28'
         assert (scratch / 'notes.txt').read_text() == 'hello\n'
         with pytest.raises(TokeoAiError, match='escapes the tool base directory'):
             app.ai._tool('read_file').exec(path='../../setup.py')
