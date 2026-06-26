@@ -65,12 +65,12 @@ def _parse_isoformat_date(dtstr):
     year = int(dtstr[0:4])
     has_sep = dtstr[4] == '-'
     pos = 4 + has_sep
-    month = int(dtstr[pos:pos + 2])
+    month = int(dtstr[pos : pos + 2])  # noqa: E203
     pos += 2
-    if (dtstr[pos:pos + 1] == '-') != has_sep:
+    if (dtstr[pos : pos + 1] == '-') != has_sep:  # noqa: E203
         raise ValueError('Inconsistent use of dash separator')
     pos += has_sep
-    day = int(dtstr[pos:pos + 2])
+    day = int(dtstr[pos : pos + 2])  # noqa: E203
     return [year, month, day]
 
 
@@ -91,9 +91,9 @@ def _parse_hh_mm_ss_ff(tstr):
     for comp in range(0, 3):
         if (len_str - pos) < 2:
             raise ValueError('Incomplete time component')
-        time_comps[comp] = int(tstr[pos:pos + 2])
+        time_comps[comp] = int(tstr[pos : pos + 2])  # noqa: E203
         pos += 2
-        next_char = tstr[pos:pos + 1]
+        next_char = tstr[pos : pos + 1]  # noqa: E203
         if comp == 0:
             has_sep = next_char == ':'
         if not next_char or comp >= 2:
@@ -108,11 +108,10 @@ def _parse_hh_mm_ss_ff(tstr):
             pos += 1
             len_remainder = len_str - pos
             to_parse = 6 if len_remainder >= 6 else len_remainder
-            time_comps[3] = int(tstr[pos:(pos + to_parse)])
+            time_comps[3] = int(tstr[pos : (pos + to_parse)])  # noqa: E203
             if to_parse < 6:
                 time_comps[3] *= _FRACTION_CORRECTION[to_parse - 1]
-            if (len_remainder > to_parse
-                    and not all(map(_is_ascii_digit, tstr[(pos + to_parse):]))):
+            if len_remainder > to_parse and not all(map(_is_ascii_digit, tstr[(pos + to_parse) :])):  # noqa: E203
                 raise ValueError('Non-digit values in unparsed fraction')
     return time_comps
 
@@ -129,8 +128,8 @@ def _parse_isoformat_time(tstr):
     if len_str < 2:
         raise ValueError('Isoformat time too short')
     # find the offset start: first '-', '+', or 'Z' (find()+1 turns -1 into 0)
-    tz_pos = (tstr.find('-') + 1 or tstr.find('+') + 1 or tstr.find('Z') + 1)
-    timestr = tstr[:tz_pos - 1] if tz_pos > 0 else tstr
+    tz_pos = tstr.find('-') + 1 or tstr.find('+') + 1 or tstr.find('Z') + 1
+    timestr = tstr[: tz_pos - 1] if tz_pos > 0 else tstr
     time_comps = _parse_hh_mm_ss_ff(timestr)
     tzi = None
     if tz_pos == len_str and tstr[-1] == 'Z':
@@ -145,8 +144,7 @@ def _parse_isoformat_time(tstr):
             tzi = timezone.utc
         else:
             tzsign = -1 if tstr[tz_pos - 1] == '-' else 1
-            td = timedelta(hours=tz_comps[0], minutes=tz_comps[1],
-                           seconds=tz_comps[2], microseconds=tz_comps[3])
+            td = timedelta(hours=tz_comps[0], minutes=tz_comps[1], seconds=tz_comps[2], microseconds=tz_comps[3])
             tzi = timezone(tzsign * td)
     time_comps.append(tzi)
     return time_comps
@@ -185,7 +183,7 @@ def fromisoformat_compat(date_string):
     try:
         separator_location = _find_isoformat_datetime_separator(date_string)
         dstr = date_string[0:separator_location]
-        tstr = date_string[(separator_location + 1):]
+        tstr = date_string[(separator_location + 1) :]  # noqa: E203
         date_components = _parse_isoformat_date(dstr)
     except ValueError:
         raise ValueError(f'Invalid isoformat string: {date_string!r}') from None
@@ -193,8 +191,7 @@ def fromisoformat_compat(date_string):
         try:
             time_components = _parse_isoformat_time(tstr)
         except ValueError:
-            raise ValueError(
-                f'Invalid isoformat string: {date_string!r}') from None
+            raise ValueError(f'Invalid isoformat string: {date_string!r}') from None
     else:
         time_components = [0, 0, 0, 0, None]
     return datetime(*(date_components + time_components))

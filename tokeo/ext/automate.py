@@ -553,6 +553,7 @@ class TokeoJsonAutomateEncoder(TokeoJsonUnknownNoneEncoder):
         # continue with tokeo encoder
         return super().encode(obj)
 
+
 class TokeoAutomateResult:
     """
     Represents the result of an automated task execution.
