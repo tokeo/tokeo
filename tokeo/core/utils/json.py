@@ -1,5 +1,5 @@
 import json
-import datetime
+from datetime import date as date_type, datetime as datetime_type
 import dataclasses
 from . import date
 
@@ -23,7 +23,7 @@ class TokeoJsonEncoder:
     - date objects are converted to 'YYYY-MM-DD' format
     - a dataclass is unpacked one level via __dict__ so json recurses through its
         fields -- not dataclasses.asdict, which deepcopies the whole graph and
-        dies on a field holding a live object (such as a trace step's origin)
+        dies on a field holding a live object (one json cannot copy or serialize)
 
     """
 
@@ -43,14 +43,14 @@ class TokeoJsonEncoder:
         """
         # check datetime before date: datetime is a subclass of date, so a
         # date-first test would also catch datetimes and drop their time part
-        if isinstance(obj, datetime.datetime):
+        if isinstance(obj, datetime_type):
             return date.to_utc_timestring(obj)
         # a plain date carries no time or tzinfo, so format it directly; routing
         # it through as_utc() would raise since as_utc only accepts str/datetime
-        if isinstance(obj, datetime.date):
+        if isinstance(obj, date_type):
             return obj.strftime('%Y-%m-%d')
         # a dataclass: hand json a shallow dict of its fields so json recurses
-        # through them (not asdict, which deepcopies and dies on a live origin)
+        # through them (not asdict, which deepcopies and dies on a live field)
         if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
             return dict(obj.__dict__)
         # an unknown object: None, so json renders it as null
@@ -74,9 +74,9 @@ class TokeoJsonUnknownNameEncoder(TokeoJsonEncoder):
     """
     Encoder that renders an unknown object as its type name.
 
-    For a readable placeholder instead of ```null``` -- e.g. a trace step's
-    ```origin``` (a handler or guard), which is an attribution, not data, so its
-    type name says more than ```null```.
+    For a readable placeholder instead of ```null``` -- for an object that is an
+    attribution or a marker rather than data, where its type name says more than
+    ```null``` does.
 
     """
 
