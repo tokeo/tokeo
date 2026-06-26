@@ -100,12 +100,10 @@ class TestToUtc:
     def test_aware_string_is_shifted(self):
         # an offset in the string is honoured: 14:00 +02:00 -> 12:00 UTC,
         # a fixed result independent of the machine's timezone
-        assert to_utc('2026-06-23T14:00:00+02:00') == datetime(
-            2026, 6, 23, 12, 0, tzinfo=timezone.utc)
+        assert to_utc('2026-06-23T14:00:00+02:00') == datetime(2026, 6, 23, 12, 0, tzinfo=timezone.utc)
 
     def test_z_string_is_utc(self):
-        assert to_utc('2026-06-23 14:00:00.000Z') == datetime(
-            2026, 6, 23, 14, 0, tzinfo=timezone.utc)
+        assert to_utc('2026-06-23 14:00:00.000Z') == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
     def test_naive_string_is_local(self):
         # a naive string has no offset, so it is read as local time; the
@@ -175,8 +173,7 @@ class TestAsUtc:
     def test_aware_string_is_relabelled(self):
         # the key fix: a string offset is dropped, not converted -- 14:00+02:00
         # relabels to 14:00 UTC, consistent with the datetime branch
-        assert as_utc('2026-06-23T14:00:00+02:00') == datetime(
-            2026, 6, 23, 14, 0, tzinfo=timezone.utc)
+        assert as_utc('2026-06-23T14:00:00+02:00') == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
     def test_string_and_datetime_are_consistent(self):
         # same value as string and as datetime must give the same result
@@ -185,8 +182,7 @@ class TestAsUtc:
         assert s == d == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
     def test_z_string(self):
-        assert as_utc('2026-06-23 14:00:00.000Z') == datetime(
-            2026, 6, 23, 14, 0, tzinfo=timezone.utc)
+        assert as_utc('2026-06-23 14:00:00.000Z') == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
     def test_date_is_lifted_to_midnight(self):
         assert as_utc(date(2026, 6, 23)) == datetime(2026, 6, 23, 0, 0, tzinfo=timezone.utc)
@@ -220,13 +216,13 @@ class TestToUtcVsAsUtc:
     def test_datetime_offset(self):
         # same input, opposite results on the wall clock
         d = datetime(2026, 6, 23, 14, 0, tzinfo=PLUS_TWO)
-        assert to_utc(d).hour == 12   # shifted
-        assert as_utc(d).hour == 14   # relabelled
+        assert to_utc(d).hour == 12  # shifted
+        assert as_utc(d).hour == 14  # relabelled
 
     def test_string_offset(self):
         s = '2026-06-23T14:00:00+02:00'
-        assert to_utc(s).hour == 12   # shifted
-        assert as_utc(s).hour == 14   # relabelled
+        assert to_utc(s).hour == 12  # shifted
+        assert as_utc(s).hour == 14  # relabelled
 
     def test_string_date_day_under_pinned_zone(self):
         # the shift can move the day for to_utc, never for as_utc
@@ -306,12 +302,12 @@ class TestFromisoformatParity:
         '2026-06-32',
         '2026-06-23T25',
         '2026-06-23xx14:00:00',
-        '2026-06-23T14;00:00',       # invalid time separator
-        '2026-06-23T14:00:00.',      # dangling fraction marker
+        '2026-06-23T14;00:00',  # invalid time separator
+        '2026-06-23T14:00:00.',  # dangling fraction marker
         '2026-06-23T14:00:00.12x4',  # non-digit in the fraction
-        '2026-06-23T14:00:00+0',     # malformed (length-1) zone
-        '2026-06-23T1',              # incomplete time component
-        '2026-0623',                 # inconsistent dash use in the date
+        '2026-06-23T14:00:00+0',  # malformed (length-1) zone
+        '2026-06-23T1',  # incomplete time component
+        '2026-0623',  # inconsistent dash use in the date
     ]
 
     @pytest.mark.parametrize('s', GOOD)
@@ -348,8 +344,7 @@ class TestFromisoformatExport:
 
     def test_export_parses_trailing_z(self):
         # the whole point of the compat layer: Z parses on every version
-        assert date_compat.fromisoformat('2026-06-23T14:00:00Z') == datetime(
-            2026, 6, 23, 14, 0, tzinfo=timezone.utc)
+        assert date_compat.fromisoformat('2026-06-23T14:00:00Z') == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
     def test_star_import_surface(self):
         # __all__ limits the public surface to the two parsers
