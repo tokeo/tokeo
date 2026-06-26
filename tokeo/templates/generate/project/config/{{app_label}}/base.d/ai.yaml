@@ -70,8 +70,8 @@ ai:
     ### the calendar toolset the akili micro model drives; every tool takes
     ### strict iso dates (YYYY-MM-DD) -- understanding looser language is
     ### the model's job, not the tool's
-    date_diff:
-      type: {{ app_label }}.core.ai.tools.date_diff.TokeoAiDateDiffTool
+    date_daydiff:
+      type: {{ app_label }}.core.ai.tools.date_daydiff.TokeoAiDateDayDiffTool
     add_days:
       type: {{ app_label }}.core.ai.tools.add_days.TokeoAiAddDaysTool
     add_months:
@@ -92,7 +92,7 @@ ai:
     ### time words today/now for the akili model)
     calendar:
       - current
-      - date_diff
+      - date_daydiff
       - add_days
       - add_months
       - add_years
