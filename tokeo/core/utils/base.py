@@ -156,9 +156,11 @@ def getprop(obj, name, **kwargs):
 
     - **obj** (any): The object to get the property from
     - **name** (str): The property/key name to get
-    - **kwargs**: Optional keyword arguments
-        - **default**: Value to return if property doesn't exist
-        - **fallback**: Alternative name for default
+
+    ### Keyword Args
+
+    - **default**: Value to return if property doesn't exist
+    - **fallback**: Alternative name for default
 
     ### Returns
 

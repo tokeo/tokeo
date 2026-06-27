@@ -156,6 +156,9 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
         ### Args
 
         - **key** (str): Configuration key to retrieve
+
+        ### Keyword Args
+
         - **kwargs**: Additional arguments passed to config.get()
 
         ### Returns

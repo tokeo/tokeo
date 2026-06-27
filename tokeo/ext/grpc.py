@@ -153,6 +153,9 @@ class TokeoGrpc(MetaMixin):
         ### Args
 
         - **key** (str): Configuration key to retrieve
+
+        ### Keyword Args
+
         - **kwargs**: Additional arguments passed to config.get()
 
         ### Returns

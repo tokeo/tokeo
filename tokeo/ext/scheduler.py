@@ -258,8 +258,11 @@ class TokeoScheduler(MetaMixin):
         ### Args
 
         - **app**: The Tokeo application instance
-        - ***args**: Variable length argument list passed to parent initializer
-        - ****kw**: Arbitrary keyword arguments passed to parent initializer
+        - **args**: Variable length argument list passed to parent initializer
+
+        ### Keyword Args
+
+        - **kw**: Arbitrary keyword arguments passed to parent initializer
 
         ### Notes
 
@@ -307,6 +310,9 @@ class TokeoScheduler(MetaMixin):
         ### Args
 
         - **key** (str): Configuration key to retrieve
+
+        ### Keyword Args
+
         - **kwargs**: Additional arguments passed to config.get(), such as
             default values
 
@@ -439,9 +445,12 @@ class TokeoScheduler(MetaMixin):
             the schedule
         - **max_running_jobs** (int, optional): Maximum number of concurrently
             running instances of this job
+        - **title** (str): Human-readable title for the task
+
+        ### Keyword Args
+
         - **kwargs** (dict, optional): Keyword arguments to pass to the
             function. Defaults to an empty dict.
-        - **title** (str): Human-readable title for the task
 
         ### Notes
 
@@ -1212,7 +1221,7 @@ class TokeoSchedulerController(Controller):
 
         ### Args
 
-        - ***args**: Message parts to log
+        - **args**: Message parts to log
 
         ### Notes
 
@@ -1228,7 +1237,7 @@ class TokeoSchedulerController(Controller):
 
         ### Args
 
-        - ***args**: Message parts to log
+        - **args**: Message parts to log
 
         ### Notes
 
@@ -1244,7 +1253,7 @@ class TokeoSchedulerController(Controller):
 
         ### Args
 
-        - ***args**: Message parts to log
+        - **args**: Message parts to log
 
         ### Notes
 
@@ -1260,7 +1269,7 @@ class TokeoSchedulerController(Controller):
 
         ### Args
 
-        - ***args**: Message parts to log
+        - **args**: Message parts to log
 
         ### Notes
 
@@ -1276,7 +1285,7 @@ class TokeoSchedulerController(Controller):
 
         ### Args
 
-        - ***args**: Message parts to log
+        - **args**: Message parts to log
 
         ### Notes
 
@@ -1292,7 +1301,7 @@ class TokeoSchedulerController(Controller):
 
         ### Args
 
-        - ***args**: Message parts to log
+        - **args**: Message parts to log
 
         ### Notes
 
@@ -1308,7 +1317,7 @@ class TokeoSchedulerController(Controller):
 
         ### Args
 
-        - ***args**: Message parts to log
+        - **args**: Message parts to log
 
         ### Notes
 
@@ -1324,7 +1333,7 @@ class TokeoSchedulerController(Controller):
 
         ### Args
 
-        - ***args**: Message parts to log
+        - **args**: Message parts to log
 
         ### Notes
 

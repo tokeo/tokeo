@@ -200,6 +200,9 @@ class TokeoInvokeLocalContext(invoke.Context):
         ### Args
 
         - **command** (str): The command line to execute
+
+        ### Keyword Args
+
         - **kwargs**: Invoke runner kwargs (pty, env, timeout, encoding, ...)
 
         ### Returns
@@ -368,6 +371,9 @@ class TokeoInvokeRemoteContext(invoke.Context):
         ### Args
 
         - **command** (str): The command line to execute remotely
+
+        ### Keyword Args
+
         - **kwargs**: Invoke-style kwargs (hide, pty, env, timeout,
             encoding, ...)
 
@@ -706,7 +712,10 @@ class TokeoAutomate(MetaMixin):
         ### Args
 
         - **key** (str): Configuration key to retrieve
-        - ****kwargs**: Additional arguments passed to config.get()
+
+        ### Keyword Args
+
+        - **kwargs**: Additional arguments passed to config.get()
 
         ### Returns
 

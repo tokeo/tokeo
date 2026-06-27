@@ -111,7 +111,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         Sets up the handler and initializes the template cache.
 
-        ### Args
+        ### Keyword Args
 
         - **kw**: Keyword arguments passed to the parent handler
 
@@ -134,6 +134,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         ### Args
 
         - **key** (str): Configuration key to retrieve
+
+        ### Keyword Args
+
         - **kwargs**: Additional arguments passed to config.get()
 
         ### Returns
@@ -161,7 +164,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         per-message overrides specified in keyword arguments. It also
         processes special parameters like X-headers.
 
-        ### Args
+        ### Keyword Args
 
         - **kw**: Keyword arguments for message-specific parameter overrides
 
@@ -610,6 +613,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         - **template** (str): Base template path/name without extension
         - **data** (dict): Data context for template rendering
+
+        ### Keyword Args
+
         - **kw**: Additional email parameters passed to send()
 
         ### Returns

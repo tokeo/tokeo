@@ -121,8 +121,11 @@ class TokeoPdoc(MetaMixin):
 
         ### Args
 
-        - ***args**: Positional arguments passed to the parent class
-        - ****kw**: Keyword arguments passed to the parent class
+        - **args**: Positional arguments passed to the parent class
+
+        ### Keyword Args
+
+        - **kw**: Keyword arguments passed to the parent class
 
         """
         super(TokeoPdoc, self).__init__(*args, **kw)
@@ -185,6 +188,9 @@ class TokeoPdoc(MetaMixin):
         ### Args
 
         - **key** (str): Configuration key to retrieve
+
+        ### Keyword Args
+
         - **kwargs**: Additional arguments passed to config.get()
 
         ### Returns
@@ -296,8 +302,11 @@ class TokeoPdoc(MetaMixin):
         ### Args
 
         - **message** (str): The warning message
-        - ***args**: Additional warning information
-        - ****kwargs**: Keyword arguments for the warning handler
+        - **args**: Additional warning information
+
+        ### Keyword Args
+
+        - **kwargs**: Keyword arguments for the warning handler
 
         ### Notes
 
@@ -758,6 +767,9 @@ def tokeo_pdoc_render_decorator(app, func, decorator, args, kwargs):
     - **func** (function): The function being decorated
     - **decorator** (str): The decorator string
     - **args** (list): Positional arguments to the decorator
+
+    ### Keyword Args
+
     - **kwargs** (dict): Keyword arguments to the decorator
 
     ### Returns

@@ -123,6 +123,9 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
             disables verification (CERT_NONE)
         - **tls_ca** (str, optional): Path to a CA bundle to trust instead of
             the system store
+
+        ### Keyword Args
+
         - **kwargs**: Remaining RabbitmqBroker arguments (e.g. middleware,
             confirm_delivery, max_priority, parameters)
 
@@ -294,6 +297,9 @@ class TokeoDramatiq(MetaMixin):
         ### Args
 
         - **key** (str): Configuration key to retrieve
+
+        ### Keyword Args
+
         - **kwargs**: Additional arguments passed to config.get()
 
         ### Returns
@@ -650,6 +656,9 @@ def tokeo_dramatiq_pdoc_render_decorator(app, func, decorator, args, kwargs):
     - **func** (function): The function being decorated
     - **decorator** (str): The decorator string
     - **args** (list): Positional arguments to the decorator
+
+    ### Keyword Args
+
     - **kwargs** (dict): Keyword arguments to the decorator
 
     ### Returns
