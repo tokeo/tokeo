@@ -130,12 +130,12 @@ def test_{{ app_label }}_akili_data_contract():
         match = re.search(r'days=(-?\d+)', d)
         assert match and int(match.group(1)) % 7 == 0, (r, d)
 
-    # date_diff between today and a date relative to today is a three-step
-    # plan: current(); a forward shift (@1 -> @2); date_diff(start=@1,
+    # date_daydiff between today and a date relative to today is a three-step
+    # plan: current(); a forward shift (@1 -> @2); date_daydiff(start=@1,
     # end=@2). so the second endpoint is resolved rather than treated as a
     # bare shift, and the shift is forward, so no negative value appears
-    relative_diff = [(r, d) for r, d in pairs if 'date_diff(start=@1,end=@2)' in d and d.count(';') == 2]
-    assert relative_diff, 'no relative-endpoint date_diff examples in the data'
+    relative_diff = [(r, d) for r, d in pairs if 'date_daydiff(start=@1,end=@2)' in d and d.count(';') == 2]
+    assert relative_diff, 'no relative-endpoint date_daydiff examples in the data'
     for r, d in relative_diff:
         assert d.startswith('current();') and '=-' not in d, (r, d)
 
@@ -150,6 +150,20 @@ def test_{{ app_label }}_akili_data_contract():
     # minus-free dataset carries a negative count, while the normal data does
     assert not any('=-' in d for _, d in dataset(8000, seed=7, minus=False))
     assert any('=-' in d for _, d in pairs)
+
+
+def test_{{ app_label }}_akili_domain_covers_calendar_tools():
+    # akili's DOMAIN (dsl.py) and the project's `calendar` tool group (ai.yaml)
+    # are two hand-kept lists of the same toolset. the planner only emits tools
+    # in both lists, so one the config activates but DOMAIN misspells (a rename
+    # landing in one list only) drops from the grammar silently -- no error,
+    # just a worse plan. lock the two lists together here, without weights
+    from {{ app_label }}.core.akili.dsl import DOMAIN
+
+    with {{ app_class_name }}AiTestApp() as app:
+        calendar = set(app.ai._resolve_tools(['calendar']))
+    missing = calendar - set(DOMAIN)
+    assert not missing, f'calendar tools missing from akili DOMAIN: {sorted(missing)}'
 
 
 @pytest.mark.skipif(
@@ -201,11 +215,11 @@ def test_{{ app_label }}_ai_akili_model():
         assert ask('today minus 1 week') == f'[akili] add_days: {(date.today() - timedelta(days=7)).isoformat()}'
         assert ask('2026-06-08 plus 3 weeks') == '[akili] add_days: 2026-06-29'
 
-        # date_diff between today and a date relative to today (three steps:
+        # date_daydiff between today and a date relative to today (three steps:
         # current, a forward shift, then the diff): today until tomorrow is
         # one day, today until next week is seven
-        assert ask('count the days from today until tomorrow') == '[akili] date_diff: 1'
-        assert ask('count the days from today until next week') == '[akili] date_diff: 7'
+        assert ask('count the days from today until tomorrow') == '[akili] date_daydiff: 1'
+        assert ask('count the days from today until next week') == '[akili] date_daydiff: 7'
 
         # a consumer reading a shifted date: the weekday of (today + 14)
         shifted = date.today() + timedelta(days=14)
@@ -237,5 +251,5 @@ def test_{{ app_label }}_ai_akili_model():
             agent='guarded',
             profile='akili',
         )
-        assert chained.answer.text == f'[akili] date_diff: {days}'
-        assert chained.answer.raw['plan'] == ['current', 'date_diff']
+        assert chained.answer.text == f'[akili] date_daydiff: {days}'
+        assert chained.answer.raw['plan'] == ['current', 'date_daydiff']
