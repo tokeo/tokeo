@@ -9,9 +9,7 @@ below ```tmp/tests```). Run from the project root, for example with
 """
 
 import logging
-import calendar
 from pathlib import Path
-from datetime import datetime as datetime_type
 
 import pytest
 from tokeo.core.ai import Invocation, ChatResult, ChatMessage, TraceStep, TokeoAiError
@@ -19,32 +17,9 @@ from tokeo.core.ai.tool import create_tool_result
 from tokeo.core.ai.linter import TokeoAiLinter
 from tokeo.core.ai.guards.validate import TokeoAiToolSchemaValidator
 from tokeo.core.ai.guards.redact import TokeoAiRegexRedactGuard, TokeoAiRedactGuardError
-from tokeo.core.utils.date import to_utc, to_utc_datestring
 from {{ app_label }}.core.ai.guards.truncate import {{ app_class_name }}AiTruncateGuard
 from {{ app_label }}.core.ai.tools.calc import TokeoAiCalcTool
 from {{ app_label }}.main import {{ app_class_name }}Test
-
-
-def _shift_months(date, months):
-    # mirror the add_months tool: normalize through the SAME to_utc the tool
-    # uses (so the day matches in any timezone), then step the calendar month
-    # and clamp the day -- this is the expected value, not a hard-coded date
-    d = to_utc(date, auto_type=True)
-    base = d.date() if isinstance(d, datetime_type) else d
-    total = base.year * 12 + (base.month - 1) + int(months)
-    year, month = divmod(total, 12)
-    month += 1
-    day = min(base.day, calendar.monthrange(year, month)[1])
-    return to_utc_datestring(d.replace(year=year, month=month, day=day))
-
-
-def _shift_years(date, years):
-    # mirror the add_years tool the same way: to_utc first, then the year step
-    d = to_utc(date, auto_type=True)
-    base = d.date() if isinstance(d, datetime_type) else d
-    year = base.year + int(years)
-    day = min(base.day, calendar.monthrange(year, base.month)[1])
-    return to_utc_datestring(d.replace(year=year, day=day))
 
 
 class {{ app_class_name }}AiTestApp({{ app_class_name }}Test):
@@ -95,12 +70,12 @@ def test_{{ app_label }}_ai_tools_exec(scratch):
         assert app.ai._tool('read_file').exec(path='sample.txt') == 'buy milk\n'
         appended = app.ai._tool('append_file').exec(text='hello')
         assert appended.value.as_str == 'true' and appended.value.as_data['file'] == 'notes.txt'
-        # the date tools normalize their input through to_utc, which can shift
-        # the day east of UTC; the expected values mirror that same to_utc so the
-        # assertions hold in any timezone rather than against a hard-coded day
-        assert app.ai._tool('add_months').exec(date='2026-01-31', months=1).value.as_str == _shift_months('2026-01-31', 1)
-        assert app.ai._tool('add_months').exec(date='2026-06-08', months=-4).value.as_str == _shift_months('2026-06-08', -4)
-        assert app.ai._tool('add_years').exec(date='2024-02-29', years=1).value.as_str == _shift_years('2024-02-29', 1)
+        # the date tools take a date-only string as utc, so the calendar step is
+        # stable on every machine; clamping shows jan 31 + 1m -> feb 28,
+        # jun 8 - 4m -> feb 8, feb 29 + 1y -> feb 28
+        assert app.ai._tool('add_months').exec(date='2026-01-31', months=1).value.as_str == '2026-02-28'
+        assert app.ai._tool('add_months').exec(date='2026-06-08', months=-4).value.as_str == '2026-02-08'
+        assert app.ai._tool('add_years').exec(date='2024-02-29', years=1).value.as_str == '2025-02-28'
         assert (scratch / 'notes.txt').read_text() == 'hello\n'
         with pytest.raises(TokeoAiError, match='escapes the tool base directory'):
             app.ai._tool('read_file').exec(path='../../setup.py')
