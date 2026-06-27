@@ -152,8 +152,11 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Args
 
         - **app**: The Tokeo application instance
-        - ***args**: Variable length argument list passed to parent initializer
-        - ****kw**: Arbitrary keyword arguments passed to parent initializer
+        - **args**: Variable length argument list passed to parent initializer
+
+        ### Keyword Args
+
+        - **kw**: Arbitrary keyword arguments passed to parent initializer
 
         ### Notes
 
@@ -235,6 +238,9 @@ class TokeoPocketBaseHandler(MetaMixin):
         ### Args
 
         - **key** (str): Configuration key to retrieve
+
+        ### Keyword Args
+
         - **kwargs**: Additional arguments passed to config.get(), such as
             default values
 

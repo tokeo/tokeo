@@ -118,7 +118,10 @@ def json_dump(obj, encoder=None, encoding=None, **kwargs):
         type-name placeholders, or a custom subclass
     - **encoding** (str, optional): If given, encode the JSON string to bytes
         with this encoding (e.g. 'utf-8')
-    - ****kwargs**: Forwarded to ```json.dumps``` (e.g. indent, sort_keys)
+
+    ### Keyword Args
+
+    - **kwargs**: Forwarded to ```json.dumps``` (e.g. indent, sort_keys)
 
     ### Returns
 

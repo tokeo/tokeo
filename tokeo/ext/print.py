@@ -80,7 +80,7 @@ def register_tokeo_print(app: App) -> None:
 
         ### Args
 
-        - ***args**: Variable arguments to print
+        - **args**: Variable arguments to print
         - **name** (str, optional): Name to identify this print operation in logs
         - **sep** (str): Separator between printed items (default: space)
         - **end** (str): String to append at the end (default: newline)
@@ -111,7 +111,7 @@ def register_tokeo_print(app: App) -> None:
 
         ### Args
 
-        - ***args**: Objects to inspect
+        - **args**: Objects to inspect
         - **name** (str, optional): Name to identify this inspection in output
         - **system** (bool): Whether to include system methods/attributes
             (those whose name starts and ends with __)
@@ -240,8 +240,11 @@ class TokeoPrintOutputHandler(output.OutputHandler):
             - name: Optional name for logging
             - divider: Optional character for divider line
 
-        - ***args**: Variable length argument list
-        - ****kw**: Arbitrary keyword arguments
+        - **args**: Variable length argument list
+
+        ### Keyword Args
+
+        - **kw**: Arbitrary keyword arguments
 
         ### Returns
 
@@ -338,8 +341,11 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
         ### Args
 
         - **data** (dict): The data dictionary to render
-        - ***args**: Variable length argument list
-        - ****kw**: Arbitrary keyword arguments
+        - **args**: Variable length argument list
+
+        ### Keyword Args
+
+        - **kw**: Arbitrary keyword arguments
 
         ### Returns
 
@@ -529,8 +535,11 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             - debug: Whether to output to debug log instead of stdout
             - divider: Character to use for divider line
 
-        - ***args**: Variable length argument list
-        - ****kw**: Arbitrary keyword arguments
+        - **args**: Variable length argument list
+
+        ### Keyword Args
+
+        - **kw**: Arbitrary keyword arguments
 
         ### Returns
 

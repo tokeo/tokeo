@@ -140,7 +140,10 @@ class TokeoDiskCacheLocksHandler:
         ### Args
 
         - **key** (str): The lock key to delete
-        - ****kw**: Additional keyword arguments passed to cache.delete
+
+        ### Keyword Args
+
+        - **kw**: Additional keyword arguments passed to cache.delete
 
         ### Returns
 
@@ -658,8 +661,11 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         ### Args
 
-        - ***args**: Positional arguments passed to the parent class
-        - ****kw**: Keyword arguments passed to the parent class
+        - **args**: Positional arguments passed to the parent class
+
+        ### Keyword Args
+
+        - **kw**: Keyword arguments passed to the parent class
 
         """
         super()._setup(*args, **kw)
@@ -683,7 +689,10 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         ### Args
 
         - **key** (str): Configuration key to retrieve
-        - ****kwargs**: Additional arguments passed to config.get()
+
+        ### Keyword Args
+
+        - **kwargs**: Additional arguments passed to config.get()
 
         ### Returns
 
@@ -720,9 +729,11 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         - **key** (str): The key of the item in the cache to get
         - **default** (any, optional): The value to return if the item is not found.
             Defaults to None.
-        - ****kw**: Additional keyword arguments
-            - **read** (bool): Whether to read without updating cache statistics
-            - **retry** (bool): Whether to retry if the database is locked
+
+        ### Keyword Args
+
+        - **read** (bool): Whether to read without updating cache statistics
+        - **retry** (bool): Whether to retry if the database is locked
 
         ### Returns
 
@@ -741,11 +752,13 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         - **key** (str): The key of the item in the cache to set
         - **value** (any): The value of the item to set
-        - ****kw**: Additional keyword arguments
-            - **expire** (float): Expiration time in seconds for the cache item
-            - **tag** (str): Tag to categorize this cache item
-            - **read** (bool): Whether to read without updating cache statistics
-            - **retry** (bool): Whether to retry if the database is locked
+
+        ### Keyword Args
+
+        - **expire** (float): Expiration time in seconds for the cache item
+        - **tag** (str): Tag to categorize this cache item
+        - **read** (bool): Whether to read without updating cache statistics
+        - **retry** (bool): Whether to retry if the database is locked
 
         ### Returns
 
@@ -766,8 +779,10 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         ### Args
 
         - **key** (str): The key to delete from the cache
-        - ****kw**: Additional keyword arguments
-            - **retry** (bool): Whether to retry if the database is locked
+
+        ### Keyword Args
+
+        - **retry** (bool): Whether to retry if the database is locked
 
         ### Returns
 
@@ -781,10 +796,9 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Purge the entire cache, removing all keys and values.
 
-        ### Args
+        ### Keyword Args
 
-        - ****kw**: Additional keyword arguments
-            - **retry** (bool): Whether to retry if the database is locked
+        - **retry** (bool): Whether to retry if the database is locked
 
         ### Returns
 
@@ -1551,7 +1565,7 @@ def unpack_func_args(func, *args):
     ### Args
 
     - **func** (callable): The function whose arguments are being unpacked
-    - ***args**: The positional arguments passed to the function
+    - **args**: The positional arguments passed to the function
 
     ### Returns
 

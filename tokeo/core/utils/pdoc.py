@@ -13,8 +13,11 @@ def pdoc_replace_decorator(*args, **kwargs):
 
     ### Args
 
-    - ***args**: Positional arguments to pass to the decorator
-    - ****kwargs**: Keyword arguments to pass to the decorator
+    - **args**: Positional arguments to pass to the decorator
+
+    ### Keyword Args
+
+    - **kwargs**: Keyword arguments to pass to the decorator
 
     ### Returns
 
