@@ -231,11 +231,11 @@ patterns:
       de:
         - 'die mondphase am {d}'
         - 'mondphase {d}'
-    date_diff:
+    date_daydiff:
       en:
         - 'count the days between {d} and {d2}'
         - 'days from {d} until {d2}'
-        - 'date_diff between {d} and {d2}'
+        - 'date_daydiff between {d} and {d2}'
         - 'how many days lie between {d} and {d2}'
       de:
         - 'zaehle die tage zwischen {d} und {d2}'

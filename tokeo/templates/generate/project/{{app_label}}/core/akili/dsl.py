@@ -29,7 +29,7 @@ each step a tool call; ```@k``` references the result of step k; a request
 outside the domain becomes ```<nomatch>```::
 
     current();add_days(date=@1,days=2);weekday(date=@2)
-    date_diff(start=2026-06-07,end=2026-12-24)
+    date_daydiff(start=2026-06-07,end=2026-12-24)
     <nomatch>
 
 This module has three jobs. ```render``` serializes a plan to that line,
@@ -54,7 +54,7 @@ NOMATCH = '<nomatch>'
 # classes) is how the language grows; the slot list IS the tool's schema
 DOMAIN = {
     'current': [],  # zero args: just "what day is it"
-    'date_diff': ['start', 'end'],  # two dates in, a day count out
+    'date_daydiff': ['start', 'end'],  # two dates in, a day count out
     'add_days': ['date', 'days'],  # shift a date by a signed count
     'add_months': ['date', 'months'],
     'add_years': ['date', 'years'],
