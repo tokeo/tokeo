@@ -1,4 +1,6 @@
 """
+Tokeo AppShare Extension Module.
+
 Provides a global access point to the running Cement app object.
 
 This module allows external modules to interact with the Cement app without

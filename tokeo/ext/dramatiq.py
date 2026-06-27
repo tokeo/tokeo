@@ -1,4 +1,6 @@
 """
+Tokeo Dramatiq Extension Module.
+
 Dramatiq integration for asynchronous task processing in Tokeo applications.
 
 Wraps Dramatiq behind a Tokeo extension: a RabbitMQ broker subclass with a

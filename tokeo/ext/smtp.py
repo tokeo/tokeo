@@ -1,5 +1,5 @@
 """
-Tokeo SMTP extension module.
+Tokeo SMTP Extension Module.
 
 This extension provides a robust email sending capability via SMTP protocol
 for Tokeo applications. It supports plain text and HTML email messages,

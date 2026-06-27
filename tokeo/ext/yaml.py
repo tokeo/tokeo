@@ -1,5 +1,5 @@
 """
-Tokeo YAML extension module.
+Tokeo YAML Extension Module.
 
 This extension provides enhanced YAML configuration handling for Tokeo applications.
 It extends the standard Cement YamlConfigHandler with additional capabilities for
