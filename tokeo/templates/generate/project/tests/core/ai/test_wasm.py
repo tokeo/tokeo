@@ -124,7 +124,7 @@ def _trusted_mounts():
 
 def wasm_ai_config():
     # both built-in exec tools, each behind a wasm sandbox: the untrusted tool
-    # runs directly in the guest (no mount), the trusted tool is rebuilt there
+    # runs directly in the guest (no app mount), the trusted tool is rebuilt there
     # from the mounted tokeo + project + dependency trees
     trusted_mounts, trusted_pythonpath = _trusted_mounts()
     cfg = init_defaults('ai')
