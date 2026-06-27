@@ -1,4 +1,6 @@
 """
+Tokeo Automate Extension Module.
+
 Task automation and remote execution for Tokeo applications.
 
 This module provides an automation framework for running local and remote tasks,
@@ -6,7 +8,8 @@ managing hosts, and creating interactive shells for task execution. It supports
 both sequential and parallel execution, SSH-based remote operations, and an
 interactive command-line interface.
 
-Example:
+### Example:
+
 ```python
 # Define a task in your configuration
 # tokeo.yml
@@ -571,6 +574,8 @@ class TokeoAutomateResult:
     - **command** (str): The command that was executed
     - **exited** (int): Exit code of the command (0 for success)
     - **values** (any): Additional values returned by the task
+    - **exception** (str): Class name of the exception that aborted the task,
+        or None on success
 
     """
 

@@ -1,4 +1,6 @@
 """
+Tokeo DiskCache Extension Module.
+
 Disk-based caching system with advanced locking, throttling, and rate limiting.
 
 This module extends the standard diskcache library to provide a robust caching
@@ -16,7 +18,8 @@ The module implements two main rate-control mechanisms:
 Both mechanisms are distributed and work across multiple processes, making them
 suitable for web applications, microservices, and other distributed systems.
 
-Example:
+### Example:
+
     ```python
     # Configure and use the cache
     from tokeo.ext import diskcache

@@ -1,5 +1,5 @@
 """
-Tokeo vault extension module.
+Tokeo VAULT Extension Module.
 
 This extension adds transparent decryption of secrets on top of the Tokeo YAML
 config handler. Encrypted values are marked in yaml with a ```!vault:<profile>```
