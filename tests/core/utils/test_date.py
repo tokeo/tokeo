@@ -32,12 +32,6 @@ from tokeo.core.utils import date_compat
 PLUS_TWO = timezone(timedelta(hours=2))
 
 
-def _local_to_utc(iso_str):
-    # mirror the naive->local->utc chain with stdlib parts, independent of the
-    # running machine's timezone, to get the value a shifting parse must produce
-    return datetime.fromisoformat(iso_str).astimezone(timezone.utc)
-
-
 class _PinnedZone:
     """Context manager that pins the local timezone via TZ + tzset."""
 
@@ -105,16 +99,17 @@ class TestToUtc:
     def test_z_string_is_utc(self):
         assert to_utc('2026-06-23 14:00:00.000Z') == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
-    def test_naive_string_is_local(self):
-        # a naive string has no offset, so it is read as local time; the
-        # expectation is derived from the local zone to stay machine-independent
-        assert to_utc('2026-06-23') == _local_to_utc('2026-06-23')
+    def test_naive_date_string_is_utc_midnight(self):
+        # a date-only string carries no time or zone, so it is taken as midnight
+        # UTC directly -- no local shift, the same day on every machine
+        assert to_utc('2026-06-23') == datetime(2026, 6, 23, 0, 0, tzinfo=timezone.utc)
 
     def test_string_auto_type_yields_date(self):
-        # a date-only string with auto_type yields a date (after the local shift)
+        # a date-only string with auto_type yields a date, taken as utc midnight
+        # so the day is kept (no local shift)
         r = to_utc('2026-06-23', auto_type=True)
         assert type(r) is date
-        assert r == _local_to_utc('2026-06-23').date()
+        assert r == date(2026, 6, 23)
 
     def test_string_auto_type_timestring_stays_datetime(self):
         r = to_utc('2026-06-23 14:00:00.000Z', auto_type=True)
@@ -134,12 +129,11 @@ class TestToUtc:
         ep = 1782744783.413
         assert to_utc(ep) == datetime.fromtimestamp(ep, timezone.utc)
 
-    def test_naive_string_shift_pinned_zone(self):
-        # deliberate shift: a naive midnight in Tokyo (+09:00) lands on the
-        # previous UTC day; pinning the zone makes the shift explicit
+    def test_naive_timestring_shift_pinned_zone(self):
+        # a naive timestring is read as local time: midnight in Tokyo (+09:00)
+        # lands on the previous UTC day; pinning the zone makes the shift explicit
         with _PinnedZone('Asia/Tokyo'):
-            assert to_utc('2026-06-23') == datetime(2026, 6, 22, 15, 0, tzinfo=timezone.utc)
-            assert to_utc('2026-06-23', auto_type=True) == date(2026, 6, 22)
+            assert to_utc('2026-06-23T00:00:00') == datetime(2026, 6, 22, 15, 0, tzinfo=timezone.utc)
 
     def test_bool_is_rejected(self):
         # bool is an int subtype, but must not be read as an epoch
@@ -225,9 +219,10 @@ class TestToUtcVsAsUtc:
         assert as_utc(s).hour == 14  # relabelled
 
     def test_string_date_day_under_pinned_zone(self):
-        # the shift can move the day for to_utc, never for as_utc
+        # for a date-only string to_utc no longer shifts the day: it now agrees
+        # with as_utc and keeps the day, on every machine
         with _PinnedZone('Asia/Tokyo'):
-            assert to_utc('2026-06-23', auto_type=True) == date(2026, 6, 22)
+            assert to_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
             assert as_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
 
 

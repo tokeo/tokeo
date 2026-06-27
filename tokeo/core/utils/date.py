@@ -57,15 +57,17 @@ def to_utc(date, auto_type=False):
     if isinstance(date, datetime_type):
         return date.astimezone(tz=timezone.utc)
     elif isinstance(date, date_type):
-        d = datetime_type.combine(date, time_type(0, 0), tzinfo=timezone.utc)
-        # with auto_type a date input stays a date
-        return d if not auto_type else d.date()
+        d = date if auto_type else datetime_type.combine(date, time_type(0, 0), tzinfo=timezone.utc)
+        # with auto_type a date input stays a date else a utc datetime midnight
+        return d
     elif isinstance(date, str) and len(date) >= 8:
         # parse the ISO string, then bring it to UTC inline (a recursive to_utc
         # call is avoided by handling the parsed datetime or date here)
         parsed = fromisoformat(date)
         if isinstance(parsed, datetime_type):
-            d = parsed.astimezone(tz=timezone.utc)
+            # if date string was a datetime then move into utc, if it was
+            # only a date then replace it to utc
+            d = parsed.astimezone(tz=timezone.utc) if len(date) > 10 else parsed.replace(tzinfo=timezone.utc)
         elif isinstance(parsed, date_type):
             d = datetime_type.combine(parsed, time_type(0, 0), tzinfo=timezone.utc)
         else:
