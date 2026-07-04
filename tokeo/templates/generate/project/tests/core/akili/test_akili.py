@@ -14,6 +14,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
+from tokeo.core.utils.date import utc_now
 from {{ app_label }}.main import {{ app_class_name }}Test
 
 # the held-out exact-plan accuracy the trained model must reach before the
@@ -166,6 +167,29 @@ def test_{{ app_label }}_akili_domain_covers_calendar_tools():
     assert not missing, f'calendar tools missing from akili DOMAIN: {sorted(missing)}'
 
 
+def test_{{ app_label }}_akili_current_reports_utc_not_local_at_midnight(monkeypatch):
+    # regression for a timezone bug: the current tool must report the UTC
+    # calendar day, never the local one. the clock is frozen 30 minutes before
+    # UTC midnight -- in any timezone ahead of UTC (UTC+1 makes this 00:30 the
+    # next day) the LOCAL day has already rolled over, so a naive date.today()
+    # expectation runs a full day ahead of the tool's UTC output. that is the
+    # exact divergence a real run hit (utc 2026-07-03 23:40, local 2026-07-04).
+    # no weights needed: the tool reads the clock, it does not plan
+    from datetime import datetime, timezone
+    from {{ app_label }}.core.ai.tools.current import TokeoAiCurrentTool
+
+    frozen = datetime(2026, 7, 3, 23, 30, tzinfo=timezone.utc)
+    monkeypatch.setattr('{{ app_label }}.core.ai.tools.current.utc_now', lambda: frozen)
+
+    with {{ app_class_name }}AiTestApp() as app:
+        out = TokeoAiCurrentTool(app).exec().value.as_str
+
+    # the tool reports the UTC day of the frozen instant ...
+    assert out.startswith('2026-07-03'), out
+    # ... and never the local-rolled-over next day (UTC+1 -> 2026-07-04 00:30)
+    assert not out.startswith('2026-07-04'), out
+
+
 @pytest.mark.skipif(
     not Path('{{ app_label }}/core/akili/weights.npz').exists(),
     reason="akili has no trained weights yet (run 'python -m {{ app_label }}.core.akili.train')",
@@ -200,19 +224,24 @@ def test_{{ app_label }}_ai_akili_model():
         assert ask('the week number of 2026-12-24') == f'[akili] week_number: {iso_week}'
 
         # a bare time word is the current date: today/now/heute/jetzt all
-        # resolve to current(); the time part varies, so match the date head
-        today = date.today().isoformat()
+        # resolve to current(); the time part varies, so match the date head.
+        # every akili date tool reports UTC (current -> utc_now, add_* -> to_utc),
+        # so build the expected days on that SAME utc basis and compute it once:
+        # a naive date.today() compares a local day against a utc day and diverges
+        # near utc midnight in a timezone ahead of utc
+        _today = utc_now().date()
+        today = _today.isoformat()
         for word in ('today', 'now', 'heute', 'jetzt'):
             out = ask(word)
             assert out.startswith(f'[akili] current: {today}'), (word, out)
 
         # relative words and the today-bridge
-        tomorrow = (date.today() + timedelta(days=1)).isoformat()
+        tomorrow = (_today + timedelta(days=1)).isoformat()
         assert ask('welches datum ist morgen') == f'[akili] add_days: {tomorrow}'
 
         # a week is seven days (there is no add_weeks tool): a week shift
         # expands to add_days with a multiple of 7
-        assert ask('today minus 1 week') == f'[akili] add_days: {(date.today() - timedelta(days=7)).isoformat()}'
+        assert ask('today minus 1 week') == f'[akili] add_days: {(_today - timedelta(days=7)).isoformat()}'
         assert ask('2026-06-08 plus 3 weeks') == '[akili] add_days: 2026-06-29'
 
         # date_daydiff between today and a date relative to today (three steps:
@@ -222,11 +251,11 @@ def test_{{ app_label }}_ai_akili_model():
         assert ask('count the days from today until next week') == '[akili] date_daydiff: 7'
 
         # a consumer reading a shifted date: the weekday of (today + 14)
-        shifted = date.today() + timedelta(days=14)
+        shifted = _today + timedelta(days=14)
         assert ask('the weekday of today plus 14 days') == f'[akili] weekday: {_WEEKDAYS[shifted.weekday()]}'
 
         # a relative chain: two shifts from today, day word then year word
-        base = date.today() + timedelta(days=1)
+        base = _today + timedelta(days=1)
         try:
             target = base.replace(year=base.year + 1)
         except ValueError:
@@ -245,7 +274,7 @@ def test_{{ app_label }}_ai_akili_model():
         assert ask('sing me a song') == '[akili] sing me a song'
 
         # multi-turn chat still threads and the guards report the plan
-        days = (date(2026, 12, 24) - date.today()).days
+        days = (date(2026, 12, 24) - _today).days
         chained = app.ai.chat(
             [{'role': 'user', 'content': 'count the days from today until 2026-12-24'}],
             agent='guarded',
