@@ -30,7 +30,7 @@ ai:
 ```
 """
 
-from tokeo.core.ai.guard import GUARD_STAGE_ON_RETURN, GUARD_STAGE_ON_CLOSE
+from tokeo.core.ai.governor import GOVERNOR_STAGE_ON_RETURN, GOVERNOR_STAGE_ON_CLOSE
 from tokeo.core.ai.guards.truncate import TokeoAiTruncateGuard
 
 
@@ -100,7 +100,7 @@ class {{ app_class_name }}AiTruncateGuard(TokeoAiTruncateGuard):
         """
         if invocation.result is None or invocation.result.value is None:
             return
-        capped, cut = self._cap(invocation.result.value.as_str or '', GUARD_STAGE_ON_RETURN)
+        capped, cut = self._cap(invocation.result.value.as_str or '', GOVERNOR_STAGE_ON_RETURN)
         if not cut:
             return
         # cap only as_str, the model-facing view: truncate shrinks what the model
@@ -126,6 +126,6 @@ class {{ app_class_name }}AiTruncateGuard(TokeoAiTruncateGuard):
             when longer than ```limit```
 
         """
-        capped, cut = self._cap(result.text or '', GUARD_STAGE_ON_CLOSE)
+        capped, cut = self._cap(result.text or '', GOVERNOR_STAGE_ON_CLOSE)
         if cut:
             result.text = capped
