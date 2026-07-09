@@ -30,6 +30,8 @@ from os.path import basename, isdir, isfile, relpath
 import shutil
 import warnings
 import pdoc
+import pdoc.html_helpers
+from contextlib import contextmanager
 import socketserver
 import http.server
 import threading
@@ -64,6 +66,87 @@ class TokeoPdocError(TokeoError):
     """
 
     pass
+
+
+def _get_config(**kwargs):
+    """
+    This is an overload function from original pdoc.__init__.py (_get_config).
+
+    The DEFAULT_CONFIG is not changeable by API and the pdoc.tpl_lookup.get_template
+    function will only returns the first other config.mako. So instead of repeating
+    all values to newly created app, here overload and set tokeo as primary.
+
+    """
+    # Apply config.mako configuration
+    MAKO_INTERNALS = Template('').module.__dict__.keys()
+    DEFAULT_CONFIG = fs.join(get_module_path('tokeo.templates.pdoc.html'), 'config.mako')
+    config = {}
+    for config_module in (Template(filename=DEFAULT_CONFIG).module, pdoc.tpl_lookup.get_template('/config.mako').module):
+        config.update((var, getattr(config_module, var, None)) for var in config_module.__dict__ if var not in MAKO_INTERNALS)
+
+    known_keys = (
+        set(config)
+        | {'docformat'}  # Feature. https://github.com/pdoc3/pdoc/issues/169
+        # deprecated
+        | {'module', 'modules', 'http_server', 'external_links', 'search_query'}
+    )
+    invalid_keys = {k: v for k, v in kwargs.items() if k not in known_keys}
+    if invalid_keys:
+        warnings.warn(f'Unknown configuration variables (not in config.mako): {invalid_keys}')
+    config.update(kwargs)
+
+    if 'search_query' in config:
+        warnings.warn('Option `search_query` has been deprecated. Use `google_search_query` instead', DeprecationWarning, stacklevel=2)
+        config['google_search_query'] = config['search_query']
+        del config['search_query']
+
+    return config
+
+
+@contextmanager
+def _fenced_code_blocks_hidden(text):
+    """
+    Overload of pdoc's html_helpers._fenced_code_blocks_hidden.
+
+    The stock opener regex is ```^(?P<fence>`{3,}|~{3,}).*\\n```, whose ```.*```
+    also matches an inline triple-backtick code span that happens to start a
+    line (e.g. a line beginning with ```type``` or ```SmtpdController```). pdoc
+    then treats it as a fenced code-block opener and hides everything up to the
+    next real fence -- swallowing intervening prose and admonitions.
+
+    Triple backticks are used deliberately for inline code because pdoc only
+    auto-links spans fenced by one or two backticks (it skips 3+), so switching
+    to single backticks is not an option. This overload keeps triple backticks
+    working anywhere by tightening the opener to ```[^`\\n]*``` after the fence:
+    a real opener is a fence plus an optional info string with no further
+    backticks, so a same-line-closed inline span is no longer mistaken for one.
+
+    ### Notes
+
+    : Behaviour is otherwise identical to the original; only the opener's info
+        string is restricted so inline code cannot pose as a fence.
+
+    """
+    hidden = {}
+
+    def hide(text):
+        def replace(match):
+            orig = match.group()
+            new = f'@{hash(orig)}@'
+            hidden[new] = orig
+            return new
+
+        return re.compile(
+            r'^(?P<fence>`{3,}|~{3,})[^`\n]*\n'
+            r'(?:.*\n)*?'
+            r'^(?P=fence)[ ]*(?!.)',
+            re.MULTILINE,
+        ).sub(replace, text)
+
+    result = [hide(text)]
+    yield result
+    for key, value in hidden.items():
+        result[0] = result[0].replace(key, value)
 
 
 class TokeoPdoc(MetaMixin):
@@ -175,6 +258,8 @@ class TokeoPdoc(MetaMixin):
             raise TokeoPdocError('To define modules for rendering pdoc it must be from type str or list')
         # rewrite the pdoc._get_config to primary load from tokeo
         pdoc._get_config = _get_config
+        # rewrite pdoc's fenced-code detection
+        pdoc.html_helpers._fenced_code_blocks_hidden = _fenced_code_blocks_hidden
         # return self as reference
         return self
 
@@ -575,7 +660,17 @@ class TokeoPdoc(MetaMixin):
                     super().end_headers()
 
             # Start the server in a separate thread
-            self._http_server = socketserver.TCPServer((self._host, self._port), CustomHandler)
+            class TCPServer(socketserver.TCPServer):
+                # allow_reuse_address and allow_reuse_port sets SO_REUSEADDR so
+                # the listener can rebind immediately after a Ctrl+C instead of
+                # being blocked by the socket's TIME_WAIT state (which otherwise
+                # reserves the port for ~30s and breaks a quick restart.
+                # This matches http.server.HTTPServer, which enables it by default;
+                # plain TCPServer does not.
+                allow_reuse_address = True
+                allow_reuse_port = True
+
+            self._http_server = TCPServer((self._host, self._port), CustomHandler)
             self._http_server_thread = threading.Thread(target=self._run_http_server)
             self._http_server_thread.daemon = True
             self._http_server_thread.start()
@@ -603,6 +698,7 @@ class TokeoPdoc(MetaMixin):
             self.app.log.info('Shutting down Tokeo pdoc server...')
             self._http_server_running = False
             self._http_server.shutdown()
+            self._http_server.server_close()
             if self._http_server_thread:
                 self._http_server_thread.join()
             self.app.log.info('Tokeo pdoc server was shut down')
@@ -847,37 +943,3 @@ def load(app):
     app.hook.register('post_setup', tokeo_pdoc_extend_app)
     app.hook.register('tokeo_pdoc_render_decorator', tokeo_pdoc_render_decorator)
 
-
-def _get_config(**kwargs):
-    """
-    This is an overload function from original pdoc.__init__.py (_get_config).
-
-    The DEFAULT_CONFIG is not changeable by API and the pdoc.tpl_lookup.get_template
-    function will only returns the first other config.mako. So instead of repeating
-    all values to newly created app, here overload and set tokeo as primary.
-
-    """
-    # Apply config.mako configuration
-    MAKO_INTERNALS = Template('').module.__dict__.keys()
-    DEFAULT_CONFIG = fs.join(get_module_path('tokeo.templates.pdoc.html'), 'config.mako')
-    config = {}
-    for config_module in (Template(filename=DEFAULT_CONFIG).module, pdoc.tpl_lookup.get_template('/config.mako').module):
-        config.update((var, getattr(config_module, var, None)) for var in config_module.__dict__ if var not in MAKO_INTERNALS)
-
-    known_keys = (
-        set(config)
-        | {'docformat'}  # Feature. https://github.com/pdoc3/pdoc/issues/169
-        # deprecated
-        | {'module', 'modules', 'http_server', 'external_links', 'search_query'}
-    )
-    invalid_keys = {k: v for k, v in kwargs.items() if k not in known_keys}
-    if invalid_keys:
-        warnings.warn(f'Unknown configuration variables (not in config.mako): {invalid_keys}')
-    config.update(kwargs)
-
-    if 'search_query' in config:
-        warnings.warn('Option `search_query` has been deprecated. Use `google_search_query` instead', DeprecationWarning, stacklevel=2)
-        config['google_search_query'] = config['search_query']
-        del config['search_query']
-
-    return config
