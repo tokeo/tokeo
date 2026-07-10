@@ -25,6 +25,25 @@
         if annot:
             annot = ' ' + sep + '\N{NBSP}' + annot
         return annot
+
+    def reexport_of(mod, d):
+        # a member is re-exported when its object originates from another module
+        # (e.g. a package __init__ that imports it from a sub-module)
+        origin = getattr(getattr(d, 'obj', None), '__module__', None)
+        return origin if (origin and origin != mod.name) else None
+
+    def origin_doc(mod, d, origin):
+        # resolve the re-exported member to its documented origin (or None when
+        # the origin is external / not part of the rendered set)
+        od = mod.find_ident(origin + '.' + d.name)
+        return od if (od is not None and not isinstance(od, pdoc.External)) else None
+
+    def split_local_reexported(mod, docs):
+        # partition a list of docs into (locally defined, re-exported)
+        local, reexported = [], []
+        for d in docs:
+            (reexported if reexport_of(mod, d) else local).append(d)
+        return local, reexported
 %>
 
 <%def name="ident(name)">
@@ -210,9 +229,12 @@
 
 <%def name="show_module(module)">
     <%
-        variables = module.variables(sort=sort_identifiers)
-        classes = module.classes(sort=sort_identifiers)
-        functions = module.functions(sort=sort_identifiers)
+        _variables = module.variables(sort=sort_identifiers)
+        _classes = module.classes(sort=sort_identifiers)
+        _functions = module.functions(sort=sort_identifiers)
+        variables, _ = split_local_reexported(module, _variables)
+        classes, _ = split_local_reexported(module, _classes)
+        functions, _ = split_local_reexported(module, _functions)
         submodules = module.submodules()
     %>
 
@@ -467,9 +489,21 @@
 
 <%def name="module_index(module)">
     <%
-        variables = module.variables(sort=sort_identifiers)
-        classes = module.classes(sort=sort_identifiers)
-        functions = module.functions(sort=sort_identifiers)
+        _variables = module.variables(sort=sort_identifiers)
+        _classes = module.classes(sort=sort_identifiers)
+        _functions = module.functions(sort=sort_identifiers)
+        variables, _ = split_local_reexported(module, _variables)
+        classes, reexported_classes = split_local_reexported(module, _classes)
+        functions, reexported_functions = split_local_reexported(module, _functions)
+        # group re-exports by their origin module: modules sorted alpha, and the
+        # re-exported names inside each module sorted alpha
+        _groups = {}
+        for d in reexported_classes + reexported_functions:
+            _groups.setdefault(reexport_of(module, d), []).append(d)
+        reexport_groups = [
+            (origin, sorted(docs, key=lambda x: x.name))
+            for origin, docs in sorted(_groups.items())
+        ]
         submodules = module.submodules()
         supermodule = module.supermodule
     %>
@@ -508,6 +542,24 @@
                 <ul>
                 % for m in submodules:
                     <li><code>${link(m)}</code></li>
+                % endfor
+                </ul>
+            </li>
+            % endif
+
+            % if reexport_groups:
+            <li><h3>Re-exported</h3>
+                <ul>
+                % for origin, docs in reexport_groups:
+                    <li>
+                        <h4 class="reexport-origin">${origin}</h4>
+                        <ul>
+                        % for d in docs:
+                            <% od = origin_doc(module, d, origin) %>
+                            <li><code>${link(od, name=d.name) if od else d.name}</code></li>
+                        % endfor
+                        </ul>
+                    </li>
                 % endfor
                 </ul>
             </li>
