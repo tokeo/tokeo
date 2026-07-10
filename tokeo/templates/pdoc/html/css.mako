@@ -351,6 +351,17 @@
     margin-top: 0.6em;
     font-weight: bold;
   }
+  /* re-export group header: the full, non-clickable origin module name,
+     kept small and unobtrusive so only the exported items read as links */
+  #index h4.reexport-origin {
+    margin-top: 0.8em;
+    margin-bottom: 0.1em;
+    font-family: monospace;
+    font-size: 1.1em;
+    font-weight: normal;
+    color: #5a5a5a;
+    letter-spacing: 0;
+  }
 
   /* Multi-column layouts */
   @media (min-width: 200ex) { #index .two-column { column-count: 2; } }
