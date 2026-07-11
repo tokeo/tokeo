@@ -1,7 +1,7 @@
 """
 Tokeo SMTPD Server Module.
 
-A one-to-one translation of midi-smtp-server's dialog engine from Ruby to
+A one-to-one translation of MidiSmtpServer dialog engine from Ruby to
 Python on ```asyncio```. ```serve_client``` owns the per-connection io loop
 (timeout, buffer limit, PIPELINING guard, CRLF handling), ```process_line```
 is the single command dispatcher (a case/when chain kept as if/elif with
@@ -276,6 +276,10 @@ class GlobalLimits:
         self.max_connections = int(max_connections) if max_connections else None
         self.active = 0
         self.active_processings = 0
+        #: shared wake event: a slot released on ANY service wakes every waiter
+        #: (each server with global_limits waits on this instead of a local one)
+        self.slot_free = asyncio.Event()
+        self.slot_free.set()
 
     def admit(self):
         """Count one more open connection."""
@@ -292,6 +296,21 @@ class GlobalLimits:
     def end_processing(self):
         """Drop one in-progress dialog."""
         self.active_processings = max(0, self.active_processings - 1)
+
+    async def slot_wait(self):
+        """
+        Wait until a slot may be free again (woken via ```slot_free```).
+
+        ### Notes
+
+        : The base implementation waits purely on the shared event -- correct
+            whenever the counters only change inside this event loop. An
+            implementation whose counters are shared ACROSS PROCESSES (where no
+            event can reach this loop) should override this with a short
+            re-check interval, e.g. ```wait_for(self.slot_free.wait(), 0.05)```
+
+        """
+        await self.slot_free.wait()
 
 
 class SmtpdServer:
@@ -386,7 +405,9 @@ class SmtpdServer:
         # + an asyncio.Event as the condition-variable equivalent)
         self._connections = 0
         self._processings = 0
-        self._slot_free = asyncio.Event()
+        # with global limits the wake event is the SHARED one, so a slot
+        # released on any service wakes waiters on every service
+        self._slot_free = global_limits.slot_free if global_limits is not None else asyncio.Event()
         self._slot_free.set()
         # graceful shutdown state
         self._shutdown = False
@@ -632,21 +653,34 @@ class SmtpdServer:
         ```asyncio.Event``` re-checked in a loop.
 
         """
-        limit = self.max_processings
+        limit = int(self.max_processings) if self.max_processings is not None else None
         gl = self.global_limits
         glimit = gl.max_processings if gl is not None else None
-        while True:
-            svc_ok = limit is None or self._processings < int(limit)
+
+        def _slot_ok():
+            svc_ok = limit is None or self._processings < limit
             glob_ok = glimit is None or gl.active_processings < glimit
-            if svc_ok and glob_ok:
+            return svc_ok and glob_ok
+
+        while True:
+            if _slot_ok():
                 self._processings += 1
                 if gl is not None:
                     gl.begin_processing()
                 session.processing = True
                 return
-            # wait for a slot to free up, then re-check
+            # arm the wake-up, then re-check once: a release between the failed
+            # check above and clear() would otherwise be swallowed (lost wakeup)
             self._slot_free.clear()
-            await self._slot_free.wait()
+            if _slot_ok():
+                continue
+            if gl is not None:
+                # the wait strategy belongs to the limits implementation: the
+                # in-process base waits on the event; a cross-process variant
+                # (shared counters under pre_fork) overrides slot_wait
+                await gl.slot_wait()
+            else:
+                await self._slot_free.wait()
 
     # ---- per-connection dialog --------------------------
 
