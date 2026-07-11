@@ -367,6 +367,7 @@ The constructor keeps the original option names. Key ones:
 <tr><td>proxy_extension</td><td>False</td><td>accept the PROXY protocol</td></tr>
 <tr><td>pipelining_extension</td><td>False</td><td>advertise PIPELINING</td></tr>
 <tr><td>internationalization_extensions</td><td>False</td><td>advertise 8BITMIME and SMTPUTF8</td></tr>
+<tr><td>spool</td><td>None</td><td>path and file name prefix for the spool temp files (section 11)</td></tr>
 <tr><td>do_dns_reverse_lookup</td><td>True</td><td>resolve the remote host name</td></tr>
 <tr><td>io_cmd_timeout</td><td>30</td><td>seconds to await a complete command line</td></tr>
 <tr><td>io_buffer_max_size</td><td>1 MiB</td><td>maximum line length before rejection</td></tr>
@@ -397,7 +398,36 @@ server_a = SmtpdServer(handler, ports=2525, global_limits=limits)
 server_b = SmtpdServer(handler, ports=2526, global_limits=limits)
 ```
 
-## 11. Lifecycle
+## 11. Message spooling
+
+With ```spool``` set (a directory ending in ```/```, or directory plus the
+start of a file name) every incoming message is streamed to a temp file
+named ```<prefix>YYYYMMDD-HHMMSS-<unique>.eml``` -- the timestamp comes from
+the connection start (UTC), the unique part from ```mkstemp```, so parallel
+messages and pre-forked workers never collide.
+
+The headers collect in memory first. When they are complete (and after
+```on_message_data_headers_event```, so injected header lines are included)
+the whole block is written to the file once; from then on body lines go to
+the file only. At ```on_message_data_event``` the file holds the complete
+de-dot-stuffed, chomped message while ```ctx.message.data``` carries ONLY
+the headers (no separator line). ```ctx.message.bytesize``` always counts
+the whole message and equals the final file size.
+
+```ctx.message.spooler``` is the owning ```MessageSpooler``` (None without
+spooling, and None for a message that ends before a header/body separator).
+The file lives until the DATA event ends: take it over via
+```spooler.keep(path)``` (moves it, ```os.replace```) or ```spooler.keep()```
+(leaves it in place and returns the path), otherwise the server deletes it.
+With ```debug=True``` on the server all files are kept, including
+interrupted ones.
+
+```keep``` does not flush: called before the message completed it only
+relocates the still growing file -- the server keeps writing through the
+open handle and flushes and closes it as usual, so the content is complete
+only after ```on_message_data_event```.
+
+## 12. Lifecycle
 
 ```SmtpdServer``` exposes an ```asyncio``` lifecycle:
 
@@ -421,7 +451,7 @@ A graceful ```stop``` stops accepting new connections, lets the connections
 already in progress finish (up to the drain window), and only then closes. This is
 what lets you restart or redeploy without dropping a message mid-delivery.
 
-## 12. Logging
+## 13. Logging
 
 The server exposes a ```logger``` whose ```info```/```warn```/```error```/
 ```fatal```/```debug``` calls are forwarded to your handler's
@@ -443,7 +473,7 @@ class MailHandler(SmtpdEvents):
 ```Severity``` values map onto the standard ```logging``` levels, so they compare
 and forward to the ```logging``` module directly.
 
-## 13. Relationship to the reference implementation
+## 14. Relationship to the reference implementation
 
 The library follows the original one-to-one: the same 13 events, the same context layout,
 the same configuration options and attribute readers, the same PROXY / AUTH /

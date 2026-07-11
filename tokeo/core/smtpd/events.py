@@ -288,8 +288,16 @@ class SmtpdEvents:
 
         ### Notes
 
-        : The raw body is reached via ```ctx.message.data``` / ```spool_path```
-            and is never part of the ctx JSON; forwarding it is the handler's job
+        : ```ctx.message.spooler``` is a ```MessageSpooler``` or None. When
+            spooling the file gets the complete message (incl. headers
+            injected on ```on_message_data_headers_event```) while
+            ```ctx.message.data``` carries ONLY the headers (no separator
+            line) for fast in-memory checks. The file lives until this event
+            ends: take it over via ```spooler.keep(path)``` (move) or
+            ```spooler.keep()``` (leave in place), else it gets deleted. It
+            is always kept in ```debug``` mode
+        : The raw body and spool file are never part of the ctx JSON;
+            forwarding and handling is the handler's job
 
         """
         pass

@@ -56,6 +56,6 @@ def test_session_status():
     assert message.received == -1
     assert message.delivered == -1
     assert message.bytesize == -1
-    assert message.headers == ''
+    assert message.headers is False
     assert message.crlf == b'\r\n'
     assert bytes(message.data) == b''
