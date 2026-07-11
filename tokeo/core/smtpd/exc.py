@@ -2,21 +2,20 @@
 Tokeo SMTPD Exceptions Module.
 
 This module defines the exception model of the SMTPD extension. It mirrors the
-```midi-smtp-server``` exception hierarchy 1:1, so a ported handler raises the
-very same names (```Smtpd550Exception```, ```Smtpd421Exception```, ...) it did
-in Ruby. The server is the single place that catches these
-and translates them into aiosmtpd responses; the handler logic never returns
-raw SMTP codes.
+ported exception hierarchy, so a handler raises the very same names like
+(```Smtpd550Exception```, ```Smtpd421Exception```, ...) it did in MidiSmtpServer.
+The server is the single place that catches these and translates them into
+aiosmtpd responses; the handler logic never returns raw SMTP codes.
 
 ### Features
 
 - Extension-level errors (```SmtpdError```, ```SmtpdContractError```) for
     config, wiring, and contract violations, rooted in ```TokeoError```
 - Internal control-flow signals (```SmtpdStopConnectionException``` and
-    friends) that carry no SMTP code, matching midi's internal exceptions
+    friends) that carry no SMTP code (internal control flow)
 - SMTP dialog exceptions (```SmtpdException``` and the numeric subclasses)
     that carry a fixed code and text; ```smtp_response``` renders the wire form
-- Faithful codes and default texts copied verbatim from midi-smtp-server
+- Faithful codes and default texts copied verbatim
 
 """
 
@@ -54,7 +53,7 @@ class SmtpdContractError(SmtpdError):
     pass
 
 
-# --- internal control-flow signals (no SMTP code, like midi's internals) ---
+# --- internal control-flow signals (no SMTP code) ---
 
 
 class SmtpdSignal(Exception):
@@ -63,7 +62,7 @@ class SmtpdSignal(Exception):
 
     ### Notes
 
-    : These mirror midi's internal RuntimeError signals; they steer the server
+    : Internal RuntimeError-style signals; they steer the server
         (stop a connection or the service, abort a slow or oversized line) and
         are not translated into a client response like ```SmtpdException```
 
@@ -96,7 +95,7 @@ class SmtpdIOBufferOverrunException(SmtpdSignal):
     pass
 
 
-# --- SMTP dialog exceptions (carry code + text; midi 1:1) ---
+# --- SMTP dialog exceptions (carry code + text) ---
 
 
 class SmtpdException(Exception):
@@ -114,7 +113,7 @@ class SmtpdException(Exception):
     ### Notes
 
     : ```smtp_response``` is built from the fixed code and text, not from
-        ```message```, so internal details never reach the client (as in midi)
+        ```message```, so internal details never reach the client
 
     """
 

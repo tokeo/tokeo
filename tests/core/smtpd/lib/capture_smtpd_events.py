@@ -5,7 +5,7 @@ A recording ```SmtpdEvents``` handler for the smtpd core-lib tests.
 captures the auth and message-data values into ```ev_*``` attributes so a test
 can inspect what the server passed to the handler. It also implements the test
 authentication used throughout (grants 'supervisor' to administrator/password,
-denies everything else with 535). It is the counterpart of midi-smtp-server's
+denies everything else with 535). It is the counterpart of
 ```MidiSmtpServerTest``` handler.
 """
 

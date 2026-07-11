@@ -2,7 +2,7 @@
 Tokeo SMTPD Logger Module.
 
 The log severities handed to ```on_logging_event``` -- a translation of
-midi-smtp-server's ```Logger::DEBUG/INFO/WARN/ERROR/FATAL``` levels. The enum
+standard ```Logger::DEBUG/INFO/WARN/ERROR/FATAL``` levels. The enum
 values are Python's ```logging``` level integers, so a handler can pass
 ```severity.value``` straight to ```logging```/```app.log``` and levels compare
 numerically, while the members themselves still compare by identity.
@@ -30,9 +30,9 @@ class Severity(Enum):
 
 class ForwardingLogger:
     """
-    A logger that forwards every call to ```on_logging_event``` (midi 1:1).
+    A logger that forwards every call to ```on_logging_event```.
 
-    Mirrors midi-smtp-server's ```ForwardingLogger```: ```info```/```warn```/
+    The ```ForwardingLogger```: ```info```/```warn```/
     ```error```/```fatal```/```debug``` push the message to the given
     ```on_logging_event``` callable with the matching ```Severity``` and a nil
     context.

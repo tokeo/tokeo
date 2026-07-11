@@ -1,8 +1,8 @@
 """
-Ported from midi-smtp-server test/specs/ports_and_hosts_test.rb.
+Ported from the reference suite's test/specs/ports_and_hosts_test.rb.
 
 Checks the ports/hosts parsing and the resulting bind addresses for three
-scenarios, each asserting ports, hosts and addresses separately (as midi does).
+scenarios, each asserting ports, hosts and addresses separately.
 """
 
 from tokeo.core.smtpd.server import SmtpdServer

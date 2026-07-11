@@ -1,7 +1,7 @@
 """
-Ported from midi-smtp-server test/unit/process_reset_session_test.rb.
+Ported from the reference suite's test/unit/process_reset_session_test.rb.
 
-Checks the session/ctx content after ```process_reset_session``` (the midi
+Checks the session/ctx content after ```process_reset_session``` (the
 default values for every field), for both connection_initialize True and False.
 """
 

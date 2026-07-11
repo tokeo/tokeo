@@ -2,7 +2,7 @@
 Tests for tokeo.ext.smtpd.server (the own asyncio SMTP server, no TLS/AUTH).
 
 Everything is exercised over a real SMTP conversation against a live server:
-the full dialog and midi-faithful behaviour (null sender, de-dot-stuffing,
+the full dialog and reference-faithful behaviour (null sender, de-dot-stuffing,
 byte-exact body, multiple transactions, sequence enforcement, handler rejects),
 the security enforcement we own (PIPELINING rejection, CRLF strictness, data_size,
 buffer overrun, command timeout), and the connection/processing limits.
@@ -154,7 +154,7 @@ def test_ehlo_advertises_extensions_when_enabled():
     assert r[0][-1] == '250 OK'
 
 
-# --- midi-faithful behaviour -------------------------------------------------
+# --- reference-faithful behaviour --------------------------------------------
 
 
 def test_null_sender_accepted():
@@ -201,7 +201,7 @@ def test_noop_and_unknown_command():
     assert r[2][0].startswith('500')
 
 
-# --- sequence and reject codes (midi-exact) ---------------------------------
+# --- sequence and reject codes ---------------------------------
 
 
 def test_sequence_rcpt_before_mail_is_503():
@@ -306,7 +306,7 @@ def test_data_size_limit_552():
 
 
 def test_buffer_overrun_421():
-    # midi: the overrun raises to the outer handler which answers 421 and drops
+    # the overrun raises to the outer handler which answers 421 and drops
     _, r = dialog(RecordingEvents(), {'io_buffer_max_size': 100}, [b'EHLO ' + b'a' * 300 + b'\r\n'])
     assert r[0][0].startswith('421')
 
@@ -429,7 +429,7 @@ def test_delivery_works_in_all_crlf_modes(mode):
 
 
 def test_on_connect_fires_even_when_refused():
-    # midi contract: every accepted connection hits on_connect_event, even one
+    # contract: every accepted connection hits on_connect_event, even one
     # that is then refused with 421 for exceeding max_connections
     ev = RecordingEvents()
 
@@ -453,7 +453,7 @@ def test_on_connect_fires_even_when_refused():
 
 
 def test_max_processings_waits_for_free_slot():
-    # midi: a new client waits (before its 220 banner) until processings drops
+    # a new client waits (before its 220 banner) until processings drops
     # below max_processings; with a single slot the second client is blocked
     async def go():
         server, port, task = await _serve(RecordingEvents(), {'max_processings': 1})
@@ -548,7 +548,7 @@ def test_proxy_disabled_is_unknown_command():
 
 
 def test_unknown_command_counts_and_allows_abuse_abort():
-    # midi fidelity: an unknown command raises Smtpd500 internally, so the serve
+    # an unknown command raises Smtpd500 internally, so the serve
     # loop counts it in ctx.server.exceptions -- which lets a handler abort an
     # abusive peer. Two unknowns answer 500; the third sees exceptions >= 2 and 421.
     class AbuseGuard(RecordingEvents):
@@ -751,7 +751,7 @@ def test_lifecycle_state_flags():
     assert after is True
 
 
-# --- AUTH (PLAIN / LOGIN, midi-faithful) --------------------------------------
+# --- AUTH (PLAIN / LOGIN) ------------------------------------------------------
 
 
 class AuthEvents(RecordingEvents):
@@ -808,7 +808,7 @@ def test_auth_plain_inline_success_and_ctx():
     assert ev.auth_calls == [('', 'user', 'secret')]
     authenticated, authentication_id, authorization_id = ev.ctx_auth
     assert authenticated and authentication_id == 'user'
-    # empty authzid falls back to the authentication id (midi)
+    # empty authzid falls back to the authentication id
     assert authorization_id == 'user'
 
 
@@ -828,7 +828,7 @@ def test_auth_plain_prompt_form():
         b'AUTH PLAIN\r\n',
         _plain('', 'user', 'secret').encode() + b'\r\n',
     ])
-    # midi answers the bare AUTH PLAIN with '334 ' (space included)
+    # the bare AUTH PLAIN is answered with '334 ' (space included)
     assert r[1][0].rstrip() == '334'
     assert r[2][0] == '235 OK'
 
@@ -859,7 +859,7 @@ def test_auth_login_with_inline_user():
 
 
 def test_auth_default_handler_denies_535():
-    # the SmtpdEvents base rejects every authentication (midi default-deny)
+    # the SmtpdEvents base rejects every authentication
     _, r = dialog(RecordingEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [
         b'EHLO me\r\n',
         b'AUTH PLAIN ' + _plain('', 'any', 'thing').encode() + b'\r\n',
@@ -927,7 +927,7 @@ def test_auth_authzid_returned_by_handler():
     assert ev.ctx_auth[2] == 'boss'
 
 
-# --- STARTTLS (midi functionality, aiosmtpd security line) --------------------
+# --- STARTTLS --------------------
 
 
 def _tls_client_ctx():

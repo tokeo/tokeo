@@ -2,10 +2,9 @@
 Tokeo SMTPD Events Contract Module.
 
 This module defines the handler contract: a base class whose method names match
-```midi-smtp-server``` 1:1 (```on_message_data_event```, ```on_rcpt_to_event```,
-...). An application implements the contract and binds it per service via
-config; the server dispatches to these methods and turns any raised SMTP
-exception into a response.
+(```on_message_data_event```, ```on_rcpt_to_event```, ...). An application
+implements the contract and binds it per service via config; the server
+dispatches to these methods and turns any raised SMTP exception into a response.
 
 ### Features
 
@@ -22,7 +21,7 @@ exception into a response.
     ```async def``` and ```@threaded def``` events; the server binds its
     logger at construction and bridges into ```on_logging_event```
 - No class-wide threading default on purpose; every method decides for itself
-- The full set of midi event methods as overridable no-ops
+- The full set of event methods as overridable no-ops
 
 ### Notes
 
@@ -114,7 +113,7 @@ def threaded(fn):
 
 class SmtpdEvents:
     """
-    The handler contract with midi 1:1 event method names.
+    The handler contract with the event method names.
 
     An application subclasses this, overrides the events it cares about, and
     binds the subclass per service via config (```type```). The ```options```
@@ -172,7 +171,7 @@ class SmtpdEvents:
     @staticmethod
     def authenticated(ctx):
         """
-        True when the connection has authenticated (midi ```authenticated?```).
+        True when the connection has authenticated.
 
         ### Args
 
@@ -188,7 +187,7 @@ class SmtpdEvents:
     @staticmethod
     def encrypted(ctx):
         """
-        True when the connection is TLS-encrypted (midi ```encrypted?```).
+        True when the connection is TLS-encrypted.
 
         ### Args
 
@@ -239,7 +238,7 @@ class SmtpdEvents:
 
         ### Notes
 
-        : midi 1:1: if authentication is used, override this event and implement
+        : If authentication is used, override this event and implement
             your own user management -- otherwise all authentications are
             blocked per default (deny with ```Smtpd535Exception```)
         : The credential check and its source (vault, DB, LDAP) live entirely in

@@ -77,7 +77,7 @@ def test_overridden_events_get_entries_with_resolved_kind():
 
 
 def test_auth_default_deny_stays_dispatchable():
-    # without an override, ON_AUTH_EVENT keeps its entry and midi's default
+    # without an override, ON_AUTH_EVENT keeps its entry and default deny
     # deny (535) still fires through _emit
     srv = SmtpdServer(BareEvents())
     assert SmtpdEvent.ON_AUTH_EVENT in srv.emit_events

@@ -1,5 +1,5 @@
 """
-Ported from midi-smtp-server test/unit/process_proxy_test.rb.
+Ported from the reference suite's test/unit/process_proxy_test.rb.
 
 Checks the PROXY protocol handling in ```process_line```: valid TCP4/TCP6
 (with IPv6 and port normalization), an illegal command, a repeated PROXY, and

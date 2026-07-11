@@ -1,5 +1,5 @@
 """
-Ported from midi-smtp-server test/integration/ports_and_connections_test.rb.
+Ported from the reference suite's test/integration/ports_and_connections_test.rb.
 
 With max_connections=2 and max_processings=1: one connection is served, a second
 waits (before its welcome) until the first frees the slot, and a third is

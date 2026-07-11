@@ -1,7 +1,7 @@
 """
-Ported from midi-smtp-server test/integration/io_waitreadable_test.rb.
+Ported from the reference suite's test/integration/io_waitreadable_test.rb.
 
-midi polls the socket non-blocking and sleeps ```io_waitreadable_sleep``` between
+Original code polls non-blocking and sleeps ```io_waitreadable_sleep``` between
 empty reads; the test measures that a larger sleep makes delivery slower. This
 polling does not exist on asyncio -- ```await readuntil``` suspends until data
 arrives, so ```io_waitreadable_sleep``` has no functional effect. The value is

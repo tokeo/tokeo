@@ -1,15 +1,15 @@
 """
 Pre-fork process model.
 
-A faithful translation of midi-smtp-server's master/worker handling (the
-``@pre_fork`` / ``@workers`` / ``fork`` / ``Process.waitpid`` logic on
-``MidiSmtpServer::Server``) into a small, framework-neutral helper.
+A faithful translation of MidiSmtpServer master/worker handling (the Ruby
+``@pre_fork`` / ``@workers`` / ``fork`` / ``Process.waitpid`` logic)
+into a small, framework-neutral helper.
 
-The model, like midi's, is: a *master* process forks ``pre_fork`` *worker*
+The model is: a *master* process forks ``pre_fork`` *worker*
 processes, and only the workers serve. The master itself does not serve; it
 forwards the stop signal (SIGINT/SIGTERM) to every worker and reaps them with
 ``waitpid`` so no worker is left orphaned or turned into a zombie. Pre-fork is
-only active for ``count > 1`` (midi: ``pre_fork?``); otherwise a single process
+only active for ``count > 1``; otherwise a single process
 serves directly.
 
 On Linux each worker additionally arms ``PR_SET_PDEATHSIG`` so it terminates
@@ -66,11 +66,11 @@ def set_pdeathsig(sig=signal.SIGTERM):
 
 def is_prefork(count):
     """
-    Return whether pre-fork is active for ```count``` (midi: ```pre_fork?```).
+    Return whether pre-fork is active for ```count```.
 
     ### Notes
 
-    : Mirrors midi exactly: forking happens only for ```count > 1```; a value
+    : Forking happens only for ```count > 1```; a value
         of 0 or 1 means a single process serves directly.
 
     ### Args
@@ -92,9 +92,8 @@ def supervise_workers(child_pids, stop_signals=_STOP_SIGNALS):
     ### Notes
 
     - Installs a handler for each stop signal that relays SIGTERM to all
-        workers (midi: ```@workers.each { Process.kill(:TERM, pid) }```), then
-        blocks in ```os.wait``` until every worker has exited (midi:
-        ```@workers.each { Process.waitpid(pid) }```) so none is left zombied
+        workers, then blocks in ```os.wait``` until every worker has exited.
+        So none is left zombied
     - Already-gone workers are ignored (```ProcessLookupError```); waiting is
         resumed across an interrupted syscall
     - The previous signal handlers are restored on return
@@ -132,12 +131,12 @@ def supervise_workers(child_pids, stop_signals=_STOP_SIGNALS):
 
 def run_prefork(worker, count, parent_death_signal=signal.SIGTERM):
     """
-    Run ```worker``` under midi's master/worker pre-fork model.
+    Run ```worker``` under the master/worker pre-fork model.
 
     ### Notes
 
     - With ```count <= 1``` no fork happens; ```worker()``` runs in this
-        process (single master, midi's default)
+        process (single master, the default)
     - With ```count > 1``` a master forks ```count``` workers and supervises
         them; each worker arms ```set_pdeathsig``` (Linux) plus a race guard
         against the master dying between ```fork``` and ```prctl```, then runs

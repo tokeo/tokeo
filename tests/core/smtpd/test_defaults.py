@@ -1,5 +1,5 @@
 """
-Ported from midi-smtp-server test/specs/defaults_test.rb.
+Ported from the reference suite's test/specs/defaults_test.rb.
 
 Checks the default properties and the host-validation exceptions of the server.
 """

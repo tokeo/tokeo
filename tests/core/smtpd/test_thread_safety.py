@@ -1,5 +1,5 @@
 """
-Ported from midi-smtp-server test/stress/thread_safety_test.rb.
+Ported from the reference suite's test/stress/thread_safety_test.rb.
 
 Runs many simultaneous authenticated deliveries and verifies the per-connection
 context is never cross-contaminated: for each connection the envelope sender must
