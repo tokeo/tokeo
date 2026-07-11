@@ -9,12 +9,12 @@ the Ruby code assigns into the hash.
 
 ### Notes
 
-: Conventions kept: string fields default to ```''```; ```proxy``` is
-    ```None```; ```received```/```delivered```/```bytesize``` start at ```-1```;
-    ```encrypted```/```authenticated``` are a single field each -- empty while
-    off, a UTC timestamp once on; ```headers``` flips from ```''``` to
-    ```'true'```; ```data``` is the raw message and is appended to directly
-    (```ctx.message.data += line + line_break``` like Ruby's ```data <<```).
+: Conventions kept: string fields default to ```''```; ```proxy``` and
+    ```message.spooler``` are ```None```; ```received```/```delivered```/
+    ```bytesize``` start at ```-1```; ```encrypted```/```authenticated```
+    are a single field each -- empty while off, a UTC timestamp once on;
+    ```headers``` flips from ```False``` to ```True```; ```data``` is the
+    raw message and is appended to directly
 : Python keyword clash: the Ruby ```ctx[:envelope][:from]``` / ```[:to]``` are
     ```ctx.envelope.mail_from``` / ```ctx.envelope.rcpt_tos``` (```from``` and
     ```to``` are reserved words); every other name is unchanged. The body is
@@ -22,6 +22,8 @@ the Ruby code assigns into the hash.
 
 """
 
+import os
+import tempfile
 from dataclasses import dataclass, field
 
 from tokeo.core.utils.json import TokeoJsonEncoder
@@ -93,6 +95,107 @@ class EnvelopeCtx:
     encoding_utf8: str = ''
 
 
+class MessageSpooler:
+    """
+    Optional file spooling for one incoming message.
+
+    Owns the spool temp file while the message streams to disk: the file
+    descriptor, the writable handle, the file path and the line ending of
+    the last written chunk (used for the final chomp).
+
+    """
+
+    __slots__ = ('fd', 'file', 'path', 'last_line_break', 'debug')
+
+    def __init__(self, dir=None, prefix=None, debug=False):
+        # create spool temp file for dir + prefix
+        self.fd, self.path = tempfile.mkstemp(dir=dir, prefix=prefix, suffix='.eml')
+        # open file handle to write
+        self.file = os.fdopen(self.fd, 'wb')
+        # reset last line_break
+        self.last_line_break = b''
+        # safe flag for debugging control
+        self.debug = debug
+
+    def chomp(self, cur_bytesize):
+        """
+        Remove the last written line break from the file.
+
+        ### Returns
+
+        - **int**: The file size after the chomp (```cur_bytesize``` when
+            the file is already closed)
+
+        """
+        # test for open file
+        if self.file:
+            _bytesize = self.file.tell()
+            if self.last_line_break:
+                _bytesize -= len(self.last_line_break)
+                self.file.truncate(_bytesize)
+                self.last_line_break = b''
+            return _bytesize
+        # without the file, return the given value
+        return cur_bytesize
+
+    def close(self):
+        """Flush and close the file handle (safe to call repeatedly)."""
+        # test for open file
+        if self.file:
+            self.file.flush()
+            self.file.close()
+            self.fd = None
+            self.file = None
+
+    def unlink(self):
+        """Close the file and delete it from disk (kept in debug mode)."""
+        self.close()
+        if not self.debug and self.path:
+            try:
+                os.unlink(self.path)
+            except FileNotFoundError:
+                pass
+            self.path = None
+
+    def keep(self, path=None):
+        """
+        Release the file from the spooler and keep it on disk.
+
+        ### Args
+
+        - **path** (str, optional): Move the file there (```os.replace```,
+            atomic on the same filesystem); without it the file stays in
+            place under its spool name
+
+        ### Returns
+
+        - **str**: The final file path, or None when already released
+
+        ### Notes
+
+        : ```keep``` does not flush. Called before the message completed it
+            only relocates the still growing file -- the server keeps
+            writing through the open handle and flushes and closes it as
+            usual, so the content is complete only after
+            ```on_message_data_event```
+
+        """
+        if self.path:
+            # only keep or move?
+            if path is not None:
+                # rename with new path
+                os.replace(self.path, path)
+            else:
+                # cache value for return
+                path = self.path
+            # do not touch the file anymore
+            self.path = None
+            # leave a result where to get the file
+            return path
+        else:
+            return None
+
+
 @dataclass
 class MessageCtx:
     """
@@ -104,22 +207,42 @@ class MessageCtx:
     received: object = -1
     #: When body reception completed (UTC); initialized with -1
     delivered: object = -1
-    #: Final message size, set when the message completes; -1 until then
+    #: Running total size of the message in bytes while receiving (final
+    #: after the closing dot); -1 until the first DATA line
     bytesize: int = -1
-    #: headers marker: '' while inside the headers, 'true' once past them
-    headers: str = ''
+    #: The active ```MessageSpooler``` while/after spooling, else None
+    spooler: MessageSpooler = None
+    #: headers marker: False while inside the headers, True once past them
+    headers: bool = False
     #: Line-break sequence recorded for the message
     crlf: bytes = b'\r\n'
     #: The raw message octets; appended to directly
     data: bytearray = field(default_factory=bytearray, repr=False)
 
     def chomp(self):
-        """```data.chomp!```: remove one trailing CRLF, LF or CR."""
-        # not rstrip: chomp removes exactly one line break, rstrip would eat all
-        if self.data.endswith(b'\r\n'):
-            del self.data[-2:]
-        elif self.data.endswith(b'\n') or self.data.endswith(b'\r'):
-            del self.data[-1:]
+        """
+        Remove one trailing line break and settle the final ```bytesize```.
+
+        With a spooler the chomp happens on the spool file (closed after);
+        otherwise on ```data``` -- exactly one CRLF, LF or CR, never more.
+
+        """
+        if self.spooler:
+            self.bytesize = self.spooler.chomp(self.bytesize)
+            self.spooler.close()
+        else:
+            # not rstrip: chomp removes exactly one line break, rstrip would eat all
+            if self.data.endswith(b'\r\n'):
+                del self.data[-2:]
+            elif self.data.endswith(b'\n') or self.data.endswith(b'\r'):
+                del self.data[-1:]
+            self.bytesize = len(self.data)
+
+    def finalize(self):
+        """Dispose an attached spooler (deletes unless kept or debug)."""
+        if self.spooler:
+            self.spooler.unlink()
+            self.spooler = None
 
 
 @dataclass
@@ -140,10 +263,10 @@ class SmtpdContext:
     message: MessageCtx = field(default_factory=MessageCtx)
     options: dict = field(default_factory=dict)
 
-    def reset_transaction(self):
-        """Reset envelope and message values."""
-        self.envelope = EnvelopeCtx()
-        self.message = MessageCtx()
+    def finalize(self):
+        """Finish interrupted per-message resources (the spooler)."""
+        if self.message:
+            self.message.finalize()
 
 
 class SmtpdContextEncoder(TokeoJsonEncoder):
@@ -159,5 +282,5 @@ class SmtpdContextEncoder(TokeoJsonEncoder):
     def encode(self, obj):
         """Strip the raw body from MessageCtx, defer the rest to the base."""
         if isinstance(obj, MessageCtx):
-            return {key: value for key, value in obj.__dict__.items() if key != 'data'}
+            return {key: value for key, value in obj.__dict__.items() if key not in ('data', 'spooler')}
         return super().encode(obj)

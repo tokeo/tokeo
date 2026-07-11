@@ -24,12 +24,13 @@ import re
 import base64
 import asyncio
 import inspect
+import os
 import socket
 import ipaddress
 from enum import Enum, auto
 
 from tokeo.core.utils.date import utc_now
-from .context import SmtpdContext, ServerCtx, EnvelopeCtx, MessageCtx
+from .context import SmtpdContext, ServerCtx, EnvelopeCtx, MessageCtx, MessageSpooler
 from .tls import TlsTransport, EncryptMode
 from .logger import Severity, ForwardingLogger
 from .events import SmtpdEvents, SmtpdEvent, SMTPD_EVENT_NAMES
@@ -325,12 +326,11 @@ class SmtpdServer:
     - **events_handler** (SmtpdEvents): The bound handler implementation instance
     - **settings** (dict): The service settings
     - **options** (dict, optional): The service ```options``` block for the ctx
-    - **app** (Application, optional): The Tokeo app, for logging if present
     - **global_limits** (GlobalLimits, optional): Shared caps across services
 
     """
 
-    def __init__(self, events_handler, settings=None, *, options=None, app=None, global_limits=None, **kwargs):
+    def __init__(self, events_handler, settings=None, *, options=None, global_limits=None, debug=False, **kwargs):
         # accept both the Tokeo settings-dict and the keyword style;
         # keyword args merge into settings, which takes precedence
         settings = dict(settings or {})
@@ -342,7 +342,7 @@ class SmtpdServer:
         self.events_handler = events_handler
         self.emit_events = self._build_emit_events_dispatcher(events_handler)
         self.options = options or {}
-        self.app = app
+        self.debug = bool(debug)
         self.global_limits = global_limits
         #: Strong refs to scheduled log tasks (the loop only holds them weakly)
         self._pending_log_tasks = set()
@@ -364,6 +364,17 @@ class SmtpdServer:
         self.crlf_mode = _parse_mode(CrlfMode, settings.get('crlf_mode'), 'CRLF_ENSURE', 'crlf_mode')
         self.pipelining_extension = bool(settings.get('pipelining_extension', False))
         self.proxy_extension = bool(settings.get('proxy_extension', False))
+        # test for message spooling
+        # value has to be an existing directory + file-name prefix
+        value = settings.get('spool')
+        if value:
+            value = str(value)
+            self._spool_dir, self._spool_prefix = os.path.split(value)
+            if not os.path.isdir(self._spool_dir):
+                raise ValueError(f'spool: directory does not exist: {self._spool_dir!r}')
+            self._spooling = True
+        else:
+            self._spooling = False
         self.internationalization_extensions = bool(settings.get('internationalization_extensions', False))
         self.do_dns_reverse_lookup = settings.get('do_dns_reverse_lookup')
         if self.do_dns_reverse_lookup is None:
@@ -897,6 +908,8 @@ class SmtpdServer:
                 writer.close()
             except OSError:
                 pass
+            # finalize the session at least here, drop maybe interrupted parts
+            self.process_reset_session(session)
 
     async def _read_line(self, reader):
         """
@@ -1223,6 +1236,8 @@ class SmtpdServer:
             if not ctx.message.data:
                 if SmtpdEvent.ON_MESSAGE_DATA_START_EVENT in self.emit_events:
                     await self._emit(SmtpdEvent.ON_MESSAGE_DATA_START_EVENT, ctx)
+                # always initialize bytesize on data
+                ctx.message.bytesize = len(ctx.message.data)
 
             # ... and the entire new message data (line) does NOT consist
             # solely of a period (.) on a line by itself then we are being
@@ -1236,15 +1251,38 @@ class SmtpdServer:
                 # end of headers
                 if not ctx.message.headers and not line:
                     # change flag to do not signal this again
-                    ctx.message.headers = 'true'
+                    ctx.message.headers = True
                     if SmtpdEvent.ON_MESSAGE_DATA_HEADERS_EVENT in self.emit_events:
                         await self._emit(SmtpdEvent.ON_MESSAGE_DATA_HEADERS_EVENT, ctx)
+                        # repair bytesize, maybe changed by headers
+                        ctx.message.bytesize = len(ctx.message.data)
 
-                # and make sure to add CR LF as defined by RFC
-                ctx.message.data += line + line_break
+                    # create the spool file and handle if activated
+                    if self._spooling:
+                        # timestamp from the connection start
+                        stamp = ctx.server.connected.strftime('%Y%m%d-%H%M%S')
+                        # create the spooler for message spooling
+                        ctx.message.spooler = MessageSpooler(dir=self._spool_dir, prefix=f'{self._spool_prefix}{stamp}-', debug=self.debug)
+                        # write current data completely into spool
+                        ctx.message.spooler.file.write(ctx.message.data)
+
+                # take next chunk and make sure to add CR LF as defined by RFC
+                chunk = line + line_break
+
+                if ctx.message.headers and ctx.message.spooler:
+                    # write into spool
+                    ctx.message.spooler.file.write(chunk)
+                    # save last line ending for final chomp
+                    ctx.message.spooler.last_line_break = line_break
+                else:
+                    # in-memory
+                    ctx.message.data += chunk
+
+                # update bytesize
+                ctx.message.bytesize += len(chunk)
 
                 # Tokeo-only option: enforce a hard data_size cap
-                if self.data_size and len(ctx.message.data) > int(self.data_size):
+                if self.data_size and ctx.message.bytesize > int(self.data_size):
                     self.process_reset_session(session)
                     raise Smtpd552Exception
 
@@ -1260,12 +1298,12 @@ class SmtpdServer:
             # solely of a period on a line by itself then we are being
             # told to finish data mode
 
-            # remove last CR LF pair or single LF in buffer
+            # remove last CR LF pair or single LF
+            # and update bytesize of message data
             ctx.message.chomp()
+
             # save delivered UTC time
             ctx.message.delivered = utc_now()
-            # save bytesize of message data
-            ctx.message.bytesize = len(ctx.message.data)
             # call event to process message
             try:
                 if SmtpdEvent.ON_MESSAGE_DATA_EVENT in self.emit_events:
@@ -1432,7 +1470,11 @@ class SmtpdServer:
         session.auth_challenge = {}
         # test existing of ctx
         if session.ctx is None:
+            # create a new one
             session.ctx = SmtpdContext(options=self.options)
+        else:
+            # make sure to finish all interrupted actions
+            session.ctx.finalize()
         ctx = session.ctx
         # reset server values (only on connection start)
         if connection_initialize:
