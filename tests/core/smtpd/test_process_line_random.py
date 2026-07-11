@@ -1,5 +1,5 @@
 """
-Ported from midi-smtp-server test/unit/process_line_random_test.rb.
+Ported from the reference suite's test/unit/process_line_random_test.rb.
 
 Checks HELO/EHLO case-insensitivity and argument stripping, and the EHLO
 extension advertisement with pipelining on and TLS forbidden.

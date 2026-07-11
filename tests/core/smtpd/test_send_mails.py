@@ -1,5 +1,5 @@
 """
-Ported from midi-smtp-server test/integration/send_mails_test.rb.
+Ported from the reference suite's test/integration/send_mails_test.rb.
 
 Real-life delivery over TCP with smtplib: plain send, ten sends, AUTH PLAIN and
 AUTH LOGIN with delivery, an AUTH failure, and a STARTTLS + AUTH + delivery.
@@ -77,7 +77,7 @@ def test_net_smtp_auth_plain_fail():
 
 
 def test_mikel_mail_simple_send_1_mail():
-    # midi drives this via the Mail gem; Python has one SMTP client, so this
+    # Ruby drives this via the Mail gem; Python has one SMTP client, so this
     # mirrors the plain send as a second, independent delivery
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')

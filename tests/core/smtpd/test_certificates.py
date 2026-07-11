@@ -1,5 +1,5 @@
 """
-Ported from midi-smtp-server test/integration/{self_signed_certificates,
+Ported from the reference suite's test/integration/{self_signed_certificates,
 memory_only_certificate,invalid_certificate_name}_test.rb.
 
 Delivery over a TLS_REQUIRED service with: a self-signed cert (simple, with a
@@ -172,7 +172,7 @@ def test_invalid_certificate_name():
 
 
 def test_in_memory_certificate_string():
-    # Tokeo extension beyond midi: the certificate and key are provided as PEM
+    # Tokeo-only extension: the certificate and key are provided as PEM
     # strings (tls_cert/tls_key) and loaded in memory (memfd), never via disk
     certs = _certs()
     ev = CaptureSmtpdEvents()

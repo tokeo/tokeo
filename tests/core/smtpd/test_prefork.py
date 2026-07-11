@@ -1,5 +1,5 @@
 """
-Tests for tokeo.core.smtpd.prefork (the midi master/worker process model).
+Tests for tokeo.core.smtpd.prefork (the master/worker process model).
 
 Split in two: platform-neutral tests that run wherever ``os.fork`` exists
 (the pre-fork threshold, single-process passthrough, forking, signal-forward
@@ -69,8 +69,8 @@ def _reap_orphans():
     'count, expected',
     [(0, False), (1, False), (2, True), (4, True), ('3', True), ('1', False)],
 )
-def test_is_prefork_matches_midi_threshold(count, expected):
-    # midi: pre_fork? is @pre_fork > 1
+def test_is_prefork_matches_reference_threshold(count, expected):
+    # Ruby: pre_fork? is @pre_fork > 1
     assert is_prefork(count) is expected
 
 

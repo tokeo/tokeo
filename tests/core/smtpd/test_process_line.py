@@ -1,11 +1,11 @@
 """
-Ported from midi-smtp-server test/unit/process_line_test.rb.
+Ported from the reference suite's test/unit/process_line_test.rb.
 
 Drives ```process_line``` directly (no TCP) through one ordered dialog on a
 shared session: EHLO, AUTH LOGIN (fail) and AUTH PLAIN (supervisor), MAIL, RCPT,
 DATA (with a Received header injected at data start and an X-inject header at the
 header boundary), NOOP, RSET, QUIT. The tests are order dependent, exactly like
-midi's suite.
+the reference suite.
 """
 
 import email
@@ -30,7 +30,7 @@ class ProcessLineEvents(CaptureSmtpdEvents):
 
 
 class TestProcessLine:
-    """One shared, order-dependent session (midi @@session)."""
+    """One shared, order-dependent session."""
 
     smtpd = None
     session = None

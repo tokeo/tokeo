@@ -1,11 +1,11 @@
 """
 Tokeo SMTPD TLS Transport Module.
 
-A translation of midi-smtp-server's ```tls-transport.rb```: it builds the
+A translation of MidiSmtpServer ```tls-transport.rb```: it builds the
 server ```ssl.SSLContext``` for STARTTLS from a certificate/key (or a generated
 self-signed test certificate when none is configured). The default ciphers and
 TLS floor follow the current Mozilla "Intermediate" profile (TLS 1.2+, ECDHE
-before DHE, AEAD only); midi's method/cipher options can still be supplied.
+before DHE, AEAD only); the classic method/cipher options can still be supplied.
 
 ### Notes
 
@@ -87,7 +87,7 @@ _TLS_VERSIONS = {
 
 
 class EncryptMode(Enum):
-    """midi's encrypt_mode symbols (member names match the config values)."""
+    """The encrypt_mode symbols (member names match the config values)."""
 
     TLS_FORBIDDEN = auto()
     TLS_OPTIONAL = auto()
@@ -105,11 +105,10 @@ class TlsTransport:
     - **key_path** (str, optional): PEM private-key path; when unset the key is
         read from ```cert_path``` (embedded key)
     - **cert** (str|bytes, optional): PEM certificate (chain) content in memory;
-        takes precedence over ```cert_path``` (Tokeo extension beyond midi)
+        takes precedence over ```cert_path``` (Tokeo-only extension)
     - **key** (str|bytes, optional): PEM private-key content in memory; when unset
         the key is read from the ```cert``` content (embedded key)
-    - **ciphers** (str, optional): OpenSSL cipher string (midi ADVANCED_PLUS
-        default)
+    - **ciphers** (str, optional): OpenSSL cipher string
     - **methods** (str, optional): TLS floor; ```'TLSv1_2'``` (default) /
         ```'TLSv1_3'``` (TLS 1.3 only) / ```'TLSv1'``` (opt-in, reaches
         deprecated TLS 1.0/1.1 clients). Unknown values fall back to TLS 1.2
@@ -134,7 +133,7 @@ class TlsTransport:
         self.context.set_ciphers(ciphers if ciphers else TLS_CIPHERS_ADVANCED_PLUS)
         self.context.minimum_version = _TLS_VERSIONS.get(methods or TLS_METHODS_ADVANCED, ssl.TLSVersion.TLSv1_2)
         if cert is not None:
-            # certificate content given in memory (Tokeo extension beyond midi):
+            # certificate content given in memory (Tokeo-only extension):
             # load it via RAM-backed paths so nothing is written to disk
             self._load_from_memory(cert, key)
         elif cert_path is None:
@@ -173,7 +172,7 @@ class TlsTransport:
 
     def _load_self_signed(self, cert_cn, cert_san):
         """
-        Generate a self-signed test certificate and load it (midi 1:1).
+        Generate a self-signed test certificate and load it.
 
         ### Notes
 
@@ -182,7 +181,7 @@ class TlsTransport:
             generated in-process with ```cryptography``` and loaded from memory
 
         """
-        # normalize the subject alt name list (midi: [cn] + san, unique)
+        # normalize the subject alt name list
         if cert_san is None:
             cert_san = []
         elif isinstance(cert_san, str):
@@ -197,7 +196,7 @@ class TlsTransport:
             except ValueError:
                 pass
         self._log(Severity.DEBUG, f'SSL: using self generated test certificate! CN={cn} SAN=[{",".join(sans)}]')
-        # generate the key and the self-signed certificate (midi's OpenSSL steps)
+        # generate the key and the self-signed certificate
         key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
         name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
         now = datetime.now(timezone.utc)

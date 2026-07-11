@@ -1,5 +1,5 @@
 """
-Ported from midi-smtp-server test/specs/logging_test.rb.
+Ported from the reference suite's test/specs/logging_test.rb.
 
 Checks the exposed ```logger``` (ForwardingLogger) routes every level to the
 handler's on_logging_event with the matching Severity and a nil context, and
