@@ -87,10 +87,23 @@ _TLS_VERSIONS = {
 
 
 class EncryptMode(Enum):
-    """The encrypt_mode symbols (member names match the config values)."""
+    """
+    The encrypt_mode symbols (member names match the config values).
+
+    ### Notes
+
+    - ```TLS_FORBIDDEN```: no STARTTLS offered at all
+    - ```TLS_OPTIONAL```: the client may upgrade via STARTTLS
+    - ```TLS_WHEN_AUTH```: like ```TLS_OPTIONAL```, but AUTH is only offered
+        and accepted on an encrypted channel. Protects credentials against
+        a plaintext downgrade
+    - ```TLS_REQUIRED```: every dialog beyond EHLO/STARTTLS demands TLS
+
+    """
 
     TLS_FORBIDDEN = auto()
     TLS_OPTIONAL = auto()
+    TLS_WHEN_AUTH = auto()
     TLS_REQUIRED = auto()
 
 

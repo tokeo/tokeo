@@ -296,9 +296,9 @@ produces the success code.
 
 ## 8. TLS and STARTTLS
 
-Set ```encrypt_mode``` to ```'TLS_OPTIONAL'``` (offer ```STARTTLS```) or
-```'TLS_REQUIRED'``` (require encryption before ```MAIL```); the default is
-```'TLS_FORBIDDEN'```. When encryption is enabled the server upgrades the
+Set ```encrypt_mode``` to ```'TLS_OPTIONAL'``` (offer ```STARTTLS```),
+```'TLS_WHEN_AUTH'``` (like ```TLS_OPTIONAL```, but ```AUTH``` is only offered and
+accepted on an encrypted channel - this mode protects credentials against a plaintext downgrade) or ```'TLS_REQUIRED'``` (require encryption in any way); the default is ```'TLS_FORBIDDEN'```. When encryption is enabled the server upgrades the
 connection in place on ```STARTTLS``` and discards any bytes buffered before the
 handshake, so a command injected ahead of the handshake can never run over the
 encrypted channel.
@@ -363,7 +363,7 @@ The constructor keeps the original option names. Key ones:
 <tr><td>max_processings</td><td>4</td><td>connections processed simultaneously</td></tr>
 <tr><td>max_connections</td><td>None</td><td>concurrent connections accepted (None = unlimited)</td></tr>
 <tr><td>auth_mode</td><td>'AUTH_FORBIDDEN'</td><td>AUTH_OPTIONAL / AUTH_REQUIRED</td></tr>
-<tr><td>encrypt_mode</td><td>'TLS_FORBIDDEN'</td><td>TLS_OPTIONAL / TLS_REQUIRED</td></tr>
+<tr><td>encrypt_mode</td><td>'TLS_FORBIDDEN'</td><td>TLS_OPTIONAL / TLS_WHEN_AUTH / TLS_REQUIRED</td></tr>
 <tr><td>proxy_extension</td><td>False</td><td>accept the PROXY protocol</td></tr>
 <tr><td>pipelining_extension</td><td>False</td><td>advertise PIPELINING</td></tr>
 <tr><td>internationalization_extensions</td><td>False</td><td>advertise 8BITMIME and SMTPUTF8</td></tr>
