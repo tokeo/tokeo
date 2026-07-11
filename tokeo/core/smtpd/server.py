@@ -682,6 +682,33 @@ class SmtpdServer:
             else:
                 await self._slot_free.wait()
 
+    def _auth_available(self, ctx):
+        """
+        True when AUTH may be offered and accepted on this channel right now.
+
+        ### Notes
+
+        : On an unencrypted channel ```TLS_WHEN_AUTH``` and ```TLS_REQUIRED```
+            refuse AUTH command (530) and EHLO does not advertise it. After
+            STARTTLS or without TLS enforcement, the advertising just follows
+            ```auth_mode``` setting.
+
+        """
+        # False if we don't want to support AUTH
+        if self.auth_mode is AuthMode.AUTH_FORBIDDEN:
+            return False
+        # True, if wanting AUTH and the channel is already encrypted
+        if ctx.server.encrypted:
+            return True
+        # False, if channel is not encrypted but AUTH needs it or TLS_REQUIRED
+        if self.encrypt_mode in (EncryptMode.TLS_WHEN_AUTH, EncryptMode.TLS_REQUIRED):
+            return False
+        # True, if TLS is FORBIDDEN or OPTIONAL
+        if self.encrypt_mode in (EncryptMode.TLS_FORBIDDEN, EncryptMode.TLS_OPTIONAL):
+            return True
+        # False, in any other not matched case yet
+        return False
+
     # ---- per-connection dialog --------------------------
 
     async def serve_client(self, session, reader, writer):
@@ -973,7 +1000,7 @@ class SmtpdServer:
                         # respond with PIPELINING if enabled
                         + ('250-PIPELINING\r\n' if self.pipelining_extension else '')
                         # respond with AUTH extensions if enabled
-                        + ('' if self.auth_mode is AuthMode.AUTH_FORBIDDEN else '250-AUTH LOGIN PLAIN\r\n')
+                        + ('250-AUTH LOGIN PLAIN\r\n' if self._auth_available(ctx) else '')
                         # respond with STARTTLS if available and not already enabled
                         + ('' if self.encrypt_mode is EncryptMode.TLS_FORBIDDEN or ctx.server.encrypted else '250-STARTTLS\r\n')
                         + '250 OK'
@@ -1056,7 +1083,7 @@ class SmtpdServer:
                     raise Smtpd500Exception
                 if session.cmd_sequence is not CMD_RSET:
                     raise Smtpd503Exception
-                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
+                if not self._auth_available(ctx):
                     raise Tls530Exception
                 if ctx.server.authenticated:
                     raise Smtpd503Exception
