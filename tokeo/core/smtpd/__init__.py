@@ -54,7 +54,6 @@ from .exc import (
 )
 from .context import SmtpdContext, ServerCtx, EnvelopeCtx, MessageCtx, MessageSpooler, SmtpdContextEncoder
 from .events import SmtpdEvents, SmtpdEvent, threaded
-from .prefork import set_pdeathsig, is_prefork, supervise_workers, run_prefork
 from .tls import (
     TlsTransport,
     EncryptMode,
@@ -124,10 +123,6 @@ __all__ = [
     'SmtpdEvents',
     'SmtpdEvent',
     'threaded',
-    'set_pdeathsig',
-    'is_prefork',
-    'supervise_workers',
-    'run_prefork',
     'SmtpdServer',
     'GlobalLimits',
     'EncryptMode',
