@@ -10,7 +10,7 @@ for it.
 import re
 from tokeo.ext.smtpd import TokeoSmtpdEvents
 from tokeo.core.smtpd.exc import Smtpd550Exception
-from .. import tasks
+from {{ app_label }}.core import tasks
 
 
 #: a simple url matcher for the example (http/https up to the next whitespace)
@@ -34,19 +34,19 @@ class {{ app_class_name }}SmtpdEvents(TokeoSmtpdEvents):
     def on_mail_from_event(self, ctx, mail_from_data):
         self.app.log.info(f'mx-{{ app_label }}: mail from {mail_from_data}')
         # cleanup the address
-        address = mail_from_data.strip().lower()
+        address = re.sub(r'^\s*<\s*(.*)\s*>\s*$', r'\1', mail_from_data).lower()
         # accept mail from the local tokeo sender only
-        if address != '<tokeo@local>':
+        if address != 'tokeo@local':
             raise Smtpd550Exception('sender not allowed')
         # push address on ctx
         return address
 
     def on_rcpt_to_event(self, ctx, rcpt_to_data):
-        self.app.log.info(f'mx-{{ app_label }}: rcpt to {mail_from_data}')
+        self.app.log.info(f'mx-{{ app_label }}: rcpt to {rcpt_to_data}')
         # cleanup the address
-        address = rcpt_to_data.strip().lower()
+        address = re.sub(r'^\s*<\s*(.*)\s*>\s*$', r'\1', rcpt_to_data).lower()
         # accept mail to the local tokeo recipient only
-        if address != '<tokeo@local>':
+        if address != 'tokeo@local':
             raise Smtpd550Exception('recipient not allowed')
         # push address on ctx
         return address
