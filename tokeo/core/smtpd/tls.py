@@ -31,10 +31,6 @@ import ipaddress
 from enum import Enum, auto
 from datetime import datetime, timedelta, timezone
 
-from cryptography import x509
-from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 
 from .logger import Severity
 from tokeo.core.utils.memfd import memory_paths
@@ -194,6 +190,13 @@ class TlsTransport:
             generated in-process with ```cryptography``` and loaded from memory
 
         """
+        # lazy: the cryptography package is only needed to GENERATE the
+        # test certificate; loading configured certificates is stdlib ssl
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
         # normalize the subject alt name list
         if cert_san is None:
             cert_san = []

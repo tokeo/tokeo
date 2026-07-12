@@ -9,8 +9,10 @@ cert, and an invalid certificate name (hostname mismatch) that fails.
 
 import os
 import ssl
+import sys
 import shutil
 import tempfile
+import subprocess
 
 import pytest
 
@@ -191,3 +193,102 @@ def test_in_memory_certificate_string():
     mail = _deliver(ev, settings, verifying_tls_context(certs['simple_cert']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
+
+
+# --- self-signed CN/SAN: derivation and configured override ---------------------
+
+
+def _peer_certificate(settings, hosts=None):
+    """Serve with a self-signed cert and return the certificate from the wire."""
+    import asyncio
+    import smtplib
+    from cryptography import x509
+
+    from tokeo.core.smtpd.server import SmtpdServer
+
+    async def go():
+        srv = SmtpdServer(CaptureSmtpdEvents(), settings=settings, hosts=hosts)
+        await srv.start([{'host': '127.0.0.1', 'port': 0}])
+        port = srv._servers[0].sockets[0].getsockname()[1]
+        loop = asyncio.get_event_loop()
+
+        def client():
+            client = smtplib.SMTP('127.0.0.1', port, timeout=10)
+            client.starttls(context=insecure_tls_context())
+            der = client.sock.getpeercert(binary_form=True)
+            client.close()
+            return der
+
+        try:
+            return await loop.run_in_executor(None, client)
+        finally:
+            await srv.stop(wait_seconds_before_close=0.3)
+
+    return x509.load_der_x509_certificate(asyncio.run(go()))
+
+
+def _names(certificate):
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+
+    cn = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+    sans = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+    return cn, sans.get_values_for_type(x509.DNSName)
+
+
+def test_tls_cert_names_derivation_rules():
+    from tokeo.core.smtpd.server import _tls_cert_names
+
+    # a configured cn wins unchanged
+    assert _tls_cert_names('mx.example.org', ['alt.example.org'], ['h'], []) == ('mx.example.org', ['alt.example.org'])
+    # loopback first -> generic localhost.local (reference behaviour)
+    assert _tls_cert_names(None, None, ['127.0.0.1'], [('127.0.0.1', 2525)]) == ('localhost.local', ['127.0.0.1'])
+    assert _tls_cert_names(None, None, ['localhost', 'mx.example.org'], [])[0] == 'localhost.local'
+    # non-loopback first -> first name becomes the cn; '*' and empties drop
+    assert _tls_cert_names(None, None, ['*', 'mx.example.org'], [('10.0.0.5', 25)]) == ('mx.example.org', ['mx.example.org', '10.0.0.5'])
+    # nothing usable left -> generic fallback
+    assert _tls_cert_names(None, None, ['*'], []) == ('localhost.local', [])
+
+
+def test_self_signed_derives_names_from_hosts():
+    certificate = _peer_certificate({'encrypt_mode': 'TLS_OPTIONAL'}, hosts=['127.0.0.1'])
+    cn, dns = _names(certificate)
+    assert cn == 'localhost.local'
+    assert '127.0.0.1' in dns and 'localhost.local' in dns
+
+
+def test_self_signed_uses_configured_names():
+    certificate = _peer_certificate({
+        'encrypt_mode': 'TLS_OPTIONAL',
+        'tls_cert_cn': 'mx.tokeo.test',
+        'tls_cert_san': 'alt.tokeo.test',
+    })
+    cn, dns = _names(certificate)
+    assert cn == 'mx.tokeo.test'
+    assert set(dns) == {'mx.tokeo.test', 'alt.tokeo.test'}
+
+
+# --- cryptography is lazy: only the self-signed generator needs it --------------
+
+
+def test_plain_smtpd_runs_without_cryptography():
+    # importing and building a server without tls must work when the
+    # cryptography package is absent (blocked in a fresh interpreter)
+    code = (
+        "import sys\n"
+        "sys.modules['cryptography'] = None\n"
+        "from tokeo.core.smtpd.server import SmtpdServer\n"
+        "from tokeo.core.smtpd.events import SmtpdEvents\n"
+        "SmtpdServer(SmtpdEvents())\n"
+        "print('OK')\n"
+    )
+    done = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, env=dict(os.environ))
+    assert done.returncode == 0 and done.stdout.strip() == 'OK', done.stderr
+
+
+def test_self_signed_without_cryptography_raises(monkeypatch):
+    from tokeo.core.smtpd.server import SmtpdServer
+
+    monkeypatch.setitem(sys.modules, 'cryptography', None)
+    with pytest.raises(ImportError):
+        SmtpdServer(CaptureSmtpdEvents(), settings={'encrypt_mode': 'TLS_OPTIONAL'})
