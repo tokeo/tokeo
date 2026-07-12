@@ -205,3 +205,23 @@ variables:
       - when: "N"
         ignore:
           - '^(.*)/config/{{app_label}}/([^/]*)/pocketbase.yaml$'
+
+  - name: feature_smtpd
+    prompt: "Enable smtpd [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    extend:
+      - when: "N"
+        ignore:
+          - '^(.*)/{{app_label}}/core/smtpd$'
+          - '^(.*)/{{app_label}}/core/smtpd/(.*)$'
+          - '^(.*)/config/{{app_label}}/([^/]*)/smtpd.yaml$'
+
+  - name: feature_smtpd_auto_certificates
+    prompt: "Enable smtpd TLS auto certificates [(Y)es/(N)o]"
+    validate: "^[YN]$"
+    case: "upper"
+    default: "Y"
+    requires:
+      feature_smtpd: "Y"

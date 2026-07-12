@@ -59,6 +59,7 @@ dev = [
     "pocketbase>=0.15.0",
     "invoke>=2.2.1",
     "paramiko>=2.7,<4",
+    "cryptography>=45.0.0",
 ]
 
 [project.scripts]
