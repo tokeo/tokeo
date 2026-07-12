@@ -253,8 +253,8 @@ class SmtpdContext:
     ### Notes
 
     : One instance per connection; ```server``` lives for the whole connection,
-        ```envelope```/```message``` are replaced by ```reset_transaction``` on
-        RSET and after each delivery
+        ```envelope```/```message``` are replaced on RSET and after each
+        delivery
 
     """
 

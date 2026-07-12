@@ -412,7 +412,8 @@ the whole block is written to the file once; from then on body lines go to
 the file only. At ```on_message_data_event``` the file holds the complete
 de-dot-stuffed, chomped message while ```ctx.message.data``` carries ONLY
 the headers (no separator line). ```ctx.message.bytesize``` always counts
-the whole message and equals the final file size.
+the whole message -- header lines added by the handler change it too (and
+count against a ```data_size``` cap) -- and equals the final file size.
 
 ```ctx.message.spooler``` is the owning ```MessageSpooler``` (None without
 spooling, and None for a message that ends before a header/body separator).
