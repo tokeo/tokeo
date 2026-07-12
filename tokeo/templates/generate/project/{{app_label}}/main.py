@@ -96,6 +96,9 @@ class {{ app_class_name }}(App):
 {% if feature_ai == "Y" %}
             'tokeo.ext.ai',
 {% endif %}
+{% if feature_smtpd == "Y" %}
+            'tokeo.ext.smtpd',
+{% endif %}
         ]
 
         # register handlers
