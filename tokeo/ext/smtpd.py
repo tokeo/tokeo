@@ -65,6 +65,7 @@ tokeo smtpd serve mx1 mx3
 
 import os
 import sys
+import time
 import signal
 import asyncio
 import importlib
@@ -431,7 +432,24 @@ class TokeoSmtpd(MetaMixin):
                     os.kill(pid, signal.SIGTERM)
                 except ProcessLookupError:
                     pass
-            for pid in child_pids:
+            # bounded reap: a worker gets time to drain, then SIGKILL ends it
+            pending = list(child_pids)
+            deadline = time.monotonic() + 5.0
+            while pending and time.monotonic() < deadline:
+                for pid in list(pending):
+                    try:
+                        done, _status = os.waitpid(pid, os.WNOHANG)
+                    except ChildProcessError:
+                        done = pid
+                    if done:
+                        pending.remove(pid)
+                if pending:
+                    time.sleep(0.05)
+            for pid in pending:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
                 try:
                     os.waitpid(pid, 0)
                 except ChildProcessError:

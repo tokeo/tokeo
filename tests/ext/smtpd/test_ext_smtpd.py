@@ -205,6 +205,14 @@ def _spawn(config, names=None):
     return proc
 
 
+def _wait_exit(proc, timeout=8):
+    """Wait for the helper; a hang reports the helper's own story."""
+    try:
+        return proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise AssertionError(f'helper still running after {timeout}s:\n{_helper_log(proc, lines=30)}')
+
+
 def _helper_log(proc, lines=15):
     with open(proc.helper_log) as f:
         tail = f.readlines()[-lines:]
@@ -343,7 +351,7 @@ def test_failed_service_start_aborts_and_stops_started_ones():
     port_a = _free_port()
     proc = _spawn({'services': [_service('mx1', port_a), _broken_service('mx2')]}, names=None)
     try:
-        assert proc.wait(timeout=8) != 0
+        assert _wait_exit(proc) != 0
         _assert_group_gone(proc.pid)
         _assert_port_free(port_a)
     finally:
@@ -356,7 +364,7 @@ def test_failed_start_terminates_forked_workers():
     port_a = _free_port()
     proc = _spawn({'services': [_service('mx1', port_a, pre_fork=2), _broken_service('mx2')]}, names=None)
     try:
-        assert proc.wait(timeout=8) != 0
+        assert _wait_exit(proc) != 0
         _assert_group_gone(proc.pid)
         _assert_port_free(port_a)
     finally:
