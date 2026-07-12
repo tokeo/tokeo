@@ -6,8 +6,9 @@ Split in two: platform-neutral tests that run wherever ``os.fork`` exists
 and reaping), and Linux-specialised tests for the parent-death signal
 (``PR_SET_PDEATHSIG``) that lets a worker stop itself when the master crashes.
 
-Every signal is delivered to a forked child, never to the pytest process, so a
-timing slip can never take the test runner down.
+The process scenarios run in a subprocess (``lib/prefork_helper.py``) and are
+observed from outside -- markers on disk, exit codes and the process group --
+so the test runner itself never forks and never receives a signal.
 """
 
 import os
@@ -15,13 +16,13 @@ import sys
 import time
 import signal
 import ctypes
+import subprocess
 
 import pytest
 
 from tokeo.core.smtpd.prefork import (
     set_pdeathsig,
     is_prefork,
-    supervise_workers,
     run_prefork,
 )
 
@@ -33,15 +34,6 @@ requires_fork = pytest.mark.skipif(not HAS_FORK, reason='requires os.fork')
 requires_linux = pytest.mark.skipif(not LINUX, reason='PR_SET_PDEATHSIG is Linux-only')
 
 
-def _alive(pid):
-    """True while ```pid``` still resolves (a reaped pid raises)."""
-    try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-
-
 def _read_pdeathsig():
     """Read back the armed parent-death signal via ```PR_GET_PDEATHSIG```."""
     out = ctypes.c_int(0)
@@ -49,15 +41,28 @@ def _read_pdeathsig():
     return out.value
 
 
-def _reap_orphans():
-    """Best-effort reap of any worker that reparented to us after a crash test."""
-    while True:
+HELPER = os.path.join(os.path.dirname(__file__), 'lib', 'prefork_helper.py')
+
+
+def _spawn(*args):
+    """Run a helper scenario as its own process group."""
+    return subprocess.Popen(
+        [sys.executable, HELPER, *[str(arg) for arg in args]],
+        start_new_session=True,
+        env=dict(os.environ),
+    )
+
+
+def _assert_group_gone(pgid, timeout=5.0):
+    """The whole process group of the scenario has ended."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
         try:
-            pid, _ = os.waitpid(-1, os.WNOHANG)
-        except ChildProcessError:
+            os.killpg(pgid, 0)
+        except ProcessLookupError:
             return
-        if pid == 0:
-            return
+        time.sleep(0.05)
+    raise AssertionError(f'process group {pgid} still has members')
 
 
 # --------------------------------------------------------------------------
@@ -96,55 +101,30 @@ def test_run_prefork_single_process_runs_worker_in_place():
 @requires_fork
 def test_supervise_workers_reaps_and_restores_handlers():
     # workers that exit on their own -> supervise reaps them all and returns,
-    # without ever signalling (proves the waitpid reap loop in isolation)
-    child_pids = []
-    for _ in range(3):
-        pid = os.fork()
-        if pid == 0:
-            time.sleep(0.1)
-            os._exit(0)
-        child_pids.append(pid)
-
-    before_int = signal.getsignal(signal.SIGINT)
-    before_term = signal.getsignal(signal.SIGTERM)
-    supervise_workers(child_pids)
-    # the previous handlers are restored on return
-    assert signal.getsignal(signal.SIGINT) == before_int
-    assert signal.getsignal(signal.SIGTERM) == before_term
-    # every worker was reaped -> no longer waitable
-    for pid in child_pids:
-        with pytest.raises(ChildProcessError):
-            os.waitpid(pid, 0)
+    # without ever signalling; the helper asserts handler restore and reaping
+    # in-process, its exit code carries the verdict
+    proc = _spawn('supervise')
+    assert proc.wait(timeout=8) == 0
+    _assert_group_gone(proc.pid)
 
 
 @requires_fork
 def test_run_prefork_forks_supervises_and_reaps(tmp_path):
-    # a forked master runs the full run_prefork; SIGTERM to it must forward to
-    # every worker, reap them, and let the master exit cleanly
-    master = os.fork()
-    if master == 0:
-        def worker():
-            (tmp_path / f'pid_{os.getpid()}').write_text('run')
-            signal.signal(signal.SIGTERM, lambda *_: os._exit(0))
-            while True:
-                time.sleep(0.02)
-        run_prefork(worker, count=3)
-        os._exit(0)
-
-    # wait until all three workers have announced themselves
-    deadline = time.time() + 3.0
-    while time.time() < deadline and len(list(tmp_path.glob('pid_*'))) < 3:
-        time.sleep(0.02)
-    worker_pids = [int(p.name[4:]) for p in tmp_path.glob('pid_*')]
-    assert len(worker_pids) == 3
-
-    os.kill(master, signal.SIGTERM)
-    _, status = os.waitpid(master, 0)
-    assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
-
-    # the master reaped the workers before exiting -> they are gone
-    for pid in worker_pids:
-        assert not _alive(pid)
+    # a master subprocess runs the full run_prefork; SIGTERM to it must
+    # forward to every worker, reap them, and let the master exit cleanly
+    proc = _spawn('run_prefork', tmp_path, 3)
+    try:
+        deadline = time.time() + 3.0
+        while time.time() < deadline and len(list(tmp_path.glob('pid_*'))) < 3:
+            time.sleep(0.02)
+        assert len(list(tmp_path.glob('pid_*'))) == 3
+        proc.send_signal(signal.SIGTERM)
+        assert proc.wait(timeout=8) == 0
+        # every worker saw the forwarded SIGTERM and the group is gone
+        assert len(list(tmp_path.glob('stopped_*'))) == 3
+        _assert_group_gone(proc.pid)
+    finally:
+        proc.kill()
 
 
 # --------------------------------------------------------------------------
@@ -174,23 +154,18 @@ def test_set_pdeathsig_honours_requested_signal():
 def test_worker_self_terminates_when_master_crashes(tmp_path):
     # a hard master crash (SIGKILL) cannot forward anything; each worker must
     # still stop itself through the armed parent-death signal
-    master = os.fork()
-    if master == 0:
-        def worker():
-            marker = tmp_path / f'stopped_{os.getpid()}'
-            signal.signal(signal.SIGTERM, lambda *_: (marker.write_text('x'), os._exit(0)))
-            while True:
-                time.sleep(0.02)
-        run_prefork(worker, count=2)
-        os._exit(0)
-
-    time.sleep(0.5)  # let the master fork the workers and arm pdeathsig
-    os.kill(master, signal.SIGKILL)
-    os.waitpid(master, 0)
-
-    deadline = time.time() + 3.0
-    while time.time() < deadline and not list(tmp_path.glob('stopped_*')):
-        time.sleep(0.05)
-    _reap_orphans()
-    # at least one worker observed the parent's death and stopped itself
-    assert list(tmp_path.glob('stopped_*'))
+    proc = _spawn('run_prefork', tmp_path, 2)
+    try:
+        deadline = time.time() + 3.0
+        while time.time() < deadline and len(list(tmp_path.glob('pid_*'))) < 2:
+            time.sleep(0.02)
+        proc.kill()
+        proc.wait(timeout=8)
+        deadline = time.time() + 3.0
+        while time.time() < deadline and len(list(tmp_path.glob('stopped_*'))) < 2:
+            time.sleep(0.05)
+        # every worker observed the parent death and the group is gone
+        assert len(list(tmp_path.glob('stopped_*'))) == 2
+        _assert_group_gone(proc.pid)
+    finally:
+        proc.kill()
