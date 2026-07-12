@@ -48,15 +48,16 @@ def scenario_supervise():
 
 def scenario_run_prefork(marker_dir, count):
     def worker():
-        with open(os.path.join(marker_dir, f'pid_{os.getpid()}'), 'w') as f:
-            f.write('run')
-
         def stop(*_):
             with open(os.path.join(marker_dir, f'stopped_{os.getpid()}'), 'w') as f:
                 f.write('x')
             os._exit(0)
 
+        # arm the handler BEFORE announcing readiness: the pid marker means
+        # "a SIGTERM from now on will be recorded"
         signal.signal(signal.SIGTERM, stop)
+        with open(os.path.join(marker_dir, f'pid_{os.getpid()}'), 'w') as f:
+            f.write('run')
         while True:
             time.sleep(0.02)
 
