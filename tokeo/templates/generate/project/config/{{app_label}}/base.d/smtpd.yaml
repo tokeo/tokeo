@@ -1,0 +1,108 @@
+### <p><strong>The {{ app_name }} Smtpd Configuration Settings</strong></p>
+### - Settings will be merged into Application Configuration.
+---
+
+
+
+### ### SMTPD Receiving Service Configuration
+###
+### One or more SMTP receiving services built on the tokeo.ext.smtpd extension.
+### Each service binds one or more listeners and dispatches the SMTP dialog to
+### your own handler class (a subclass of tokeo.ext.smtpd.TokeoSmtpdEvents).
+###
+### Every setting below is shown with its DEFAULT value and is commented out --
+### uncomment and change only what you need. The listener host/port is kept
+### active so the example service runs out of the box on 127.0.0.1:2525.
+smtpd:
+  ### global caps across ALL services (default: unlimited). A single service may
+  ### set a SMALLER value under its own settings -- the smaller value always wins.
+  ### maximum connections processed at the same time over all services
+  # max_processings: null
+  ### maximum simultaneous open connections over all services
+  # max_connections: null
+  ### list of receiving services; add more list items to run more services
+  services:
+      ### a name used in logs to identify this service
+    - name: mx-{{ app_label }}
+      ### dotted path to your handler class (a subclass of TokeoSmtpdEvents,
+      ### see the example in {{ app_label }}/core/smtpd/events_handler.py)
+      events_handler: "{{ app_label }}.core.smtpd.events_handler.{{ app_class_name }}SmtpdEvents"
+      ### one or more host:port listeners this service accepts mail on
+      listeners:
+        - host: 127.0.0.1
+          port: 2525
+      ### custom options handed to your handler as __init__(options=...)
+      # options: {}
+      ### per-service settings; every value shown below is the default
+      settings:
+
+        ### --- concurrency & limits ---
+        ### maximum messages processed at the same time (null = unlimited)
+        # max_processings: 4
+        ### maximum simultaneous connections; beyond this new ones get 421
+        ### and are closed (null = unlimited)
+        # max_connections: 0
+        ### fork N worker processes sharing the port via SO_REUSEPORT for
+        ### multi-core scaling (null or 0 = a single process)
+        # pre_fork: null
+
+        ### --- timeouts & buffers ---
+        ### seconds to wait for a complete command/data line before aborting
+        # io_cmd_timeout: 30
+        ### maximum bytes per line until a LF is expected (1 MiB). This is the
+        ### max line length in BYTES, not a character count
+        # io_buffer_max_size: 1048576
+        ### hard message size limit in bytes; null = no limit. A handler may
+        ### instead enforce a dynamic cap in on_message_data_receiving_event
+        ### by checking ctx.message.bytesize and raising Smtpd552Exception
+        # data_size: null
+
+        ### --- line endings (see feature_cr_lf_modes) ---
+        ### CRLF_ENSURE normalises a bare LF to CRLF; CRLF_LEAVE keeps the
+        ### line ending as received; CRLF_STRICT rejects a bare LF with 500
+        # crlf_mode: CRLF_ENSURE
+
+        ### --- message spool ---
+        ### null keeps the whole message in RAM. A directory plus the start
+        ### of a file name spools every message in parallel to a temp file.
+        ### E.g. '/tmp/<prefix>YYYYMMDD-HHMMSS-<unique>.eml' while receiving:
+        ### ctx.message.data then carries ONLY the headers while
+        ### ctx.message.spooler owns the file -- complete at
+        ### on_message_data_event and deleted right after it; take it over
+        ### via spooler.keep(path) or spooler.keep() (debug keeps all files)
+        # spool: null
+        ###   spool: /var/spool/inbound/mx1-   # -> .../mx1-YYYYMMDD-HHMMSS-....eml
+
+        ### --- authentication ---
+        ### AUTH_FORBIDDEN | AUTH_OPTIONAL | AUTH_REQUIRED. The credential check
+        ### lives entirely in your handler's on_auth_event
+        # auth_mode: AUTH_FORBIDDEN
+        ### --- encryption (STARTTLS) ---
+        ### TLS_FORBIDDEN | TLS_OPTIONAL | TLS_WHEN_AUTH | TLS_REQUIRED.
+        ### without a configured certificate a self-signed test certificate
+        ### is generated in memory (fine for the example, replace for real use)
+        encrypt_mode: TLS_OPTIONAL
+        ### the self-signed certificate derives its CN and SAN from the
+        ### listener hosts; set them here if you need other names
+        # tls_cert_cn: null
+        # tls_cert_san: null
+        ### certificate + key from files on disk ...
+        # tls_cert_path: null
+        # tls_key_path: null
+        ### ... or as inline PEM strings (e.g. from a !vault: value). These are
+        ### loaded through an anonymous fd and never written to disk (Linux and
+        ### macOS/BSD; on Windows use tls_cert_path/tls_key_path)
+        # tls_cert: null
+        # tls_key: null
+
+        ### --- PROXY verb (behind a load balancer / TLS terminator) ---
+        ### accept a PROXY v1/v2 header before the SMTP greeting; the real
+        ### client address is then available via ctx.server.proxy
+        # proxy_extension: false
+
+        ### --- extensions & lookups ---
+        ### advertise 8BITMIME and SMTPUTF8 (internationalized email)
+        # internationalization_extensions: false
+        ### reverse-resolve the client and local IP into ctx.server.remote_host
+        ### and ctx.server.local_host (adds a DNS lookup per connection)
+        # do_dns_reverse_lookup: false
