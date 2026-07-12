@@ -158,6 +158,8 @@ def test_extension_loads_into_cement_app():
         with pytest.raises(TokeoSmtpdError):
             app.smtpd.services(['mx-a', 'mx-a'])   # named twice must not start twice
         app.smtpd.list()   # must run without raising
+        # the listener hosts reach the server (feeds the self-signed CN/SAN)
+        assert app.smtpd._build_server(app.smtpd.services()[0], None).hosts == ['127.0.0.1']
 
 
 # --- process tests: real termination behaviour ----------------------------------
@@ -322,5 +324,40 @@ def test_term_mixed_services_with_shared_limits():
         _assert_group_gone(proc.pid)
         _assert_port_free(port_a)
         _assert_port_free(port_b)
+    finally:
+        proc.kill()
+
+
+def _broken_service(name):
+    """A service whose listener cannot bind (TEST-NET address)."""
+    return {
+        'name': name,
+        'events_handler': 'tokeo.ext.smtpd.TokeoSmtpdEvents',
+        'listeners': [{'host': '203.0.113.1', 'port': 2525}],
+    }
+
+
+def test_failed_service_start_aborts_and_stops_started_ones():
+    # the second service cannot bind: the invocation must end with an error
+    # and release the already bound port of the first one
+    port_a = _free_port()
+    proc = _spawn({'services': [_service('mx1', port_a), _broken_service('mx2')]}, names=None)
+    try:
+        assert proc.wait(timeout=8) != 0
+        _assert_group_gone(proc.pid)
+        _assert_port_free(port_a)
+    finally:
+        proc.kill()
+
+
+def test_failed_start_terminates_forked_workers():
+    # a healthy 2-worker group plus a broken in-loop service: the abort must
+    # SIGTERM the forked workers instead of hanging in the reap
+    port_a = _free_port()
+    proc = _spawn({'services': [_service('mx1', port_a, pre_fork=2), _broken_service('mx2')]}, names=None)
+    try:
+        assert proc.wait(timeout=8) != 0
+        _assert_group_gone(proc.pid)
+        _assert_port_free(port_a)
     finally:
         proc.kill()
