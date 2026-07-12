@@ -327,12 +327,16 @@ class TokeoSmtpd(MetaMixin):
     def _build_server(self, svc, global_limits):
         """Build the ```SmtpdServer``` for one service config."""
         events_handler = _resolve_events_handler(svc.get('events_handler'))(self.app, options=svc.get('options'))
+        # hand the listener hosts to the server so a self-signed certificate
+        # derives its CN and SAN from them
+        hosts = list(dict.fromkeys(lst.get('host') for lst in svc.get('listeners') or [] if lst.get('host')))
         return SmtpdServer(
             events_handler,
             settings=svc.get('settings'),
             options=svc.get('options'),
             global_limits=global_limits,
             debug=self.app.debug,
+            hosts=hosts or None,
         )
 
     async def _serve_async(self, services, global_limits, child_pids, reuse):
@@ -346,25 +350,28 @@ class TokeoSmtpd(MetaMixin):
 
         """
         servers = []
-        for svc in services:
-            server = self._build_server(svc, global_limits)
-            listeners = self._listeners(svc, svc.get('name') in reuse)
-            await server.start(listeners)
-            where = ', '.join(f"{lst.get('host')}:{lst.get('port')}" for lst in listeners)
-            self.app.log.info(f"smtpd: service '{svc.get('name')}' listening on {where} (pid {os.getpid()})")
-            servers.append(server)
-        stop = asyncio.Event()
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, stop.set)
-        await stop.wait()
-        for pid in child_pids:
-            try:
-                os.kill(pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-        for server in servers:
-            await server.stop(wait_seconds_before_close=2.0)
+        try:
+            for svc in services:
+                server = self._build_server(svc, global_limits)
+                listeners = self._listeners(svc, svc.get('name') in reuse)
+                await server.start(listeners)
+                where = ', '.join(f"{lst.get('host')}:{lst.get('port')}" for lst in listeners)
+                self.app.log.info(f"smtpd: service '{svc.get('name')}' listening on {where} (pid {os.getpid()})")
+                servers.append(server)
+            stop = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(sig, stop.set)
+            await stop.wait()
+            for pid in child_pids:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+        finally:
+            # a failed start must not leave already started services bound
+            for server in servers:
+                await server.stop(wait_seconds_before_close=2.0)
 
     def _run_worker(self, svc, global_limits, reuse):
         """Run one forked worker serving exactly one service."""
@@ -417,7 +424,13 @@ class TokeoSmtpd(MetaMixin):
         try:
             asyncio.run(self._serve_async(plan['inloop'], global_limits, child_pids, plan['reuse']))
         finally:
-            # reap every worker; they got SIGTERM before the loop ended
+            # the normal stop already forwarded SIGTERM; after a failed start
+            # the workers still run and need it here before the reap
+            for pid in child_pids:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
             for pid in child_pids:
                 try:
                     os.waitpid(pid, 0)
