@@ -188,6 +188,7 @@ def _parse_hosts(hosts):
     ### Args
 
     - **hosts**: e.g. ```'127.0.0.1'```, ```'127.0.0.1, ::1'```, ```'*'```
+        or an already split list of host identifiers
 
     ### Returns
 
@@ -198,7 +199,10 @@ def _parse_hosts(hosts):
     - **ValueError**: On no hosts or an empty ```''``` inner host item
 
     """
-    items = str(hosts).replace(' ', '').split(',')
+    if isinstance(hosts, (list, tuple)):
+        items = [str(host).strip() for host in hosts]
+    else:
+        items = str(hosts).replace(' ', '').split(',')
     if not items or items == ['']:
         raise ValueError(
             'No hosts defined! Please use specific hostnames and / or ip_addresses or "*" for wildcard!'
@@ -314,6 +318,26 @@ class GlobalLimits:
         await self.slot_free.wait()
 
 
+def _tls_cert_names(cert_cn, cert_san, hosts, addresses):
+    """
+    The CN and SAN for the self-signed certificate (reference parity).
+
+    A configured ```cert_cn``` wins unchanged; without one the names derive
+    from the configured hosts and addresses: hosts plus the address host
+    parts, deduplicated, ```'*'``` and empties dropped -- the CN becomes
+    ```'localhost.local'``` when the first name is a loopback identifier,
+    else the first name itself.
+
+    """
+    if cert_cn is not None:
+        return cert_cn, cert_san
+    sans = list(dict.fromkeys(list(hosts) + [host for host, _port in addresses]))
+    sans = [san for san in sans if san and san != '*']
+    if not sans or re.match(r'^(127\.0?0?0\.0?0?0\.0?0?1|::1|localhost)$', sans[0], re.IGNORECASE):
+        return 'localhost.local', sans
+    return sans[0], sans
+
+
 class SmtpdServer:
     """
     The SMTP service: binds listeners and serves each client.
@@ -400,6 +424,11 @@ class SmtpdServer:
         #: STARTTLS answers 500)
         self.tls = None
         if self.encrypt_mode is not EncryptMode.TLS_FORBIDDEN:
+            # reference parity: without a configured common name the CN and
+            # SAN of a self-signed certificate derive from hosts + addresses
+            tls_cert_cn, tls_cert_san = _tls_cert_names(
+                settings.get('tls_cert_cn'), settings.get('tls_cert_san'), self.hosts, self._addresses
+            )
             self.tls = TlsTransport(
                 cert_path=settings.get('tls_cert_path'),
                 key_path=settings.get('tls_key_path'),
@@ -407,8 +436,8 @@ class SmtpdServer:
                 key=settings.get('tls_key'),
                 ciphers=settings.get('tls_ciphers'),
                 methods=settings.get('tls_methods'),
-                cert_cn=settings.get('tls_cert_cn', ''),
-                cert_san=settings.get('tls_cert_san'),
+                cert_cn=tls_cert_cn,
+                cert_san=tls_cert_san,
                 logger=lambda severity, msg: self._log_bridge(None, severity, msg),
             )
         self._servers = []
