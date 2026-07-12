@@ -52,7 +52,7 @@ from .exc import (
     Tls454Exception,
     Tls530Exception,
 )
-from .context import SmtpdContext, ServerCtx, EnvelopeCtx, MessageCtx, SmtpdContextEncoder
+from .context import SmtpdContext, ServerCtx, EnvelopeCtx, MessageCtx, MessageSpooler, SmtpdContextEncoder
 from .events import SmtpdEvents, SmtpdEvent, threaded
 from .prefork import set_pdeathsig, is_prefork, supervise_workers, run_prefork
 from .tls import (
@@ -119,6 +119,7 @@ __all__ = [
     'ServerCtx',
     'EnvelopeCtx',
     'MessageCtx',
+    'MessageSpooler',
     'SmtpdContextEncoder',
     'SmtpdEvents',
     'SmtpdEvent',

@@ -279,7 +279,16 @@ class SmtpdEvents:
         pass
 
     def on_message_data_headers_event(self, ctx):
-        """Called once when the headers are complete, before the body."""
+        """
+        Called once when the headers are complete, before the body.
+
+        ### Notes
+
+        : Header lines appended to ```ctx.message.data``` here become part
+            of the message: they change ```bytesize``` (and count against a
+            ```data_size``` cap) and reach the spool file when spooling
+
+        """
         pass
 
     def on_message_data_event(self, ctx):

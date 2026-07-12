@@ -21,6 +21,7 @@ from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents
 
 from tests.core.smtpd.lib.smtpd_helpers import send_mail
+from tests.core.smtpd.test_crlf_modes import run_wire
 
 
 MESSAGE = (
@@ -345,6 +346,57 @@ def test_data_size_cap_works_in_spool_mode(tmp_path):
 
     asyncio.run(go())
     assert os.listdir(tmp_path) == []   # aborted file cleaned up
+
+
+class DoubleKeep(Capture):
+    """Calls keep() twice; the second call must be a no-op returning None."""
+
+    def on_message_data_event(self, ctx):
+        super().on_message_data_event(ctx)
+        self.seen[-1]['first'] = ctx.message.spooler.keep()
+        self.seen[-1]['second'] = ctx.message.spooler.keep()
+
+
+def test_keep_called_twice_returns_none(tmp_path):
+    events = DoubleKeep()
+    _run(events, {'spool': str(tmp_path) + '/'})
+    first, second = events.seen[0]['first'], events.seen[0]['second']
+    assert first is not None and os.path.exists(first)
+    assert second is None
+    os.unlink(first)
+
+
+def test_empty_body_message_matches_ram_mode(tmp_path):
+    # headers + separator + '.' -- the chomp hits the separator line break
+    wire = b'Subject: t\r\n\r\n'
+    ram = Capture()
+    assert run_wire(ram, {}, wire) == b'250'
+    spool = Capture()
+    assert run_wire(spool, {'spool': str(tmp_path) + '/'}, wire) == b'250'
+    assert spool.seen[0]['file'] == ram.seen[0]['data'] == b'Subject: t\r\n'
+    assert spool.seen[0]['bytesize'] == ram.seen[0]['bytesize']
+
+
+def test_crlf_leave_spool_file_is_byte_true(tmp_path):
+    # LF-only endings must survive into the spool file, chomp removes the
+    # exact last line break (a bare LF here)
+    wire = b'Subject: t\n\nzeile-a\nzeile-b\n'
+    ram = Capture()
+    assert run_wire(ram, {'crlf_mode': 'CRLF_LEAVE'}, wire) == b'250'
+    spool = Capture()
+    assert run_wire(spool, {'crlf_mode': 'CRLF_LEAVE', 'spool': str(tmp_path) + '/'}, wire) == b'250'
+    assert spool.seen[0]['file'] == ram.seen[0]['data']
+    assert not spool.seen[0]['file'].endswith(b'\n')
+    assert spool.seen[0]['bytesize'] == ram.seen[0]['bytesize']
+
+
+def test_completely_empty_message(tmp_path):
+    # a bare '.' right after DATA: no spooler, no file, bytesize 0
+    events = Capture()
+    assert run_wire(events, {'spool': str(tmp_path) + '/'}, b'') == b'250'
+    assert events.seen[0]['path'] is None
+    assert events.seen[0]['bytesize'] == 0
+    assert os.listdir(tmp_path) == []
 
 
 def test_missing_spool_directory_fails_at_start(tmp_path):
