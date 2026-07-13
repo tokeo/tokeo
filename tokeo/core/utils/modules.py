@@ -1,7 +1,6 @@
 import os
 import types
 import importlib
-from cement.utils.fs import abspath
 from tokeo.core.exc import TokeoError
 
 
@@ -42,11 +41,11 @@ def get_module_path(module):
     # packages expose __path__ (a list of directories); use the first entry
     path = getattr(obj, '__path__', None)
     if path:
-        return abspath(path[0]) if (len(path[0]) > 0) else None
+        return os.path.abspath(path[0]) if (len(path[0]) > 0) else None
     # plain modules have no __path__ but a __file__; fall back to the
     # directory that contains the module file so both kinds resolve alike
     file = getattr(obj, '__file__', None)
     if file:
-        return abspath(os.path.dirname(file))
+        return os.path.abspath(os.path.dirname(file))
     # neither path nor file: nothing sensible to return
     return None
