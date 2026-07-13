@@ -17,11 +17,6 @@ from {{ app_label }}.core import tasks
 URL_PATTERN = re.compile(r'https?://\S+')
 
 
-def _address(data):
-    """The plain lowercase address from a MAIL FROM / RCPT TO argument."""
-    return data.strip().strip('<>').lower()
-
-
 class {{ app_class_name }}SmtpdEvents(TokeoSmtpdEvents):
     """
     Events handler for the mx-{{ app_label }} receiving service.
