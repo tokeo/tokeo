@@ -266,6 +266,7 @@ class TokeoSmtpd(MetaMixin):
         config_defaults = dict(
             max_processings=None,
             max_connections=None,
+            session_id_bytes=8,
             services=[],
         )
 
@@ -338,6 +339,7 @@ class TokeoSmtpd(MetaMixin):
             global_limits=global_limits,
             debug=self.app.debug,
             hosts=hosts or None,
+            session_id_bytes=self._config('session_id_bytes'),
         )
 
     async def _serve_async(self, services, global_limits, child_pids, reuse):

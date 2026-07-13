@@ -255,13 +255,23 @@ class SmtpdContext:
     : One instance per connection; ```server``` lives for the whole connection,
         ```envelope```/```message``` are replaced on RSET and after each
         delivery
+    : ```id``` uniquely identifies the connection in logs and dumps and is
+        write-once -- a second assignment raises ```AttributeError```
 
     """
 
+    #: Unique session id (hex string), set once when the context is created
+    id: str = ''
     server: ServerCtx = field(default_factory=ServerCtx)
     envelope: EnvelopeCtx = field(default_factory=EnvelopeCtx)
     message: MessageCtx = field(default_factory=MessageCtx)
     options: dict = field(default_factory=dict)
+
+    def __setattr__(self, name, value):
+        """Guard the write-once session ```id``` against a second assignment."""
+        if name == 'id' and getattr(self, 'id', ''):
+            raise AttributeError('SmtpdContext.id is read-only')
+        super().__setattr__(name, value)
 
     def finalize(self):
         """Finish interrupted per-message resources (the spooler)."""
