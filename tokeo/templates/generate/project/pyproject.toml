@@ -72,7 +72,7 @@ dependencies = [
 {% if feature_ai == "Y" and feature_ai_wasm == "Y" %}
     "wasmtime",
 {% endif -%}
-{% if feature_smtpd == "Y" and feature_smtpd_auto_certificates == "Y" %}
+{% if feature_vault == "Y" or (feature_smtpd == "Y" and feature_smtpd_auto_certificates == "Y") %}
     "cryptography>=45.0.0",
 {% endif -%}
 ]
