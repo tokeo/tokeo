@@ -26,6 +26,8 @@ An integrated [gRPC](https://grpc.io) service allows external access to availabl
 
 For timed job execution, a background and interactive [APScheduler](https://apscheduler.readthedocs.io/en/master/) cron service is included.
 
+Receive mails right inside your application by the smtpd service -- a faithful asyncio port of the battle-tested Ruby [midi-smtp-server](https://github.com/4commerce-technologies-AG/midi-smtp-server), turns incoming SMTP messages into events.
+
 [Fabric](https://www.fabfile.org) simplifies running task automation locally and remotely, configurable through YAML files and CLI arguments.
 
 Expose your values and functions via [NiceGUI](https://nicegui.io/) web-based API and pages.
@@ -56,6 +58,7 @@ Tokeo is a robust CLI framework for task automation, message queues, and web int
 - **Developer-Friendly Tools**: The ```Makefile``` provides one-liners for formatting (```fmt```), linting (```lint```), testing (```test```), and packaging (```sdist```, ```wheel```), speeding up development.
 - **DiskCache** by ```tokeo.ext.diskcache``` enhances performance with disk-based caching for frequently accessed data, reducing load times and improving efficiency.
 - **Manage task execution rates** using ```temper``` and ```throttle``` to prevent overloading with rate-limiting tools, ensuring stable and controlled processing.
+- **SMTP Receiving Services**: Run mail-receiving endpoints with the smtpd extension (```tokeo.ext.smtpd```), dispatch the SMTP dialog by your own events handlers, supports STARTTLS, AUTH, PROXY, limits, message spooling and scaling.
 - **SMTP with Jinja2 Templates**: Send emails with precise, individualized content using Jinja2 templates, supporting text, HTML, inline images, and attachments for dynamic communications.
 - **Simple debugging** when using ```app.inspect```. Provides basic debugging tools to inspect application state of vars and objects.
 - **Web Interface**: Create beautiful UIs with the built-in NiceGUI extension to visualize data and interact with your application.
@@ -170,6 +173,13 @@ Scheduler> tasks fire 1  # Resume task with ID 1
 ```bash
 # Run automation tasks locally or remotely
 your_app automate run uname --verbose --as-json
+```
+
+### Receive Emails with the SMTPD Service
+
+```bash
+# Start the configured mail services (STARTTLS ready out of the box)
+your_app smtpd serve
 ```
 
 ### Create Web Interfaces
