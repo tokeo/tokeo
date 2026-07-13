@@ -297,11 +297,16 @@ produces the success code.
 ## 8. TLS and STARTTLS
 
 Set ```encrypt_mode``` to ```'TLS_OPTIONAL'``` (offer ```STARTTLS```),
-```'TLS_WHEN_AUTH'``` (like ```TLS_OPTIONAL```, but ```AUTH``` is only offered and
-accepted on an encrypted channel - this mode protects credentials against a plaintext downgrade) or ```'TLS_REQUIRED'``` (require encryption in any way); the default is ```'TLS_FORBIDDEN'```. When encryption is enabled the server upgrades the
-connection in place on ```STARTTLS``` and discards any bytes buffered before the
-handshake, so a command injected ahead of the handshake can never run over the
-encrypted channel.
+```'TLS_WHEN_AUTH'``` (like ```TLS_OPTIONAL```, but ```AUTH``` is only offered
+and accepted on an encrypted channel - this mode protects credentials against
+a plaintext downgrade) or ```'TLS_REQUIRED'``` (require encryption in any
+way, as described in RFC 3207); the default is ```'TLS_FORBIDDEN'```. When
+encryption is enabled the server upgrades the connection in place on
+```STARTTLS``` and discards any bytes buffered before the handshake, so a
+command injected ahead of the handshake can never run over the encrypted
+channel.
+
+### Certificates
 
 The certificate can be supplied three ways:
 
@@ -319,27 +324,75 @@ SmtpdServer(handler, encrypt_mode='TLS_OPTIONAL',
             tls_cert_cn='mx.example.com', tls_cert_san=['mx.example.com', '127.0.0.1'])
 ```
 
-The self-signed certificate is generated in-process with ```cryptography``` (RSA
-4096, SHA256, 90 days, CN and subject alt names, serverAuth) — no subprocess and
-no temp file is involved. The default ciphers and TLS floor follow the current
-Mozilla "Intermediate" profile: the default minimum is TLS 1.2 (the RFC 8996
-minimum for a secure server), ECDHE is preferred over DHE, and only AEAD suites
-(AES-GCM, ChaCha20) are used. Three presets are available via ```tls_methods```
-and ```tls_ciphers```: MODERN (```'TLSv1_3'```, TLS 1.3 only), ADVANCED (default,
-TLS 1.2+), and LEGACY (```TLS_METHODS_LEGACY``` + ```TLS_CIPHERS_LEGACY```) — an
-opt-in that lowers the floor to TLS 1.0 and adds forward-secret SHA1 CBC suites
-(but no 3DES/RC4/DES/MD5) to still reach old clients, useful for opportunistic
-SMTP TLS where a weakly-encrypted hop beats a cleartext one. TLS 1.3 key-exchange
-groups are left at the runtime default, so a build on OpenSSL 3.5+ negotiates the
-post-quantum hybrid (X25519MLKEM768) automatically. ```TlsTransport``` holds the
-built ```ssl.SSLContext```.
+A combined ```.pem``` holding the trust chain and the private key in one file
+works as well: pass it as ```tls_cert_path``` alone and leave
+```tls_key_path``` unset - the key is then read from the same file.
+
+The self-signed certificate is generated in-process with ```cryptography```
+(RSA 4096, SHA256, valid for 90 days, serverAuth) - no subprocess and no temp
+file is involved. It is meant for tests and debugging only, never for
+production. To prevent client errors like ```hostname does not match``` its
+CN and subject alt names derive from the hosts and addresses configured on
+the server (reference behaviour): every name becomes a subject alt name, a
+loopback-only setup gets the generic CN ```localhost.local```, otherwise the
+first name is used - and a configured ```tls_cert_cn``` / ```tls_cert_san```
+always wins over the derivation.
 
 .. note::
 
     The in-memory string certificate is loaded through a RAM-backed file
     descriptor (```tokeo.core.utils.memfd```), because the stdlib
-    ```ssl.SSLContext``` only loads a server certificate from a filesystem path.
-    The private key never touches disk.
+    ```ssl.SSLContext``` only loads a server certificate from a filesystem
+    path. The private key never touches disk.
+
+For production generate a certificate from your own authority or use a
+trust-center like [LetsEncrypt](https://letsencrypt.org/). A quick guide to
+create a self-managed certificate with ```openssl```:
+
+```bash
+# create a private key
+openssl genrsa -out key.pem 4096
+# create a certificate signing request (CSR)
+openssl req -new -key key.pem -out csr.pem
+# create a SSL certificate
+openssl x509 -in csr.pem -out cert.pem -req -signkey key.pem -days 90
+```
+
+### Security profile
+
+The default ciphers and TLS floor follow the current Mozilla "Intermediate"
+profile: the default minimum is TLS 1.2 (the RFC 8996 minimum for a secure
+server), ECDHE is preferred over DHE, and only AEAD suites (AES-GCM,
+ChaCha20) are used. Three presets are available via ```tls_methods``` and
+```tls_ciphers```: MODERN (```'TLSv1_3'```, TLS 1.3 only), ADVANCED (default,
+TLS 1.2+), and LEGACY (```TLS_METHODS_LEGACY``` + ```TLS_CIPHERS_LEGACY```) -
+an opt-in that lowers the floor to TLS 1.0 and adds forward-secret SHA1 CBC
+suites (but no 3DES/RC4/DES/MD5) to still reach old clients, useful for
+opportunistic SMTP TLS where a weakly-encrypted hop beats a cleartext one.
+TLS 1.3 key-exchange groups are left at the runtime default, so a build on
+OpenSSL 3.5+ negotiates the post-quantum hybrid (X25519MLKEM768)
+automatically.
+
+The built ```ssl.SSLContext``` is exposed as ```server.tls.context```, e.g.
+to inspect the generated self-signed certificate during debugging.
+
+### Test encrypted communication
+
+While working with encrypted communication it is sometimes hard to test and
+check the dialog during development or debugging. The GNU tool
+```gnutls-cli``` connects to the running server and proceeds with the
+encrypted communication on request:
+
+```bash
+# use --insecure when the server runs the self-signed test certificate
+gnutls-cli --insecure -s -p 2525 127.0.0.1
+```
+
+After launching ```gnutls-cli``` speak the SMTP dialog: send ```EHLO``` and
+then ```STARTTLS```. When the server answers ```220```, press Ctrl-D to run
+the TLS handshake between ```gnutls-cli``` and the server. The session then
+starts over on the encrypted channel (reference behaviour), so begin again
+with ```EHLO``` before ```MAIL FROM```.
 
 ## 9. The PROXY protocol
 
