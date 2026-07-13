@@ -33,7 +33,6 @@ clean:
 	rm -rf tmp
 	rm -rf build/
 	mkdir -p tmp/tests
-	touch tmp/tests/.gitkeep
 
 venv:
 	@if [ "0${VIRTUAL_ENV}" != "0" ]; then echo "Please deactivate venv before continue!"; exit 1; fi
