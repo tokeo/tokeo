@@ -21,6 +21,10 @@ smtpd:
   ### maximum simultaneous open connections over all services
   # max_connections: null
   ### list of receiving services; add more list items to run more services
+  ### bytes of randomness for the per-connection session id (ctx.id);
+  ### the hex string is twice as many characters. applies to all services
+  # session_id_bytes: 8
+
   services:
       ### a name used in logs to identify this service
     - name: mx-{{ app_label }}

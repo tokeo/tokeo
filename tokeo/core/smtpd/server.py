@@ -22,6 +22,7 @@ answer 500 only while ```encrypt_mode```/```auth_mode``` are FORBIDDEN.
 
 import re
 import base64
+import secrets
 import asyncio
 import inspect
 import os
@@ -361,7 +362,7 @@ class SmtpdServer:
         if kwargs.get('tls_mode') is not None:
             settings.setdefault('encrypt_mode', kwargs['tls_mode'])
         for key, value in kwargs.items():
-            if value is not None and key not in ('ports', 'hosts', 'tls_mode'):
+            if value is not None and key not in ('ports', 'hosts', 'tls_mode', 'session_id_bytes'):
                 settings.setdefault(key, value)
         self.events_handler = events_handler
         self.emit_events = self._build_emit_events_dispatcher(events_handler)
@@ -376,6 +377,9 @@ class SmtpdServer:
         self.logger = ForwardingLogger(self._log_bridge)
         events_handler.log = self.logger
         # ports / hosts / addresses
+        # bytes of randomness for the per-connection session id (ctx.id);
+        # a keyword-only server property, never read from service settings
+        self.session_id_bytes = int(kwargs.get('session_id_bytes') or 8)
         self.ports = _parse_ports(kwargs.get('ports') if kwargs.get('ports') is not None else settings.get('ports', DEFAULT_SMTPD_PORT))
         self.hosts = _parse_hosts(kwargs.get('hosts') if kwargs.get('hosts') is not None else settings.get('hosts', DEFAULT_SMTPD_HOST))
         self._addresses = _build_addresses(self.ports, self.hosts)
@@ -1500,7 +1504,7 @@ class SmtpdServer:
         # test existing of ctx
         if session.ctx is None:
             # create a new one
-            session.ctx = SmtpdContext(options=self.options)
+            session.ctx = SmtpdContext(id=secrets.token_hex(self.session_id_bytes), options=self.options)
         else:
             # make sure to finish all interrupted actions
             session.ctx.finalize()
