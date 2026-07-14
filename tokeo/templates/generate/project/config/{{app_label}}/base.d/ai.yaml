@@ -94,15 +94,14 @@ ai:
           - '\bsk-[A-Za-z0-9]{16,}\b'
           - '\bAKIA[0-9A-Z]{16}\b'
           - '(?i)\b(?:api[_-]?key|secret|password|token)\b\s*[:=]\s*\S+'
-    ### caps over-long text (project example, core/ai/guards/truncate.py)
+  ### transformers reshape (mask, rewrite, enrich) but never deny. same item
+  ### form as guards; the core ships no built-in type, so "type" is a dotted path
+  transformers:
+    ### caps over-long text (project example, core/ai/transformers/truncate.py)
     truncate:
-      type: {{ app_label }}.core.ai.guards.truncate.{{ app_class_name }}AiTruncateGuard
+      type: {{ app_label }}.core.ai.transformers.truncate.{{ app_class_name }}AiTruncateTransformer
       options:
         limit: 500
-
-  ### transformers reshape (mask, rewrite, enrich) but never deny. same item
-  ### form as guards; no built-in type yet, so "type" is a dotted class path
-  transformers: {}
 
   ### conductors steer the run (order, redirect, drive). same item form as
   ### guards; no built-in type yet, so "type" is a dotted class path
@@ -188,7 +187,7 @@ ai:
         sandboxes:
           - coded
 
-    ### showcase: the truncate guard at on_close only ("[stages]" stage list).
+    ### showcase: the truncate transformer at on_close only ("[stages]" stage list).
     ###   {{ app_label }} ai ask "tell me a longer story" --agent showcase
     showcase:
       type: fundi

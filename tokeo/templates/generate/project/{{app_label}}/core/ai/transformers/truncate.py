@@ -1,27 +1,27 @@
 """
-Truncate guard example for the {{ app_name }} ai agent.
+Truncate transformer example for the {{ app_name }} ai agent.
 
 Caps over-long text so a large payload cannot blow the context budget or flood
 the trace and log. It keeps the head and appends a marker that records how much
 was cut; it blocks nothing and never changes a ```decision```.
 
-This is a worked example, derived from the core ```TokeoAiTruncateGuard``` type.
-It acts at two stages: ```on_return``` caps a completed tool call's
+This is a worked example, derived from the core ```TokeoAiTruncateTransformer```
+type. It acts at two stages: ```on_return``` caps a completed tool call's
 ```result.value.as_str``` (a big file read, a large retrieval), and ```on_close```
 caps the run's final ```ChatResult.text```. Each stage reads its own settings via
 ```_config(stage)```, so the config can set a different ```limit```/```marker```
 per stage (an ```on_return```/```on_close``` options block) or one shared default.
 
-This module is self-contained: it holds only the guard class. The project names
-it by its full dotted class path under ```ai.guards``` in the config, so it
-needs no registration and no entry in the app extensions; the handler imports
-and instantiates it on demand.
+This module is self-contained: it holds only the transformer class. The
+project names it by its full dotted class path under ```ai.transformers``` in
+the config, so it needs no registration and no entry in the app extensions;
+the handler imports and instantiates it on demand.
 
 ```yaml
 ai:
-  guards:
+  transformers:
     truncate:
-      type: {{ app_label }}.core.ai.guards.truncate.{{ app_class_name }}AiTruncateGuard
+      type: {{ app_label }}.core.ai.transformers.truncate.{{ app_class_name }}AiTruncateTransformer
       options:
         # cap the model-facing text at this many characters; 0 disables the cap
         limit: 2000
@@ -31,26 +31,27 @@ ai:
 """
 
 from tokeo.core.ai.governor import GOVERNOR_STAGE_ON_RETURN, GOVERNOR_STAGE_ON_CLOSE
-from tokeo.core.ai.guards.truncate import TokeoAiTruncateGuard
+from tokeo.core.ai.transformers.truncate import TokeoAiTruncateTransformer
 
 
-class {{ app_class_name }}AiTruncateGuard(TokeoAiTruncateGuard):
+class {{ app_class_name }}AiTruncateTransformer(TokeoAiTruncateTransformer):
     """
-    A truncate guard that caps over-long text at the tool and final stages.
+    A truncate transformer that caps over-long text at the tool and final stages.
 
     When the text is longer than ```limit``` characters it keeps the head and
     appends ```marker``` (with the cut count), so the model (or the caller) still
     sees the start of a large output without the whole blob entering the history.
     It never changes the ```decision``` and notes the cut on ```reason``` (at the
-    tool stage). Derived from the core ```TokeoAiTruncateGuard``` type; see the
-    stage guide in ```TokeoAiGuard``` for what each stage hands a guard.
+    tool stage). Derived from the core ```TokeoAiTruncateTransformer```
+    type; see the stage guide in `tokeo.core.ai.governor.TokeoAiGovernor` for
+    what each stage hands a governor.
 
     """
 
     class Meta:
-        """Truncate guard meta-data."""
+        """Truncate transformer meta-data."""
 
-        # the configurable defaults, as one dict; a guard entry's options (and a
+        # the configurable defaults, as one dict; an entry's options (and a
         # per-stage override) overlay this, read at runtime via _config. limit:
         # the character cap, 0 disables it. marker: appended in place of the cut
         # tail, "{n}" is the removed count
