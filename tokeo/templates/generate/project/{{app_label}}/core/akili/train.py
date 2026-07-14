@@ -31,8 +31,9 @@ root; the weights land in ```{{ app_label }}/core/akili/weights.npz```.
 
 ### The pipeline, step by step
 
-1. ```data.dataset()``` generates the synthetic (request, plan) pairs; the
-    first 600 are held back for the final evaluation and never trained on.
+1. ```data.dataset()``` generates the synthetic (request, plan) pairs; a
+    fixed leading slice is held back for the final evaluation and never
+    trained on.
 2. ```encode_pair```/```tensorize``` turn every pair into one fixed-length row
     of byte tokens: ```request + SEP + plan + EOS```, padded with ```PAD```.
 3. The loop samples random batches and minimizes cross-entropy on the
@@ -56,9 +57,13 @@ root; the weights land in ```{{ app_label }}/core/akili/weights.npz```.
 
 ### Environment knobs
 
-- ```AKILI_STEPS``` (default 3000): optimizer steps of the full schedule
-- ```AKILI_BATCH``` (default 96): examples per step
-- ```AKILI_DATA``` (default 40000): generated examples (600 held out)
+The default values are read in one place -- the ```os.environ``` lookups in
+```main()``` -- so this guide names the knobs and leaves the numbers to the
+code, where they cannot drift from what actually runs:
+
+- ```AKILI_STEPS```: optimizer steps of the full schedule
+- ```AKILI_BATCH```: examples per step
+- ```AKILI_DATA```: generated examples (a fixed slice is held out)
 - ```AKILI_CKPT```: path to a checkpoint file; enables resumable training
 - ```AKILI_CHUNK```: steps per invocation when checkpointing (call the
     module repeatedly until the full schedule is done)
@@ -68,6 +73,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 
 import numpy
 import torch
@@ -75,6 +81,7 @@ from torch import nn
 
 from {{ app_label }}.core.akili import tokenizer
 from {{ app_label }}.core.akili.data import dataset
+from {{ app_label }}.core.akili.dsl import NOMATCH
 # one source of truth for the plan-length budget: the same constant the
 # NumPy runtime uses, so training-side decoding and evaluation reserve
 # exactly as much room for the plan as inference does
@@ -342,6 +349,36 @@ def main():
 
 
 @torch.no_grad()
+def classify(request, dsl):
+    """
+    Name the request class of one held-out example.
+
+    The buckets mirror the seams of the training mixture: refusals, single
+    steps, plain chains, and the two minus chains (from today / from an
+    explicit date). The last one is the thinnest slice of the mixture, so
+    it is exactly the class an aggregate accuracy can hide.
+
+    ### Args
+
+    - **request** (str): The natural-language request of the example
+    - **dsl** (str): Its target plan line
+
+    ### Returns
+
+    - **str**: The class label used by the per-class report
+
+    """
+    if dsl == NOMATCH:
+        return 'nomatch'
+    if ';' not in dsl:
+        return 'single step'
+    if not re.search(r'=-\d', dsl):
+        return 'chain, plus'
+    if re.search(r'\d{4}-\d{2}-\d{2}', request):
+        return 'chain, minus explicit date'
+    return 'chain, minus from today'
+
+
 def evaluate(model, examples):
     """
     Exact-plan accuracy on held-out examples.
@@ -350,6 +387,11 @@ def evaluate(model, examples):
     produce the plan line character by character, byte-exact, with no fence
     to catch a wrong turn. That makes this number an honest lower bound --
     the runtime adds the grammar on top, so real use is at least this good.
+
+    Beside the aggregate it prints one line per request class (see
+    ```classify```): an aggregate above the quality bar can still hide a
+    thin class that fails often -- the table is the honest look behind the
+    single number, and the teaching aid for exactly that lesson.
 
     ### Args
 
@@ -363,11 +405,22 @@ def evaluate(model, examples):
     """
     model.eval()
     hits = 0
+    class_hits = {}
+    class_totals = {}
     for request, dsl in examples:
+        label = classify(request, dsl)
+        class_totals[label] = class_totals.get(label, 0) + 1
         # a hit is a *byte-exact* match of the whole plan line; anything off
         # -- a wrong tool, a miscopied digit, a truncated step -- is a miss
         if generate(model, request) == dsl:
             hits += 1
+            class_hits[label] = class_hits.get(label, 0) + 1
+    # the per-class table: the honest look behind the single number -- a
+    # thin class can fail often without denting the aggregate above the bar
+    for label in sorted(class_totals):
+        total = class_totals[label]
+        rate = class_hits.get(label, 0) / total
+        print(f'  {label:<26} {rate:6.1%}  on {total} held out ({total / len(examples):.1%} of the mix)')
     model.train()
     return hits / len(examples)
 

@@ -38,12 +38,25 @@ shell block, so each one is a single copy away from your terminal.
 
 ## Before the show
 
-Train the weights once. They are a project asset (gitignored), built from
-the synthetic data in ```AKILI-LEX.yaml``` in a few minutes on a CPU:
+Three acts, one ladder -- built so that no prior knowledge is needed:
+act 1 shows the agent machinery with **no model at all** (a deterministic
+stand-in drives it, so you can start right away and watch every gear),
+act 2 puts **a real micro model you train yourself** on the same stage,
+and act 3 shows **where and why it breaks** -- on purpose, because seeing
+the edges is the lesson the big models hide.
+
+Act 1 needs no weights, so feel free to start there immediately. Before
+act 2, train the weights once. They are a project asset (gitignored),
+built from the synthetic data in ```AKILI-LEX.yaml``` in a few minutes on
+a CPU:
 
 ```shell
 python -m {{ app_label }}.core.akili.train
 ```
+
+While it trains, watch what it prints: the aggregate accuracy is the
+headline, and the small table beneath it shows the accuracy **per request
+class**. Keep that table in mind -- act 3 comes back to it.
 
 Give the file tools something to read:
 
@@ -327,6 +340,43 @@ checks arguments against the schema, deny and the sandbox chain bound
 what a wrong plan can touch, ```max_loops``` stops a model stuck on
 refusals, and the trace makes every step inspectable. **The model may be
 wrong -- the architecture makes the error visible, bounded, and cheap.**
+
+### Reading the per-class table: the seam behind the average
+
+Training prints one accuracy line per request class. The aggregate can
+clear the quality bar while a single class lags behind -- and the thin
+**chain, minus explicit date** slice ("the weekday of 2026-12-24 minus
+2 days") is the canonical example: it needs a two-step plan (shift the
+date, then consume it), and it is the rarest shape in the mixture. If
+exactly such a request fails while the aggregate looks fine, you are not
+looking at a broken model -- you are looking at a thin class. The fix is
+never "more steps": it is more, or better-weighted, data for that class.
+The generator drills this seam on purpose -- the re-roll inside
+the ```_render_shift``` helper of ```data.py``` -- and the table is how
+you verify the drill worked.
+
+### The ablation: training without the knowledge
+
+The strongest lesson is a model that cannot know something. Retrain with
+the ablation switch:
+
+```shell
+python -m {{ app_label }}.core.akili.train --no-minus
+```
+
+Same architecture, same budget -- but every minus/ago/vor wording is left
+out of the data. Now ask:
+
+```shell
+{{ app_label }} ai ask "weekday of 2026-12-24 minus 2 days" --profile akili
+```
+
+Expect it to fail: typically an honest ```<nomatch>``` or a plan without
+the backward shift -- the exact form depends on your run. The point is
+the contrast with everything above. No amount of extra steps teaches what
+the data never contained: knowledge lives in the dataset, training only
+distills it. Retrain without the flag afterwards to restore the full
+model -- the weights file is simply overwritten.
 
 ## Curtain
 
