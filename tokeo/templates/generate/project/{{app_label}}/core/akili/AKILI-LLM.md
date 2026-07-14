@@ -311,8 +311,25 @@ lookup table -- one line per word, mapping it to its shift from today --
 they chain ("tomorrow next year" is two shifts in order), and every
 shift shape speaks all units alike -- the unit word (days, months,
 years) picks the tool.
-Teaching a new word is adding a table line and retraining. A fixed seed makes the dataset reproducible at any time; run
+Teaching a new word is adding a table line and retraining. A fixed seed
+makes the dataset reproducible at any time; run
 ```python -m {{ app_label }}.core.akili.data``` to print samples.
+
+**The mixture and its thin seams.** The mixture is deliberately weighted
+(the commented cut points in ```sample```), and the weighting carries a
+lesson: an aggregate accuracy is an average over the mixture, so a class
+that is thin in the data is nearly invisible in the number -- a model can
+score above the quality bar and still fail a thin class often. The
+thinnest seam here is the composed minus shift from an explicit date
+("the weekday of 2026-12-24 minus 2 days"): the sign, the explicit date
+and the trailing consumer each cut its share down. Two levers keep that
+seam honest without a single extra training step: ```_render_shift```
+re-rolls half of the minus shifts onto a composed pattern (the bucket
+shares stay untouched, only the inside of the minus slice drills the
+chain harder), and ```evaluate``` prints the accuracy per request class
+beside the aggregate -- the honest look behind the single number. More
+steps only polish the distribution; the distribution decides what there
+is to polish.
 
 ### ```AKILI-LEX.yaml``` -- the editable language definition
 

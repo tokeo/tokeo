@@ -342,6 +342,17 @@ def _render_shift(rng, lang_en, minus=True):
     sign = '-' if minus and rng.random() < 0.4 else ''
     group = 'shift_minus' if sign else 'shift'
     phrase = rng.choice(_LEXICON['patterns'][group][_lang(lang_en)])
+    # the composed minus shift ("... minus 2 days" plus a consumer such as
+    # weekday) is the thinnest seam of the mixture: the sign, the explicit
+    # date and the consumer each thin it further, until the aggregate
+    # accuracy barely samples it and a model can miss the chain unnoticed.
+    # when the sign is set, re-roll onto a composed
+    # ({c}) pattern half of the time: the bucket shares above stay
+    # untouched, only the inside of the minus slice drills the chain harder
+    if sign and '{c}' not in phrase and rng.random() < 0.5:
+        composed = [one for one in _LEXICON['patterns'][group][_lang(lang_en)] if '{c}' in one]
+        if composed:
+            phrase = rng.choice(composed)
     count = _count(rng, unit)
     request = phrase.replace('{n}', str(count)).replace('{u}', rng.choice(unit['one'] if count == 1 else unit['many']))
     plan = []
