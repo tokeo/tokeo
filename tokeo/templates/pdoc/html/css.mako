@@ -622,6 +622,36 @@
   .admonition.error > .admonition-title::before { content: '❌'; }
   .admonition.danger > .admonition-title::before { content: '🔥'; }
   .admonition.caution > .admonition-title::before { content: '☠️'; }
+
+  pre::selection, pre *::selection, code::selection, code *::selection, code.hljs::selection, code.hljs *::selection {
+    background: var(--highlight-color);
+    color: var(--text-color);
+  }
+
+  pre{
+    position: relative;
+  }
+  .pdoc-copy {
+    position: absolute;
+    top: .45em;
+    right: .45em;
+    border: 1px solid rgba(0, 0, 0, .18);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, .88);
+    color: var(--secondary-color);
+    font: 600 .72em/1 system-ui, sans-serif;
+    padding: .35em .6em;
+    cursor: pointer;
+    opacity: .35;
+    transition: opacity .15s ease;
+  }
+  pre:hover .pdoc-copy, .pdoc-copy:focus {
+    opacity: 1;
+  }
+  .pdoc-copy.done {
+    color: #1a7f37;
+    border-color: #1a7f37;
+  }
 </%def>
 
 <%def name="desktop()" filter="minify_css">
