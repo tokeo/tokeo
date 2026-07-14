@@ -748,5 +748,50 @@
     </p>
 </footer>
 
+
+<script>
+/* attach a copy control to every code box; clipboard api with a fallback
+   for non-secure contexts (file://), so the docs work opened as files too */
+document.addEventListener('DOMContentLoaded', function () {
+    function fallbackCopy(text) {
+        var area = document.createElement('textarea');
+        area.value = text;
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        try { document.execCommand('copy'); } catch (error) {}
+        document.body.removeChild(area);
+    }
+    document.querySelectorAll('pre > code').forEach(function (code) {
+        var pre = code.parentElement;
+        if (pre.querySelector('.pdoc-copy')) return;
+        var button = document.createElement('button');
+        button.className = 'pdoc-copy';
+        button.type = 'button';
+        button.title = 'copy this block';
+        button.textContent = 'copy';
+        button.addEventListener('click', function () {
+            var text = code.innerText.replace(/\s+$/, '');
+            var done = function () {
+                button.textContent = 'copied';
+                button.classList.add('done');
+                setTimeout(function () {
+                    button.textContent = 'copy';
+                    button.classList.remove('done');
+                }, 1200);
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(done);
+            } else {
+                fallbackCopy(text);
+                done();
+            }
+        });
+        pre.classList.add('pdoc-copyable');
+        pre.appendChild(button);
+    });
+});
+</script>
 </body>
 </html>
