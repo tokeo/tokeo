@@ -1,13 +1,10 @@
 """
-The project's guard implementations: positioned steps in the agent loop
-that observe, govern, mask, or shorten what the run carries.
+The project's guard implementations: positioned steps in the agent loop that
+check a tool call and may deny it.
 
-The truncate guard is re-exported here, so it can be reached from the short
-package path ```{{ app_label }}.core.ai.guards``` as well as its own module.
+This example ships no project-specific guard -- the core guards (trace_audit,
+tool_policy, tool_schema_validate, regex_redact) are used straight from the
+config. Add a project guard module here and re-export it below when you need one.
 """
 
-from {{ app_label }}.core.ai.guards.truncate import {{ app_class_name }}AiTruncateGuard
-
-__all__ = [
-    '{{ app_class_name }}AiTruncateGuard',
-]
+__all__ = []
