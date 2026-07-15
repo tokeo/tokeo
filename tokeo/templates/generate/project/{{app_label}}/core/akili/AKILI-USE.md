@@ -22,15 +22,15 @@ If your entity does not qualify for the zero-cost license, a separate
 commercial Enterprise License is required.
 -->
 
-# akili in use -- a guided demo in three acts
+# akili in use -- a guided demo in three parts
 
 One sentence carries the whole design: **fundi** (the master) wields the
 tools, **akili** (the mind) plans them, and **tokeo** (the result) is what
 they produce together. This document is the stage script for showing that
-live: act 1 demonstrates the fundi agent (guards, sandboxes, denials) with
+live: part 1 demonstrates the fundi agent (guards, sandboxes, denials) with
 the deterministic mock model -- including a step where that same mock WRITES
-code and runs it in the wasm sandbox -- act 2 puts the real, self-trained
-akili micro model behind the very same governance, and act 3 -- on purpose --
+code and runs it in the wasm sandbox -- part 2 puts the real, self-trained
+akili micro model behind the very same governance, and part 3 -- on purpose --
 shows where the model breaks, and why. Every command sits in its own
 shell block, so each one is a single copy away from your terminal.
 
@@ -38,15 +38,15 @@ shell block, so each one is a single copy away from your terminal.
 
 ## Before the show
 
-Three acts, one ladder -- built so that no prior knowledge is needed:
-act 1 shows the agent machinery with **no model at all** (a deterministic
+Three parts, one ladder -- built so that no prior knowledge is needed:
+part 1 shows the agent machinery with **no model at all** (a deterministic
 stand-in drives it, so you can start right away and watch every gear),
-act 2 puts **a real micro model you train yourself** on the same stage,
-and act 3 shows **where and why it breaks** -- on purpose, because seeing
+part 2 puts **a real micro model you train yourself** on the same stage,
+and part 3 shows **where and why it breaks** -- on purpose, because seeing
 the edges is the lesson the big models hide.
 
-Act 1 needs no weights, so feel free to start there immediately. Before
-act 2, train the weights once. They are a project asset (gitignored),
+Part 1 needs no weights, so feel free to start there immediately. Before
+part 2, train the weights once. They are a project asset (gitignored),
 built from the synthetic data in ```AKILI-LEX.yaml``` in a few minutes on
 a CPU:
 
@@ -56,7 +56,7 @@ python -m {{ app_label }}.core.akili.train
 
 While it trains, watch what it prints: the aggregate accuracy is the
 headline, and the small table beneath it shows the accuracy **per request
-class**. Keep that table in mind -- act 3 comes back to it.
+class**. Keep that table in mind -- part 3 comes back to it.
 
 Give the file tools something to read:
 
@@ -64,12 +64,12 @@ Give the file tools something to read:
 echo "fundi wields the tools, akili plans them" > tmp/notes.txt
 ```
 
-## Act 1 -- the fundi agent (the mock model as a deterministic driver)
+## Part 1 -- the fundi agent (the mock model as a deterministic driver)
 
 The built-in ```mock``` provider is the test driver: it makes a tool call
 whenever the first word of the prompt names an active tool, otherwise it
 echoes. Deterministic, offline, perfect for demos -- everything in this
-act runs before any model is trained.
+part runs before any model is trained.
 
 ### 1. A tool call, contained: calc runs in a subprocess
 
@@ -144,7 +144,7 @@ reasoning model and **not** recursive. It is a coding mock: it recognises a
 fixed keyword (```text``` plus ```upper```/```reverse```/```len```, with a
 few German synonyms) and fills a code template with the rest of the line. It
 does not parse intent, it does not resolve nested requests, and it does not
-chain tools the way the akili model does in Act 2. It exists to demonstrate
+chain tools the way the akili model does in Part 2. It exists to demonstrate
 the wasm execution path and the audit trail, not language understanding.
 
 It is opt-in: it needs the wasm extra and a user-built ```python.wasm``` (the
@@ -192,7 +192,7 @@ sandbox 'coded', returned: '24'```.
 Expected: ```ai config ok```. Unknown tools, dangling sandbox names, or
 options a sandbox cannot enforce surface here, not at runtime.
 
-## Act 2 -- the akili model (a real, self-trained micro model)
+## Part 2 -- the akili model (a real, self-trained micro model)
 
 Now the same governance, but the plan comes from a real language model:
 ~651k parameters, trained from scratch on this project's synthetic
@@ -231,7 +231,122 @@ Expected: no calculation. The akili profile shares the ```guarded``` agent
 simply not offered. One agent, several profiles, each carving out only
 the tools it needs: ```agent.tools - agent.deny - profile.deny```.
 
-## Act 3 -- where akili breaks, and why (limits, on purpose)
+### 12. Relative words -- and chains of them
+
+```shell
+spiral ai ask "welches datum ist übermorgen" --profile akili
+```
+
+```shell
+spiral ai ask "the date of tomorrow next year" --profile akili
+```
+
+Expected: the day after tomorrow, and tomorrow's date shifted one year --
+the second one is a real three-step chain from two plain words. Relative
+words live in a lookup table in ```AKILI-LEX.yaml``` -- one line per word,
+mapping it to its shift from today. The three words above, verbatim:
+
+```yaml
+relative_words:
+  en:
+    'tomorrow':                 {tool: add_days,   shift: 1}
+    'next year':                {tool: add_years,  shift: 1}
+  de:
+    'übermorgen':               {tool: add_days,   shift: 2}
+```
+
+Teaching a new word is adding a line here and retraining. The words
+compose: a day word first, a month or year word second. A first edge
+already shows here: that ordering is part of the learned shape -- swap
+it ("next year tomorrow") and you are outside the trained patterns,
+where part 3 picks up the story.
+
+### 13. Months and years: the unit word picks the tool
+
+```shell
+spiral ai ask "add 2 months to 2026-06-08" --profile akili
+```
+
+```shell
+spiral ai ask "das datum 3 monate nach 2026-01-15" --profile akili
+```
+
+```shell
+spiral ai ask "heute plus 1 jahr" --profile akili
+```
+
+Expected: shifted dates via ```add_months``` and ```add_years``` -- the same
+sentence shapes as day shifts, only the unit word decides which tool the
+plan calls. Edge note: months and years are near-identical endings from
+the model's view; the per-class table (part 3) is where a confusion
+between them would surface.
+
+### 14. Weeks are seven-day shifts (there is no add_weeks tool)
+
+```shell
+spiral ai ask "2026-06-08 plus 3 weeks" --profile akili
+```
+
+```shell
+spiral ai ask "heute minus 1 woche" --profile akili
+```
+
+Expected: ```add_days``` plans with ```days=21``` and ```days=-7``` -- the
+model learned to *translate* the unit, because the toolset has no week
+tool. Look at the plan with ```--json```: the multiplication happened at
+planning time, not in a tool.
+
+### 15. Countdowns: days between today and a relative date
+
+```shell
+spiral ai ask "count the days from today until next week" --profile akili
+```
+
+```shell
+spiral ai ask "tage von heute bis morgen" --profile akili
+```
+
+Expected: ```7``` and ```1```, each from a three-step plan (resolve today,
+shift it, count between both). Edge note: this daydiff shape -- anchored
+on today and a trained word -- is the well-practised one; its harder
+siblings (a literal date as the second endpoint, or two literal dates)
+sit further out on the edge, and part 3 walks them on purpose.
+
+### 16. Backwards from today: the practised minus
+
+```shell
+spiral ai ask "der wochentag von heute minus 2 tagen" --profile akili
+```
+
+```shell
+spiral ai ask "the date 2 weeks ago" --profile akili
+```
+
+Expected: the weekday of the day before yesterday, and today shifted
+back fourteen days -- ago/vor forms name no date and imply today.
+Edge note: backward shifts *from today* are drilled and solid; the same
+minus words anchored on a literal date are the thinnest seam of the
+mixture -- part 3 stands exactly there.
+
+### 17. Wordings, languages, and small slips
+
+```shell
+spiral ai ask "what is the date right now" --profile akili
+```
+
+```shell
+spiral ai ask "welche kw ist heute" --profile akili
+```
+
+Expected: the current date, and today's ISO week from the German "kw"
+abbreviation -- every tool speaks several phrasings per language, and
+mixing languages across preamble and request is part of the training.
+Edge note: a small share of the training data carries one human typo, so
+a slip like "tommorrow" usually still finds its plan -- but that is
+learned tolerance, not spelling correction: dates and digits are never
+fuzzy, exact copying stays exact. Where tolerance ends, part 3 begins.
+
+## Part 3 -- where akili breaks, and why (limits, on purpose)
 
 ```AKILI-LLM.md``` explains why akili cannot hallucinate *form*: the plan
 grammar admits no invented tools, and ~15% of the training mixture maps
@@ -239,7 +354,7 @@ off-domain requests to an honest ```<nomatch>```. But abstention is a trained
 pattern like any other -- and patterns have edges. *Meaning* can still go
 wrong: a well-formed plan for a question that was never asked, exactly
 where a request falls into the gap between the trained patterns and the
-trained refusals. This act demonstrates those gaps deliberately.
+trained refusals. This part demonstrates those gaps deliberately.
 
 A note on reproducibility: the exact outputs depend on your local
 training run (seed, epochs). The failure *classes* below follow from the
@@ -334,7 +449,7 @@ composition.**
 ```
 
 The hallucinated plan is right there in the trace -- arguments, schema,
-decision, result. And this closes the circle back to act 1: *because*
+decision, result. And this closes the circle back to part 1: *because*
 models break like this, the fundi machinery exists. The validate guard
 checks arguments against the schema, deny and the sandbox chain bound
 what a wrong plan can touch, ```max_loops``` stops a model stuck on
@@ -353,7 +468,50 @@ looking at a broken model -- you are looking at a thin class. The fix is
 never "more steps": it is more, or better-weighted, data for that class.
 The generator drills this seam on purpose -- the re-roll inside
 the ```_render_shift``` helper of ```data.py``` -- and the table is how
-you verify the drill worked.
+you verify the drill worked. One reading rule: on classes with fewer
+than ~25 held-out examples read the absolute counts, not the
+percentages -- two hits move a small class by ten points.
+
+### Walking the edge: commands that just work -- and tip
+
+Everything shown so far lives in the model's strong classes. The per-class
+table has weaker ones -- and you can stand on that edge yourself. Each
+pair below starts with a request that usually lands and follows with its
+close sibling that tends to tip. Run each a few times, add ```--json``` to
+see the plan, and keep your own table next to it: your weight set differs,
+so your edge differs -- that is the point.
+
+The consumer edge -- the chain is right, the last step may swap:
+
+```shell
+{{ app_label }} ai ask "weekday of 2026-06-08 plus 2 days" --profile akili
+{{ app_label }} ai ask "erst 4 jahre von 2018-09-23 abziehen und dann der kalenderwoche" --profile akili
+```
+
+The daydiff edge -- three shapes of the same question, rising difficulty:
+anchored on today and a trained word, anchored on today and a literal
+date, and the hardest copy task of the domain, two literal dates:
+
+```shell
+{{ app_label }} ai ask "count the days from today until tomorrow" --profile akili
+{{ app_label }} ai ask "zaehle die tage zwischen heute und 2036-11-10" --profile akili
+{{ app_label }} ai ask "how many days lie between 2032-02-03 and 2003-08-27" --profile akili
+```
+
+The minus edge -- the request family this whole chapter started from:
+shifting backwards from today is well practised, the same words anchored
+on a literal date sit on the thin seam:
+
+```shell
+{{ app_label }} ai ask "der wochentag von heute minus 2 tagen" --profile akili
+{{ app_label }} ai ask "the weekday of 2026-12-24 minus 2 days" --profile akili
+```
+
+When a pair tips for you, you are looking at the live form of the per-class table:
+a class the data drills but the model has not mastered at this size. The levers
+are the drill strengths in ```data.py``` (the re-roll inside ```_render_shift```)
+and the patterns in ```AKILI-LEX.yaml``` -- strengthen one, retrain, and watch
+both the table and your pair respond.
 
 ### The ablation: training without the knowledge
 
@@ -385,4 +543,4 @@ all, **akili** shows a real model you trained yourself planning real
 tool chains, and a **remote profile** (the OpenAI-compatible provider)
 puts a large model behind the very same agents, guards, and sandboxes --
 nothing about the governance changes. Bigger models move the edges of
-act 3; they do not remove them. That is the point of the whole exercise.
+part 3; they do not remove them. That is the point of the whole exercise.
