@@ -147,7 +147,9 @@ class TokeoAiAkiliProvider(TokeoAiProvider):
                 prompt = message.get('content') or ''
                 feedback = []
             elif message.get('role') == 'tool':
-                feedback.append(str(message.get('content') or ''))
+                # count ONLY results answering one of our own calls
+                if str(message.get('tool_call_id') or '').startswith('call_'):
+                    feedback.append(str(message.get('content') or ''))
         return prompt, feedback
 
     def _result(self, text, prompt, tool_calls=None, finish_reason='stop', plan=None):
