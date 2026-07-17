@@ -77,12 +77,11 @@ class {{ app_class_name }}AiTruncateTransformer(TokeoAiTruncateTransformer):
             ```capped_text``` is the original text
 
         """
-        config = self._config(stage)
-        limit = config.get('limit')
+        limit = self._config('limit', stage=stage)
         if not limit or len(text or '') <= limit:
             return text, 0
         cut = len(text) - limit
-        return text[:limit] + config.get('marker').format(n=cut), cut
+        return text[:limit] + self._config('marker', stage=stage).format(n=cut), cut
 
     def on_return(self, ctx, invocation):
         """
