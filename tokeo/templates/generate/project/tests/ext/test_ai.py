@@ -150,8 +150,8 @@ def test_{{ app_label }}_ai_tool_schema_validator_denies_when_strict():
     # anything runs (here: the required "input" is missing)
     with {{ app_class_name }}AiTestApp() as app:
         guard = TokeoAiToolSchemaValidator(app)
-        # strict comes from the declaration's options, as the handler sets it
-        guard._declaration = {'options': {'strict': True}}
+        # strict comes from the declaration's options, handed in by _setup
+        guard._setup(app, 'tool_schema_validate', {'options': {'strict': True}})
         invocation = Invocation(id='t1', name='calc', arguments={}, parameters=TokeoAiCalcTool.Meta.parameters)
         guard.on_call(None, invocation)
         assert invocation.decision == 'deny'
@@ -169,6 +169,8 @@ def test_{{ app_label }}_ai_tool_schema_validator_flags_when_not_strict():
         app.log.backend.addHandler(handler)
         app.log.backend.setLevel(logging.WARNING)
         guard = TokeoAiToolSchemaValidator(app)
+        # a setup without a config: the guard runs on its class defaults
+        guard._setup(app)
         invocation = Invocation(id='t1', name='calc', arguments={}, parameters=TokeoAiCalcTool.Meta.parameters)
         guard.on_call(None, invocation)
         # not denied: the call is allowed to run
@@ -184,16 +186,19 @@ def test_{{ app_label }}_ai_redact_guard_masks_secrets():
     # leaked token never reaches history/trace/log
     with {{ app_class_name }}AiTestApp() as app:
         guard = TokeoAiRegexRedactGuard(app)
-        # patterns are required (no built-in list); supply them as the handler would
-        guard._declaration = {
-            'options': {
-                'patterns': [
-                    r'(?i)\bbearer\s+[A-Za-z0-9._\-]{8,}',
-                    r'(?i)\b(?:api[_-]?key|secret|password|token)\b\s*[:=]\s*\S+',
-                ],
+        # patterns are required (no built-in list); hand them in through _setup
+        guard._setup(
+            app,
+            'regex_redact',
+            {
+                'options': {
+                    'patterns': [
+                        r'(?i)\bbearer\s+[A-Za-z0-9._\-]{8,}',
+                        r'(?i)\b(?:api[_-]?key|secret|password|token)\b\s*[:=]\s*\S+',
+                    ],
+                },
             },
-        }
-        guard._setup(app)
+        )
         # on_return: a secret in the returned text is masked
         invocation = Invocation(id='t1', name='read_file', arguments={})
         invocation.result = create_tool_result('the page said Bearer abc123DEF456ghi789 here')
@@ -232,7 +237,7 @@ def test_{{ app_label }}_ai_truncate_transformer_caps_long_results():
     # stages: on_return (a tool result) and on_close (the final answer)
     with {{ app_class_name }}AiTestApp() as app:
         transformer = {{ app_class_name }}AiTruncateTransformer(app)
-        transformer._declaration = dict(options=dict(limit=10))
+        transformer._setup(app, 'truncate', dict(options=dict(limit=10)))
         # on_return caps the tool result text and notes the cut on reason
         invocation = Invocation(id='t1', name='read_file', arguments={})
         invocation.result = create_tool_result('x' * 50)

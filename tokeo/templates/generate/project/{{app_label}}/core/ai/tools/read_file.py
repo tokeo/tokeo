@@ -34,9 +34,10 @@ class TokeoAiReadFileTool(TokeoAiTool):
     """
     Tool that reads a text file below the configured base directory.
 
-    The ```Meta``` description and parameters are what the model sees; the
-    ```base_dir``` is the tool's own setting, overridden per item by its config
-    ```options``` and read from ```_meta```.
+    The ```Meta``` description and parameters are what the model sees; they are
+    code, not config. The ```base_dir``` is the tool's own setting: it is declared
+    in ```config_defaults``` -- the tool's whole outward surface -- overridden per
+    item by its config ```options``` and read through ```_config```.
 
     """
 
@@ -53,9 +54,12 @@ class TokeoAiReadFileTool(TokeoAiTool):
             required=['path'],
         )
 
-        # the directory the tool may read from; a tool setting, not
-        # model-facing
-        base_dir = 'tmp'
+        # the tool's outward surface: the directory it may read from. a
+        # project overrides it per item under ```options```; nothing else of
+        # this Meta is reachable from the config
+        config_defaults = dict(
+            base_dir='tmp',
+        )
 
     def exec(self, path):
         """
@@ -75,7 +79,7 @@ class TokeoAiReadFileTool(TokeoAiTool):
             file does not exist
 
         """
-        target = _resolve_below(self._meta.base_dir, path)
+        target = _resolve_below(self._config('base_dir'), path)
         if not target.is_file():
             raise TokeoAiError(f'no such file: {str(path)!r}')
         # the value is the file content; as_str defaults to the same text

@@ -71,7 +71,7 @@ ai:
       type: tokeo.core.ai.tools.TokeoAiPythonUntrustedExecTool
 
   ### guards check a call and may deny it (deny-and-continue). an item: "type"
-  ### is a built-in short name or a dotted class path, settings under "options"
+  ### is a built-in alias or a dotted class path, settings under "options"
   guards:
     ### checks call arguments against the tool's parameters schema
     tool_schema_validate:
@@ -213,7 +213,7 @@ ai:
         sandboxes:
           - allow
 
-  ### profiles bind the model. an item: "type" is a provider short name or a
+  ### profiles bind the model. an item: "type" is a provider alias or a
   ### dotted path; connection settings under "options"; "agent" names the agent
   profiles:
     ### the built-in local mock: deterministic, no server (calls a tool when the

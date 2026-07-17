@@ -37,8 +37,10 @@ class TokeoAiAppendFileTool(TokeoAiTool):
     Tool that appends a line of text to the configured file.
 
     The ```Meta``` description and parameters are what the model sees; the
-    ```base_dir``` and the target ```file``` are the tool's own settings,
-    overridden per item by its config ```options``` and read from ```_meta```.
+    ```base_dir``` and the target ```file``` are the tool's own settings: they
+    are declared in ```config_defaults``` -- the tool's whole outward surface --
+    overridden per item by its config ```options``` and read through
+    ```_config```.
 
     """
 
@@ -55,10 +57,13 @@ class TokeoAiAppendFileTool(TokeoAiTool):
             required=['text'],
         )
 
-        # the directory and file the tool may write to; tool settings, not
-        # model-facing
-        base_dir = 'tmp'
-        file = 'notes.txt'
+        # the tool's outward surface: the directory and file it may write to.
+        # a project overrides them per item under ```options```; nothing else of
+        # this Meta is reachable from the config
+        config_defaults = dict(
+            base_dir='tmp',
+            file='notes.txt',
+        )
 
     def exec(self, text):
         """
@@ -83,7 +88,7 @@ class TokeoAiAppendFileTool(TokeoAiTool):
         - **TokeoAiError**: If the configured file escapes the base directory
 
         """
-        target = _resolve_below(self._meta.base_dir, self._meta.file)
+        target = _resolve_below(self._config('base_dir'), self._config('file'))
         # check existence and size BEFORE the append: a missing file is created
         # by append mode, so this is the only point that can tell new from empty
         created = not target.is_file()
@@ -96,7 +101,7 @@ class TokeoAiAppendFileTool(TokeoAiTool):
         stat = target.stat()
         created_at = getattr(stat, 'st_birthtime', stat.st_ctime)
         result = dict(
-            file=self._meta.file,
+            file=self._config('file'),
             size_before=size_before,
             size_after=stat.st_size,
             created=created,
