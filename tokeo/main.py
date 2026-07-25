@@ -123,6 +123,15 @@ def main():
     try:
         app = Tokeo()
         with app:
+            # dynamic embed tokeo-ramani template package
+            # if not installed only blueprints for `tokeo generate` are missing
+            # the template package is not necessary to run apps with tokeo framework
+            try:
+                import tokeo.ramani  # noqa: F401
+                app._meta.template_module = 'tokeo.ramani'
+            except ImportError:
+                pass
+
             app.run()
 
     except (TokeoError, AssertionError) as e:
