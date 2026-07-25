@@ -1,4 +1,4 @@
+include LICENSE.txt NOTICE.md
+include README.md CHANGELOG.md
 recursive-include config *.yaml
 recursive-exclude config *.local.yaml
-include CHANGELOG.md LICENSE.md
-include Makefile
