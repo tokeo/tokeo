@@ -1,0 +1,25 @@
+{#- ===================================================================== -#}
+{#- Page frame, replacing pdoc's `default/frame.html.jinja2`.              -#}
+{#-                                                                        -#}
+{#- pdoc hardcodes `<html lang="en">` outside of any Jinja block, so the   -#}
+{#- language cannot be set by overriding a block — the whole frame has to  -#}
+{#- be supplied. That is cheap here: our page templates override `title`,  -#}
+{#- `style`, `head` and `body` anyway, so nothing else of pdoc's frame is  -#}
+{#- used. Its `nav`, `content` and `style_*` blocks stay unused, and the   -#}
+{#- math/mermaid includes are off (`head.html` wires up mermaid itself).   -#}
+{#- ===================================================================== -#}
+<!doctype html>
+<html lang="{{ html_lang | default("en", true) }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="generator" content="tokeo pdoc {{ tokeo_version }}"/>
+  <title>{% block title %}{% endblock %}</title>
+  {% block favicon %}{% if favicon %}<link rel="icon" href="{{ favicon }}"/>{% endif %}{% endblock %}
+  {% block head %}{% endblock %}
+  {% block style %}{% endblock %}
+</head>
+<body>
+{% block body %}{% endblock body %}
+</body>
+</html>

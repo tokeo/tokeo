@@ -38,4 +38,4 @@ Actors can also be scheduled and priorized by using ```send_with_options```.
 
 - **Exception**:
 
-    If an error occurs during email sending.
+    If an error occurs during actors processing.
