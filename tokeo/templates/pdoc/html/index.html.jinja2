@@ -1,0 +1,49 @@
+{% extends "frame.html.jinja2" %}
+
+{% block title %}{{ app_name | default("tokeo") }} · {{ doc_title }}{% endblock %}
+{% block style %}<link rel="stylesheet" href="/assets/tailwind.min.css"><link rel="stylesheet" href="/assets/tokeo.theme.css">{% endblock %}
+{% block head %}{% include "head.html" %}{% endblock %}
+
+{% block body %}
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 text-brand-ink font-sans flex flex-col">
+    <main class="flex-1 w-full max-w-6xl mx-auto px-6 py-12">
+      <div class="tk-header">
+        <h1>🚀 {{ app_name | default("tokeo") }} modules</h1>
+        <p>Explore the API documentation of project modules</p>
+      </div>
+
+      {# top-level packages only: a module whose parent is not itself documented #}
+      {% set roots = [] %}
+      {% for name, mod in all_modules.items() %}
+        {% set parent = name.rsplit('.', 1)[0] if '.' in name else '' %}
+        {% if mod and parent not in all_modules %}{% set _ = roots.append((name, mod)) %}{% endif %}
+      {% endfor %}
+
+      {% if not roots and not has_config %}
+        <p class="text-brand-muted mt-8">No modules found.</p>
+      {% else %}
+        <div class="grid gap-8 mt-10 grid-cols-1 md:grid-cols-2">
+          {% for name, mod in roots %}
+            <div class="relative overflow-hidden rounded-xl border border-black/5 bg-white p-7 shadow-md transition-transform hover:-translate-y-1 hover:shadow-xl">
+              <div class="absolute inset-x-0 top-0 h-1" style="background: var(--gradient-brand)"></div>
+              <a href="/{{ name.replace(".", "/") }}.html" class="text-xl font-semibold text-brand-secondary hover:text-brand-accent break-all">{{ name }}</a>
+              {% set _w = (mod.docstring or "").split("\n\n")[0].split() %}{% set _summary = _w[:75] | join(" ") %}{% if _w | length > 75 %}{% set _summary = _summary ~ " …" %}{% endif %}<div class="tk-doc mt-4 text-brand-muted leading-relaxed">{{ _summary | to_html }}</div>
+            </div>
+          {% endfor %}
+
+          {% if has_config %}
+            <div class="relative overflow-hidden rounded-xl border border-black/5 bg-white p-7 shadow-md transition-transform hover:-translate-y-1 hover:shadow-xl">
+              <div class="absolute inset-x-0 top-0 h-1" style="background: var(--gradient-brand)"></div>
+              <a href="/config/" class="text-xl font-semibold text-brand-secondary hover:text-brand-accent break-all">config</a>
+              <div class="tk-doc mt-4 text-brand-muted leading-relaxed"><p>The configuration files and their settings.</p></div>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+    </main>
+    <footer class="border-t border-black/10 bg-white/70 px-6 py-6 text-sm text-brand-muted text-center">
+      Generated with <a class="text-brand-primary hover:text-brand-accent" href="https://github.com/tokeo/tokeo">Tokeo</a> 🚀{% if tokeo_version %} ( {{ tokeo_version }} ){% endif %} and <a class="text-brand-primary hover:text-brand-accent" href="https://pdoc.dev">pdoc</a>{% if pdoc_version %} ( {{ pdoc_version }} ){% endif %}
+    </footer>
+  </div>
+{% endblock %}

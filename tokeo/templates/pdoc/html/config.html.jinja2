@@ -1,0 +1,115 @@
+{% extends "frame.html.jinja2" %}
+
+{#- ================================================================== -#}
+{#- Tokeo configuration page — same shell, sidebar and type scale as    -#}
+{#- module.html.jinja2. Content extraction (comment blocks, per-setting -#}
+{#- yaml source, .local redaction) happens in tokeo/ext/pdoc.py; this   -#}
+{#- template is presentation only.                                     -#}
+{#- ================================================================== -#}
+
+{% block title %}Configuration · {{ doc_title | default("Tokeo API") }}{% endblock %}
+{% block style %}<link rel="stylesheet" href="/assets/tailwind.min.css"><link rel="stylesheet" href="/assets/tokeo.theme.css">{% endblock %}
+{% block head %}{% include "head.html" %}{% endblock %}
+
+{#- ---------- helpers ---------- -#}
+
+{% macro sourcebox(label, source) %}
+  <details>
+    <summary class="group flex items-center justify-end gap-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden select-none py-1">
+      <span class="rounded-md bg-black/[0.06] px-2 py-1 font-mono text-sm text-brand-muted">{{ label }}</span>
+      <span class="font-sans text-xs font-semibold uppercase tracking-wide text-brand-muted group-hover:text-brand-accent">Expand</span>
+    </summary>
+    <div class="mt-2 max-h-[500px] overflow-auto rounded-xl bg-[#231e18] p-4"><pre class="!m-0 !bg-transparent !border-0"><code class="language-yaml !text-[0.8rem] !leading-relaxed">{{ source }}</code></pre></div>
+  </details>
+{% endmacro %}
+
+{% macro namebox(name) %}
+  <div class="rounded-lg border border-brand-primary/10 bg-gradient-to-br from-[#f4f8fb] to-[#e6f0f6] px-5 py-3 font-mono text-[0.95rem] leading-relaxed shadow-sm overflow-x-auto">
+    <span class="font-bold text-brand-ident">{{ name }}</span>
+  </div>
+{% endmacro %}
+
+{% macro show_setting(setting) %}
+  <div id="setting-{{ setting }}" class="scroll-mt-6 target:ring-2 target:ring-brand-highlight rounded-lg">
+    {{ namebox(setting) }}
+    <div class="mt-3 pl-5 tk-member-doc">
+      {% for f, data in configdict.items() if setting in data.settings %}
+        {% set entry = data.settings[setting] %}
+        <div class="{% if not loop.first %}{{ 'mt-6' if entry.intro else 'mt-1' }}{% endif %}">
+          {% if entry.intro %}<div class="tk-doc">{{ entry.intro | to_html }}</div>{% endif %}
+          {{ sourcebox(f, entry.source) }}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endmacro %}
+
+{#- ---------- page ---------- -#}
+{% block body %}
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 text-brand-ink font-sans flex flex-col">
+    <div class="flex flex-1 flex-col md:flex-row">
+
+    {# ---------- sidebar ---------- #}
+    <aside class="md:w-72 md:shrink-0 md:h-screen md:sticky md:top-0 md:overflow-auto border-b md:border-b-0 md:border-r border-black/5 bg-white px-6 py-7">
+      <a href="/" class="tk-header block !py-3 !px-4 !mb-7 !text-left"><span class="text-lg font-semibold">{{ brand | default("🚀 " + (app_name | default("tokeo")), true) }}</span></a>
+      <nav class="space-y-7 text-[0.95rem] font-sans whitespace-nowrap">
+        <div>
+          <h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Home</h3>
+          <a href="/" class="text-brand-primary hover:text-brand-accent">All packages</a>
+        </div>
+        {% if configenvs %}
+        <div>
+          <h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Environments</h3>
+          <ul class="space-y-1">{% for name in configenvs %}<li><a class="text-brand-primary hover:text-brand-accent" href="#env-{{ name }}">{{ name }}</a></li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if configsettings %}
+        <div>
+          <h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Settings</h3>
+          <ul class="space-y-1">{% for setting in configsettings %}<li><a class="text-brand-primary hover:text-brand-accent" href="#setting-{{ setting }}">{{ setting }}</a></li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </nav>
+    </aside>
+
+    {# ---------- main ---------- #}
+    <main class="flex-1 min-w-0 bg-white px-6 sm:px-10 lg:px-14 py-10">
+      <div class="max-w-5xl">
+        <header class="mb-8">
+          <nav class="font-mono text-[0.95rem] text-brand-muted mb-3">
+            <a href="/" class="text-brand-primary hover:text-brand-accent">All packages</a>
+          </nav>
+          <h1 class="text-4xl font-light">Configuration <code class="font-bold">{{ app_name | default("tokeo") }}</code></h1>
+        </header>
+
+        {% if configenvs %}
+        <section class="mt-12">
+          <h2 class="text-2xl font-light mb-5 text-brand-primary">Environments</h2>
+          <div class="space-y-10">
+            {% for name in configenvs %}
+              <div id="env-{{ name }}" class="scroll-mt-6 target:ring-2 target:ring-brand-highlight rounded-lg">
+                {{ namebox(name) }}
+                <div class="mt-3 pl-5 tk-member-doc">
+                  <div class="tk-doc">{{ configdict[name].description | to_html }}</div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+        <section class="{{ 'mt-24' if configenvs else 'mt-12' }}">
+          <h2 class="text-2xl font-light mb-5 text-brand-primary" id="header-settings">Settings</h2>
+          <div class="space-y-10">
+            {% for setting in configsettings %}{{ show_setting(setting) }}{% endfor %}
+          </div>
+        </section>
+      </div>
+    </main>
+    </div>
+
+    <footer class="border-t border-black/10 bg-white/70 px-6 py-6 text-sm text-brand-muted text-center">
+      Generated with <a class="text-brand-primary hover:text-brand-accent" href="https://github.com/tokeo/tokeo">Tokeo</a> 🚀{% if tokeo_version %} ( {{ tokeo_version }} ){% endif %} and <a class="text-brand-primary hover:text-brand-accent" href="https://pdoc.dev">pdoc</a>{% if pdoc_version %} ( {{ pdoc_version }} ){% endif %}
+    </footer>
+  </div>
+{% endblock %}

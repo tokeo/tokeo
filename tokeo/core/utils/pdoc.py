@@ -1,6 +1,7 @@
 from functools import wraps
 import re
 import ast
+import textwrap
 
 
 def pdoc_replace_decorator(*args, **kwargs):
@@ -112,13 +113,22 @@ class DecoratedFunction:
             or None otherwise
 
         """
-        block_start = re.search(rf'\s*{self.func.funcdef()}\s+{self.func.name}', self.func.source, re.MULTILINE)
+        # `funcdef` is a method on pdoc3 and a property on pdoc (pdoc.dev);
+        # support both so the util works across the documented API versions
+        funcdef = getattr(self.func, 'funcdef', None)
+        funcdef = funcdef() if callable(funcdef) else funcdef
+        if not funcdef:
+            return None
+
+        block_start = re.search(rf'\s*{funcdef}\s+{self.func.name}', self.func.source, re.MULTILINE)
         if block_start is None:
             return None
 
         # get the source block from zero to function definition and
         # replace by simplest method just for ast parsing
-        block = f'{self.func.source[:block_start.end()]}_decorator(): pass'
+        # methods arrive indented (pdoc keeps the original indentation), which
+        # ast.parse rejects — dedent so class members parse like plain funcs
+        block = textwrap.dedent(f'{self.func.source[:block_start.end()]}_decorator(): pass')
         try:
             # safe parse the block
             tree = ast.parse(block)
