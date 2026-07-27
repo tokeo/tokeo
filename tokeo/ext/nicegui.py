@@ -25,9 +25,10 @@ polling mechanism.
 from sys import argv, executable as sys_executable
 from os import execv as os_execv
 from os.path import basename, dirname, isfile
-from multiprocessing.util import _exit_function as mp_exit_function
-from asyncio import sleep as asyncio_sleep
+from time import monotonic
 import importlib
+from asyncio import sleep as asyncio_sleep
+
 from tokeo.ext.argparse import Controller
 from tokeo.core.exc import TokeoError
 from cement.core.meta import MetaMixin
@@ -77,6 +78,9 @@ try:
 
         """
 
+        #: Event types that mean a file really changed
+        WATCH_EVENTS = frozenset({'created', 'deleted', 'modified', 'moved'})
+
         def __init__(self, patterns=None, ignore_patterns=None, ignore_directories=False, case_sensitive=False, callback=None):
             """
             Initialize the watchdog event handler.
@@ -117,7 +121,7 @@ try:
             - Only invokes the callback if one was provided during initialization
 
             """
-            if self.callback:
+            if self.callback and event.event_type in self.WATCH_EVENTS:
                 self.callback()
 
 except ImportError:
@@ -329,6 +333,8 @@ class TokeoNicegui(MetaMixin):
             hotload_dir=None,
             hotload_includes='*.py',
             hotload_excludes='.*, .py[cod], .sw.*, ~*',
+            hotload_interval=2.0,
+            hotload_settle=1.5,
             logging_level='warning',
             run_kwargs=None,
         )
@@ -371,6 +377,7 @@ class TokeoNicegui(MetaMixin):
         # watchdog files components
         self._hotload_dir = None
         self._watchdog_hotload_requested = False
+        self._watchdog_last_event = 0.0
         self._watchdog_observer = None
         self._watchdog_handler = None
 
@@ -429,7 +436,7 @@ class TokeoNicegui(MetaMixin):
             ignore_patterns=exclude_patterns,
             ignore_directories=False,
             case_sensitive=False,
-            callback=lambda: setattr(self, '_watchdog_hotload_requested', True),
+            callback=self._watchdog_on_event,
         )
         # Create observer
         self._watchdog_observer = Observer()
@@ -438,29 +445,40 @@ class TokeoNicegui(MetaMixin):
         # Start the observer
         self._watchdog_observer.start()
 
+    def _watchdog_on_event(self):
+        """
+        Record a detected file change for the hotload loop.
+
+        ### Notes
+
+        - Runs on the watchdog observer thread
+        - Stores the time of the change so `_watchdog_file_changes` can wait
+          for the burst to finish before restarting
+
+        """
+        self._watchdog_hotload_requested = True
+        self._watchdog_last_event = monotonic()
+
     async def _watchdog_file_changes(self):
         """
         Asynchronously monitor for file changes and handle app hot reload.
 
-        Periodically checks for file changes detected by watchdog and
-        initiates application shutdown when changes are detected.
-
         ### Notes
 
         - Runs as an asynchronous task in the FastAPI event loop
-        - Checks the _watchdog_hotload_requested flag every 2 seconds
-        - Triggers FastAPI shutdown when changes are detected
-        - The shutdown triggers the application restart through the hooks
+        - Checks the flag every `hotload_interval` seconds
+        - Waits for `hotload_settle` seconds of quiet, so a burst of writes
+          collapses into a single restart
+        - Triggers FastAPI shutdown, which restarts the app through the hooks
 
         """
+        interval = float(self._config('hotload_interval'))
+        settle = float(self._config('hotload_settle'))
         while True:
-            # Check if watchdog detected changes
-            if self._watchdog_hotload_requested:
+            if self._watchdog_hotload_requested and monotonic() - self._watchdog_last_event >= settle:
                 fastapi_app.shutdown()
                 break
-            else:
-                # Wait before checking again
-                await asyncio_sleep(2)
+            await asyncio_sleep(interval)
 
     def startup(self, hotload_dir=None, hotload=False):
         """
@@ -488,23 +506,37 @@ class TokeoNicegui(MetaMixin):
         - Starts the NiceGUI server with configuration from the application
 
         """
-        # load the api and routes modules
-        apis_module = importlib.import_module(self._apis_module) if self._apis_module else None
-        routes_module = importlib.import_module(self._routes_module) if self._routes_module else None
+        # a misconfigured routes setting cannot be fixed
+        # validate before start and always raise
+        if self._routes is not None and not isinstance(self._routes, str):
+            raise TokeoNiceguiError(
+                f'Misconfiguration for route handler. Must be null or name of method, but is: [{str(type(self._routes))}]'
+            )
 
-        # check default routes handler
-        if self._routes:
-            if isinstance(self._routes, str) and self._routes != '':
+        try:
+            # load the api and routes modules
+            apis_module = importlib.import_module(self._apis_module) if self._apis_module else None
+            routes_module = importlib.import_module(self._routes_module) if self._routes_module else None
+
+            # check default routes handler
+            if self._routes:
                 routes_handler = getattr(routes_module, self._routes, None)
                 # verify
                 if routes_handler is None:
                     raise TokeoNiceguiError(f'Route handler "{self._routes}" could not be found in module "{self._routes_module}"')
                 # initialize registered default route
                 routes_handler()
+
+        except Exception as err:
+            # when hotload a failed start stays running, so the next save
+            # can fix the error. _setup_watchdog() runs further down and
+            # is reached either way.
+            if hotload:
+                apis_module = routes_module = None
+                self.app.log.error(f'Loading apis and routes failed: {err}', exc_info=True)
             else:
-                raise TokeoNiceguiError(
-                    f'Misconfiguration for route handler. Must be null or name of method, but is: [{str(type(self._routes))}]'
-                )
+                # otherwise a failed start is a fail start and stops
+                raise
 
         # check config for watchdog
         if hotload:
@@ -639,10 +671,14 @@ class TokeoNicegui(MetaMixin):
         - Logs a message indicating that hotload is in progress
 
         """
+
+        # only needed for the replacement itself
+        from multiprocessing.util import _exit_function as mp_exit_function
+
         if self._watchdog_hotload_requested:
             self.app.log.info('Hotload webservice ...')
             mp_exit_function()
-            os_execv(sys_executable, ['python'] + argv)
+            os_execv(sys_executable, [sys_executable] + argv)
 
 
 class TokeoNiceguiController(Controller):
