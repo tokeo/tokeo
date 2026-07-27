@@ -325,11 +325,35 @@ Tokeo is designed to grow with your project. As you build, consider:
 <br/>
 <br/>
 
+## ⚖️ Licensing Philosophy: Fair Use & Legal Certainty
+
+I believe in empowering the community while building a sustainable ecosystem. That's why Tokeo and its extensions use a dual-approach to licensing:
+
+**The Tokeo Core Framework (Apache 2.0)**
+
+I transitioned the core Tokeo framework from its original MIT license to the **Apache 2.0 license**. This switch wasn't primarily about Tokeo itself. It was made to provide *you*, the implementer and the project, with absolute legal certainty. In addition, the Apache 2.0 license includes explicit patent grants and protection, giving your projects a legally safe and rock-solid foundation to build upon.
+
+**The Tokeo Fundi Agent AI Extension (Source-Available License)**
+
+The optional ```tokeo-fundi``` AI extension is governed by the custom **Tokeo-Fundi Source-Available License 1.0**. Please don't let this scare you off! I am deeply committed to keeping software free for the community. If you are a hobbyist, a startup, or a small team, ```tokeo-fundi``` is **free of charge** for you to use in any personal, internal or commercial project.
+
+However, to keep this project healthy, actively developed, and sustainable, this license introduces a fair-use threshold. Businesses with highly successful commercial operations (across the whole group: more than EUR 2,000,000 in fiscal year global gross revenue excluding VAT, or more than 50 FTEs) are required to purchase a commercial Enterprise License. Read the complete and authoritative terms in ```LICENSE.md``` of the [tokeo-fundi](https://github.com/tokeo/fundi/) distribution.
+
+I believe this is a fair balance: those who achieve significant economic success using this software should contribute back to the developers making it possible.
+
+<br/>
+<br/>
+
 ## ⭐ Support the Project
 
 Tokeo is built in the open, with working code over promises. If this approach is useful to you, a star on [GitHub](https://github.com/tokeo/tokeo) helps others find it -- issues, ideas, and pull requests are just as welcome.
 
-One note on contributions: we do not accept purely AI-generated issues or pull requests. We keep the human in the loop and use AI as an exoskeleton, not as a replacement.
+<br/>
+<br/>
+
+## A note on contributions
+
+We keep the human in the loop and use AI as an exoskeleton, not a replacement -- the same conviction that shapes the runtime itself. Purely AI-generated issues or pull requests are not accepted.
 
 <br/>
 <br/>
