@@ -10,13 +10,16 @@ from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_helpers import run_line
 
 
-_SMTPD = SmtpdServer(CaptureSmtpdEvents(), settings={
-    'max_processings': 1,
-    'auth_mode': 'AUTH_OPTIONAL',
-    'encrypt_mode': 'TLS_FORBIDDEN',
-    'pipelining_extension': True,
-    'internationalization_extensions': True,
-})
+_SMTPD = SmtpdServer(
+    CaptureSmtpdEvents(),
+    settings={
+        'max_processings': 1,
+        'auth_mode': 'AUTH_OPTIONAL',
+        'encrypt_mode': 'TLS_FORBIDDEN',
+        'pipelining_extension': True,
+        'internationalization_extensions': True,
+    },
+)
 
 
 def _session():
@@ -46,8 +49,6 @@ def test_ehlo_no_case_strip():
     helo_str = '  Process line unit test   '
     result = run_line(_SMTPD, session, f'eHlO {helo_str}')
     assert result == (
-        '250-Process line test - Greeting\r\n'
-        '250-8BITMIME\r\n250-SMTPUTF8\r\n250-PIPELINING\r\n'
-        '250-AUTH LOGIN PLAIN\r\n250 OK'
+        '250-Process line test - Greeting\r\n' '250-8BITMIME\r\n250-SMTPUTF8\r\n250-PIPELINING\r\n' '250-AUTH LOGIN PLAIN\r\n250 OK'
     )
     assert session.ctx.server.helo == helo_str.strip()

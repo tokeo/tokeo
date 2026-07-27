@@ -85,6 +85,7 @@ def test_self_log_from_sync_and_async_events_with_async_logging():
     # live dialog: a sync and an async event both call self.log while
     # on_logging_event itself is async -> scheduled on the loop, captured
     class Handler(AsyncLogging):
+
         def on_mail_from_event(self, ctx, mail_from_data):
             self.log.info('mail_from (sync event)')
 
@@ -118,6 +119,7 @@ def test_self_log_from_threaded_event_reaches_loop_threadsafe():
     # a @threaded event runs on a worker thread (no running loop there); the
     # bridge must schedule thread-safe onto the server loop
     class Handler(AsyncLogging):
+
         @threaded
         def on_message_data_event(self, ctx):
             self.log.info('data (threaded event)')
@@ -141,7 +143,7 @@ def test_self_log_from_threaded_event_reaches_loop_threadsafe():
             await srv.stop(wait_seconds_before_close=0.3)
 
     asyncio.run(scenario())
-    assert ('data (threaded event)' in [m for _, m in events.captured])
+    assert 'data (threaded event)' in [m for _, m in events.captured]
 
 
 def test_base_auth_deny_logs_via_bound_self_log():

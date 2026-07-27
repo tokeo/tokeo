@@ -20,8 +20,7 @@ class ThreadSafetyEvents(CaptureSmtpdEvents):
 
     def on_message_data_event(self, ctx):
         super().on_message_data_event(ctx)
-        if (ctx.envelope.mail_from != f'<{ctx.server.authentication_id}>'
-                or ctx.envelope.mail_from != ctx.envelope.rcpt_tos[0]):
+        if ctx.envelope.mail_from != f'<{ctx.server.authentication_id}>' or ctx.envelope.mail_from != ctx.envelope.rcpt_tos[0]:
             self.ev_fail_counter += 1
 
 

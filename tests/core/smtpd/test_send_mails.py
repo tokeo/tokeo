@@ -50,9 +50,13 @@ def test_net_smtp_simple_send_10_mails():
 def test_net_smtp_auth_plain_and_simple_send_1_mail():
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
-    run_server_client(ev, SETTINGS, lambda port: send_mail(
-        port, ENVELOPE_FROM, ENVELOPE_TO, mail,
-        authentication_id='administrator', password='password', auth_type='plain'))
+    run_server_client(
+        ev,
+        SETTINGS,
+        lambda port: send_mail(
+            port, ENVELOPE_FROM, ENVELOPE_TO, mail, authentication_id='administrator', password='password', auth_type='plain'
+        ),
+    )
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -60,9 +64,13 @@ def test_net_smtp_auth_plain_and_simple_send_1_mail():
 def test_net_smtp_auth_login_and_simple_send_1_mail():
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
-    run_server_client(ev, SETTINGS, lambda port: send_mail(
-        port, ENVELOPE_FROM, ENVELOPE_TO, mail,
-        authentication_id='administrator', password='password', auth_type='login'))
+    run_server_client(
+        ev,
+        SETTINGS,
+        lambda port: send_mail(
+            port, ENVELOPE_FROM, ENVELOPE_TO, mail, authentication_id='administrator', password='password', auth_type='login'
+        ),
+    )
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -71,9 +79,13 @@ def test_net_smtp_auth_plain_fail():
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
     with pytest.raises(smtplib.SMTPAuthenticationError):
-        run_server_client(ev, SETTINGS, lambda port: send_mail(
-            port, ENVELOPE_FROM, ENVELOPE_TO, mail,
-            authentication_id='administrator', password='error_password', auth_type='plain'))
+        run_server_client(
+            ev,
+            SETTINGS,
+            lambda port: send_mail(
+                port, ENVELOPE_FROM, ENVELOPE_TO, mail, authentication_id='administrator', password='error_password', auth_type='plain'
+            ),
+        )
 
 
 def test_mikel_mail_simple_send_1_mail():
@@ -88,9 +100,20 @@ def test_mikel_mail_simple_send_1_mail():
 def test_mikel_mail_simple_send_1_mail_starttls():
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
-    run_server_client(ev, SETTINGS, lambda port: send_mail(
-        port, ENVELOPE_FROM, ENVELOPE_TO, mail,
-        authentication_id='administrator', password='password', auth_type='login',
-        tls_enabled=True, tls_context=insecure_tls_context()))
+    run_server_client(
+        ev,
+        SETTINGS,
+        lambda port: send_mail(
+            port,
+            ENVELOPE_FROM,
+            ENVELOPE_TO,
+            mail,
+            authentication_id='administrator',
+            password='password',
+            auth_type='login',
+            tls_enabled=True,
+            tls_context=insecure_tls_context(),
+        ),
+    )
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'

@@ -29,10 +29,14 @@ def _plain(authzid, authcid, password):
 
 
 def _ehlo_auth_and_authcmd(settings):
-    banner, r = dialog(AuthEvents(), settings, [
-        b'EHLO me\r\n',
-        b'AUTH PLAIN ' + _plain('', 'user', 'secret').encode() + b'\r\n',
-    ])
+    banner, r = dialog(
+        AuthEvents(),
+        settings,
+        [
+            b'EHLO me\r\n',
+            b'AUTH PLAIN ' + _plain('', 'user', 'secret').encode() + b'\r\n',
+        ],
+    )
     ehlo_lines = r[0]
     advertised = any('AUTH' in line for line in ehlo_lines)
     starttls = any('STARTTLS' in line for line in ehlo_lines)
@@ -40,13 +44,15 @@ def _ehlo_auth_and_authcmd(settings):
 
 
 def test_when_auth_on_plain_hides_auth_but_offers_starttls():
-    advertised, starttls, reply = _ehlo_auth_and_authcmd({
-        'auth_mode': 'AUTH_OPTIONAL',
-        'encrypt_mode': 'TLS_WHEN_AUTH',
-    })
+    advertised, starttls, reply = _ehlo_auth_and_authcmd(
+        {
+            'auth_mode': 'AUTH_OPTIONAL',
+            'encrypt_mode': 'TLS_WHEN_AUTH',
+        }
+    )
     assert advertised is False
-    assert starttls is True          # the upgrade path is advertised
-    assert reply.startswith('530')   # ... and plaintext AUTH is refused
+    assert starttls is True  # the upgrade path is advertised
+    assert reply.startswith('530')  # ... and plaintext AUTH is refused
 
 
 def test_when_auth_after_starttls_offers_and_accepts_auth():
@@ -79,36 +85,42 @@ def test_when_auth_after_starttls_offers_and_accepts_auth():
             await _stop(server, task)
 
     ehlo1, ehlo2, auth_reply = asyncio.run(go())
-    assert not any('AUTH' in ln for ln in ehlo1)   # hidden while plaintext
-    assert any('AUTH' in ln for ln in ehlo2)       # offered once encrypted
-    assert auth_reply[0].startswith('235')         # and accepted
+    assert not any('AUTH' in ln for ln in ehlo1)  # hidden while plaintext
+    assert any('AUTH' in ln for ln in ehlo2)  # offered once encrypted
+    assert auth_reply[0].startswith('235')  # and accepted
 
 
 def test_tls_optional_keeps_reference_plaintext_auth():
     # TLS_OPTIONAL stays pure reference behaviour: AUTH advertised and
     # accepted on plaintext
-    advertised, _, reply = _ehlo_auth_and_authcmd({
-        'auth_mode': 'AUTH_OPTIONAL',
-        'encrypt_mode': 'TLS_OPTIONAL',
-    })
+    advertised, _, reply = _ehlo_auth_and_authcmd(
+        {
+            'auth_mode': 'AUTH_OPTIONAL',
+            'encrypt_mode': 'TLS_OPTIONAL',
+        }
+    )
     assert advertised is True
     assert reply.startswith('235')
 
 
 def test_tls_required_on_plain_refuses_auth():
-    advertised, _, reply = _ehlo_auth_and_authcmd({
-        'auth_mode': 'AUTH_OPTIONAL',
-        'encrypt_mode': 'TLS_REQUIRED',
-    })
+    advertised, _, reply = _ehlo_auth_and_authcmd(
+        {
+            'auth_mode': 'AUTH_OPTIONAL',
+            'encrypt_mode': 'TLS_REQUIRED',
+        }
+    )
     assert advertised is False
     assert reply.startswith('530')
 
 
 def test_tls_forbidden_offers_plain_auth():
-    advertised, starttls, reply = _ehlo_auth_and_authcmd({
-        'auth_mode': 'AUTH_OPTIONAL',
-        'encrypt_mode': 'TLS_FORBIDDEN',
-    })
+    advertised, starttls, reply = _ehlo_auth_and_authcmd(
+        {
+            'auth_mode': 'AUTH_OPTIONAL',
+            'encrypt_mode': 'TLS_FORBIDDEN',
+        }
+    )
     assert advertised is True
     assert starttls is False
     assert reply.startswith('235')
@@ -116,6 +128,7 @@ def test_tls_forbidden_offers_plain_auth():
 
 def test_parse_error_lists_the_new_mode():
     from tokeo.core.smtpd.server import SmtpdServer
+
     with pytest.raises(ValueError) as exc:
         SmtpdServer(AuthEvents(), settings={'encrypt_mode': 'TLS_NOPE'})
     assert 'TLS_WHEN_AUTH' in str(exc.value)

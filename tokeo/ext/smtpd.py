@@ -461,7 +461,9 @@ class TokeoSmtpd(MetaMixin):
         """Print the configured services."""
         for svc in self._config('services') or []:
             where = ', '.join(f"{lst.get('host')}:{lst.get('port')}" for lst in svc.get('listeners') or [])
-            self.app.print(f"{svc.get('name')}  events_handler={svc.get('events_handler')}  listeners=[{where}]  pre_fork={_pre_fork(svc)}")
+            self.app.print(
+                f'{svc.get("name")}  events_handler={svc.get("events_handler")}  listeners=[{where}]  pre_fork={_pre_fork(svc)}'
+            )
 
 
 class TokeoSmtpdController(Controller):

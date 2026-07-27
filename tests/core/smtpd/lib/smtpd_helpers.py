@@ -83,34 +83,43 @@ def make_cert(common_name, san_ips=(), san_dns=(), issuer_cert=None, issuer_key=
         # a CA needs certificate/CRL signing key usage under strict verification
         builder = builder.add_extension(
             x509.KeyUsage(
-                digital_signature=True, content_commitment=False, key_encipherment=False,
-                data_encipherment=False, key_agreement=False, key_cert_sign=True,
-                crl_sign=True, encipher_only=False, decipher_only=False,
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=False,
+                decipher_only=False,
             ),
             critical=True,
         )
     else:
         builder = builder.add_extension(
             x509.KeyUsage(
-                digital_signature=True, content_commitment=False, key_encipherment=True,
-                data_encipherment=False, key_agreement=False, key_cert_sign=False,
-                crl_sign=False, encipher_only=False, decipher_only=False,
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=True,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False,
             ),
             critical=True,
         )
         # server authentication for the leaf certificate
-        builder = builder.add_extension(
-            x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
+        builder = builder.add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
     if alt:
         builder = builder.add_extension(x509.SubjectAlternativeName(alt), critical=False)
     # subject key identifier on every cert, and an authority key identifier that
     # points at the issuer's key -- required for strict chain verification
     # (Python 3.13's ssl rejects a chain that is missing these)
-    builder = builder.add_extension(
-        x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+    builder = builder.add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
     if issuer_cert is not None:
-        builder = builder.add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_cert.public_key()), critical=False)
+        builder = builder.add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_cert.public_key()), critical=False)
     certificate = builder.sign(signing_key, hashes.SHA256())
     cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
     key_pem = key.private_bytes(
@@ -146,8 +155,18 @@ def verifying_tls_context(ca_file):
     return ctx
 
 
-def send_mail(port, mail_from, rcpt_to, message_data, authentication_id=None, password=None,
-              auth_type=None, tls_enabled=False, tls_context=None, ehlo_name='Integration Test client'):
+def send_mail(
+    port,
+    mail_from,
+    rcpt_to,
+    message_data,
+    authentication_id=None,
+    password=None,
+    auth_type=None,
+    tls_enabled=False,
+    tls_context=None,
+    ehlo_name='Integration Test client',
+):
     """
     Send one mail via smtplib.
 

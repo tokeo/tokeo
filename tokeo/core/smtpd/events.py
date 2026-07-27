@@ -104,8 +104,7 @@ def threaded(fn):
     # guard 1: @threaded on async def is meaningless (async runs inline, awaits)
     if inspect.iscoroutinefunction(fn):
         raise SmtpdContractError(
-            f"@threaded on async def '{fn.__name__}' is meaningless -- "
-            f'an async def runs inline and can await; drop one of the two'
+            f'@threaded on async def "{fn.__name__}" is meaningless! An async def runs inline and can await. Drop one of the two.'
         )
     fn._smtpd_threaded = True
     return fn
@@ -157,8 +156,7 @@ class SmtpdEvents:
             method = getattr(cls, name, None)
             if method is not None and getattr(method, '_smtpd_threaded', False):
                 raise SmtpdContractError(
-                    f'{cls.__name__}.{name} must not be @threaded -- '
-                    f'this event fires per data line and must stay inline'
+                    f'"{cls.__name__}.{name}" must not be @threaded. This event fires per data line and must stay inline.'
                 )
 
     def __init__(self, options=None):

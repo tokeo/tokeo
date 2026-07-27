@@ -74,8 +74,8 @@ def test_plan_single_service_stays_in_main_process():
 
 def test_plan_single_service_prefork_main_is_worker_one():
     plan = _plan([_svc('mx1', 3)], has_global_limit=True)
-    assert plan['inloop'][0]['name'] == 'mx1'          # main process serves
-    assert plan['forks'] == [(_svc('mx1', 3), 2)]      # plus N-1 workers
+    assert plan['inloop'][0]['name'] == 'mx1'  # main process serves
+    assert plan['forks'] == [(_svc('mx1', 3), 2)]  # plus N-1 workers
     assert plan['reuse'] == {'mx1'}
     assert plan['shared'] is True
 
@@ -85,7 +85,7 @@ def test_plan_multi_services_rules():
     plan = _plan(services, has_global_limit=True)
     assert [svc['name'] for svc in plan['inloop']] == ['mx2']
     assert [(svc['name'], count) for svc, count in plan['forks']] == [('mx1', 5), ('mx3', 1)]
-    assert plan['reuse'] == {'mx1'}                    # only groups > 1 share a port
+    assert plan['reuse'] == {'mx1'}  # only groups > 1 share a port
     assert plan['shared'] is True
     # all services forked: the master only supervises
     plan = _plan([_svc('mx1', 2), _svc('mx2', 1)], has_global_limit=False)
@@ -114,7 +114,7 @@ def test_shared_limits_count_across_processes():
     limits.release()
     limits.end_processing()
     limits.release()
-    limits.release()                                    # floor at 0
+    limits.release()  # floor at 0
     assert limits.active == 0 and limits.active_processings == 0
 
 
@@ -124,10 +124,10 @@ def test_shared_limits_slot_wait_recheck_interval():
     async def measure():
         limits.slot_free.clear()
         start = time.perf_counter()
-        await limits.slot_wait()                        # nobody sets the event
+        await limits.slot_wait()  # nobody sets the event
         return time.perf_counter() - start
 
-    assert asyncio.run(measure()) < 0.5                 # returns via the poll
+    assert asyncio.run(measure()) < 0.5  # returns via the poll
 
 
 # --- cement wiring ---------------------------------------------------------------
@@ -145,19 +145,25 @@ def test_extension_loads_into_cement_app():
                 'tokeo.ext.smtpd',
             ]
 
-    config = dict(smtpd=dict(services=[{
-        'name': 'mx-a',
-        'events_handler': 'tokeo.ext.smtpd.TokeoSmtpdEvents',
-        'listeners': [{'host': '127.0.0.1', 'port': 2525}],
-    }]))
+    config = dict(
+        smtpd=dict(
+            services=[
+                {
+                    'name': 'mx-a',
+                    'events_handler': 'tokeo.ext.smtpd.TokeoSmtpdEvents',
+                    'listeners': [{'host': '127.0.0.1', 'port': 2525}],
+                }
+            ]
+        )
+    )
     with SmtpdApp(config_defaults=config) as app:
         assert app.smtpd is not None
         assert [svc['name'] for svc in app.smtpd.services()] == ['mx-a']
         with pytest.raises(TokeoSmtpdError):
             app.smtpd.services(['nope'])
         with pytest.raises(TokeoSmtpdError):
-            app.smtpd.services(['mx-a', 'mx-a'])   # named twice must not start twice
-        app.smtpd.list()   # must run without raising
+            app.smtpd.services(['mx-a', 'mx-a'])  # named twice must not start twice
+        app.smtpd.list()  # must run without raising
         # the listener hosts reach the server (feeds the self-signed CN/SAN)
         server = app.smtpd._build_server(app.smtpd.services()[0], None)
         assert server.hosts == ['127.0.0.1']

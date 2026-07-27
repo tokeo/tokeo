@@ -205,13 +205,10 @@ def _parse_hosts(hosts):
     else:
         items = str(hosts).replace(' ', '').split(',')
     if not items or items == ['']:
-        raise ValueError(
-            'No hosts defined! Please use specific hostnames and / or ip_addresses or "*" for wildcard!'
-        )
+        raise ValueError('No hosts defined! Please use specific hostnames and / or ip_addresses or "*" for wildcard!')
     if '' in items:
         raise ValueError(
-            'Detected an empty identifier in given hosts! '
-            'Please use specific hostnames and / or ip_addresses or "*" for wildcard!'
+            'Detected an empty identifier in given hosts! Please use specific hostnames and / or ip_addresses or "*" for wildcard!'
         )
     return items
 

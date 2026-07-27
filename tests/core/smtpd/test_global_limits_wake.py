@@ -55,23 +55,19 @@ def test_release_on_service_a_wakes_waiter_on_service_b():
         port_b = srv_b._servers[0].sockets[0].getsockname()[1]
         loop = asyncio.get_event_loop()
         try:
-            mail_a = loop.run_in_executor(
-                None, lambda: send_mail(port_a, 'a@x.org', 'to@x.org', 'Subject: a\r\n\r\nA')
-            )
+            mail_a = loop.run_in_executor(None, lambda: send_mail(port_a, 'a@x.org', 'to@x.org', 'Subject: a\r\n\r\nA'))
             # wait until A really holds the one global slot
             deadline = loop.time() + 3.0
             while loop.time() < deadline and gl.active_processings < 1:
                 await asyncio.sleep(0.02)
             assert gl.active_processings == 1
 
-            mail_b = loop.run_in_executor(
-                None, lambda: send_mail(port_b, 'b@x.org', 'to@x.org', 'Subject: b\r\n\r\nB')
-            )
-            await asyncio.sleep(0.3)          # B is now waiting for the slot
-            assert events_b.delivered == []   # ... and did not get through yet
+            mail_b = loop.run_in_executor(None, lambda: send_mail(port_b, 'b@x.org', 'to@x.org', 'Subject: b\r\n\r\nB'))
+            await asyncio.sleep(0.3)  # B is now waiting for the slot
+            assert events_b.delivered == []  # ... and did not get through yet
 
-            events_a.gate.set()               # A finishes -> releases the slot
-            events_b.gate.set()               # let B pass once admitted
+            events_a.gate.set()  # A finishes -> releases the slot
+            events_b.gate.set()  # let B pass once admitted
             code_a, _ = await asyncio.wait_for(mail_a, 5.0)
             code_b, _ = await asyncio.wait_for(mail_b, 5.0)
             assert code_a == 250 and code_b == 250
@@ -110,13 +106,11 @@ def test_external_counter_release_is_seen_via_slot_wait_override():
         loop = asyncio.get_event_loop()
         try:
             gl.active_processings = 1  # as if another process holds the slot
-            mail = loop.run_in_executor(
-                None, lambda: send_mail(port, 'a@x.org', 'to@x.org', 'Subject: x\r\n\r\nhi')
-            )
+            mail = loop.run_in_executor(None, lambda: send_mail(port, 'a@x.org', 'to@x.org', 'Subject: x\r\n\r\nhi'))
             await asyncio.sleep(0.3)
             assert events.delivered == []  # throttled by the "foreign" slot
 
-            gl.active_processings = 0      # foreign process releases: NO event
+            gl.active_processings = 0  # foreign process releases: NO event
             code, _ = await asyncio.wait_for(mail, 5.0)
             assert code == 250 and len(events.delivered) == 1
         finally:

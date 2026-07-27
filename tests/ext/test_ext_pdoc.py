@@ -148,9 +148,7 @@ def test_strip_comment_markers_keeps_indentation():
     # only one space after the marker is consumed; a greedy `[ \t]*` would
     # eat the indentation too and flatten nested lists and code blocks
     text = '### - first level\n###     - nested\n### ```\n###   code\n### ```'
-    assert _strip_comment_markers(text) == (
-        '- first level\n    - nested\n```\n  code\n```'
-    )
+    assert _strip_comment_markers(text) == ('- first level\n    - nested\n```\n  code\n```')
 
 
 def test_strip_comment_markers_handles_empty_input():
@@ -270,7 +268,7 @@ def test_inject_hash_colon_docstrings_fills_pdoc_members(app, tmp_path, monkeypa
 # --------------------------------------------------------------------------------------
 
 
-BASE_YAML = '''### **Main Configuration**
+BASE_YAML = """### **Main Configuration**
 ###
 ### ### Loading order
 ###
@@ -285,42 +283,34 @@ smtp:
 
 log.colorlog:
   level: info
-'''
+"""
 
-LOCAL_YAML = '''### Secrets, never checked in.
+LOCAL_YAML = """### Secrets, never checked in.
 ---
 
 smtp:
   password: PLAINTEXT-SECRET
   host: mail.internal
-'''
+"""
 
 
 @pytest.fixture
 def base_settings(app):
     import yaml
 
-    return app.pdoc._config_settings(
-        'base', BASE_YAML.split('\n'), yaml.safe_load(BASE_YAML)
-    )
+    return app.pdoc._config_settings('base', BASE_YAML.split('\n'), yaml.safe_load(BASE_YAML))
 
 
 @pytest.fixture
 def local_settings(app):
     import yaml
 
-    return app.pdoc._config_settings(
-        'development.local', LOCAL_YAML.split('\n'), yaml.safe_load(LOCAL_YAML)
-    )
+    return app.pdoc._config_settings('development.local', LOCAL_YAML.split('\n'), yaml.safe_load(LOCAL_YAML))
 
 
 def test_config_settings_extracts_intro_and_source(base_settings):
-    assert base_settings['smtp']['intro'] == (
-        'Outgoing mail.\nSecond line of the intro.'
-    )
-    assert base_settings['smtp']['source'] == (
-        'smtp:\n  host: localhost\n  port: 25'
-    )
+    assert base_settings['smtp']['intro'] == ('Outgoing mail.\nSecond line of the intro.')
+    assert base_settings['smtp']['source'] == ('smtp:\n  host: localhost\n  port: 25')
 
 
 def test_config_settings_block_ends_at_a_dotted_key(base_settings):
@@ -372,7 +362,8 @@ def collect_config_sections(app, tmp_path, monkeypatch):
 
     config_dir = build_config_tree(tmp_path / 'config' / 'spiral')
     monkeypatch.setattr(
-        app, 'env',
+        app,
+        'env',
         types.SimpleNamespace(
             APP_CONFIG_DIR=str(config_dir),
             get_config_files=lambda app_env='base', app_config_file_suffix='.yaml': (
@@ -384,8 +375,10 @@ def collect_config_sections(app, tmp_path, monkeypatch):
     app.pdoc.set_show_config(show=True)
 
     import pdoc.render
+
     monkeypatch.setattr(
-        pdoc.render.env, 'get_template',
+        pdoc.render.env,
+        'get_template',
         lambda name: types.SimpleNamespace(render=lambda **kw: '<html></html>'),
     )
     app.pdoc._render_config_page(str(tmp_path / 'out'))
@@ -406,11 +399,7 @@ def fake_appenv_files(config_dir, app_env, suffix):
     env_file = str(config_dir / f'{app_env}{suffix}')
     configs = [env_file] if os.path.isfile(env_file) else []
     local_file = str(config_dir / f'{app_env}.local{suffix}')
-    local = (
-        [local_file]
-        if app_env != 'base' and os.path.isfile(local_file)
-        else []
-    )
+    local = [local_file] if app_env != 'base' and os.path.isfile(local_file) else []
     for path in sorted(glob.glob(str(config_dir / f'{app_env}.d' / '**' / f'*{suffix}'), recursive=True)):
         if path.endswith(f'.local{suffix}'):
             if app_env != 'base':
@@ -522,9 +511,15 @@ def test_watch_dirs_drops_directories_outside_the_project(app, tmp_path, monkeyp
     outside_dir = tmp_path / 'site-packages' / 'tokeo'
     outside_dir.mkdir(parents=True)
     monkeypatch.chdir(project)
-    stub_dirs(app, monkeypatch, [
-        str(project / 'spiral'), str(project / 'tests'), str(outside_dir),
-    ])
+    stub_dirs(
+        app,
+        monkeypatch,
+        [
+            str(project / 'spiral'),
+            str(project / 'tests'),
+            str(outside_dir),
+        ],
+    )
 
     dirs, outside = app.pdoc._watch_dirs()
 
@@ -536,15 +531,22 @@ def test_watch_dirs_collapses_nested_directories(app, tmp_path, monkeypatch):
     project = tmp_path / 'project'
     (project / 'spiral' / 'core').mkdir(parents=True)
     monkeypatch.chdir(project)
-    stub_dirs(app, monkeypatch, [
-        str(project / 'spiral'), str(project / 'spiral' / 'core'),
-    ])
+    stub_dirs(
+        app,
+        monkeypatch,
+        [
+            str(project / 'spiral'),
+            str(project / 'spiral' / 'core'),
+        ],
+    )
 
     assert app.pdoc._watch_dirs()[0] == [str(project / 'spiral')]
 
 
 def test_watch_dirs_does_not_confuse_a_prefix_with_a_parent(
-    app, tmp_path, monkeypatch,
+    app,
+    tmp_path,
+    monkeypatch,
 ):
     # `proj2` starts with `proj` but is not inside it; a plain startswith()
     # check on the paths would wrongly keep it
@@ -566,10 +568,13 @@ def test_watch_dirs_includes_the_docstrings_dirs(app, tmp_path, monkeypatch):
     (project / 'snippets').mkdir()
     monkeypatch.chdir(project)
     monkeypatch.setattr(
-        app.pdoc, '_module_dirs', lambda: [str(project / 'spiral')],
+        app.pdoc,
+        '_module_dirs',
+        lambda: [str(project / 'spiral')],
     )
     monkeypatch.setattr(
-        app.pdoc, '_resolve_docstrings_dirs',
+        app.pdoc,
+        '_resolve_docstrings_dirs',
         lambda: [str(project / 'snippets')],
     )
 
@@ -579,7 +584,9 @@ def test_watch_dirs_includes_the_docstrings_dirs(app, tmp_path, monkeypatch):
 
 
 def test_watch_dirs_includes_the_config_dir_when_appenv_is_loaded(
-    app, tmp_path, monkeypatch,
+    app,
+    tmp_path,
+    monkeypatch,
 ):
     import types
 
@@ -589,7 +596,8 @@ def test_watch_dirs_includes_the_config_dir_when_appenv_is_loaded(
     monkeypatch.chdir(project)
     stub_dirs(app, monkeypatch, [str(project / 'spiral')])
     monkeypatch.setattr(
-        app, 'env',
+        app,
+        'env',
         types.SimpleNamespace(APP_CONFIG_DIR=str(project / 'config')),
         raising=False,
     )
@@ -605,7 +613,9 @@ def test_watch_dirs_includes_the_config_dir_when_appenv_is_loaded(
 
 
 def test_init_md_becomes_the_docstring_of_a_namespace_package(
-    app, tmp_path, monkeypatch,
+    app,
+    tmp_path,
+    monkeypatch,
 ):
     # a directory with only __init__.md has no python docstring, so pdoc
     # would render the package page blank
@@ -766,7 +776,9 @@ def render_sidebar(tmp_path, monkeypatch, source, package_name='sample'):
     pdoc.doc.Module.from_name.cache_clear()
 
     defaults = pdoc_defaults(
-        tmp_path, modules=[package_name], show_config=False,
+        tmp_path,
+        modules=[package_name],
+        show_config=False,
     )
     with PdocTest(config_defaults=defaults) as booted:
         booted.run()
@@ -835,15 +847,14 @@ def test_sidebar_bare_classes_are_not_indented(tmp_path, monkeypatch):
     # with no chevron anywhere in the section there is nothing to line up
     # with, so padding would only push the names out of line with every
     # other sidebar section
-    entries = class_entries(
-        render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['bare'], 'bare_a')
-    )
+    entries = class_entries(render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['bare'], 'bare_a'))
 
     assert entries == {'Alpha': 'py-0.5', 'Beta': 'py-0.5'}
 
 
 def test_sidebar_bare_classes_align_with_the_functions_section(
-    tmp_path, monkeypatch,
+    tmp_path,
+    monkeypatch,
 ):
     # the visible symptom of a wrong padding: class names sitting further in
     # than the function names right below them
@@ -871,9 +882,7 @@ def test_sidebar_expandable_classes_list_their_members(tmp_path, monkeypatch):
 def test_sidebar_mixed_classes_line_up_with_the_chevron(tmp_path, monkeypatch):
     # here the padding is earned: the plain link has to start where the
     # expandable one's name starts, past its chevron
-    entries = class_entries(
-        render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_a')
-    )
+    entries = class_entries(render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_a'))
 
     assert entries['Beta'] == 'expandable'
     assert entries['Alpha'] == 'py-0.5 pl-3.5'
@@ -917,7 +926,9 @@ def test_serve_answers_and_stops_via_the_started_monitor(app, tmp_path, monkeypa
 
     # `_watch()` returns the monitor; serve() runs it in a daemon thread
     monkeypatch.setattr(
-        app.pdoc, '_watch', lambda restarted=False: monitor,
+        app.pdoc,
+        '_watch',
+        lambda restarted=False: monitor,
     )
 
     thread = threading.Thread(target=lambda: app.pdoc.serve(watch=True))
@@ -976,7 +987,10 @@ def test_documented_appends_config_when_the_page_is_written(app, monkeypatch):
     app.pdoc.set_modules(['spiral'])
     app.pdoc.set_show_config(show=True)
     monkeypatch.setattr(
-        app, 'env', types.SimpleNamespace(APP_CONFIG_DIR='/x'), raising=False,
+        app,
+        'env',
+        types.SimpleNamespace(APP_CONFIG_DIR='/x'),
+        raising=False,
     )
 
     assert app.pdoc._documented() == ['spiral', 'config']
@@ -988,7 +1002,10 @@ def test_documented_omits_config_when_disabled(app, monkeypatch):
     app.pdoc.set_modules(['spiral'])
     app.pdoc.set_show_config(show=False)
     monkeypatch.setattr(
-        app, 'env', types.SimpleNamespace(APP_CONFIG_DIR='/x'), raising=False,
+        app,
+        'env',
+        types.SimpleNamespace(APP_CONFIG_DIR='/x'),
+        raising=False,
     )
 
     assert app.pdoc._documented() == ['spiral']
@@ -1045,8 +1062,12 @@ def test_setup_reads_the_configured_show_config(tmp_path):
 
 def test_set_show_config_accepts_truthy_strings(app):
     for value, expected in (
-        (True, True), ('yes', True), ('1', True),
-        (False, False), ('no', False), ('off', False),
+        (True, True),
+        ('yes', True),
+        ('1', True),
+        (False, False),
+        ('no', False),
+        ('off', False),
     ):
         app.pdoc.set_show_config(show=value)
         assert app.pdoc._show_config is expected
@@ -1072,7 +1093,8 @@ def watch_output(app, monkeypatch, tmp_path, restarted=False):
     lines = {'info': [], 'debug': []}
     for level in lines:
         monkeypatch.setattr(
-            app.log, level,
+            app.log,
+            level,
             lambda msg, *a, _l=level, **k: lines[_l].append(str(msg)),
         )
 
@@ -1129,7 +1151,8 @@ def test_hotload_hands_the_restart_flag_on(app, monkeypatch):
 def test_hotload_does_not_repeat_the_restart_flag(app, monkeypatch):
     seen = {}
     monkeypatch.setattr(
-        'tokeo.ext.pdoc.os.execv', lambda path, argv: seen.update(argv=argv),
+        'tokeo.ext.pdoc.os.execv',
+        lambda path, argv: seen.update(argv=argv),
     )
     monkeypatch.setattr(
         'sys.argv',
@@ -1251,7 +1274,9 @@ def test_render_reports_after_a_restart_too(tmp_path, monkeypatch):
     with booted_app(tmp_path) as booted:
         monkeypatch.setattr(booted.pdoc, '_render', lambda **kwargs: None)
         monkeypatch.setattr(
-            booted.log, 'info', lambda msg, *a, **k: lines.append(str(msg)),
+            booted.log,
+            'info',
+            lambda msg, *a, **k: lines.append(str(msg)),
         )
         monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--restart'])
         booted.run()
@@ -1309,11 +1334,13 @@ def run_cli(tmp_path, monkeypatch, argv):
 
     with booted_app(tmp_path) as booted:
         monkeypatch.setattr(
-            booted.pdoc, 'render',
+            booted.pdoc,
+            'render',
             lambda **kwargs: calls.append(('render', kwargs.get('raise_on_error'))),
         )
         monkeypatch.setattr(
-            booted.pdoc, 'serve',
+            booted.pdoc,
+            'serve',
             lambda **kwargs: calls.append(('serve', kwargs.get('watch'))),
         )
         monkeypatch.setattr(booted._meta, 'argv', argv)
@@ -1347,7 +1374,9 @@ def test_both_config_switches_are_a_contradiction(tmp_path, monkeypatch):
     with booted_app(tmp_path) as booted:
         monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
         monkeypatch.setattr(
-            booted._meta, 'argv', ['pdoc', 'render', '--config', '--no-config'],
+            booted._meta,
+            'argv',
+            ['pdoc', 'render', '--config', '--no-config'],
         )
 
         with pytest.raises(TokeoPdocError) as excinfo:
@@ -1373,8 +1402,10 @@ def test_no_config_switch_removes_config_from_the_summary(tmp_path, monkeypatch)
     with booted_app(tmp_path, show_config=True) as booted:
         monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
         monkeypatch.setattr(
-            booted, 'env',
-            types.SimpleNamespace(APP_CONFIG_DIR=str(tmp_path)), raising=False,
+            booted,
+            'env',
+            types.SimpleNamespace(APP_CONFIG_DIR=str(tmp_path)),
+            raising=False,
         )
         monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--no-config'])
         booted.run()
@@ -1390,7 +1421,8 @@ def test_controller_renders_only_without_flags(tmp_path, monkeypatch):
 
 def test_controller_serves_after_rendering(tmp_path, monkeypatch):
     assert run_cli(tmp_path, monkeypatch, ['pdoc', 'render', '--serve']) == [
-        ('render', True), ('serve', False),
+        ('render', True),
+        ('serve', False),
     ]
 
 
@@ -1406,7 +1438,8 @@ def test_controller_watches_and_tolerates_a_failed_render(tmp_path, monkeypatch)
     # a broken template must not end the watch session, the next save fixes it
     argv = ['pdoc', 'render', '--serve', '--watch']
     assert run_cli(tmp_path, monkeypatch, argv) == [
-        ('render', False), ('serve', True),
+        ('render', False),
+        ('serve', True),
     ]
 
 
@@ -1419,7 +1452,8 @@ def test_controller_passes_positional_modules(tmp_path, monkeypatch):
 
     with booted_app(tmp_path, modules=['from', 'config']) as booted:
         monkeypatch.setattr(
-            booted.pdoc, 'render',
+            booted.pdoc,
+            'render',
             lambda **kwargs: seen.update(kwargs),
         )
         monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', 'spiral', 'tests'])

@@ -128,8 +128,9 @@ class TlsTransport:
 
     """
 
-    def __init__(self, cert_path=None, key_path=None, cert=None, key=None, ciphers=None, methods=None,
-                 cert_cn='', cert_san=None, logger=None):
+    def __init__(
+        self, cert_path=None, key_path=None, cert=None, key=None, ciphers=None, methods=None, cert_cn='', cert_san=None, logger=None
+    ):
         self._logger = logger
         cert_path = (cert_path or '').strip() or None
         key_path = (key_path or '').strip() or None
@@ -229,14 +230,21 @@ class TlsTransport:
             .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=False)
             .add_extension(
                 x509.KeyUsage(
-                    digital_signature=True, content_commitment=False, key_encipherment=True,
-                    data_encipherment=False, key_agreement=False, key_cert_sign=False,
-                    crl_sign=False, encipher_only=False, decipher_only=False,
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=True,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
                 ),
                 critical=True,
             )
             .add_extension(
-                x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False,
+                x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
+                critical=False,
             )
             .add_extension(x509.SubjectAlternativeName(alt_names), critical=False)
             .sign(key, hashes.SHA256())
