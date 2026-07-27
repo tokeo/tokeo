@@ -23,18 +23,19 @@ bundles the following third-party assets. Each retains its own license.
 Web fonts (self-hosted under ```assets/fonts/```):
 
 - Inter — Copyright The Inter Project Authors; SIL Open Font License 1.1.
-  Full text: `assets/fonts/Inter-OFL.txt`.
+  Full text: ```assets/fonts/Inter-OFL.txt```.
 - Source Code Pro — Copyright Adobe (Adobe Systems Incorporated);
   SIL Open Font License 1.1.
-  Full text: `assets/fonts/SourceCodePro-OFL.txt`.
+  Full text: ```assets/fonts/SourceCodePro-OFL.txt```.
 
 Styles and scripts:
 
-- The bundled `tailwind.css` is generated with Tailwind CSS
+- The bundled ```assets/tailwind.min.css``` is generated with Tailwind CSS
   (Copyright Tailwind Labs, Inc.; MIT License); the MIT banner is retained
-  in the file.
+  in the file. The accompanying ```assets/tokeo.theme.css``` is tokeo's own
+  plain-CSS theme (Apache-2.0, part of this product).
 - highlight.js (BSD-3-Clause) and Mermaid (MIT) are bundled under
-  `assets/` for client-side syntax highlighting and diagrams.
+  ```assets/``` for client-side syntax highlighting and diagrams.
 
 The documentation renderer itself uses pdoc (https://pdoc.dev, MIT) and
 Python-Markdown (BSD-3-Clause) at runtime, declared as dependencies.
