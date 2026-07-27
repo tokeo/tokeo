@@ -34,8 +34,14 @@ Styles and scripts:
   (Copyright Tailwind Labs, Inc.; MIT License); the MIT banner is retained
   in the file. The accompanying ```assets/tokeo.theme.css``` is tokeo's own
   plain-CSS theme (Apache-2.0, part of this product).
-- highlight.js (BSD-3-Clause) and Mermaid (MIT) are bundled under
-  ```assets/``` for client-side syntax highlighting and diagrams.
+- highlight.js — Copyright (c) 2006 Ivan Sagalaev; BSD-3-Clause. Bundled as
+  ```assets/highlight.min.js``` together with the themes under
+  ```assets/hljs/styles/```, each of which retains its own banner.
+  Full text: ```assets/highlightjs-LICENSE.txt```.
+- Mermaid — Copyright (c) 2014-2022 Knut Sveidqvist; MIT License. Bundled as
+  ```assets/mermaid.min.js```. That build embeds further third-party
+  components under their own licenses; see the note in the license file.
+  Full text: ```assets/mermaid-LICENSE.txt```.
 
-The documentation renderer itself uses pdoc (https://pdoc.dev, MIT) and
+The documentation renderer itself uses pdoc (https://pdoc.dev, MIT-0) and
 Python-Markdown (BSD-3-Clause) at runtime, declared as dependencies.
