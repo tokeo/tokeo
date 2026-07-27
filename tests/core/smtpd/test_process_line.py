@@ -37,14 +37,17 @@ class TestProcessLine:
 
     @classmethod
     def setup_class(cls):
-        cls.smtpd = SmtpdServer(ProcessLineEvents(), settings={
-            'max_processings': 1,
-            'auth_mode': 'AUTH_OPTIONAL',
-            'encrypt_mode': 'TLS_OPTIONAL',
-            'tls_cert_cn': 'localhost',
-            'pipelining_extension': False,
-            'internationalization_extensions': True,
-        })
+        cls.smtpd = SmtpdServer(
+            ProcessLineEvents(),
+            settings={
+                'max_processings': 1,
+                'auth_mode': 'AUTH_OPTIONAL',
+                'encrypt_mode': 'TLS_OPTIONAL',
+                'tls_cert_cn': 'localhost',
+                'pipelining_extension': False,
+                'internationalization_extensions': True,
+            },
+        )
         session = SmtpdSession()
         cls.smtpd.process_reset_session(session, connection_initialize=True)
         server = session.ctx.server
@@ -64,9 +67,7 @@ class TestProcessLine:
     def test_10_ehlo(self):
         result = self._line('EHLO Process line unit test')
         assert result == (
-            '250-Process line test - Greeting\r\n'
-            '250-8BITMIME\r\n250-SMTPUTF8\r\n'
-            '250-AUTH LOGIN PLAIN\r\n250-STARTTLS\r\n250 OK'
+            '250-Process line test - Greeting\r\n' '250-8BITMIME\r\n250-SMTPUTF8\r\n' '250-AUTH LOGIN PLAIN\r\n250-STARTTLS\r\n250 OK'
         )
         assert self.session.ctx.server.helo == 'Process line unit test'
 

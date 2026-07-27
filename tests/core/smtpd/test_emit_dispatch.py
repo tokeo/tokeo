@@ -44,6 +44,7 @@ class MixedEvents(SmtpdEvents):
 
 def _ctx():
     from tokeo.core.smtpd.context import SmtpdContext
+
     ctx = SmtpdContext()
     ctx.server.remote_ip = '127.0.0.1'
     ctx.server.remote_port = '12345'

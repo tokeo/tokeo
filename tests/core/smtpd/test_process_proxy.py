@@ -14,15 +14,18 @@ from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_helpers import run_line
 
 
-_SMTPD = SmtpdServer(CaptureSmtpdEvents(), settings={
-    'max_processings': 1,
-    'auth_mode': 'AUTH_OPTIONAL',
-    'encrypt_mode': 'TLS_OPTIONAL',
-    'tls_cert_cn': 'localhost',
-    'proxy_extension': True,
-    'pipelining_extension': False,
-    'internationalization_extensions': True,
-})
+_SMTPD = SmtpdServer(
+    CaptureSmtpdEvents(),
+    settings={
+        'max_processings': 1,
+        'auth_mode': 'AUTH_OPTIONAL',
+        'encrypt_mode': 'TLS_OPTIONAL',
+        'tls_cert_cn': 'localhost',
+        'proxy_extension': True,
+        'pipelining_extension': False,
+        'internationalization_extensions': True,
+    },
+)
 
 
 def _session():

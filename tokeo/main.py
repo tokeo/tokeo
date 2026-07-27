@@ -128,6 +128,7 @@ def main():
             # the template package is not necessary to run apps with tokeo framework
             try:
                 import tokeo.ramani  # noqa: F401
+
                 app._meta.template_module = 'tokeo.ramani'
             except ImportError:
                 pass

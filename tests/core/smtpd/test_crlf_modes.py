@@ -65,15 +65,7 @@ def run_wire(events, settings, wire_body):
 
 
 #: mixed endings, interior CR, LF-only separator, dot-stuffing, CR before CRLF
-NASTY = (
-    b'Subject: t\n'
-    b'X: a\rb\r\n'
-    b'\n'
-    b'A\r\n'
-    b'B\n'
-    b'..C\r\n'
-    b'D\r\r\n'
-)
+NASTY = b'Subject: t\n' b'X: a\rb\r\n' b'\n' b'A\r\n' b'B\n' b'..C\r\n' b'D\r\r\n'
 
 
 def test_crlf_leave_preserves_wire_bytes():

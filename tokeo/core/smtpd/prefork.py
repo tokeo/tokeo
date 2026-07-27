@@ -104,6 +104,7 @@ def supervise_workers(child_pids, stop_signals=_STOP_SIGNALS):
     - **stop_signals** (tuple): Signals that trigger the forward-and-reap
 
     """
+
     def _forward(_signum, _frame):
         for pid in child_pids:
             try:

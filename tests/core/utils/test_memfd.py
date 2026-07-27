@@ -74,7 +74,7 @@ def test_loads_ssl_cert_chain_from_memory():
     cert_pem, key_pem = _self_signed_pem()
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     with memory_paths(cert_pem, key_pem) as (cert_ref, key_ref):
-        context.load_cert_chain(cert_ref, key_ref)      # must not raise
+        context.load_cert_chain(cert_ref, key_ref)  # must not raise
 
 
 @pytest.mark.skipif(not os.path.isdir('/dev/fd'), reason='needs /dev/fd')

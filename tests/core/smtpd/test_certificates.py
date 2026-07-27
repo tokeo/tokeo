@@ -19,7 +19,12 @@ import pytest
 from tokeo.core.smtpd.tls import TLS_METHODS_LEGACY, TLS_CIPHERS_LEGACY
 from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_helpers import (
-    read_message, send_mail, run_server_client, insecure_tls_context, verifying_tls_context, make_cert,
+    read_message,
+    send_mail,
+    run_server_client,
+    insecure_tls_context,
+    verifying_tls_context,
+    make_cert,
 )
 
 
@@ -50,8 +55,7 @@ def _certs():
     _write(path('srv.key.pem'), simple_key)
     # a CA and a server certificate signed by it (for the chain cases)
     ca_cert_obj, ca_key_obj, ca_pem, _ = make_cert('Tokeo Test CA', is_ca=True)
-    _, _, chain_cert, chain_key = make_cert(
-        '127.0.0.1', san_ips=['127.0.0.1'], issuer_cert=ca_cert_obj, issuer_key=ca_key_obj)
+    _, _, chain_cert, chain_key = make_cert('127.0.0.1', san_ips=['127.0.0.1'], issuer_cert=ca_cert_obj, issuer_key=ca_key_obj)
     _write(path('ca.pem'), ca_pem)
     _write(path('chain.key.pem'), chain_key)
     # chain file = server cert + CA cert; and a combined chain + key file
@@ -90,10 +94,21 @@ def _tls_settings(cert_path, key_path):
 
 def _deliver(events, settings, tls_context):
     mail = read_message('simple_mail.msg')
-    run_server_client(events, settings, lambda port: send_mail(
-        port, ENVELOPE_FROM, ENVELOPE_TO, mail,
-        authentication_id='administrator', password='password', auth_type='login',
-        tls_enabled=True, tls_context=tls_context))
+    run_server_client(
+        events,
+        settings,
+        lambda port: send_mail(
+            port,
+            ENVELOPE_FROM,
+            ENVELOPE_TO,
+            mail,
+            authentication_id='administrator',
+            password='password',
+            auth_type='login',
+            tls_enabled=True,
+            tls_context=tls_context,
+        ),
+    )
     return mail
 
 
@@ -258,11 +273,13 @@ def test_self_signed_derives_names_from_hosts():
 
 
 def test_self_signed_uses_configured_names():
-    certificate = _peer_certificate({
-        'encrypt_mode': 'TLS_OPTIONAL',
-        'tls_cert_cn': 'mx.tokeo.test',
-        'tls_cert_san': 'alt.tokeo.test',
-    })
+    certificate = _peer_certificate(
+        {
+            'encrypt_mode': 'TLS_OPTIONAL',
+            'tls_cert_cn': 'mx.tokeo.test',
+            'tls_cert_san': 'alt.tokeo.test',
+        }
+    )
     cn, dns = _names(certificate)
     assert cn == 'mx.tokeo.test'
     assert set(dns) == {'mx.tokeo.test', 'alt.tokeo.test'}
@@ -275,11 +292,11 @@ def test_plain_smtpd_runs_without_cryptography():
     # importing and building a server without tls must work when the
     # cryptography package is absent (blocked in a fresh interpreter)
     code = (
-        "import sys\n"
+        'import sys\n'
         "sys.modules['cryptography'] = None\n"
-        "from tokeo.core.smtpd.server import SmtpdServer\n"
-        "from tokeo.core.smtpd.events import SmtpdEvents\n"
-        "SmtpdServer(SmtpdEvents())\n"
+        'from tokeo.core.smtpd.server import SmtpdServer\n'
+        'from tokeo.core.smtpd.events import SmtpdEvents\n'
+        'SmtpdServer(SmtpdEvents())\n'
         "print('OK')\n"
     )
     done = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, env=dict(os.environ))

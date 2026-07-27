@@ -24,14 +24,7 @@ from tests.core.smtpd.lib.smtpd_helpers import send_mail
 from tests.core.smtpd.test_crlf_modes import run_wire
 
 
-MESSAGE = (
-    'Subject: spool test\r\n'
-    'From: a@x.org\r\n'
-    '\r\n'
-    'line one\r\n'
-    '.leading dot gets stuffed by the client\r\n'
-    'last line'
-)
+MESSAGE = 'Subject: spool test\r\n' 'From: a@x.org\r\n' '\r\n' 'line one\r\n' '.leading dot gets stuffed by the client\r\n' 'last line'
 
 
 class Capture(SmtpdEvents):
@@ -112,9 +105,7 @@ def _run(events, settings, messages=(MESSAGE,), debug=False):
         loop = asyncio.get_event_loop()
         try:
             for msg in messages:
-                code, _ = await loop.run_in_executor(
-                    None, lambda m=msg: send_mail(port, 'a@x.org', 'to@y.org', m)
-                )
+                code, _ = await loop.run_in_executor(None, lambda m=msg: send_mail(port, 'a@x.org', 'to@y.org', m))
                 assert code == 250
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
@@ -139,6 +130,7 @@ def test_data_holds_only_headers_without_separator_line(tmp_path):
     _run(events, {'spool': str(tmp_path) + '/'})
     assert events.seen[0]['data'] == b'Subject: spool test\r\nFrom: a@x.org\r\n'
     import email
+
     assert email.message_from_bytes(events.seen[0]['data'])['Subject'] == 'spool test'
 
 
@@ -191,8 +183,8 @@ def test_file_name_pattern_and_prefix(tmp_path):
 def test_file_deleted_after_event(tmp_path):
     events = Capture()
     _run(events, {'spool': str(tmp_path) + '/'})
-    assert events.seen[0]['file'] is not None      # existed during the event
-    assert os.listdir(tmp_path) == []              # gone afterwards
+    assert events.seen[0]['file'] is not None  # existed during the event
+    assert os.listdir(tmp_path) == []  # gone afterwards
 
 
 def test_debug_keeps_delivered_files(tmp_path):
@@ -215,6 +207,7 @@ def test_two_messages_one_connection_get_fresh_files(tmp_path):
 
         def client():
             import smtplib
+
             c = smtplib.SMTP('127.0.0.1', port, timeout=10)
             c.ehlo('twice')
             for body in ('first', 'second'):
@@ -272,7 +265,7 @@ def test_early_keep_mid_stream_completes_at_target(tmp_path):
 
 def test_manual_rename_takeover_still_safe(tmp_path):
     events = RenameCapture()
-    _run(events, {'spool': str(tmp_path) + '/'})   # unlink must not raise
+    _run(events, {'spool': str(tmp_path) + '/'})  # unlink must not raise
     target = events.seen[0]['target']
     assert os.path.exists(target)
     with open(target, 'rb') as f:
@@ -291,6 +284,7 @@ def _abort_mid_data(tmp_path, debug):
 
         def client():
             import smtplib
+
             c = smtplib.SMTP('127.0.0.1', port, timeout=10)
             c.ehlo('abort')
             c.mail('a@x.org')
@@ -345,7 +339,7 @@ def test_data_size_cap_works_in_spool_mode(tmp_path):
             await srv.stop(wait_seconds_before_close=0.3)
 
     asyncio.run(go())
-    assert os.listdir(tmp_path) == []   # aborted file cleaned up
+    assert os.listdir(tmp_path) == []  # aborted file cleaned up
 
 
 class DoubleKeep(Capture):
