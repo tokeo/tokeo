@@ -351,6 +351,101 @@ def test_config_settings_returns_empty_for_a_non_mapping(app):
 
 
 # --------------------------------------------------------------------------------------
+# config page: which files appear and in what order
+# --------------------------------------------------------------------------------------
+
+
+def build_config_tree(root):
+    """A config dir covering every file kind appenv knows."""
+    write(root / 'base.yaml', 'smtp:\n  host: base\n')
+    write(root / 'base.d' / 'smtp.yaml', 'smtp:\n  port: 25\n')
+    write(root / 'production.yaml', 'smtp:\n  host: prod\n')
+    write(root / 'production.d' / 'smtp.yaml', 'smtp:\n  port: 587\n')
+    write(root / 'production.d' / 'creds.local.yaml', 'smtp:\n  user: u\n')
+    write(root / 'production.local.yaml', 'smtp:\n  password: SECRET\n')
+    return root
+
+
+def collect_config_sections(app, tmp_path, monkeypatch):
+    """Run `_render_config_page` and return the section names it produced."""
+    import types
+
+    config_dir = build_config_tree(tmp_path / 'config' / 'spiral')
+    monkeypatch.setattr(
+        app, 'env',
+        types.SimpleNamespace(
+            APP_CONFIG_DIR=str(config_dir),
+            get_config_files=lambda app_env='base', app_config_file_suffix='.yaml': (
+                fake_appenv_files(config_dir, app_env, app_config_file_suffix)
+            ),
+        ),
+        raising=False,
+    )
+    app.pdoc.set_show_config(show=True)
+
+    import pdoc.render
+    monkeypatch.setattr(
+        pdoc.render.env, 'get_template',
+        lambda name: types.SimpleNamespace(render=lambda **kw: '<html></html>'),
+    )
+    app.pdoc._render_config_page(str(tmp_path / 'out'))
+    seen = pdoc.render.env.globals.get('configdict', {})
+    return list(seen)
+
+
+def fake_appenv_files(config_dir, app_env, suffix):
+    """Reproduce appenv's resolver, including its ordering.
+
+    Env file, then `.d/*`, then the top-level `.local`, then `.d/*.local`.
+    That is cement's load order, and the config page follows it so the
+    entries read in the order the values are applied.
+    """
+    import glob
+    import os
+
+    env_file = str(config_dir / f'{app_env}{suffix}')
+    configs = [env_file] if os.path.isfile(env_file) else []
+    local_file = str(config_dir / f'{app_env}.local{suffix}')
+    local = (
+        [local_file]
+        if app_env != 'base' and os.path.isfile(local_file)
+        else []
+    )
+    for path in sorted(glob.glob(str(config_dir / f'{app_env}.d' / '**' / f'*{suffix}'), recursive=True)):
+        if path.endswith(f'.local{suffix}'):
+            if app_env != 'base':
+                local.append(path)
+        else:
+            configs.append(path)
+    return [*configs, *local]
+
+
+def test_config_page_follows_the_load_order(app, tmp_path, monkeypatch):
+    # the order carries meaning: cement merges the files in this sequence and
+    # the last one wins, so the page reads top to bottom as values are applied
+    sections = collect_config_sections(app, tmp_path, monkeypatch)
+
+    assert sections == [
+        'base',
+        'base.d/smtp',
+        'production',
+        'production.d/smtp',
+        'production.local',
+        'production.d/creds.local',
+    ]
+
+
+def test_config_page_skips_base_local(app, tmp_path, monkeypatch):
+    # appenv ignores `.local` for the base environment, so documenting one
+    # would promise an override that never happens
+    write(tmp_path / 'config' / 'spiral' / 'base.local.yaml', 'smtp:\n  x: 1\n')
+
+    sections = collect_config_sections(app, tmp_path, monkeypatch)
+
+    assert 'base.local' not in sections
+
+
+# --------------------------------------------------------------------------------------
 # module discovery, including namespace packages
 # --------------------------------------------------------------------------------------
 
@@ -408,38 +503,36 @@ def test_discover_honours_pdoc_overrides(app, tmp_path, monkeypatch):
 
 
 # --------------------------------------------------------------------------------------
-# watched roots (pure path logic, no observer involved)
+# watched directories (pure path logic, no observer involved)
 # --------------------------------------------------------------------------------------
 
 
 def stub_dirs(app, monkeypatch, dirs):
     """Pretend the documented modules resolve to `dirs`."""
-    monkeypatch.setattr(app.pdoc, '_module_dirs', lambda with_modules=None: dirs)
+    monkeypatch.setattr(app.pdoc, '_module_dirs', lambda: dirs)
     monkeypatch.setattr(app.pdoc, '_resolve_docstrings_dirs', lambda: [])
 
 
-def test_watch_dirs_drops_roots_outside_the_project(
-    app, log_lines, tmp_path, monkeypatch,
-):
+def test_watch_dirs_drops_directories_outside_the_project(app, tmp_path, monkeypatch):
     # an installed tokeo lives in site-packages and is never edited there,
-    # so it must not be watched — but the fact has to be logged
+    # so it must not be watched — but it has to be reported back
     project = tmp_path / 'project'
     (project / 'spiral').mkdir(parents=True)
     (project / 'tests').mkdir()
-    outside = tmp_path / 'site-packages' / 'tokeo'
-    outside.mkdir(parents=True)
+    outside_dir = tmp_path / 'site-packages' / 'tokeo'
+    outside_dir.mkdir(parents=True)
     monkeypatch.chdir(project)
     stub_dirs(app, monkeypatch, [
-        str(project / 'spiral'), str(project / 'tests'), str(outside),
+        str(project / 'spiral'), str(project / 'tests'), str(outside_dir),
     ])
 
-    roots = app.pdoc._watch_dirs()
+    dirs, outside = app.pdoc._watch_dirs()
 
-    assert sorted(Path(r).name for r in roots) == ['spiral', 'tests']
-    assert has(log_lines, 'not watching')
+    assert sorted(Path(d).name for d in dirs) == ['spiral', 'tests']
+    assert outside == [str(outside_dir)]
 
 
-def test_watch_dirs_collapses_nested_roots(app, tmp_path, monkeypatch):
+def test_watch_dirs_collapses_nested_directories(app, tmp_path, monkeypatch):
     project = tmp_path / 'project'
     (project / 'spiral' / 'core').mkdir(parents=True)
     monkeypatch.chdir(project)
@@ -447,7 +540,7 @@ def test_watch_dirs_collapses_nested_roots(app, tmp_path, monkeypatch):
         str(project / 'spiral'), str(project / 'spiral' / 'core'),
     ])
 
-    assert app.pdoc._watch_dirs() == [str(project / 'spiral')]
+    assert app.pdoc._watch_dirs()[0] == [str(project / 'spiral')]
 
 
 def test_watch_dirs_does_not_confuse_a_prefix_with_a_parent(
@@ -462,7 +555,27 @@ def test_watch_dirs_does_not_confuse_a_prefix_with_a_parent(
     monkeypatch.chdir(project)
     stub_dirs(app, monkeypatch, [str(project / 'app'), str(sibling)])
 
-    assert app.pdoc._watch_dirs() == [str(project / 'app')]
+    assert app.pdoc._watch_dirs()[0] == [str(project / 'app')]
+
+
+def test_watch_dirs_includes_the_docstrings_dirs(app, tmp_path, monkeypatch):
+    # the decorator snippets are watched too, so editing one rebuilds. Cannot
+    # use stub_dirs() here: that helper pins _resolve_docstrings_dirs to []
+    project = tmp_path / 'project'
+    (project / 'spiral').mkdir(parents=True)
+    (project / 'snippets').mkdir()
+    monkeypatch.chdir(project)
+    monkeypatch.setattr(
+        app.pdoc, '_module_dirs', lambda: [str(project / 'spiral')],
+    )
+    monkeypatch.setattr(
+        app.pdoc, '_resolve_docstrings_dirs',
+        lambda: [str(project / 'snippets')],
+    )
+
+    dirs, _ = app.pdoc._watch_dirs()
+
+    assert sorted(Path(d).name for d in dirs) == ['snippets', 'spiral']
 
 
 def test_watch_dirs_includes_the_config_dir_when_appenv_is_loaded(
@@ -481,9 +594,9 @@ def test_watch_dirs_includes_the_config_dir_when_appenv_is_loaded(
         raising=False,
     )
 
-    roots = app.pdoc._watch_dirs()
+    dirs, _ = app.pdoc._watch_dirs()
 
-    assert sorted(Path(r).name for r in roots) == ['config', 'spiral']
+    assert sorted(Path(d).name for d in dirs) == ['config', 'spiral']
 
 
 # --------------------------------------------------------------------------------------
@@ -803,7 +916,9 @@ def test_serve_answers_and_stops_via_the_started_monitor(app, tmp_path, monkeypa
         httpd.shutdown()
 
     # `_watch()` returns the monitor; serve() runs it in a daemon thread
-    monkeypatch.setattr(app.pdoc, '_watch', lambda with_modules=None: monitor)
+    monkeypatch.setattr(
+        app.pdoc, '_watch', lambda restarted=False: monitor,
+    )
 
     thread = threading.Thread(target=lambda: app.pdoc.serve(watch=True))
     thread.start()
@@ -842,8 +957,306 @@ def test_serve_raises_a_clean_error_when_the_port_is_taken(tmp_path):
 
 
 # --------------------------------------------------------------------------------------
+# startup output and the hidden --restart flag
+# --------------------------------------------------------------------------------------
+
+
+def test_documented_lists_the_configured_modules(app, monkeypatch):
+    # the summary says what is *documented*; an installed tokeo is
+    # documented even though --watch never observes it
+    app.pdoc.set_modules(['spiral', 'tests', 'tokeo'])
+    monkeypatch.setattr(app, 'env', None, raising=False)
+
+    assert app.pdoc._documented() == ['spiral', 'tests', 'tokeo']
+
+
+def test_documented_appends_config_when_the_page_is_written(app, monkeypatch):
+    import types
+
+    app.pdoc.set_modules(['spiral'])
+    app.pdoc.set_show_config(show=True)
+    monkeypatch.setattr(
+        app, 'env', types.SimpleNamespace(APP_CONFIG_DIR='/x'), raising=False,
+    )
+
+    assert app.pdoc._documented() == ['spiral', 'config']
+
+
+def test_documented_omits_config_when_disabled(app, monkeypatch):
+    import types
+
+    app.pdoc.set_modules(['spiral'])
+    app.pdoc.set_show_config(show=False)
+    monkeypatch.setattr(
+        app, 'env', types.SimpleNamespace(APP_CONFIG_DIR='/x'), raising=False,
+    )
+
+    assert app.pdoc._documented() == ['spiral']
+
+
+def test_documented_keeps_the_specs_as_configured(app, monkeypatch):
+    # `modules: [spiral.core, spiral.ext, tests]` documents exactly those
+    # three, so shortening them to `spiral` would misreport the render
+    app.pdoc.set_modules(['spiral.core', 'spiral.ext', 'tests'])
+    monkeypatch.setattr(app, 'env', None, raising=False)
+
+    assert app.pdoc._documented() == ['spiral.core', 'spiral.ext', 'tests']
+
+
+def test_documented_removes_duplicates_but_keeps_the_order(app, monkeypatch):
+    app.pdoc.set_modules(['tests', 'spiral', 'tests'])
+    monkeypatch.setattr(app, 'env', None, raising=False)
+
+    assert app.pdoc._documented() == ['tests', 'spiral']
+
+
+def test_set_modules_takes_a_list(app):
+    app.pdoc.set_modules(['alpha', 'beta'])
+
+    assert app.pdoc._modules == ['alpha', 'beta']
+
+
+def test_set_modules_splits_a_string(app):
+    app.pdoc.set_modules('alpha beta gamma')
+
+    assert app.pdoc._modules == ['alpha', 'beta', 'gamma']
+
+
+def test_set_modules_defaults_to_app_tests_and_tokeo(app):
+    app.pdoc.set_modules(None)
+
+    assert app.pdoc._modules == [app._meta.label, 'tests', 'tokeo']
+
+
+def test_setup_reads_the_configured_modules(tmp_path):
+    with booted_app(tmp_path, modules=['alpha', 'beta']) as booted:
+        booted.run()
+
+        assert booted.pdoc._modules == ['alpha', 'beta']
+
+
+def test_setup_reads_the_configured_show_config(tmp_path):
+    for configured in (True, False):
+        with booted_app(tmp_path / str(configured), show_config=configured) as booted:
+            booted.run()
+
+            assert booted.pdoc._show_config is configured
+
+
+def test_set_show_config_accepts_truthy_strings(app):
+    for value, expected in (
+        (True, True), ('yes', True), ('1', True),
+        (False, False), ('no', False), ('off', False),
+    ):
+        app.pdoc.set_show_config(show=value)
+        assert app.pdoc._show_config is expected
+
+
+def test_set_show_config_without_argument_takes_the_config(app):
+    app.pdoc.set_show_config(show=False)
+    app.pdoc.set_show_config()
+
+    assert app.pdoc._show_config == app.config.get('pdoc', 'show_config')
+
+
+def watch_output(app, monkeypatch, tmp_path, restarted=False):
+    """Start a watch and return the lines it logged, by level."""
+    pytest.importorskip('watchdog')
+    project = tmp_path / 'project'
+    (project / 'spiral').mkdir(parents=True)
+    monkeypatch.chdir(project)
+    elsewhere = tmp_path / 'elsewhere'
+    elsewhere.mkdir()
+    stub_dirs(app, monkeypatch, [str(project / 'spiral'), str(elsewhere)])
+
+    lines = {'info': [], 'debug': []}
+    for level in lines:
+        monkeypatch.setattr(
+            app.log, level,
+            lambda msg, *a, _l=level, **k: lines[_l].append(str(msg)),
+        )
+
+    app.pdoc._watch(restarted=restarted)
+    app.pdoc.shutdown()
+    return lines
+
+
+def test_watch_announces_itself_on_info(app, monkeypatch, tmp_path):
+    lines = watch_output(app, monkeypatch, tmp_path)
+
+    assert lines['info'] == ['pdoc watching for changes on project files']
+
+
+def test_watch_puts_the_directory_detail_on_debug(app, monkeypatch, tmp_path):
+    # the paths are noise on info level but the only way to tell why an edit
+    # does nothing, so they belong on debug rather than nowhere
+    lines = watch_output(app, monkeypatch, tmp_path)
+
+    assert any(line.startswith('pdoc watching /') for line in lines['debug'])
+    assert any('not watching' in line for line in lines['debug'])
+    assert not any('not watching' in line for line in lines['info'])
+
+
+def test_watch_stays_quiet_after_a_restart(app, monkeypatch, tmp_path):
+    # a restart replays the whole command, and repeating the startup output
+    # would bury the one line that says what changed
+    lines = watch_output(app, monkeypatch, tmp_path, restarted=True)
+
+    assert lines['info'] == []
+    assert lines['debug'] == []
+
+
+def test_hotload_hands_the_restart_flag_on(app, monkeypatch):
+    # the replayed command line drops --clean (wipe once, not per rebuild)
+    # and gains --restart (stay quiet next time)
+    seen = {}
+    monkeypatch.setattr(
+        'tokeo.ext.pdoc.os.execv',
+        lambda path, argv: seen.update(path=path, argv=argv),
+    )
+    monkeypatch.setattr(
+        'sys.argv',
+        ['/venv/bin/spiral', 'pdoc', 'render', '--clean', '--serve', '--watch'],
+    )
+    app.pdoc._watchdog_restart_requested = True
+
+    app.pdoc.hotload()
+
+    # argv[0] is the interpreter, argv[1] the console script
+    assert seen['argv'][2:] == ['pdoc', 'render', '--serve', '--watch', '--restart']
+
+
+def test_hotload_does_not_repeat_the_restart_flag(app, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        'tokeo.ext.pdoc.os.execv', lambda path, argv: seen.update(argv=argv),
+    )
+    monkeypatch.setattr(
+        'sys.argv',
+        ['/venv/bin/spiral', 'pdoc', 'render', '--serve', '--watch', '--restart'],
+    )
+    app.pdoc._watchdog_restart_requested = True
+
+    app.pdoc.hotload()
+
+    assert seen['argv'].count('--restart') == 1
+
+
+def test_restart_flag_is_hidden_from_the_help(tmp_path, monkeypatch, capsys):
+    # it exists for the process replacement, not for users to type
+    with booted_app(tmp_path) as booted:
+        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--help'])
+        with pytest.raises(SystemExit):
+            booted.run()
+
+    help_text = capsys.readouterr().out
+    assert '--watch' in help_text
+    assert '--restart' not in help_text
+
+
+# --------------------------------------------------------------------------------------
 # render error handling
 # --------------------------------------------------------------------------------------
+
+
+def render_minimal(tmp_path, monkeypatch, package_name, clean):
+    """Render a one-module package, so the clean step really runs."""
+    import pdoc.doc
+
+    package = tmp_path / package_name
+    package.mkdir()
+    write(package / '__init__.py', '"""Sample."""\n')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.syspath_prepend(str(tmp_path))
+    pdoc.doc.Module.from_name.cache_clear()
+
+    defaults = pdoc_defaults(tmp_path, modules=[package_name], show_config=False)
+    with PdocTest(config_defaults=defaults) as booted:
+        booted.run()
+        booted.pdoc.render(clean=clean)
+
+
+def test_clean_wipes_the_output_dir(tmp_path, monkeypatch):
+    # pages of modules that no longer exist would otherwise stay reachable
+    stale = tmp_path / 'html' / 'stale.html'
+    write(stale, '<html>from an earlier render</html>\n')
+
+    render_minimal(tmp_path, monkeypatch, 'cleanpkg', clean=True)
+
+    assert not stale.exists()
+    assert (tmp_path / 'html' / 'index.html').exists()
+
+
+def test_without_clean_the_output_dir_is_kept(tmp_path, monkeypatch):
+    stale = tmp_path / 'html' / 'stale.html'
+    write(stale, '<html>from an earlier render</html>\n')
+
+    render_minimal(tmp_path, monkeypatch, 'keeppkg', clean=False)
+
+    assert stale.exists()
+    assert (tmp_path / 'html' / 'index.html').exists()
+
+
+def test_output_dir_is_resolved_at_setup(tmp_path):
+    # resolved once from the config, so render and serve cannot disagree and
+    # a read before the first render already answers
+    with booted_app(tmp_path) as booted:
+        booted.run()
+
+        assert booted.pdoc._output_dir == str(tmp_path / 'html')
+
+
+def test_output_dir_is_absolute(tmp_path, monkeypatch):
+    # `output_dir: html` in the config is relative; every consumer needs the
+    # absolute path
+    monkeypatch.chdir(tmp_path)
+    with booted_app(tmp_path, output_dir='html') as booted:
+        booted.run()
+
+        assert Path(booted.pdoc._output_dir).is_absolute()
+        assert Path(booted.pdoc._output_dir).name == 'html'
+
+
+def test_render_reports_the_output_directory(app, monkeypatch):
+    lines = []
+    monkeypatch.setattr(app.pdoc, '_render', lambda **kwargs: None)
+    monkeypatch.setattr(app.log, 'info', lambda msg, *a, **k: lines.append(str(msg)))
+
+    app.pdoc.render()
+
+    assert any('documentation updated in' in line for line in lines)
+
+
+def test_render_reports_nothing_when_it_failed(app, monkeypatch):
+    # the message sits inside the try, so a failed render must not claim
+    # that anything was written
+    lines = []
+
+    def boom(**kwargs):
+        raise RuntimeError('boom')
+
+    monkeypatch.setattr(app.pdoc, '_render', boom)
+    monkeypatch.setattr(app.log, 'info', lambda msg, *a, **k: lines.append(str(msg)))
+
+    app.pdoc.render(raise_on_error=False)
+
+    assert not any('documentation updated in' in line for line in lines)
+
+
+def test_render_reports_after_a_restart_too(tmp_path, monkeypatch):
+    # a restart shows the change and what came of it; this line is the only
+    # confirmation that the rebuild finished
+    lines = []
+
+    with booted_app(tmp_path) as booted:
+        monkeypatch.setattr(booted.pdoc, '_render', lambda **kwargs: None)
+        monkeypatch.setattr(
+            booted.log, 'info', lambda msg, *a, **k: lines.append(str(msg)),
+        )
+        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--restart'])
+        booted.run()
+
+    assert any('documentation updated in' in line for line in lines)
 
 
 def test_render_raises_by_default(app, monkeypatch):
@@ -868,7 +1281,7 @@ def test_render_logs_instead_of_raising_for_watch(app, log_lines, monkeypatch):
     assert has(log_lines, 'render failed')
 
 
-def test_module_dir_of_a_package(app, tmp_path, monkeypatch):
+def test_module_source_dir_of_a_package(app, tmp_path, monkeypatch):
     import importlib
     import types
 
@@ -876,7 +1289,7 @@ def test_module_dir_of_a_package(app, tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(str(tmp_path))
     module = types.SimpleNamespace(obj=importlib.import_module('mdpkg'))
 
-    assert Path(app.pdoc._module_dir(module)).name == 'mdpkg'
+    assert Path(app.pdoc._module_source_dir(module)).name == 'mdpkg'
 
 
 # --------------------------------------------------------------------------------------
@@ -907,6 +1320,66 @@ def run_cli(tmp_path, monkeypatch, argv):
         booted.run()
 
     return calls
+
+
+def test_config_switch_turns_the_page_on(tmp_path, monkeypatch):
+    with booted_app(tmp_path, show_config=False) as booted:
+        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
+        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--config'])
+        booted.run()
+
+        assert booted.pdoc._show_config is True
+        # the switch is for one run; the configured value stays as written
+        assert booted.config.get('pdoc', 'show_config') is False
+
+
+def test_no_config_switch_turns_the_page_off(tmp_path, monkeypatch):
+    with booted_app(tmp_path, show_config=True) as booted:
+        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
+        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--no-config'])
+        booted.run()
+
+        assert booted.pdoc._show_config is False
+        assert booted.config.get('pdoc', 'show_config') is True
+
+
+def test_both_config_switches_are_a_contradiction(tmp_path, monkeypatch):
+    with booted_app(tmp_path) as booted:
+        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
+        monkeypatch.setattr(
+            booted._meta, 'argv', ['pdoc', 'render', '--config', '--no-config'],
+        )
+
+        with pytest.raises(TokeoPdocError) as excinfo:
+            booted.run()
+
+        assert 'exclude each other' in str(excinfo.value)
+
+
+def test_config_switches_leave_the_setting_alone_when_unused(tmp_path, monkeypatch):
+    # both switches are always offered, so the one matching the current
+    # setting must simply do nothing
+    with booted_app(tmp_path, show_config=True) as booted:
+        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
+        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render'])
+        booted.run()
+
+        assert booted.pdoc._show_config is True
+
+
+def test_no_config_switch_removes_config_from_the_summary(tmp_path, monkeypatch):
+    import types
+
+    with booted_app(tmp_path, show_config=True) as booted:
+        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
+        monkeypatch.setattr(
+            booted, 'env',
+            types.SimpleNamespace(APP_CONFIG_DIR=str(tmp_path)), raising=False,
+        )
+        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--no-config'])
+        booted.run()
+
+        assert 'config' not in booted.pdoc._documented()
 
 
 def test_controller_renders_only_without_flags(tmp_path, monkeypatch):
@@ -944,7 +1417,7 @@ def test_controller_serve_command_does_not_render(tmp_path, monkeypatch):
 def test_controller_passes_positional_modules(tmp_path, monkeypatch):
     seen = {}
 
-    with booted_app(tmp_path) as booted:
+    with booted_app(tmp_path, modules=['from', 'config']) as booted:
         monkeypatch.setattr(
             booted.pdoc, 'render',
             lambda **kwargs: seen.update(kwargs),
@@ -952,7 +1425,9 @@ def test_controller_passes_positional_modules(tmp_path, monkeypatch):
         monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', 'spiral', 'tests'])
         booted.run()
 
-    assert seen['with_modules'] == ['spiral', 'tests']
+        # positionals replace the configured modules for this run
+        assert booted.pdoc._modules == ['spiral', 'tests']
+
     assert seen['clean'] is False
 
 

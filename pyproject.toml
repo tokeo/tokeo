@@ -42,7 +42,7 @@ dev = [
     "lazy_loader",
     "prompt_toolkit",
     "diskcache",
-    "dramatiq",
+    "dramatiq>=2.0.0",
     "dramatiq[rabbitmq]",
     "pika",
     "grpcio",
@@ -58,6 +58,7 @@ dev = [
     "invoke>=2.2.1",
     "paramiko>=2.7,<4",
     "cryptography>=45.0.0",
+    "watchdog",
 ]
 
 [project.scripts]

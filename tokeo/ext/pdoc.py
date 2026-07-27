@@ -27,27 +27,29 @@ import warnings
 import logging
 from threading import Thread, Lock, Event
 
-from cement.core.handler import Handler
 from cement.utils import fs
+from cement.utils.misc import is_true
+from cement.core.handler import Handler
+from cement import ex
+from argparse import SUPPRESS
 from tokeo.ext.argparse import Controller
 from tokeo.core.exc import TokeoError
-from cement import ex
 
 
 #: A yaml comment marker at the start of a line: one run of `#` plus at most
 #: one following space. Only the marker is removed, so a documentation line
 #: written as `### ### Heading` keeps its Markdown `###` and still renders as
 #: a heading. (Stripping every leading `#` would flatten it to a paragraph.)
-_COMMENT_MARKER = re.compile(r'^[ \t]*#+[ \t]?', re.MULTILINE)
+_RE_COMMENT_MARKER = re.compile(r'^[ \t]*#+[ \t]?', re.MULTILINE)
 
 #: A line that ends a settings block: either a new top-level key or a comment
 #: introducing the next one.
-_BLOCK_END = re.compile(r'^([a-zA-Z0-9_.-]+:$|#)')
+_RE_BLOCK_END = re.compile(r'^([a-zA-Z0-9_.-]+:$|#)')
 
 
 def _strip_comment_markers(text):
     """Turn a block of yaml comment lines into plain Markdown."""
-    return _COMMENT_MARKER.sub('', text or '')
+    return _RE_COMMENT_MARKER.sub('', text or '')
 
 
 def _yaml_header_end(lines):
@@ -97,7 +99,7 @@ try:
         """
 
         #: event types that mean a file really changed
-        CHANGE_EVENTS = frozenset({'created', 'deleted', 'modified', 'moved'})
+        WATCH_EVENTS = frozenset({'created', 'deleted', 'modified', 'moved'})
 
         def __init__(self, patterns=None, ignore_patterns=None, ignore_directories=False, case_sensitive=False, callback=None):
             """
@@ -137,7 +139,7 @@ try:
             - Read-only events are dropped, see the class docstring
 
             """
-            if self.callback and event.event_type in self.CHANGE_EVENTS:
+            if self.callback and event.event_type in self.WATCH_EVENTS:
                 self.callback(event)
 
 except ImportError:
@@ -211,8 +213,6 @@ class TokeoPdoc(Handler):
             watch_settle=1.5,
         )
 
-    _output_dir = None
-
     def _setup(self, app):
         super()._setup(app)
         self.app = app
@@ -222,6 +222,9 @@ class TokeoPdoc(Handler):
             {self._meta.config_section: self._meta.config_defaults},
             override=False,
         )
+        self._output_dir = fs.abspath(self._config('output_dir'))
+        self.set_modules(self._config('modules'))
+        self.set_show_config(self._config('show_config'))
         # external decorator/docstring markdown snippets (see `docstrings()`)
         self._docstrings_cache = dict()
         self._docstrings_dirs = None
@@ -329,19 +332,43 @@ class TokeoPdoc(Handler):
             self.app.log.debug(f'pdoc: decorator parsing failed: {err}')
             return []
 
-    def _resolve_modules(self, with_modules=None):
-        """Configured modules, overridable by CLI positionals."""
-        if with_modules:
-            return list(with_modules)
-        mods = self._config('modules')
-        if not mods:
-            # default matches the prior pdoc3 extension: the app package, its
-            # tests, and the tokeo framework itself
-            label = self.app._meta.label
-            return [label, 'tests', 'tokeo']
-        if isinstance(mods, str):
-            return mods.split(',')
-        return list(mods)
+    def set_modules(self, modules=None):
+        """Set the modules this render documents.
+
+        Called once at setup from the config and again from the CLI when
+        positional modules are given, so everything below reads one settled
+        list instead of resolving the override on every call.
+
+        ### Args
+
+        - **modules** (str|list): Module specs, or None for the default: the
+            app package, its tests and the tokeo framework
+
+        """
+        if modules is None:
+            self._modules = [self.app._meta.label, 'tests', 'tokeo']
+        elif isinstance(modules, str):
+            self._modules = modules.split()
+        else:
+            self._modules = list(modules)
+
+    def set_show_config(self, show=None):
+        """Set whether the yaml config page is rendered.
+
+        Called once at setup from the config and again from the CLI for
+        `--config` / `--no-config`, which override the setting for one run
+        without writing it back to the config.
+
+        ### Args
+
+        - **show** (bool|str): Truthy to render the page, or None to take
+            the configured value
+
+        """
+        if show is None:
+            self._show_config = self._config('show_config')
+        else:
+            self._show_config = is_true(show)
 
     def _template_dirs(self):
         """Resolve configured template modules/paths to filesystem dirs.
@@ -377,13 +404,12 @@ class TokeoPdoc(Handler):
 
     # --- rendering --------------------------------------------------------
 
-    def render(self, clean=False, with_modules=None, raise_on_error=True):
+    def render(self, clean=False, raise_on_error=True):
         """Render HTML documentation for the configured modules.
 
         ### Args
 
         - **clean** (bool): Wipe output_dir before rendering
-        - **with_modules** (list): Modules to render, overriding the config
         - **raise_on_error** (bool): Let a failure through. `--watch` passes
             False: a broken template or an unreadable config file must not
             end the watch session, since the next save usually fixes it. A
@@ -391,14 +417,15 @@ class TokeoPdoc(Handler):
 
         """
         try:
-            self._render(clean=clean, with_modules=with_modules)
+            self._render(clean=clean)
+            self.app.log.info(f'pdoc documentation updated in: {self._output_dir}')
         except Exception as err:
             if raise_on_error:
                 # re-raise and abort if set
                 raise
             self.app.log.error(f'pdoc render failed: {err}', exc_info=True)
 
-    def _render(self, clean=False, with_modules=None):
+    def _render(self, clean=False):
         import pdoc
         import pdoc.doc
         import pdoc.render
@@ -420,12 +447,9 @@ class TokeoPdoc(Handler):
         warnings.filterwarnings('ignore', category=RuntimeWarning)
         logging.getLogger('pdoc').setLevel(logging.ERROR)
 
-        output_dir = fs.abspath(self._config('output_dir'))
-        self._output_dir = output_dir
-
-        if clean and os.path.isdir(output_dir):
-            shutil.rmtree(output_dir)
-        os.makedirs(output_dir, exist_ok=True)
+        if clean and os.path.isdir(self._output_dir):
+            shutil.rmtree(self._output_dir)
+        os.makedirs(self._output_dir, exist_ok=True)
 
         template_dirs = self._template_dirs()
         primary_tpl = Path(template_dirs[0]) if template_dirs else None
@@ -470,8 +494,7 @@ class TokeoPdoc(Handler):
 
         # is a config page going to be written? (index links to it)
         pdoc.render.env.globals['has_config'] = bool(
-            self._config('show_config')
-            and getattr(self.app, 'env', None) is not None
+            self._show_config and getattr(self.app, 'env', None) is not None
         )
 
         pdoc.render.env.globals['html_lang'] = self._config('lang')
@@ -582,7 +605,7 @@ class TokeoPdoc(Handler):
         for res in self.app.hook.run('tokeo_pdoc_pre_render', self.app):
             pass
 
-        module_names = self._resolve_modules(with_modules)
+        module_names = self._modules
 
         # discover the full set of modules (incl. namespace subtrees) that
         # walk_specs would miss, then load each — preserving the order the
@@ -632,7 +655,7 @@ class TokeoPdoc(Handler):
             # point the markdown filter at this module's directory so its
             # docstring's `.. include:: ./FILE.md` resolves relative to it
             if getattr(self, '_md_state', None) is not None:
-                self._md_state['module_dir'] = self._module_dir(mod)
+                self._md_state['module_dir'] = self._module_source_dir(mod)
             html = pdoc.render.html_module(mod, all_modules)
             # pdoc's native flat convention: every module renders to
             # `dotted/name.html`. This keeps output paths consistent with
@@ -640,21 +663,21 @@ class TokeoPdoc(Handler):
             # pdoc3, which used `pkg/index.html` for packages; that is a
             # deliberate, documented divergence (links stay self-consistent).
             rel = spec.replace('.', '/') + '.html'
-            out = Path(output_dir) / rel
+            out = Path(self._output_dir) / rel
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(html, encoding='utf-8')
 
         # index page
         index = pdoc.render.html_index(all_modules)
         if index:
-            (Path(output_dir) / 'index.html').write_text(index, encoding='utf-8')
+            (Path(self._output_dir) / 'index.html').write_text(index, encoding='utf-8')
 
         # copy template assets (highlight.js, mermaid, hljs themes, css) into
         # the output dir so the pages' /assets/ references resolve
-        self._copy_assets(template_dirs, output_dir)
+        self._copy_assets(template_dirs, self._output_dir)
 
         # optional config documentation page
-        self._render_config_page(output_dir)
+        self._render_config_page(self._output_dir)
 
         # post-render hook: lets extensions restore what they swapped in
         # `tokeo_pdoc_pre_render` (e.g. dramatiq's real actor decorator)
@@ -710,7 +733,7 @@ class TokeoPdoc(Handler):
             # the key's own block, up to the next top-level key or comment
             end = len(lines) - 1
             for j in range(start + 1, len(lines)):
-                if _BLOCK_END.match(lines[j]):
+                if _RE_BLOCK_END.match(lines[j]):
                     end = j - 1
                     break
             while end > start and lines[end] == '':
@@ -740,7 +763,7 @@ class TokeoPdoc(Handler):
         redacts `.local` files, and renders a synthetic `config/index.html`.
         Requires the appenv extension (`app.env`); skipped otherwise.
         """
-        if not self._config('show_config'):
+        if not self._show_config:
             return
         env = getattr(self.app, 'env', None)
         if env is None:
@@ -759,17 +782,6 @@ class TokeoPdoc(Handler):
                 )
             except Exception:
                 continue
-            # appenv globs `.local` overrides only inside `{env}.d/`, so the
-            # standalone `{env}.local{suffix}` next to the env file is never
-            # returned even though cement loads it. Splice it in right after
-            # the top-level entry (always index 0). `base` is skipped on
-            # purpose: appenv ignores `.local` for the base environment.
-            if app_env != 'base':
-                local_top = os.path.join(
-                    config_dir, f'{app_env}.local{suffix}',
-                )
-                if os.path.isfile(local_top) and local_top not in file_list:
-                    file_list.insert(1, local_top)
             for filename in file_list:
                 if not os.path.isfile(filename):
                     continue
@@ -1105,7 +1117,7 @@ class TokeoPdoc(Handler):
         if hasattr(mod, 'members'):
             walk(mod.members)
 
-    def _module_dir(self, mod):
+    def _module_source_dir(self, mod):
         """Directory that holds a module's source, for include resolution.
 
         For a package this is the package directory (where sibling guide files
@@ -1230,11 +1242,11 @@ class TokeoPdoc(Handler):
 
     # --- watching ---------------------------------------------------------
 
-    def _module_dirs(self, with_modules=None):
+    def _module_dirs(self):
         """Filesystem roots of the packages that get documented."""
 
         dirs = []
-        for spec in self._resolve_modules(with_modules):
+        for spec in self._modules:
             top = spec.split('.')[0]
             try:
                 mod = importlib.import_module(top)
@@ -1257,7 +1269,31 @@ class TokeoPdoc(Handler):
                     continue
         return dirs
 
-    def _watch_dirs(self, with_modules=None):
+    def _documented(self):
+        """Readable names of everything this render documents.
+
+        The module specs exactly as configured, plus `config` when the yaml
+        config page is written. Used for the one-line summary; it says what is
+        *documented*, which is not the same as what `--watch` observes — an
+        installed `tokeo` is documented but never watched. The `--watch`
+        detail is on debug level.
+
+        ### Returns
+
+        - **list**: Names in configured order, duplicates removed
+
+        """
+        # the specs as configured: `modules: [spiral.core, tests]` documents
+        # exactly those two, so that is what the line has to say
+        documented = list(dict.fromkeys(self._modules))
+        # mirror the condition in `_render_config_page`, so the line never
+        # claims a config page that was not written. `app.env` comes from the
+        # optional appenv extension, hence getattr rather than attribute access
+        if self._show_config and getattr(self.app, 'env', None):
+            documented.append('config')
+        return documented
+
+    def _watch_dirs(self):
         """Every directory whose contents can change and be edited here.
 
         Modules, external docstring snippets and — when appenv is loaded —
@@ -1273,29 +1309,31 @@ class TokeoPdoc(Handler):
         Template directories are left out on purpose: they hold `.jinja2`,
         `.html`, `.css` and font files, none of which match `watch_includes`.
         Adding `*.jinja2` there is therefore a config change plus this line.
+
+        ### Returns
+
+        - **tuple**: `(roots, outside)` — the directories to watch and the
+          ones dropped for sitting outside the project
+
         """
-        dirs = list(self._module_dirs(with_modules))
-        dirs.extend(self._resolve_docstrings_dirs() or [])
+        candidates = list(self._module_dirs())
+        candidates.extend(self._resolve_docstrings_dirs() or [])
         env = getattr(self.app, 'env', None)
         config_dir = getattr(env, 'APP_CONFIG_DIR', None) if env else None
         if config_dir and os.path.isdir(config_dir):
-            dirs.append(config_dir)
+            candidates.append(config_dir)
 
         project = fs.abspath(os.getcwd())
-        roots, outside = [], []
-        for entry in sorted({fs.abspath(x) for x in dirs if x}, key=len):
+        dirs, outside = [], []
+        for entry in sorted({fs.abspath(x) for x in candidates if x}, key=len):
             if not Path(entry).is_relative_to(project):
                 outside.append(entry)
                 continue
-            if not any(Path(entry).is_relative_to(r) for r in roots):
-                roots.append(entry)
-        for entry in outside:
-            # never silent: someone developing the framework from a sibling
-            # checkout has to see why their edits do not trigger a rebuild
-            self.app.log.info(
-                f'pdoc not watching {entry} (outside the project root)'
-            )
-        return roots
+            if not any(Path(entry).is_relative_to(r) for r in dirs):
+                dirs.append(entry)
+        # logging is left to the caller, so the summary line can precede the
+        # per-directory detail
+        return dirs, outside
 
     def _setup_watchdog(self, dirs):
         """
@@ -1356,7 +1394,7 @@ class TokeoPdoc(Handler):
             self._watchdog_last_event = monotonic()
             self._watchdog_last_path = path
 
-    def _watch(self, with_modules=None):
+    def _watch(self, restarted=False):
         """Start the observer and returns the monitor
 
         On a settled change the monitor stops the server, `serve()` returns,
@@ -1367,9 +1405,9 @@ class TokeoPdoc(Handler):
 
         ### Args
 
-        - **with_modules** (list): Modules to watch, overriding the config.
-            Pass the same list the render used, so the watched roots match
-            the documented ones
+        - **restarted** (bool): Suppress the startup output. Set after a
+            process replacement, where repeating it would bury the one line
+            that says what changed
 
         ### Returns
 
@@ -1380,7 +1418,7 @@ class TokeoPdoc(Handler):
         - **TokeoPdocError**: When watchdog is missing or nothing to watch
 
         """
-        dirs = self._watch_dirs(with_modules)
+        dirs, outside = self._watch_dirs()
         if not dirs:
             raise TokeoPdocError(
                 'pdoc --watch: nothing to watch. Check the "modules" setting '
@@ -1397,9 +1435,17 @@ class TokeoPdoc(Handler):
         # raises TokeoPdocError when watchdog is not installed, before the
         # observer is touched
         self._setup_watchdog(dirs)
-        for directory in dirs:
-            self.app.log.info(f'pdoc watching {directory}')
-        self.app.log.info('pdoc watching for changes; press Ctrl+C to stop')
+
+        if not restarted:
+            self.app.log.info('pdoc watching for changes on project files')
+            # the paths are noise on info level, but the only way to tell why
+            # an edit does nothing, so they go to debug rather than nowhere
+            for directory in dirs:
+                self.app.log.debug(f'pdoc watching {directory}')
+            for directory in outside:
+                self.app.log.debug(
+                    f'pdoc not watching {directory} (outside the project root)'
+                )
 
         # returns the watch handler
         return self._watch_file_changes
@@ -1501,14 +1547,16 @@ class TokeoPdoc(Handler):
 
         if not self._watchdog_restart_requested:
             return
-        self.app.log.info('Reloading documentation ...')
-        argv = [arg for arg in sys.argv if arg != '--clean']
+        # `--clean` means "wipe the output once at the start", not on every
+        # rebuild; `--restart` tells the next process to skip the startup
+        # output so only the line naming the change remains visible
+        argv = [arg for arg in sys.argv if arg not in ['--clean', '--restart']]
         mp_exit_function()
-        os.execv(sys.executable, [sys.executable] + argv)
+        os.execv(sys.executable, [sys.executable] + argv + ['--restart'])
 
     # --- serving ----------------------------------------------------------
 
-    def serve(self, watch=False, with_modules=None):
+    def serve(self, watch=False, restarted=False):
         """Serve the rendered documentation directory over HTTP.
 
         The render step already produced static HTML in ``output_dir``. Serving
@@ -1524,9 +1572,9 @@ class TokeoPdoc(Handler):
             server, mirroring nicegui's `fastapi_app.on_startup(...)`: the
             server keeps the foreground, so Ctrl+C lands where expected and
             the monitor ends the session by stopping the server.
-        - **with_modules** (list): Modules to watch, overriding the config.
-            Only read when `watch` is set; pass the same list the render
-            used, so the watched roots match the documented ones.
+        - **restarted** (bool): Suppress the startup output, because this
+            process came out of a `--watch` restart and the interesting line
+            is the one naming the change.
 
         ### Raises
 
@@ -1537,13 +1585,12 @@ class TokeoPdoc(Handler):
         import functools
         import http.server
 
-        output_dir = fs.abspath(self._config('output_dir'))
         host = self._config('host')
         port = int(self._config('port'))
 
-        if not os.path.isdir(output_dir):
+        if not os.path.isdir(self._output_dir):
             self.app.log.error(
-                f'pdoc: nothing to serve at {output_dir}; run '
+                f'pdoc: nothing to serve at {self._output_dir}; run '
                 f'"pdoc render" first'
             )
             return
@@ -1553,7 +1600,7 @@ class TokeoPdoc(Handler):
             def log_message(self, *args, **kwargs):
                 pass
 
-        handler = functools.partial(_QuietHandler, directory=output_dir)
+        handler = functools.partial(_QuietHandler, directory=self._output_dir)
         try:
             httpd = http.server.ThreadingHTTPServer((host, port), handler)
         except OSError as err:
@@ -1566,8 +1613,12 @@ class TokeoPdoc(Handler):
                 f'Another process may already use that port; stop it or set a '
                 f'different "port" in the [pdoc] config section.'
             ) from err
-        url = f'http://{host}:{port}'
-        self.app.log.info(f'pdoc serving {output_dir} at {url}')
+        if not restarted:
+            self.app.log.info(f'pdoc serving at http://{host}:{port}')
+            self.app.log.info(
+                f'pdoc explaining modules: '
+                f'{", ".join(self._documented())}'
+            )
         # the monitor needs the running server to stop it later, so the
         # observer can only be set up once `httpd` exists. Consequence worth
         # knowing: a failing `_watch()` (watchdog missing, nothing to watch)
@@ -1575,11 +1626,14 @@ class TokeoPdoc(Handler):
         # is left unclosed because the `try/finally` starts below. Harmless
         # at process exit, but the messages read out of order.
         if watch:
-            watch_daemon = self._watch(with_modules=with_modules)
+            watch_daemon = self._watch(restarted=restarted)
             Thread(
                 target=watch_daemon, args=(httpd,), daemon=True,
                 name='tokeo-pdoc-watch-daemon',
             ).start()
+
+        if not restarted:
+            self.app.log.info('press Ctrl+C to stop')
 
         try:
             # blocks until Ctrl+C, or until the watch monitor calls
@@ -1615,15 +1669,40 @@ class TokeoPdocController(Controller):
             (['--watch'], dict(action='store_true',
                                help='only with --serve: watch modules, docstrings '
                                     'and configs, and restart on every change')),
+            # hotload suppress the startup output
+            (['--restart'], dict(action='store_true', help=SUPPRESS)),
+            (['--config'], dict(action='store_true',
+                                help='add the yaml configuration page')),
+            (['--no-config'], dict(action='store_true',
+                                   help='skip the yaml configuration page')),
             (['modules'], dict(nargs='*',
                                help='modules to render; overrides the configured modules')),
         ],
     )
     def render(self):
-        self.app.pdoc.render(clean=self.app.pargs.clean, with_modules=self.app.pargs.modules, raise_on_error=not self.app.pargs.serve or not self.app.pargs.watch)
-        self.app.log.info(f'Documentation generated in: {self.app.pdoc._output_dir}')
+        # both switches are always offered, whatever `show_config` says, so a
+        # command line keeps working when the config default is flipped. They
+        # override the setting for this run only; the config stays untouched
+        if self.app.pargs.config and self.app.pargs.no_config:
+            raise TokeoPdocError(
+                'pdoc render: --config and --no-config exclude each other'
+            )
+        if self.app.pargs.config:
+            self.app.pdoc.set_show_config(show=True)
+        elif self.app.pargs.no_config:
+            self.app.pdoc.set_show_config(show=False)
+        if self.app.pargs.modules:
+            self.app.pdoc.set_modules(self.app.pargs.modules)
+        self.app.pdoc.render(
+            clean=self.app.pargs.clean,
+            raise_on_error=not self.app.pargs.serve or not self.app.pargs.watch,
+        )
         if self.app.pargs.serve:
-            self.app.pdoc.serve(watch=self.app.pargs.watch, with_modules=self.app.pargs.modules)
+            # the modules were resolved and remembered by the render above
+            self.app.pdoc.serve(
+                watch=self.app.pargs.watch,
+                restarted=self.app.pargs.restart,
+            )
 
     @ex(
         help='start http service',
