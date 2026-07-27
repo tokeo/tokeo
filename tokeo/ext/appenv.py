@@ -157,15 +157,18 @@ class TokeoAppEnv:
         - **list**: List of configuration file paths, with the base and
             environment config files first, followed by any .local config files
 
+        ### Notes
+
+        : Even when added, a missing file will be skipped by the config reader
+
         """
 
-        # define empty arrays for env and local configurations
-        configs = []
-        local_configs = []
-
-        # main env config is added unconditionally
-        # a missing file will be skipped by the config reader
-        configs.append(os.path.join(self.APP_CONFIG_DIR, f'{app_env}{app_config_file_suffix}'))
+        # define and initialize arrays for env and local configurations
+        # main env configs are added always if exists but .local not for base
+        f = os.path.join(self.APP_CONFIG_DIR, f'{app_env}{app_config_file_suffix}')
+        configs = [f] if os.path.isfile(f) else []
+        f = os.path.join(self.APP_CONFIG_DIR, f'{app_env}.local{app_config_file_suffix}')
+        local_configs = [f] if app_env != 'base' and os.path.isfile(f) else []
 
         # partial environment config files in .d directories
         files = glob.glob(os.path.join(self.APP_CONFIG_DIR, f'{app_env}.d', '**', f'*{app_config_file_suffix}'), recursive=True)
