@@ -349,11 +349,13 @@ The optional ```tokeo-fundi``` AI extension is governed by the custom **Tokeo-Fu
 
 However, to keep this project healthy, actively developed, and sustainable, this license introduces a fair-use threshold. Businesses with highly successful commercial operations (across the whole group: more than EUR 2,000,000 in fiscal year global gross revenue excluding VAT, or more than 50 FTEs) are required to purchase a commercial Enterprise License. The license also restricts using its source code as training data for machine-learning systems. Read the complete and authoritative terms in ```LICENSE.md``` of the [tokeo-fundi](https://github.com/tokeo/fundi/) distribution.
 
+Only installing ```tokeo-fundi```, also as a dependency of something else, is always free and carries no conditions. The limits apply only once you actually run it, through its commands or from your own code.
+
+I believe this is a fair balance: those who achieve significant economic success using this software should contribute back to the developers making it possible.
+
 **The Tokeo Akili Demonstration LLM (Apache 2.0)**
 
 ```akili``` is not part of this package. It is generated into your application from Ramani's template and stays under the Apache License, Version 2.0. It is meant as a demonstration and is not intended for delivery. It ships so you can experiment and learn, and it can be removed without side effects.
-
-I believe this is a fair balance: those who achieve significant economic success using this software should contribute back to the developers making it possible.
 
 <br/>
 <br/>
