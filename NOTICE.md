@@ -37,7 +37,7 @@ Styles and scripts:
 - highlight.js — Copyright (c) 2006 Ivan Sagalaev; BSD-3-Clause. Bundled as
   ```assets/highlight.min.js``` together with the themes under
   ```assets/hljs/styles/```, each of which retains its own banner.
-  Full text: ```assets/highlightjs-LICENSE.txt```.
+  Full text: ```assets/highlight-LICENSE.txt```.
 - Mermaid — Copyright (c) 2014-2022 Knut Sveidqvist; MIT License. Bundled as
   ```assets/mermaid.min.js```. That build embeds further third-party
   components under their own licenses; see the note in the license file.
