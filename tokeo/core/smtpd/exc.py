@@ -84,7 +84,7 @@ class SmtpdStopServiceException(SmtpdSignal):
 
 
 class SmtpdIOTimeoutException(SmtpdSignal):
-    """Signal that a complete data line did not arrive within io_cmd_timeout."""
+    """Signal that a complete data line did not arrive within the given timeout."""
 
     pass
 

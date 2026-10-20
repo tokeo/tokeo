@@ -64,6 +64,7 @@ DEFAULT_SMTPD_PRE_FORK = 0
 DEFAULT_SMTPD_MAX_PROCESSINGS = 4
 DEFAULT_IO_WAITREADABLE_SLEEP = 0.1
 DEFAULT_IO_CMD_TIMEOUT = 30
+DEFAULT_IO_PROXY_CMD_TIMEOUT = 5
 DEFAULT_IO_BUFFER_CHUNK_SIZE = 4 * 1024
 DEFAULT_IO_BUFFER_MAX_SIZE = 1 * 1024 * 1024
 
@@ -79,6 +80,7 @@ class CmdSequence(Enum):
 
     """
 
+    PROXY = auto()
     HELO = auto()
     RSET = auto()
     MAIL = auto()
@@ -119,6 +121,7 @@ def _parse_mode(enum_cls, value, default, label):
 
 
 # short module-level aliases for the :CMD_* symbol names
+CMD_PROXY = CmdSequence.PROXY
 CMD_HELO = CmdSequence.HELO
 CMD_RSET = CmdSequence.RSET
 CMD_MAIL = CmdSequence.MAIL
@@ -389,6 +392,7 @@ class SmtpdServer:
         self.crlf_mode = _parse_mode(CrlfMode, settings.get('crlf_mode'), 'CRLF_ENSURE', 'crlf_mode')
         self.pipelining_extension = bool(settings.get('pipelining_extension', False))
         self.proxy_extension = bool(settings.get('proxy_extension', False))
+        self.io_proxy_cmd_timeout = settings.get('io_proxy_cmd_timeout', DEFAULT_IO_PROXY_CMD_TIMEOUT)
         # test for message spooling
         # value has to be an existing directory + file-name prefix
         value = settings.get('spool')
@@ -798,19 +802,32 @@ class SmtpdServer:
                 # when processings exceed the maximum allowed, wait for a free slot
                 await self._acquire_processing_slot(session)
 
-                output = f'220 {ctx.server.local_response.strip()}'
-
-                # log and show to client
-                if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
-                    await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, f'>>> {output}')
-
-                writer.write(output.encode('utf-8', 'surrogateescape') + b'\r\n')
-                await writer.drain()
+                # a graceful shutdown refuses a connection that was not greeted yet
+                if self._shutdown:
+                    raise Smtpd421Exception('Abort connection while service is shutting down!')
 
                 # initialize \r\n line_break for CRLF_ENSURE and CRLF_STRICT
                 line_break = b'\r\n'
 
+                # greet on connect only without proxy_extension, otherwise
+                # the PROXY header comes first and its answer is the greeting
+                output = '' if session.cmd_sequence is CMD_PROXY else f'220 {ctx.server.local_response.strip()}'
+
                 while True:
+                    if output:
+                        if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                            await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, f'>>> {output}')
+
+                        writer.write(output.encode('utf-8', 'surrogateescape') + b'\r\n')
+                        await writer.drain()
+
+                    if session.cmd_sequence is CMD_QUIT:
+                        break
+
+                    # a graceful shutdown ends the dialog after the current command
+                    if self._shutdown:
+                        break
+
                     if session.cmd_sequence is CMD_STARTTLS:
                         # discard plaintext buffered before the handshake so
                         # commands injected right after STARTTLS cannot run over
@@ -824,7 +841,9 @@ class SmtpdServer:
                         session.cmd_sequence = CMD_HELO
                         ctx.server.helo = ''
 
-                    raw = await self._read_line(reader)
+                    raw = await self._read_line(
+                        reader, self.io_proxy_cmd_timeout if session.cmd_sequence is CMD_PROXY else self.io_cmd_timeout
+                    )
                     if raw == b'':
                         # connection closed by the remote peer
                         break
@@ -834,7 +853,7 @@ class SmtpdServer:
                         if not (
                             (session.cmd_sequence is CMD_DATA)
                             or self.pipelining_extension
-                            or (self.proxy_extension and session.cmd_sequence is CMD_HELO)
+                            or (session.cmd_sequence is CMD_PROXY)
                             or not self._buffered_line_lf(reader)
                         ):
                             raise Smtpd500PipeliningException
@@ -887,19 +906,9 @@ class SmtpdServer:
                             await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.ERROR, f'{e} ({type(e).__name__})', e)
                         output = Smtpd500Exception().smtp_response
 
-                    if output:
-                        if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
-                            await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, f'>>> {output}')
-
-                        writer.write(output.encode('utf-8', 'surrogateescape') + b'\r\n')
-                        await writer.drain()
-
-                    if session.cmd_sequence is CMD_QUIT:
-                        break
-
-                    # a graceful shutdown ends the dialog after the current command
-                    if self._shutdown:
-                        break
+                    # still in CMD_PROXY: the header failed, end without a dialog
+                    if session.cmd_sequence is CMD_PROXY:
+                        raise Smtpd421Exception(f'Abort connection while PROXY failed! ({output})')
 
                 output = '221 Service closing transmission channel'
                 writer.write(output.encode() + b'\r\n')
@@ -941,13 +950,19 @@ class SmtpdServer:
             # finalize the session at least here, drop maybe interrupted parts
             self.process_reset_session(session)
 
-    async def _read_line(self, reader):
+    async def _read_line(self, reader, io_timeout):
         """
         Read one raw line (with terminator) enforcing timeout and buffer size.
 
+        ### Args
+
+        - **reader** (StreamReader): The connection input stream
+        - **io_timeout** (int|float|None): Seconds to wait for a complete line
+            (None or 0 waits without a timeout)
+
         ### Raises
 
-        - **SmtpdIOTimeoutException**: No line within io_cmd_timeout
+        - **SmtpdIOTimeoutException**: No line within io timeout
         - **SmtpdIOBufferOverrunException**: Buffer above io_buffer_max_size;
             both bubble to the outer handler which answers 421
 
@@ -957,8 +972,8 @@ class SmtpdServer:
             # already buffered, readuntil returns without waiting, so the costly
             # wait_for wrapper (timer + context per call) is skipped -- in
             # pipelined/DATA bulk traffic that is nearly every line
-            if self.io_cmd_timeout and not self._buffered_line_lf(reader):
-                raw = await asyncio.wait_for(reader.readuntil(b'\n'), self.io_cmd_timeout)
+            if io_timeout and not self._buffered_line_lf(reader):
+                raw = await asyncio.wait_for(reader.readuntil(b'\n'), io_timeout)
             else:
                 raw = await reader.readuntil(b'\n')
         except asyncio.TimeoutError:
@@ -1002,7 +1017,7 @@ class SmtpdServer:
 
         ### Returns
 
-        - **str**: The SMTP response, or '' for silence (DATA lines, QUIT, PROXY)
+        - **str**: The SMTP response, or '' for silence (DATA lines, QUIT)
 
         """
         ctx = session.ctx
@@ -1023,49 +1038,22 @@ class SmtpdServer:
             # commands are text; decode byte-exact
             line = line.decode('utf-8', 'surrogateescape')
 
-            # Handle specific messages from the client
-            if re.match(r'^(HELO|EHLO)(\s+.*)?$', line, re.IGNORECASE):
-                # HELO/EHLO
-                if session.cmd_sequence is not CMD_HELO:
-                    raise Smtpd503Exception
-                cmd_data = re.sub(r'^(HELO|EHLO)\ ', '', line, flags=re.IGNORECASE).strip()
-                if SmtpdEvent.ON_HELO_EVENT in self.emit_events:
-                    await self._emit(SmtpdEvent.ON_HELO_EVENT, ctx, cmd_data)
-                ctx.server.helo = cmd_data
-                session.cmd_sequence = CMD_RSET
-                if re.match(r'^EHLO', line, re.IGNORECASE):
-                    return (
-                        f'250-{ctx.server.helo_response.strip()}\r\n'
-                        # respond with 8BITMIME extension
-                        + ('250-8BITMIME\r\n' if self.internationalization_extensions else '')
-                        # respond with SMTPUTF8 extension
-                        + ('250-SMTPUTF8\r\n' if self.internationalization_extensions else '')
-                        # respond with PIPELINING if enabled
-                        + ('250-PIPELINING\r\n' if self.pipelining_extension else '')
-                        # respond with AUTH extensions if enabled
-                        + ('250-AUTH LOGIN PLAIN\r\n' if self._auth_available(ctx) else '')
-                        # respond with STARTTLS if available and not already enabled
-                        + ('' if self.encrypt_mode is EncryptMode.TLS_FORBIDDEN or ctx.server.encrypted else '250-STARTTLS\r\n')
-                        + '250 OK'
-                    )
-                else:
-                    return f'250 OK {ctx.server.helo_response.strip()}'.strip()
-
-            elif self.proxy_extension and re.match(r'^PROXY(\s+)', line, re.IGNORECASE):
-                # PROXY
-                # Docs: haproxy/doc/proxy-protocol.txt (github.com/haproxy)
-                # syntax
-                # PROXY PROTO source-ip dest-ip source-port dest-port
-                if session.cmd_sequence is not CMD_HELO:
-                    raise Smtpd503Exception
+            # PROXY
+            # Docs: haproxy/doc/proxy-protocol.txt (github.com/haproxy)
+            # syntax
+            # PROXY PROTO source-ip dest-ip source-port dest-port
+            if session.cmd_sequence is CMD_PROXY:
+                # with proxy_extension the PROXY header has to be the first line
+                if not re.match(r'^PROXY(\s+)', line, re.IGNORECASE):
+                    raise Smtpd421Exception('Abort connection while PROXY is not the first command!')
+                # test valid proxy command params
                 if not re.match(
                     r'^PROXY(\s+)(UNKNOWN(|(\s+).*)|TCP(4|6)(\s+)([0-9a-f.:]+)(\s+)([0-9a-f.:]+)(\s+)([0-9]+)(\s+)([0-9]+)(\s*))$',
                     line,
                     re.IGNORECASE,
                 ):
                     raise Smtpd421Exception('Abort connection while illegal PROXY command!')
-                if ctx.server.proxy:
-                    raise Smtpd421Exception('Abort connection while PROXY already set!')
+                # extract params
                 cmd_data = re.sub(r'^PROXY\ ', '', line, flags=re.IGNORECASE).strip().split()
                 proxy_data = {
                     'proto': cmd_data[0].upper(),
@@ -1102,9 +1090,41 @@ class SmtpdServer:
                     if return_value:
                         proxy_data = return_value
                 ctx.server.proxy = proxy_data
-                # otherwise on buffering clients or enabled feature pipelining
-                # the original client will receive unhandleable responses
-                return ''
+                # the server greeting now follows the PROXY header, not the connect
+                session.cmd_sequence = CMD_HELO
+                return f'220 {ctx.server.local_response.strip()}'
+
+            elif self.proxy_extension and re.match(r'^PROXY(\s+)', line, re.IGNORECASE):
+                # PROXY is only valid as first line, a later one is an abuse
+                raise Smtpd421Exception('Abort connection while PROXY already set!')
+
+            # Handle specific messages from the client
+            elif re.match(r'^(HELO|EHLO)(\s+.*)?$', line, re.IGNORECASE):
+                # HELO/EHLO
+                if session.cmd_sequence is not CMD_HELO:
+                    raise Smtpd503Exception
+                cmd_data = re.sub(r'^(HELO|EHLO)\ ', '', line, flags=re.IGNORECASE).strip()
+                if SmtpdEvent.ON_HELO_EVENT in self.emit_events:
+                    await self._emit(SmtpdEvent.ON_HELO_EVENT, ctx, cmd_data)
+                ctx.server.helo = cmd_data
+                session.cmd_sequence = CMD_RSET
+                if re.match(r'^EHLO', line, re.IGNORECASE):
+                    return (
+                        f'250-{ctx.server.helo_response.strip()}\r\n'
+                        # respond with 8BITMIME extension
+                        + ('250-8BITMIME\r\n' if self.internationalization_extensions else '')
+                        # respond with SMTPUTF8 extension
+                        + ('250-SMTPUTF8\r\n' if self.internationalization_extensions else '')
+                        # respond with PIPELINING if enabled
+                        + ('250-PIPELINING\r\n' if self.pipelining_extension else '')
+                        # respond with AUTH extensions if enabled
+                        + ('250-AUTH LOGIN PLAIN\r\n' if self._auth_available(ctx) else '')
+                        # respond with STARTTLS if available and not already enabled
+                        + ('' if self.encrypt_mode is EncryptMode.TLS_FORBIDDEN or ctx.server.encrypted else '250-STARTTLS\r\n')
+                        + '250 OK'
+                    )
+                else:
+                    return f'250 OK {ctx.server.helo_response.strip()}'.strip()
 
             elif re.match(r'^STARTTLS\s*$', line, re.IGNORECASE):
                 # STARTTLS
@@ -1491,11 +1511,11 @@ class SmtpdServer:
 
         - **session** (SmtpdSession): The session state to reset
         - **connection_initialize** (bool): True on connection start; builds the
-            ctx and sets the sequence to CMD_HELO (else CMD_RSET)
+            ctx and sets the sequence to CMD_PROXY or CMD_HELO else CMD_RSET
 
         """
         # set active command sequence info
-        session.cmd_sequence = CMD_HELO if connection_initialize else CMD_RSET
+        session.cmd_sequence = (CMD_PROXY if self.proxy_extension else CMD_HELO) if connection_initialize else CMD_RSET
         # drop any auth challenge
         session.auth_challenge = {}
         # test existing of ctx

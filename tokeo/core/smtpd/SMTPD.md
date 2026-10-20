@@ -396,11 +396,31 @@ with ```EHLO``` before ```MAIL FROM```.
 
 ## 9. The PROXY protocol
 
-To sit behind a proxy or load balancer that speaks the PROXY protocol, set
-```proxy_extension=True```. The server then accepts a leading ```PROXY``` line,
-validates it (TCP4/TCP6, normalized addresses and ports), stores the parsed result
-on ```ctx.server.proxy``` and calls ```on_proxy_event```. The original client
-address is thus available to your handler.
+To sit behind a proxy or load balancer that speaks the PROXY protocol
+(haproxy, version 1), set ```proxy_extension=True```. The PROXY header is
+then mandatory as the very first line of each connection: the server sends
+no greeting on connect, validates the header (TCP4/TCP6/UNKNOWN, normalized
+addresses and ports), stores the parsed result on ```ctx.server.proxy```,
+calls ```on_proxy_event``` and answers with the ```220``` greeting only
+after that. The original client address is thus available to your handler.
+
+```on_connect_event``` runs before the header, so ```ctx.server.remote_ip```
+there is the address of the proxy; this is the place to accept trusted
+proxies only.
+
+The server logs and closes the connection with ```421``` when the first line
+is not a valid PROXY header, when the header does not arrive within
+```io_proxy_cmd_timeout``` seconds (default 5), when processing the header
+fails, or when a later line sends PROXY again (a Tokeo safeguard, the
+specification only defines the leading header).
+
+Deviations from the specification, kept for compatibility:
+
+- the header is matched case-insensitive
+- a bare LF ends the header as well (except with ```CRLF_STRICT```)
+- the header length is limited by ```io_buffer_max_size```, not 107 bytes
+- only version 1 (text) is supported, a version 2 (binary) header is
+  rejected with ```421```
 
 ## 10. Listeners, limits and options
 
@@ -417,13 +437,14 @@ The constructor keeps the original option names. Key ones:
 <tr><td>max_connections</td><td>None</td><td>concurrent connections accepted (None = unlimited)</td></tr>
 <tr><td>auth_mode</td><td>'AUTH_FORBIDDEN'</td><td>AUTH_OPTIONAL / AUTH_REQUIRED</td></tr>
 <tr><td>encrypt_mode</td><td>'TLS_FORBIDDEN'</td><td>TLS_OPTIONAL / TLS_WHEN_AUTH / TLS_REQUIRED</td></tr>
-<tr><td>proxy_extension</td><td>False</td><td>accept the PROXY protocol</td></tr>
 <tr><td>pipelining_extension</td><td>False</td><td>advertise PIPELINING</td></tr>
 <tr><td>internationalization_extensions</td><td>False</td><td>advertise 8BITMIME and SMTPUTF8</td></tr>
 <tr><td>spool</td><td>None</td><td>path and file name prefix for the spool temp files (section 11)</td></tr>
 <tr><td>do_dns_reverse_lookup</td><td>True</td><td>resolve the remote host name</td></tr>
 <tr><td>io_cmd_timeout</td><td>30</td><td>seconds to await a complete command line</td></tr>
 <tr><td>io_buffer_max_size</td><td>1 MiB</td><td>maximum line length before rejection</td></tr>
+<tr><td>proxy_extension</td><td>False</td><td>accept the PROXY protocol</td></tr>
+<tr><td>io_proxy_cmd_timeout</td><td>5</td><td>seconds to await the PROXY header line</td></tr>
 </tbody>
 </table>
 
@@ -530,11 +551,12 @@ and forward to the ```logging``` module directly.
 ## 14. Relationship to the reference implementation
 
 The library follows the original one-to-one: the same 13 events, the same context layout,
-the same configuration options and attribute readers, the same PROXY / AUTH /
+the same configuration options and attribute readers, the same AUTH /
 STARTTLS behaviour, the same exception set and the same lifecycle. Its full test
 suite is a direct port of the original test suite. The differences are the ones asyncio
 forces or Tokeo adds: the events may be ```async def``` (or ```@threaded```)
 instead of Ruby threads; a certificate may be supplied as an in-memory PEM string
-(```tls_cert```/```tls_key```); and the polling-only ```io_waitreadable_sleep```
-knob has no effect because ```asyncio``` is event-driven (it is accepted for
-parity).
+(```tls_cert```/```tls_key```); with ```proxy_extension``` the PROXY header is
+mandatory as the first line and answered by the greeting (section 9); and the
+polling-only ```io_waitreadable_sleep``` knob has no effect because
+```asyncio``` is event-driven (it is accepted for parity).
