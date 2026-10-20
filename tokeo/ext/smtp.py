@@ -518,7 +518,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # X-headers
         for item in params.keys():
             if item.startswith('X-'):
-                msg.add_header(item, self._header(f'{params[item]}', _charset=cs_header, **params))
+                msg[item] = self._header(f'{params[item]}', _charset=cs_header, **params)
 
     def _attach_body(self, msg, part_text, part_html, cs_body, **params):
         """Attach body parts to the message with correct MIME structure."""
