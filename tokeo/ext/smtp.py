@@ -25,7 +25,6 @@ from email.mime.image import MIMEImage
 from email import encoders
 from email.utils import format_datetime, make_msgid
 from cement.core import mail
-from cement.core.deprecations import deprecate
 from cement.utils import fs
 from cement.utils.misc import is_true
 
@@ -331,10 +330,6 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
             msg = self._make_message(body, **params)
             res = server.send_message(msg)
-
-        # Deprecation: bool return will change to senderrs dict
-        # https://github.com/python/cpython/blob/3.13/Lib/smtplib.py#L899
-        deprecate('3.0.16-1')
 
         if len(res) > 0:  # pragma: nocover  # defensive: unreachable - Mailpit accepts everything
             self.app.log.error(f'SMTPHandler Errors: {res}')
