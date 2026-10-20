@@ -601,8 +601,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
                 else:
                     part = MIMEBase('application', 'octet-stream')
                     part.set_payload(file.read())
-
-            encoders.encode_base64(part)
+                    # MIMEImage encodes itself, MIMEBase needs it explicitly
+                    encoders.encode_base64(part)
 
             # inline only into the related part, otherwise as attachment
             if cid and rel is not None:
