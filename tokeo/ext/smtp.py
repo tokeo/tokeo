@@ -421,6 +421,199 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         """
         return Header(value, charset=_charset) if params['header_encoding'] else value
 
+    def _build_charsets(self, **params):
+        """Build charset objects for header and body encoding."""
+        cs_header = Charset(params['charset'])
+        if params['header_encoding'] == 'base64':
+            cs_header.header_encoding = BASE64
+        elif params['header_encoding'] == 'qp' or params['header_encoding'] == 'quoted-printable':
+            cs_header.header_encoding = QP
+
+        cs_body = Charset(params['charset'])
+        if params['body_encoding'] == 'base64':
+            cs_body.body_encoding = BASE64
+        elif params['body_encoding'] == 'qp' or params['body_encoding'] == 'quoted-printable':
+            cs_body.body_encoding = QP
+
+        return cs_header, cs_body
+
+    def _build_body_parts(self, body, cs_body):
+        """Parse body into text and html MIME parts."""
+        part_text = None
+        part_html = None
+
+        # str.strip() keeps the TypeError for a non str value
+        if isinstance(body, str):
+            part_text = MIMEText(body, 'plain', _charset=cs_body)
+        elif isinstance(body, tuple):
+            if len(body) >= 1 and body[0] and str.strip(body[0]) != '':
+                part_text = MIMEText(str.strip(body[0]), 'plain', _charset=cs_body)
+            if len(body) >= 2 and body[1] and str.strip(body[1]) != '':
+                part_html = MIMEText(str.strip(body[1]), 'html', _charset=cs_body)
+        elif isinstance(body, dict):
+            if 'text' in body and str.strip(body['text']) != '':
+                part_text = MIMEText(str.strip(body['text']), 'plain', _charset=cs_body)
+            if 'html' in body and str.strip(body['html']) != '':
+                part_html = MIMEText(str.strip(body['html']), 'html', _charset=cs_body)
+        else:
+            raise TypeError(
+                # fmt: off
+                "Message body must be string, "
+                "tuple ('<text>', '<html>') or "
+                "dict {'text': '<text>', 'html': '<html>'}"
+                # fmt: on
+            )
+
+        return part_text, part_html
+
+    def _build_mime_structure(self, part_text, part_html, cs_body, **params):
+        """Select the correct MIME container based on content and attachments."""
+        # If only "text" exists => text/plain, if only
+        # "html" exists => text/html, if "text" and
+        # "html" exists => multipart/alternative. In
+        # any case that files exists => multipart/mixed.
+        if params['files']:
+            msg = MIMEMultipart('mixed')
+            msg.set_charset(params['charset'])
+        elif part_text and part_html:
+            msg = MIMEMultipart('alternative')
+            msg.set_charset(params['charset'])
+        elif part_html:
+            msg = MIMEBase('text', 'html')
+            msg.set_charset(cs_body)
+        else:
+            msg = MIMEBase('text', 'plain')
+            msg.set_charset(cs_body)
+
+        return msg
+
+    def _set_headers(self, msg, cs_header, **params):
+        """Set all message headers including addresses, dates, and X-headers."""
+        msg['From'] = params['from_addr']
+        msg['To'] = ', '.join(params['to'])
+        if params['cc']:
+            msg['Cc'] = ', '.join(params['cc'])
+        if params['bcc']:
+            msg['Bcc'] = ', '.join(params['bcc'])
+        if params['subject_prefix'] not in [None, '']:
+            msg['Subject'] = self._header(f"{params['subject_prefix']} {params['subject']}", _charset=cs_header, **params)
+        else:
+            msg['Subject'] = self._header(params['subject'], _charset=cs_header, **params)
+
+        # auto-generate date and message-id if enforced and not provided
+        if is_true(params['date_enforce']) and not params.get('date', None):
+            params['date'] = format_datetime(datetime.now(timezone.utc))
+        if is_true(params['msgid_enforce']) and not params.get('message_id', None):
+            params['message_id'] = make_msgid(params['msgid_str'], params['msgid_domain'])
+
+        if params.get('date', None):
+            msg['Date'] = params['date']
+        if params.get('message_id', None):
+            msg['Message-Id'] = params['message_id']
+        if params.get('return_path', None):
+            msg['Return-Path'] = params['return_path']
+        if params.get('reply_to', None):
+            msg['Reply-To'] = params['reply_to']
+
+        # X-headers
+        for item in params.keys():
+            if item.startswith('X-'):
+                msg.add_header(item, self._header(f'{params[item]}', _charset=cs_header, **params))
+
+    def _attach_body(self, msg, part_text, part_html, cs_body, **params):
+        """Attach body parts to the message with correct MIME structure."""
+        rel = None
+        if params['files']:
+            # multipart/mixed
+            if part_html:
+                # when html exists, create a related part to include
+                # the body alternatives and eventually files as related
+                # attachments (e.g. images).
+                rel = MIMEMultipart('related')
+                alt = MIMEMultipart('alternative')
+                if part_text:
+                    alt.attach(part_text)
+                alt.attach(part_html)
+                rel.attach(alt)
+                msg.attach(rel)
+            else:
+                if part_text:
+                    msg.attach(part_text)
+                else:
+                    # no body, the files only
+                    pass
+        else:
+            if part_text and part_html:
+                msg.attach(part_text)
+                msg.attach(part_html)
+            else:
+                if part_text:
+                    msg.set_payload(part_text.get_payload(), charset=cs_body)
+                elif part_html:
+                    msg.set_payload(part_html.get_payload(), charset=cs_body)
+                else:
+                    # no body no files = empty message = just headers
+                    pass
+
+        # hand out the related part, inline images are attached into it
+        return rel
+
+    def _attach_files(self, msg, rel, **params):
+        """Attach file attachments to the message."""
+        if not params['files']:
+            return
+
+        for in_path in params['files']:
+            # support for alternative file name if its tuple or dict
+            # like [
+            #      'path/simple.ext',
+            #      ('altname.ext', 'path/filename.ext'),
+            #      ('altname.ext', 'path/filename.ext', 'content_id'),
+            #      {'name': 'altname', 'path': 'path/filename.ext', cid: 'cidname'},
+            #     ]
+            # an alternative name is used as given, the developer decides on it
+            if isinstance(in_path, tuple):
+                altname = in_path[0]
+                path = in_path[1]
+                cid = in_path[2] if len(in_path) >= 3 else None
+            elif isinstance(in_path, dict):
+                altname = in_path.get('name', None)
+                path = in_path.get('path')
+                cid = in_path.get('cid', None)
+            else:
+                altname = None
+                path = in_path
+                cid = None
+
+            path = fs.abspath(path)
+            if not altname:
+                altname = os.path.basename(path)
+
+            # add attachment payload from file
+            with open(path, 'rb') as file:
+                if cid:
+                    part = MIMEImage(file.read())
+                else:
+                    part = MIMEBase('application', 'octet-stream')
+                    part.set_payload(file.read())
+
+            encoders.encode_base64(part)
+
+            # inline only into the related part, otherwise as attachment
+            if cid and rel is not None:
+                part.add_header(
+                    'Content-Disposition',
+                    f'inline; filename={altname}',
+                )
+                part.add_header('Content-ID', f'<{cid}>')
+                rel.attach(part)
+            else:
+                part.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename={altname}',
+                )
+                msg.attach(part)
+
     def _make_message(self, body, **params):
         """
         Create an email message object with all necessary parts.
@@ -456,205 +649,12 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             - multipart/related: For HTML emails with inline images
 
         """
-        # Set up encoding for header parts
-        cs_header = Charset(params['charset'])
-        if params['header_encoding'] == 'base64':
-            cs_header.header_encoding = BASE64
-        elif params['header_encoding'] in ('qp', 'quoted-printable'):
-            cs_header.header_encoding = QP
-
-        # Set up encoding for body parts
-        cs_body = Charset(params['charset'])
-        if params['body_encoding'] == 'base64':
-            cs_body.body_encoding = BASE64
-        elif params['body_encoding'] in ('qp', 'quoted-printable'):
-            cs_body.body_encoding = QP
-
-        # Initialize body part containers
-        partText = None
-        partHtml = None
-
-        # Extract text and HTML parts from the body argument
-        if isinstance(body, str):
-            # String body = plain text only
-            partText = MIMEText(body, 'plain', _charset=cs_body)
-        elif isinstance(body, tuple):
-            # Tuple body = (text, html)
-            # Process plain text part if provided
-            if len(body) >= 1 and body[0] and str.strip(body[0]) != '':
-                partText = MIMEText(str.strip(body[0]), 'plain', _charset=cs_body)
-            # Process HTML part if provided
-            if len(body) >= 2 and body[1] and str.strip(body[1]) != '':
-                partHtml = MIMEText(str.strip(body[1]), 'html', _charset=cs_body)
-        elif isinstance(body, dict):
-            # Dict body = {'text': '...', 'html': '...'}
-            # Process plain text part if provided
-            if 'text' in body and str.strip(body['text']) != '':
-                partText = MIMEText(str.strip(body['text']), 'plain', _charset=cs_body)
-            # Process HTML part if provided
-            if 'html' in body and str.strip(body['html']) != '':
-                partHtml = MIMEText(str.strip(body['html']), 'html', _charset=cs_body)
-        else:
-            raise TypeError(
-                # fmt: off
-                "Message body must be string, "
-                "tuple ('<text>', '<html>') or "
-                "dict {'text': '<text>', 'html': '<html>'}"
-                # fmt: on
-            )
-
-        # To define the correct message content-type
-        # we need to indentify the content of this mail.
-        # If only "text" exists => text/plain, if only
-        # "html" exists => text/html, if "text" and
-        # "html" exists => multipart/alternative. In
-        # any case that files exists => multipart/mixed.
-        # Set message charset and encoding based on parts
-        if params['files']:
-            msg = MIMEMultipart('mixed')
-            msg.set_charset(params['charset'])
-        elif partText and partHtml:
-            msg = MIMEMultipart('alternative')
-            msg.set_charset(params['charset'])
-        elif partHtml:
-            msg = MIMEBase('text', 'html')
-            msg.set_charset(cs_body)
-        else:
-            msg = MIMEBase('text', 'plain')
-            msg.set_charset(cs_body)
-
-        # create message
-        msg['From'] = params['from_addr']
-        msg['To'] = ', '.join(params['to'])
-        if params['cc']:
-            msg['Cc'] = ', '.join(params['cc'])
-        if params['bcc']:
-            msg['Bcc'] = ', '.join(params['bcc'])
-        if params['subject_prefix'] not in [None, '']:
-            msg['Subject'] = self._header(f'{params["subject_prefix"]} {params["subject"]}', _charset=cs_header, **params)
-        else:
-            msg['Subject'] = self._header(params['subject'], _charset=cs_header, **params)
-        # check for date
-        if is_true(params['date_enforce']) and not params.get('date', None):
-            params['date'] = format_datetime(datetime.now(timezone.utc))
-        # check for message-id
-        if is_true(params['msgid_enforce']) and not params.get('message_id', None):
-            params['message_id'] = make_msgid(params['msgid_str'], params['msgid_domain'])
-
-        # check for message headers
-        if params.get('date', None):
-            msg['Date'] = params['date']
-        if params.get('message_id', None):
-            msg['Message-Id'] = params['message_id']
-        if params.get('return_path', None):
-            msg['Return-Path'] = params['return_path']
-        if params.get('reply_to', None):
-            msg['Reply-To'] = params['reply_to']
-
-        # check for X-headers
-        for item in params.keys():
-            if item.startswith('X-'):
-                msg.add_header(item, self._header(f'{params[item]}', _charset=cs_header, **params))
-
-        # append the body parts
-        if params['files']:
-            # multipart/mixed
-            if partHtml:
-                # when html exists, create always a related part to include
-                # the body alternatives and eventually files as related
-                # attachments (e.g. images).
-                rel = MIMEMultipart('related')
-                # create an alternative part to include bodies for text and html
-                alt = MIMEMultipart('alternative')
-                # body text and body html
-                if partText:
-                    alt.attach(partText)
-                alt.attach(partHtml)
-                rel.attach(alt)
-                msg.attach(rel)
-            else:
-                # only body text or no body
-                if partText:
-                    msg.attach(partText)
-                else:
-                    # no body no files = empty message = just headers
-                    pass
-        else:
-            # multipart/alternative
-            if partText and partHtml:
-                # plain/text and plain/html
-                msg.attach(partText)
-                msg.attach(partHtml)
-            else:
-                # plain/text or plain/html only so just append payload
-                if partText:
-                    msg.set_payload(partText.get_payload(), charset=cs_body)
-                elif partHtml:
-                    msg.set_payload(partHtml.get_payload(), charset=cs_body)
-                else:
-                    # no body no files = empty message = just headers
-                    pass
-
-        # attach files
-        if params['files']:
-            for in_path in params['files']:
-                # support for alternative file name if its tuple or dict
-                # like [
-                #     'path/simple.ext',
-                #     ('alt_name.ext', 'path/filename.ext'),
-                #     ('alt_name.ext', 'path/filename.ext', 'cidname'),
-                #     {
-                #         'name': 'alt_name',
-                #         'path': 'path/filename.ext',
-                #         cid: 'cidname'
-                #     },
-                # ]
-                if isinstance(in_path, tuple):
-                    alt_name = in_path[0]
-                    path = in_path[1]
-                    cid = in_path[2] if len(in_path) >= 3 else None
-                elif isinstance(in_path, dict):
-                    alt_name = in_path.get('name', None)
-                    path = in_path.get('path')
-                    cid = in_path.get('cid', None)
-                else:
-                    alt_name = None
-                    path = in_path
-                    cid = None
-
-                path = fs.abspath(path)
-                if not alt_name:
-                    alt_name = os.path.basename(path)
-
-                # add attachment payload from file
-                with open(path, 'rb') as file:
-                    # check for embedded image or regular attachments
-                    if cid:
-                        part = MIMEImage(file.read())
-                    else:
-                        part = MIMEBase('application', 'octet-stream')
-                        part.set_payload(file.read())
-
-                # encoder
-                encoders.encode_base64(part)
-
-                # embedded inline or attachment
-                if cid and partHtml and rel:
-                    # inline alt_name and id header
-                    part.add_header(
-                        'Content-Disposition',
-                        f'inline; filename={alt_name}',
-                    )
-                    part.add_header('Content-ID', f'<{cid}>')
-                    rel.attach(part)
-                else:
-                    # attachment alt_name header
-                    part.add_header(
-                        'Content-Disposition',
-                        f'attachment; filename={alt_name}',
-                    )
-                    msg.attach(part)
-
+        cs_header, cs_body = self._build_charsets(**params)
+        part_text, part_html = self._build_body_parts(body, cs_body)
+        msg = self._build_mime_structure(part_text, part_html, cs_body, **params)
+        self._set_headers(msg, cs_header, **params)
+        rel = self._attach_body(msg, part_text, part_html, cs_body, **params)
+        self._attach_files(msg, rel, **params)
         return msg
 
     def send_by_template(self, template, data=None, **kw):
