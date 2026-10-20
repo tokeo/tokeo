@@ -310,11 +310,11 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         params = self._get_params(**kw)
 
         if is_true(params['ssl']):
-            server = smtplib.SMTP_SSL(params['host'], params['port'], params['timeout'])
+            server = smtplib.SMTP_SSL(params['host'], params['port'], timeout=params['timeout'])
             self.app.log.debug(f'{self._meta.label} : initiating smtp over ssl')
 
         else:
-            server = smtplib.SMTP(params['host'], params['port'], params['timeout'])
+            server = smtplib.SMTP(params['host'], params['port'], timeout=params['timeout'])
             self.app.log.debug(f'{self._meta.label} : initiating smtp')
 
         # use context manager instead try finally to keep all original exceptions
@@ -497,7 +497,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # check for X-headers
         for item in params.keys():
             if item.startswith('X-'):
-                msg.add_header(item.title(), self._header(f'{params[item]}', _charset=cs_header, **params))
+                msg.add_header(item, self._header(f'{params[item]}', _charset=cs_header, **params))
 
         # append the body parts
         if params['files']:
