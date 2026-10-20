@@ -591,8 +591,13 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
             # add attachment payload from file
             with open(path, 'rb') as file:
-                if cid:
-                    part = MIMEImage(file.read())
+                # an image part is only needed when it is embedded inline
+                if cid and rel is not None:
+                    try:
+                        part = MIMEImage(file.read())
+                    except TypeError as e:
+                        # the image type is guessed from the content, not the name
+                        raise TypeError(f'Not a supported image: {path} at inline attachment with cid {cid!r}') from e
                 else:
                     part = MIMEBase('application', 'octet-stream')
                     part.set_payload(file.read())
