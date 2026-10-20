@@ -16,6 +16,7 @@ configuration options.
 import os
 from datetime import datetime, timezone
 import smtplib
+import ssl
 from email.header import Header
 from email.charset import Charset, BASE64, QP
 from email.mime.multipart import MIMEMultipart
@@ -86,8 +87,12 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             'host': 'localhost',  # SMTP server hostname
             'port': '25',  # SMTP server port
             'timeout': 30,  # Connection timeout in seconds
+            'local_hostname': None,  # Name announced in EHLO/HELO (None = FQDN of local host)
+            'source_address': None,  # Local address to bind before connecting (None = by routing)
             'ssl': False,  # Use SSL/TLS connection
             'tls': False,  # Use STARTTLS command
+            'host_cert_verify': False,  # Verify certificate chain and hostname for ssl and tls
+            'host_cert_ca': None,  # CA for verify: single line = file path, multi line = PEM text
             'auth': False,  # Use SMTP authentication
             'auth_identity': None,  # SMTP username or identity
             'auth_password': None,  # SMTP password
@@ -207,7 +212,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         for item in [
             # fmt: off
             'ssl', 'tls', 'host', 'port', 'auth', 'auth_identity', 'auth_password',
-            'timeout', 'msgid_domain'
+            'timeout', 'local_hostname', 'source_address', 'host_cert_verify', 'host_cert_ca',
+            'msgid_domain'
             # fmt: on
         ]:
             params[item] = self.app.config.get(self._meta.config_section, item)
@@ -308,12 +314,32 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         """
         params = self._get_params(**kw)
 
+        # build before connecting, so a bad CA setting fails without network
+        context = self._host_cert_context(**params)
+        # an empty value means "not set", smtplib would announce an empty EHLO
+        local_hostname = params['local_hostname'] or None
+        # port 0 lets the system choose the local port
+        source_address = (params['source_address'], 0) if params['source_address'] else None
+
         if is_true(params['ssl']):
-            server = smtplib.SMTP_SSL(params['host'], params['port'], timeout=params['timeout'])
+            server = smtplib.SMTP_SSL(
+                params['host'],
+                params['port'],
+                local_hostname=local_hostname,
+                timeout=params['timeout'],
+                source_address=source_address,
+                context=context,
+            )
             self.app.log.debug(f'{self._meta.label} : initiating smtp over ssl')
 
         else:
-            server = smtplib.SMTP(params['host'], params['port'], timeout=params['timeout'])
+            server = smtplib.SMTP(
+                params['host'],
+                params['port'],
+                local_hostname=local_hostname,
+                timeout=params['timeout'],
+                source_address=source_address,
+            )
             self.app.log.debug(f'{self._meta.label} : initiating smtp')
 
         # use context manager instead try finally to keep all original exceptions
@@ -323,7 +349,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
             if is_true(params['tls']):
                 self.app.log.debug(f'{self._meta.label} : initiating tls')
-                server.starttls()
+                server.starttls(context=context)
 
             if is_true(params['auth']):
                 server.login(params['auth_identity'], params['auth_password'])
@@ -336,6 +362,42 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             return False
         else:
             return True
+
+    def _host_cert_context(self, **params):
+        """
+        Create the TLS context that verifies the certificate of the host.
+
+        The context is used for both encrypted connections, ```ssl``` and
+        ```tls``` (STARTTLS). It checks the certificate chain and that the
+        configured ```host``` is contained in the certificate.
+
+        ### Args
+
+        - **params**: Parameter dictionary from _get_params()
+
+        ### Returns
+
+        - **ssl.SSLContext|None**: Verifying context if ```host_cert_verify```
+            is set, otherwise ```None``` to keep the smtplib default
+
+        ### Notes
+
+        - Without ```host_cert_ca``` the CAs of the system are trusted
+        - A single line ```host_cert_ca``` is the path of a CA file
+        - A multi line ```host_cert_ca``` is the PEM text of one or more
+            certificates, e.g. a self-signed certificate of the host
+        - The value is used as is, a path must not end with a line break
+
+        """
+        if not is_true(params['host_cert_verify']):
+            return None
+
+        ca = params['host_cert_ca']
+        if not ca:
+            return ssl.create_default_context()
+        if '\n' in ca:
+            return ssl.create_default_context(cadata=ca)
+        return ssl.create_default_context(cafile=ca)
 
     def _header(self, value, _charset=None, **params):
         """
