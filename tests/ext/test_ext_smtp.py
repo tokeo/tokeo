@@ -50,7 +50,7 @@ def test_smtp_qp_message(rando, tmp):
             subject=subjMsg,
             files=[
                 ('Demo-Rechnung.pdf', pdf),
-                {'alt_name': 'abcd1234.webp', 'path': webp, 'cid': 'abcd1234.webp'},
+                {'name': 'abcd1234.webp', 'path': webp, 'cid': 'abcd1234.webp'},
             ],
         )
         msg = mail._make_message(body, **get_params).as_string()
@@ -80,7 +80,7 @@ def test_smtp_qp(rando):
             subject=subjMsg,
             files=[
                 ('Demo-Rechnung.pdf', './invoice.pdf'),
-                {'alt_name': 'abcd1234.webp', 'path': './abcd1234.webp', 'cid': 'abcd1234.webp'},
+                {'name': 'abcd1234.webp', 'path': './abcd1234.webp', 'cid': 'abcd1234.webp'},
             ],
         )
 
