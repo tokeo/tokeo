@@ -399,13 +399,13 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             return ssl.create_default_context(cadata=ca)
         return ssl.create_default_context(cafile=ca)
 
-    def _header(self, value, _charset=None, **params):
+    def _header(self, value=None, _charset=None, **params):
         """
         Create an email header value with proper encoding if needed.
 
         ### Args
 
-        - **value** (str): The header value to encode
+        - **value** (str, optional): The header value to encode
         - **_charset** (Charset): Character set for encoding
         - **params**: Parameter dictionary containing encoding settings
 
