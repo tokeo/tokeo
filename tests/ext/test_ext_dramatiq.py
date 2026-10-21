@@ -221,3 +221,29 @@ def test_serve_falls_back_to_spawn_without_forkserver(serve, monkeypatch):
     monkeypatch.setattr('tokeo.ext.dramatiq.multiprocessing.get_all_start_methods', lambda: ['spawn'])
     calls = serve()
     assert calls['start_methods'] == [('spawn', True)]
+
+
+@pytest.mark.parametrize(
+    'options, config, method',
+    [
+        ([], dict(use_spawn=True), 'spawn'),
+        (['--use-spawn'], {}, 'spawn'),
+        (['--use-forkserver'], dict(use_spawn=True), 'forkserver'),
+        (['--use-spawn', '--use-forkserver'], {}, 'forkserver'),
+    ],
+    ids=['config', 'switch', 'forkserver_switch', 'last_wins'],
+)
+def test_serve_use_spawn(serve, options, config, method):
+    calls = serve(*options, config=config)
+    assert calls['start_methods'] == [(method, True)]
+    # tokeo sets the start method itself, dramatiq never gets the switch
+    assert '--use-spawn' not in calls['dramatiq_argv']
+    # a restart by --watch keeps the switches
+    assert calls['argv'] == ['tokeo', 'dramatiq', 'serve', *options]
+
+
+@pytest.mark.parametrize('value', ['yes', 1, None])
+def test_serve_invalid_use_spawn_config(serve, value):
+    with pytest.raises(TokeoDramatiqError, match='Invalid dramatiq config use_spawn'):
+        serve(config=dict(use_spawn=value))
+    assert sys.argv == ['tokeo']

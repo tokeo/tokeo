@@ -239,6 +239,8 @@ class TokeoDramatiq(MetaMixin):
             # Number of messages to prefetch from delay queues; auto (or 0)
             # follows the dramatiq defaults
             delay_queue_prefetch='auto',
+            # Start the worker processes by spawn instead of forkserver
+            use_spawn=False,
             # Broker type (currently only rabbitmq supported)
             broker='rabbitmq',
             # RabbitMQ connection settings
@@ -653,6 +655,26 @@ class TokeoDramatiqController(Controller):
                     help='milliseconds to wait for workers on shutdown',
                 ),
             ),
+            (
+                ['--use-spawn'],
+                dict(
+                    dest='use_spawn',
+                    action='store_const',
+                    const=True,
+                    default=None,
+                    help='start the worker processes by spawn',
+                ),
+            ),
+            (
+                ['--use-forkserver'],
+                dict(
+                    dest='use_spawn',
+                    action='store_const',
+                    const=False,
+                    default=None,
+                    help='start the worker processes by forkserver',
+                ),
+            ),
         ],
     )
     def serve(self):
@@ -676,11 +698,14 @@ class TokeoDramatiqController(Controller):
             delay queue
         - **--worker-shutdown-timeout** (int): Milliseconds to wait for the
             workers on shutdown
+        - **--use-spawn** (flag): Start the worker processes by spawn
+        - **--use-forkserver** (flag): Start the worker processes by
+            forkserver
 
         ### Raises
 
-        - **TokeoDramatiqError**: If a worker option in the config is not
-            allowed
+        - **TokeoDramatiqError**: If a worker option or ```use_spawn``` in
+            the config is not allowed
 
         ### Notes
 
@@ -710,6 +735,10 @@ class TokeoDramatiqController(Controller):
         - The worker processes start by forkserver on all python versions,
             so they never inherit the state of this process. Where
             forkserver is not available (e.g. Windows) spawn is used
+        - With ```use_spawn``` or --use-spawn each worker process starts a
+            fresh interpreter instead; --use-forkserver returns to
+            forkserver when the config sets ```use_spawn```. The last of
+            both switches wins
 
         """
         self.app.log.info('Spin up the dramatiq service workers')
@@ -720,6 +749,11 @@ class TokeoDramatiqController(Controller):
         shutdown_timeout = self._worker_option('worker_shutdown_timeout', 'worker_shutdown_timeout')
         queue_prefetch = self._worker_option('queue_prefetch', 'queue_prefetch', allow_auto=True, config_min_value=0)
         delay_queue_prefetch = self._worker_option('delay_queue_prefetch', 'delay_queue_prefetch', allow_auto=True, config_min_value=0)
+        use_spawn = self.app.pargs.use_spawn
+        if use_spawn is None:
+            use_spawn = self.app.dramatiq.config('use_spawn')
+            if not isinstance(use_spawn, bool):
+                raise TokeoDramatiqError(f'Invalid dramatiq config use_spawn: Value {use_spawn!r} must be true or false!')
         # build a synthetic sys.argv that dramatiq's own argparser will
         # consume: cli.make_argument_parser().parse_args() reads from
         # sys.argv directly, so we override it here, then restore the
@@ -787,8 +821,9 @@ class TokeoDramatiqController(Controller):
             except Exception:
                 pass
         # tokeo sets the start method itself, python before 3.14 would fork
-        # the workers with the state of this process
-        start_method = 'forkserver'
+        # the workers with the state of this process; --use-spawn is never
+        # handed to dramatiq, its set_start_method without force would fail
+        start_method = 'spawn' if use_spawn else 'forkserver'
         if start_method not in multiprocessing.get_all_start_methods():
             self.app.log.debug(f'dramatiq start method {start_method} is not available, use spawn')
             start_method = 'spawn'
