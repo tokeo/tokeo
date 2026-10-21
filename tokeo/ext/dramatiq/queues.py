@@ -7,6 +7,8 @@ together under the name of the queue.
 
 """
 
+import copy
+import time
 import importlib
 import threading
 import dataclasses
@@ -42,6 +44,7 @@ class TokeoDramatiqQueues:
         self._lock = threading.Lock()
         self._connection = None
         self._channel = None
+        self._cache = {}
 
     # --- connection ---------------------------------------------------------------
 
@@ -70,16 +73,19 @@ class TokeoDramatiqQueues:
         return self._channel
 
     def _call(self, func, *args):
-        # a connection closed by rabbitmq gets opened again once
         with self._lock:
-            for attempt in range(2):
-                try:
-                    self._open()
-                    return func(*args)
-                except pika.exceptions.AMQPConnectionError as e:
-                    self._close()
-                    if attempt:
-                        raise TokeoDramatiqError(f'Cannot connect to rabbitmq at {self._address()}!') from e
+            return self._run(func, *args)
+
+    def _run(self, func, *args):
+        # a connection closed by rabbitmq gets opened again once
+        for attempt in range(2):
+            try:
+                self._open()
+                return func(*args)
+            except pika.exceptions.AMQPConnectionError as e:
+                self._close()
+                if attempt:
+                    raise TokeoDramatiqError(f'Cannot connect to rabbitmq at {self._address()}!') from e
 
     def _address(self):
         # host and port only, the url may carry the password
@@ -131,7 +137,7 @@ class TokeoDramatiqQueues:
 
     # --- state --------------------------------------------------------------------
 
-    def state(self, names=None):
+    def state(self, names=None, cache_ttl=0):
         """
         Get the state of queues without creating missing ones.
 
@@ -139,6 +145,8 @@ class TokeoDramatiqQueues:
 
         - **names** (str|list, optional): Queue names, all queues of the app
             without
+        - **cache_ttl** (float, optional): Seconds a state is kept for further
+            calls. Defaults to 0, no cache
 
         ### Returns
 
@@ -152,7 +160,16 @@ class TokeoDramatiqQueues:
 
         """
         actors = self._actors()
-        return self._call(self._state, self._names(names), actors)
+        names = self._names(names)
+        key = tuple(names)
+        # one lock for check and query, waiting callers get the fresh state
+        with self._lock:
+            cached = self._cache.get(key)
+            if cached is None or time.monotonic() - cached[0] >= cache_ttl:
+                cached = (time.monotonic(), self._run(self._state, names, actors))
+                self._cache[key] = cached
+            # a copy, a caller may change its dicts
+            return copy.deepcopy(cached[1])
 
     def _state(self, names, actors):
         result = []
@@ -234,6 +251,7 @@ class TokeoDramatiqQueues:
         return self._call(self._requeue_dead, q_name(name), limit)
 
     def _requeue_dead(self, name, limit):
+        self._cache.clear()
         if self._declared(name) is None:
             raise TokeoDramatiqError(f'Queue {name} is missing, recreate it before the requeue!')
         dead = self._declared(xq_name(name))
@@ -287,6 +305,7 @@ class TokeoDramatiqQueues:
         return self._call(self._purge, self._names(names), dead_only)
 
     def _purge(self, names, dead_only):
+        self._cache.clear()
         result = []
         for name in names:
             purged = 0
@@ -320,6 +339,7 @@ class TokeoDramatiqQueues:
         return self._call(self._delete, self._names(names), force)
 
     def _delete(self, names, force):
+        self._cache.clear()
         if not force:
             for state in self._state(names, {}):
                 busy = [key for key in ('ready', 'delayed', 'dead', 'consumers') if state[key]]

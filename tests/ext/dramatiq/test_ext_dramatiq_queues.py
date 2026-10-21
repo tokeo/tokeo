@@ -26,6 +26,7 @@ class FakeServer:
         self.drop_next = False
         self.refuse_publish = False
         self.down = False
+        self.declares = 0
 
     def add(self, name, *bodies, consumers=0, arguments=None):
         self.queues[name] = dict(messages=list(bodies), consumers=consumers, arguments=arguments or {})
@@ -43,6 +44,7 @@ class FakeChannel:
         pass
 
     def queue_declare(self, queue, passive=False, durable=False, arguments=None):
+        self.server.declares += 1
         if queue not in self.server.queues:
             if passive:
                 self.is_closed = True
@@ -355,3 +357,39 @@ def test_command_purge(command, server):
 def test_command_refuses(command, options, error):
     with pytest.raises(TokeoDramatiqError, match=error):
         command(*options)
+
+
+# --- cache ---------------------------------------------------------------------
+
+
+def test_state_without_cache_asks_each_time(app, server):
+    app.dramatiq.queues.state('mail')
+    app.dramatiq.queues.state('mail')
+    assert server.declares == 6
+
+
+def test_state_cache(app, server, monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr('tokeo.ext.dramatiq.queues.time.monotonic', lambda: now[0])
+    server.add('mail', b'1')
+    queues = app.dramatiq.queues
+    first = queues.state('mail', cache_ttl=5)
+    server.add('mail', b'1', b'2')
+    now[0] += 4
+    # within the ttl the kept state comes back, rabbitmq is not asked
+    assert queues.state('mail', cache_ttl=5) == first and server.declares == 3
+    # a caller may change its copy without changing the cache
+    first[0]['ready'] = 99
+    assert queues.state('mail', cache_ttl=5)[0]['ready'] == 1
+    now[0] += 1
+    assert queues.state('mail', cache_ttl=5)[0]['ready'] == 2
+
+
+def test_state_cache_per_names_and_cleared_by_changes(app, server):
+    server.add('mail', b'1')
+    queues = app.dramatiq.queues
+    queues.state('mail', cache_ttl=60)
+    queues.state(cache_ttl=60)
+    assert server.declares == 9
+    queues.purge('mail')
+    assert queues.state('mail', cache_ttl=60)[0]['ready'] == 0
