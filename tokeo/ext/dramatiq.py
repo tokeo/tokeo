@@ -705,6 +705,14 @@ class TokeoDramatiqController(Controller):
                     help='start the worker processes by forkserver',
                 ),
             ),
+            (
+                ['--queues'],
+                dict(
+                    nargs='+',
+                    metavar='QUEUE',
+                    help='consume only these queues, all queues without this option',
+                ),
+            ),
         ],
     )
     def serve(self):
@@ -731,6 +739,8 @@ class TokeoDramatiqController(Controller):
         - **--use-spawn** (flag): Start the worker processes by spawn
         - **--use-forkserver** (flag): Start the worker processes by
             forkserver
+        - **--queues** (str): Names of the queues to consume, all queues
+            without this option
 
         ### Raises
 
@@ -753,6 +763,11 @@ class TokeoDramatiqController(Controller):
             and reloads actors when files change
         - In debug mode of the app dramatiq logs on debug level as well,
             unless --skip-logging is given
+        - With --queues the instance still declares all queues of the
+            actors but consumes only the given ones, their delay queues
+            included. A wrong name raises no error, the instance then
+            consumes nothing of it; a queue no instance consumes stays
+            unprocessed
 
         - Worker processes log to the console; the call blocks until they
             terminate (signal, error or shutdown via the management hooks)
@@ -844,6 +859,12 @@ class TokeoDramatiqController(Controller):
                 self.app.dramatiq.config('actors'),
             ],
         )
+        # --queues takes any number of values in dramatiq, so it must come
+        # after the broker and actors it would swallow otherwise
+        if self.app.pargs.queues:
+            sys.argv.extend(
+                ['--queues', *self.app.pargs.queues],
+            )
         # parse the synthetic argv we just assembled
         args = cli.make_argument_parser().parse_args()
         # restore sys.argv: dramatiq forks workers and may re-exec on

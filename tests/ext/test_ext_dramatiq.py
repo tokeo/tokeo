@@ -293,3 +293,29 @@ def test_serve_verbose_follows_debug(serve, options, debug, verbose, skip_loggin
     calls = serve(*options, debug=debug)
     args = calls['main'][0]
     assert (args.verbose, args.skip_logging) == (verbose, skip_logging)
+
+
+# --- queue binding -------------------------------------------------------------
+
+
+def test_serve_consumes_all_queues_without_switch(serve):
+    calls = serve()
+    assert '--queues' not in calls['dramatiq_argv']
+    assert not calls['main'][0].queues
+
+
+def test_serve_binds_queues(serve):
+    calls = serve('--queues', 'mail', 'orders_unparalleled')
+    args = calls['main'][0]
+    # --queues stays behind broker and actors, so dramatiq keeps both
+    assert calls['dramatiq_argv'][-3:] == ['--queues', 'mail', 'orders_unparalleled']
+    assert (args.broker, args.modules) == ('main:method', ['actors.module'])
+    assert args.queues == ['mail', 'orders_unparalleled']
+    # a restart by --watch keeps the binding
+    assert calls['argv'] == ['tokeo', 'dramatiq', 'serve', '--queues', 'mail', 'orders_unparalleled']
+
+
+def test_serve_queues_needs_a_name(serve, capsys):
+    with pytest.raises(SystemExit):
+        serve('--queues')
+    assert '--queues' in capsys.readouterr().err
