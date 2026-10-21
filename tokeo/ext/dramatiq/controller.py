@@ -13,7 +13,6 @@ import multiprocessing
 from os.path import basename, dirname, abspath
 from cement import ex
 from dramatiq import cli
-from dramatiq import worker as dramatiq_worker
 from tokeo.ext.argparse import Controller
 from tokeo.ext.dramatiq.base import TokeoDramatiqError, _number
 
@@ -307,11 +306,6 @@ class TokeoDramatiqController(Controller):
         # only the env reaches the workers, they bind the value on import
         if worker_poll_interval is not None:
             os.environ['dramatiq_worker_timeout'] = str(worker_poll_interval)
-        # dramatiq.worker read the env on import, update its constants too
-        dramatiq_worker.CONSUMER_RESTART_DELAY = restart_delay
-        dramatiq_worker.CONSUMER_RESTART_DELAY_SECS = restart_delay / 1000
-        dramatiq_worker.QUEUE_PREFETCH = queue_prefetch
-        dramatiq_worker.DELAY_QUEUE_PREFETCH = delay_queue_prefetch
         # check for logging parameter
         if self.app.pargs.skip_logging:
             # add logging parameter

@@ -10,20 +10,16 @@ import sys
 
 import pytest
 from dramatiq import cli as dramatiq_cli
-from dramatiq import worker as dramatiq_worker
 from tokeo.ext.dramatiq import TokeoDramatiqError
 
 
 @pytest.fixture
 def serve(tmp, monkeypatch, dramatiq_app):
     """Run the serve command with a recording cli and purge."""
-    # serve rewrites sys.argv, the env and the dramatiq worker constants;
-    # monkeypatch restores all of them after the test
+    # serve rewrites sys.argv and the env, monkeypatch restores both
     monkeypatch.setattr(sys, 'argv', ['tokeo'])
     for name in ('dramatiq_restart_delay', 'dramatiq_queue_prefetch', 'dramatiq_delay_queue_prefetch', 'dramatiq_worker_timeout'):
         monkeypatch.delenv(name, raising=False)
-    for name in ('CONSUMER_RESTART_DELAY', 'CONSUMER_RESTART_DELAY_SECS', 'QUEUE_PREFETCH', 'DELAY_QUEUE_PREFETCH'):
-        monkeypatch.setattr(dramatiq_worker, name, getattr(dramatiq_worker, name))
     calls = dict(main=[], purge=0, argv=None, start_methods=[])
 
     def fake_main(args):
@@ -94,8 +90,7 @@ def test_serve_worker_options_from_config(serve):
     # the defaults of the extension reach dramatiq
     assert (args.processes, args.threads, args.worker_shutdown_timeout) == (2, 1, 600_000)
     # auto in the config hands 0 to dramatiq, which follows the threads
-    assert (dramatiq_worker.QUEUE_PREFETCH, dramatiq_worker.DELAY_QUEUE_PREFETCH) == (0, 0)
-    assert os.environ['dramatiq_queue_prefetch'] == '0'
+    assert (os.environ['dramatiq_queue_prefetch'], os.environ['dramatiq_delay_queue_prefetch']) == ('0', '0')
 
 
 def test_serve_worker_switches_replace_config(serve):
@@ -121,14 +116,13 @@ def test_serve_worker_switches_replace_config(serve):
     )
     args = calls['main'][0]
     assert (args.processes, args.threads, args.worker_shutdown_timeout) == (5, 6, 7000)
-    assert (dramatiq_worker.QUEUE_PREFETCH, dramatiq_worker.DELAY_QUEUE_PREFETCH) == (8, 9)
     assert (os.environ['dramatiq_queue_prefetch'], os.environ['dramatiq_delay_queue_prefetch']) == ('8', '9')
 
 
 def test_serve_fixed_config_values_without_switches(serve):
     calls = serve(config=dict(worker_processes=3, queue_prefetch=10, delay_queue_prefetch='20'))
     assert calls['main'][0].processes == 3
-    assert (dramatiq_worker.QUEUE_PREFETCH, dramatiq_worker.DELAY_QUEUE_PREFETCH) == (10, 20)
+    assert (os.environ['dramatiq_queue_prefetch'], os.environ['dramatiq_delay_queue_prefetch']) == ('10', '20')
 
 
 def test_serve_auto_switches_reset_fixed_config(serve):
@@ -137,13 +131,13 @@ def test_serve_auto_switches_reset_fixed_config(serve):
     # without --processes dramatiq takes its default, the cpus of the host
     assert '--processes' not in calls['dramatiq_argv']
     assert calls['main'][0].processes == dramatiq_cli.CPUS
-    assert (dramatiq_worker.QUEUE_PREFETCH, dramatiq_worker.DELAY_QUEUE_PREFETCH) == (0, 0)
+    assert (os.environ['dramatiq_queue_prefetch'], os.environ['dramatiq_delay_queue_prefetch']) == ('0', '0')
 
 
 @pytest.mark.parametrize('value', ['auto', 0, '0'])
 def test_serve_auto_prefetch_in_config(serve, value):
     serve(config=dict(queue_prefetch=value, delay_queue_prefetch=value))
-    assert (dramatiq_worker.QUEUE_PREFETCH, dramatiq_worker.DELAY_QUEUE_PREFETCH) == (0, 0)
+    assert (os.environ['dramatiq_queue_prefetch'], os.environ['dramatiq_delay_queue_prefetch']) == ('0', '0')
 
 
 def test_serve_auto_processes_in_config(serve):
