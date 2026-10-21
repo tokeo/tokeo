@@ -4,7 +4,8 @@ Tests for tokeo.ext.smtp against the own smtpd as a live server.
 The server runs in a background thread with its own event loop, while the
 blocking smtplib client of the extension talks to it. Covered are the TLS
 connections (STARTTLS and SMTPS) with and without host certificate checks,
-and the connection end when the dialog fails.
+the connection end when the dialog fails, and the delivery of a complete
+quoted-printable message with attachments, inline image and X-headers.
 """
 
 import os
@@ -16,11 +17,12 @@ import asyncio
 import smtplib
 import platform
 import threading
+from email.header import decode_header, make_header
 
 import pytest
 
 from tokeo.core.smtpd import SmtpdServer, SmtpdEvents, Smtpd535Exception, Smtpd550Exception
-from tests.ext.test_ext_smtp import smtp_app, make_cert
+from tests.ext.test_ext_smtp import smtp_app, make_cert, subjMsg, textMsg, htmlImg
 
 
 _VERSION = sys.version_info[:3]
@@ -169,3 +171,49 @@ def test_smtp_closes_connection_on_error(smtp, error):
         assert smtpd.server.connections == 0
 
     assert smtpd.events.messages == []
+
+
+# --- delivery of a complete message ------------------------------------------
+
+
+def test_smtp_qp_delivered_to_smtpd(tmp):
+    pdf = os.path.join(tmp.dir, 'invoice.pdf')
+    with open(pdf, 'wb') as f:
+        f.write(b'%PDF-1.4 dummy invoice')
+    webp = os.path.join(tmp.dir, 'abcd1234.webp')
+    with open(webp, 'wb') as f:
+        f.write(b'RIFF0000WEBPVP8 dummy')
+
+    with BackgroundSmtpd({}) as smtpd:
+        # quoted-printable is set for the config of this app only
+        with smtp_app(host='127.0.0.1', port=smtpd.port, timeout=5, body_encoding='qp') as app:
+            sent = app.mail.send(
+                (textMsg, htmlImg),
+                subject=subjMsg,
+                files=[
+                    ('Demo-Rechnung.pdf', pdf),
+                    {'name': 'abcd1234.webp', 'path': webp, 'cid': 'abcd1234.webp'},
+                ],
+                x_super='Toller Key',
+                x_binary=(12, 'hallo', -1),
+            )
+
+    assert sent is True
+    assert len(smtpd.events.messages) == 1
+    data, _ = smtpd.events.messages[0]
+    msg = email.message_from_bytes(data)
+    parts = {part.get_content_type(): part for part in msg.walk()}
+
+    assert str(make_header(decode_header(msg['Subject']))) == subjMsg
+    assert msg['X-super'] == 'Toller Key'
+    assert msg['X-binary'] == "(12, 'hallo', -1)"
+    # the text arrives quoted-printable with the umlauts encoded as utf-8
+    text = parts['text/plain']
+    assert text['Content-Transfer-Encoding'] == 'quoted-printable'
+    assert '=C3=A4=C3=B6=C3=BC' in text.get_payload()
+    assert text.get_payload(decode=True).decode('utf-8') == textMsg
+    # the pdf is an attachment, the image is embedded into the related part
+    assert parts['application/octet-stream'].get_filename() == 'Demo-Rechnung.pdf'
+    image = [p for p in parts['multipart/related'].walk() if p.get_content_type() == 'image/webp'][0]
+    assert image['Content-ID'] == '<abcd1234.webp>'
+    assert image.get_payload(decode=True) == b'RIFF0000WEBPVP8 dummy'

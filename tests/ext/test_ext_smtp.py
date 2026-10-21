@@ -70,40 +70,6 @@ def test_smtp_qp_message(rando, tmp):
         assert 'Demo-Rechnung.pdf' in msg and 'abcd1234.webp' in msg
 
 
-def test_smtp_qp(rando):
-    defaults['smtp']['body_encoding'] = 'qp'
-
-    with SmtpTest(config_defaults=defaults) as app:
-
-        # the send half needs real credentials from a local secret section
-        if 'test_ext_smtp' not in app.config.get_sections():
-            pytest.skip('no local test_ext_smtp section with smtp credentials configured')
-
-        # merge the test specific section
-        app.config.merge(dict(smtp=app.config.get_section_dict('test_ext_smtp')))
-
-        mail = app.mail
-        body = (textMsg, htmlImg)
-
-        test_params = dict(
-            to=app.mail._config('to'),
-            subject=subjMsg,
-            files=[
-                ('Demo-Rechnung.pdf', './invoice.pdf'),
-                {'name': 'abcd1234.webp', 'path': './abcd1234.webp', 'cid': 'abcd1234.webp'},
-            ],
-        )
-
-        test_params['x_super'] = 'Toller Key'
-        test_params['x_binary'] = (12, 'hallo', -1)
-
-        get_params = mail._get_params(**test_params)
-        msg = mail._make_message(body, **get_params)
-        app.print(msg.as_string())
-
-        mail.send(body, **test_params)
-
-
 # --- helpers for the tests below ---------------------------------------------
 
 
