@@ -57,7 +57,8 @@ class TokeoActor(dramatiq.Actor):
         try:
             return super().send_with_options(args=args, kwargs=kwargs, delay=delay, **options)
         except BrokerConnectionError as e:
-            address = _broker_address(self.broker)
+            # another broker, e.g. the stub broker of tests, has no address
+            address = getattr(self.broker, 'address', None)
             where = f' at {address}' if address else ''
             raise TokeoDramatiqConnectionError(f'Cannot send {self.actor_name}, rabbitmq is not reachable{where}!') from e
 
@@ -82,15 +83,6 @@ def tokeo_actor(fn=None, **options):
     """
     options.setdefault('actor_class', TokeoActor)
     return dramatiq_actor(fn, **options)
-
-
-def _broker_address(broker):
-    """Host and port of the broker, never its url with the password."""
-    parameters = getattr(broker, 'parameters', None)
-    if parameters is None:
-        return None
-    parameters = parameters if isinstance(parameters, list) else [parameters]
-    return ', '.join(f'{p.host}:{p.port}' for p in parameters)
 
 
 class TokeoAsyncIO(middleware.AsyncIO):
@@ -203,6 +195,12 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
                 ],
                 **kwargs,
             )
+
+    @property
+    def address(self):
+        """Host and port of the broker, never its url with the password."""
+        parameters = self.parameters if isinstance(self.parameters, list) else [self.parameters]
+        return ', '.join(f'{p.host}:{p.port}' for p in parameters)
 
     def _build_queue_arguments(self, queue_name):
         """
