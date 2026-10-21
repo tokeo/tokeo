@@ -166,10 +166,11 @@ def test_serve_auto_processes_in_config(serve):
     ],
     ids=lambda options: ' '.join(options),
 )
-def test_serve_invalid_switches(serve, capsys, options):
-    with pytest.raises(SystemExit):
+def test_serve_invalid_switches(serve, options):
+    # switches are checked like the config, with the name of the switch
+    switch = {'-p': '--processes', '-t': '--threads'}.get(options[0], options[0])
+    with pytest.raises(TokeoDramatiqError, match=f'Invalid switch {switch}: Value .* must be'):
         serve(*options)
-    assert 'must be' in capsys.readouterr().err
     assert sys.argv == ['tokeo']
 
 

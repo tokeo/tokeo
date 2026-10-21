@@ -9,39 +9,13 @@ diskcache locks of the actors.
 
 import os
 import sys
-import argparse
 import multiprocessing
 from os.path import basename, dirname, abspath
 from cement import ex
 from dramatiq import cli
 from dramatiq import worker as dramatiq_worker
 from tokeo.ext.argparse import Controller
-from tokeo.ext.dramatiq.base import TokeoDramatiqError, _config_number, _env_number, _worker_value
-
-
-def _worker_argtype(allow_auto=False):
-    """
-    Build an argparse type for a worker option of the serve command.
-
-    ### Args
-
-    - **allow_auto** (bool, optional): Whether ```'auto'``` is allowed.
-        Defaults to False
-
-    ### Returns
-
-    - **callable**: The type function, raising ```ArgumentTypeError```
-
-    """
-
-    def argtype(value):
-        try:
-            return _worker_value(value, allow_auto=allow_auto)
-        except ValueError as e:
-            # argparse shows the message of this error instead of a generic one
-            raise argparse.ArgumentTypeError(str(e)) from None
-
-    return argtype
+from tokeo.ext.dramatiq.base import TokeoDramatiqError, _number
 
 
 class TokeoDramatiqController(Controller):
@@ -71,7 +45,7 @@ class TokeoDramatiqController(Controller):
 
     def _worker_option(self, option, key, allow_auto=False, config_min_value=1):
         """
-        Get a worker option from the command line or else from the config.
+        Get a worker option from its switch or else from the config.
 
         ### Args
 
@@ -88,17 +62,15 @@ class TokeoDramatiqController(Controller):
 
         ### Raises
 
-        - **TokeoDramatiqError**: If the config value is not allowed
+        - **TokeoDramatiqError**: If the switch or the config value is not
+            allowed
 
         """
-        # a given switch replaces the config value, argparse checked it already
+        # a given switch replaces the config value
         value = getattr(self.app.pargs, option)
         if value is not None:
-            return value
-        try:
-            value = _worker_value(self.app.dramatiq.config(key), config_min_value, allow_auto)
-        except ValueError as e:
-            raise TokeoDramatiqError(f'Invalid dramatiq config {key}: {e}') from None
+            return _number(f'switch --{option.replace("_", "-")}', value, allow_auto=allow_auto)
+        value = _number(f'dramatiq config {key}', self.app.dramatiq.config(key), min_value=config_min_value, allow_auto=allow_auto)
         # 0 stays valid in the config for prefetch and means auto as before
         return 'auto' if value == 0 else value
 
@@ -180,7 +152,6 @@ class TokeoDramatiqController(Controller):
             (
                 ['-p', '--processes'],
                 dict(
-                    type=_worker_argtype(allow_auto=True),
                     metavar='N|auto',
                     help='number of worker processes, auto follows the dramatiq defaults',
                 ),
@@ -188,7 +159,6 @@ class TokeoDramatiqController(Controller):
             (
                 ['-t', '--threads'],
                 dict(
-                    type=_worker_argtype(),
                     metavar='N',
                     help='number of worker threads per process',
                 ),
@@ -196,7 +166,6 @@ class TokeoDramatiqController(Controller):
             (
                 ['--queue-prefetch'],
                 dict(
-                    type=_worker_argtype(allow_auto=True),
                     metavar='N|auto',
                     help='messages to prefetch per queue, auto follows the dramatiq defaults',
                 ),
@@ -204,7 +173,6 @@ class TokeoDramatiqController(Controller):
             (
                 ['--delay-queue-prefetch'],
                 dict(
-                    type=_worker_argtype(allow_auto=True),
                     metavar='N|auto',
                     help='messages to prefetch per delay queue, auto follows the dramatiq defaults',
                 ),
@@ -212,7 +180,6 @@ class TokeoDramatiqController(Controller):
             (
                 ['--worker-shutdown-timeout'],
                 dict(
-                    type=_worker_argtype(),
                     metavar='MS',
                     help='milliseconds to wait for workers on shutdown',
                 ),
@@ -276,8 +243,9 @@ class TokeoDramatiqController(Controller):
 
         ### Raises
 
-        - **TokeoDramatiqError**: If a worker option or ```use_spawn``` in
-            the config is not allowed
+        - **TokeoDramatiqError**: If a worker switch, a worker option or
+            ```use_spawn``` in the config, or the env of dramatiq is not
+            allowed
 
         ### Notes
 
@@ -333,10 +301,12 @@ class TokeoDramatiqController(Controller):
         shutdown_timeout = self._worker_option('worker_shutdown_timeout', 'worker_shutdown_timeout')
         queue_prefetch = self._worker_option('queue_prefetch', 'queue_prefetch', allow_auto=True, config_min_value=0)
         delay_queue_prefetch = self._worker_option('delay_queue_prefetch', 'delay_queue_prefetch', allow_auto=True, config_min_value=0)
-        worker_poll_interval = _config_number('worker_poll_interval', self.app.dramatiq.config('worker_poll_interval'))
-        if worker_poll_interval is None:
+        worker_poll_interval = _number(
+            'dramatiq config worker_poll_interval', self.app.dramatiq.config('worker_poll_interval'), allow_none=True
+        )
+        if worker_poll_interval is None and 'dramatiq_worker_timeout' in os.environ:
             # dramatiq takes the env then, check it before the workers start
-            _env_number('dramatiq_worker_timeout')
+            _number('env dramatiq_worker_timeout', os.environ['dramatiq_worker_timeout'])
         use_spawn = self.app.pargs.use_spawn
         if use_spawn is None:
             use_spawn = self.app.dramatiq.config('use_spawn')

@@ -400,15 +400,15 @@ class TokeoDramatiq(MetaMixin):
         """
         self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')
         # defaults of the middleware for all actors from the config
-        time_limit = _config_number('time_limit', self._config('time_limit'), allow_none=False)
-        max_age = _config_number('max_age', self._config('max_age'))
+        time_limit = _number('dramatiq config time_limit', self._config('time_limit'))
+        max_age = _number('dramatiq config max_age', self._config('max_age'), allow_none=True)
         notify_shutdown = self._config('notify_shutdown')
         if not isinstance(notify_shutdown, bool):
             raise TokeoDramatiqError(f'Invalid dramatiq config notify_shutdown: Value {notify_shutdown!r} must be true or false!')
-        max_retries = _config_number('max_retries', self._config('max_retries'), min_value=0, allow_none=False)
-        min_backoff = _config_number('min_backoff', self._config('min_backoff'), allow_none=False)
+        max_retries = _number('dramatiq config max_retries', self._config('max_retries'), min_value=0)
+        min_backoff = _number('dramatiq config min_backoff', self._config('min_backoff'))
         # dramatiq caps the retry delay at 7 days, a longer one has no effect
-        max_backoff = _config_number('max_backoff', self._config('max_backoff'), max_value=604_800_000, allow_none=False)
+        max_backoff = _number('dramatiq config max_backoff', self._config('max_backoff'), max_value=604_800_000)
         # re-build set of middlewares to use
         use_middleware = [
             middleware.AgeLimit(max_age=max_age),
@@ -428,15 +428,16 @@ class TokeoDramatiq(MetaMixin):
             raise TokeoDramatiqError(
                 f'Invalid dramatiq config rabbitmq.confirm_delivery: Value {rabbitmq_config["confirm_delivery"]!r} must be true or false!'
             )
-        max_priority = _config_number('rabbitmq.max_priority', rabbitmq_config['max_priority'], max_value=255)
-        dead_message_ttl = _config_number('rabbitmq.dead_message_ttl', rabbitmq_config['dead_message_ttl'])
+        max_priority = _number('dramatiq config rabbitmq.max_priority', rabbitmq_config['max_priority'], max_value=255, allow_none=True)
+        dead_message_ttl = _number('dramatiq config rabbitmq.dead_message_ttl', rabbitmq_config['dead_message_ttl'], allow_none=True)
         # dramatiq reads the env into this constant on import, which already
         # happened, so a configured value goes to the constant directly
         if dead_message_ttl is not None:
             dramatiq_rabbitmq.DEAD_MESSAGE_TTL = dead_message_ttl
         else:
             # dramatiq takes the env then; 0 would drop every dead letter
-            _env_number('dramatiq_dead_message_ttl')
+            if 'dramatiq_dead_message_ttl' in os.environ:
+                _number('env dramatiq_dead_message_ttl', os.environ['dramatiq_dead_message_ttl'])
         rabbitmq_broker = ExtendedRabbitmqBroker(
             url=rabbitmq_config['url'],
             auth_identity=rabbitmq_config['auth_identity'],
@@ -509,96 +510,45 @@ class TokeoDramatiq(MetaMixin):
             raise TokeoDramatiqError('Enable tokeo diskcache extension to allow locks')
 
 
-def _config_number(key, value, min_value=1, max_value=None, allow_none=True):
+def _number(key, value, min_value=1, max_value=None, allow_none=False, allow_auto=False):
     """
-    Check a number from the dramatiq config.
+    Check a number from the config, the env or a switch of the extension.
 
     ### Args
 
-    - **key** (str): The config key, used in the error message
+    - **key** (str): What the value is, e.g. ```dramatiq config time_limit```,
+        used in the error message
     - **value** (int|str|None): The value to check
     - **min_value** (int, optional): The lowest allowed number. Defaults to 1
     - **max_value** (int, optional): The highest allowed number. Defaults
         to no limit
     - **allow_none** (bool, optional): Whether None (not set) is allowed.
-        Defaults to True
-
-    ### Returns
-
-    - **int|None**: The number as int, or None when not set
-
-    ### Raises
-
-    - **TokeoDramatiqError**: If the value is not an allowed number, or
-        None while not allowed
-
-    """
-    if value is None and allow_none:
-        return None
-    try:
-        number = None if value is None else _worker_value(value, min_value)
-    except ValueError:
-        number = None
-    if number is None or (max_value is not None and number > max_value):
-        expected = f'{min_value} to {max_value}' if max_value is not None else f'an integer >= {min_value}'
-        expected = f'null or {expected}' if allow_none else expected
-        raise TokeoDramatiqError(f'Invalid dramatiq config {key}: Value {value!r} must be {expected}!')
-    return number
-
-
-def _env_number(name, min_value=1):
-    """
-    Check a number that dramatiq reads from the environment.
-
-    ### Args
-
-    - **name** (str): The name of the environment variable
-    - **min_value** (int, optional): The lowest allowed number. Defaults to 1
-
-    ### Returns
-
-    - **int|None**: The number as int, or None when the variable is not set
-
-    ### Raises
-
-    - **TokeoDramatiqError**: If the variable is set but not an allowed
-        number
-
-    """
-    value = os.environ.get(name)
-    if value is None:
-        return None
-    try:
-        return _worker_value(value, min_value)
-    except ValueError:
-        raise TokeoDramatiqError(f'Invalid env {name}: Value {value!r} must be an integer >= {min_value}!') from None
-
-
-def _worker_value(value, min_value=1, allow_auto=False):
-    """
-    Check a worker option value from config or command line.
-
-    ### Args
-
-    - **value** (int|str): The value to check
-    - **min_value** (int, optional): The lowest allowed number. Defaults to 1
+        Defaults to False
     - **allow_auto** (bool, optional): Whether ```'auto'``` is allowed.
         Defaults to False
 
     ### Returns
 
-    - **int|str**: The number as int, or ```'auto'```
+    - **int|str|None**: The number as int, ```'auto'```, or None when not set
 
     ### Raises
 
-    - **ValueError**: If the value is not allowed
+    - **TokeoDramatiqError**: If the value is not allowed
 
     """
+    if value is None and allow_none:
+        return None
     try:
-        result = as_int_or_auto(value, min_value)
+        number = None if value is None else as_int_or_auto(value, min_value)
     except ValueError:
-        result = None
-    if result is None or (result == 'auto' and not allow_auto):
-        expected = f'"auto" or an integer >= {min_value}' if allow_auto else f'an integer >= {min_value}'
-        raise ValueError(f'Value {value!r} must be {expected}!')
-    return result
+        number = None
+    if number == 'auto':
+        valid = allow_auto
+    else:
+        valid = number is not None and (max_value is None or number <= max_value)
+    if not valid:
+        expected = f'{min_value} to {max_value}' if max_value is not None else f'an integer >= {min_value}'
+        expected = f'"auto" or {expected}' if allow_auto else expected
+        expected = f'null or {expected}' if allow_none else expected
+        raise TokeoDramatiqError(f'Invalid {key}: Value {value!r} must be {expected}!')
+    return number
