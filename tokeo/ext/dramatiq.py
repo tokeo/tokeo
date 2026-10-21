@@ -59,6 +59,7 @@ from dramatiq import middleware, cli, actor as dramatiq_actor
 from dramatiq import worker as dramatiq_worker
 from dramatiq.asyncio import EventLoopThread, set_event_loop_thread
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
+from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
 import pika
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.url import overload_with_auth as url_overload_with_auth
@@ -291,6 +292,19 @@ class TokeoDramatiq(MetaMixin):
                 # wait for rabbitmq to confirm each sent message; only then a
                 # lost message raises and a deleted queue is declared again
                 confirm_delivery=True,
+                # highest message priority a queue accepts (x-max-priority, 1 to
+                # 255, at most 10 recommended); None declares queues without
+                # priorities. A message gets its priority by
+                # send_with_options(broker_priority=n). Existing queues keep
+                # their argument until they are deleted and declared again
+                max_priority=None,
+                # milliseconds a dead letter stays in the XQ of every queue
+                # (x-message-ttl); None keeps the value of dramatiq, read from
+                # the env dramatiq_dead_message_ttl or else 7 days. A value here
+                # wins over the env. All senders and workers need the same
+                # value, existing XQs keep theirs until deleted and declared
+                # again
+                dead_message_ttl=None,
             ),
             # Tag for dramatiq locks in the cache
             locks_tag='dramatiq_locks',
@@ -378,9 +392,23 @@ class TokeoDramatiq(MetaMixin):
             confirmation of rabbitmq; a message that cannot be delivered
             raises instead of getting lost
 
+        : ```max_priority``` and ```dead_message_ttl``` are arguments of the
+            queues (```x-max-priority```, ```x-message-ttl``` of the XQ), so
+            all senders and workers need the same values. Rabbitmq refuses
+            to declare an existing queue with other arguments; a change
+            needs the queue deleted and declared again
+
+        : Without ```dead_message_ttl``` in the config dramatiq keeps its own
+            value, read on import from the env ```dramatiq_dead_message_ttl```
+            or else 7 days. A value in the config wins over the env and is
+            set on the constant of dramatiq, because the module is imported
+            before the config is read
+
         ### Raises
 
-        - **TokeoDramatiqError**: If ```confirm_delivery``` is not a bool
+        - **TokeoDramatiqError**: If ```confirm_delivery``` is not a bool,
+            ```max_priority``` not None or 1 to 255, or
+            ```dead_message_ttl``` not None or a positive integer
 
         """
         self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')
@@ -406,6 +434,12 @@ class TokeoDramatiq(MetaMixin):
             raise TokeoDramatiqError(
                 f'Invalid dramatiq config rabbitmq.confirm_delivery: Value {rabbitmq_config["confirm_delivery"]!r} must be true or false!'
             )
+        max_priority = _config_number('rabbitmq.max_priority', rabbitmq_config['max_priority'], max_value=255)
+        dead_message_ttl = _config_number('rabbitmq.dead_message_ttl', rabbitmq_config['dead_message_ttl'])
+        # dramatiq reads the env into this constant on import, which already
+        # happened, so a configured value goes to the constant directly
+        if dead_message_ttl is not None:
+            dramatiq_rabbitmq.DEAD_MESSAGE_TTL = dead_message_ttl
         rabbitmq_broker = ExtendedRabbitmqBroker(
             url=rabbitmq_config['url'],
             auth_identity=rabbitmq_config['auth_identity'],
@@ -414,6 +448,7 @@ class TokeoDramatiq(MetaMixin):
             tls_verify_cert=rabbitmq_config['tls_verify_cert'],
             tls_ca=rabbitmq_config['tls_ca'],
             confirm_delivery=rabbitmq_config['confirm_delivery'],
+            max_priority=max_priority,
             middleware=use_middleware,
         )
         # globally set the broker on dramatiq
@@ -475,6 +510,40 @@ class TokeoDramatiq(MetaMixin):
             return self._locks
         else:
             raise TokeoDramatiqError('Enable tokeo diskcache extension to allow locks')
+
+
+def _config_number(key, value, min_value=1, max_value=None):
+    """
+    Check an optional number from the dramatiq config.
+
+    ### Args
+
+    - **key** (str): The config key, used in the error message
+    - **value** (int|str|None): The value to check
+    - **min_value** (int, optional): The lowest allowed number. Defaults to 1
+    - **max_value** (int, optional): The highest allowed number. Defaults
+        to no limit
+
+    ### Returns
+
+    - **int|None**: The number as int, or None when not set
+
+    ### Raises
+
+    - **TokeoDramatiqError**: If the value is neither None nor an allowed
+        number
+
+    """
+    if value is None:
+        return None
+    try:
+        number = _worker_value(value, min_value)
+    except ValueError:
+        number = None
+    if number is None or (max_value is not None and number > max_value):
+        expected = f'{min_value} to {max_value}' if max_value is not None else f'an integer >= {min_value}'
+        raise TokeoDramatiqError(f'Invalid dramatiq config {key}: Value {value!r} must be null or {expected}!')
+    return number
 
 
 def _worker_value(value, min_value=1, allow_auto=False):

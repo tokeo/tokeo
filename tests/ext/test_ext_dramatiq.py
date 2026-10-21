@@ -12,6 +12,7 @@ import pytest
 from cement.utils.misc import init_defaults
 from dramatiq import cli as dramatiq_cli
 from dramatiq import worker as dramatiq_worker
+from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
 from tokeo.main import TokeoTest
 from dramatiq.asyncio import get_event_loop_thread
 from tokeo.ext.dramatiq import TokeoDramatiqError, TokeoAsyncIO
@@ -369,3 +370,53 @@ def test_register_invalid_confirm_delivery(tmp, value):
     with pytest.raises(TokeoDramatiqError, match='Invalid dramatiq config rabbitmq.confirm_delivery'):
         with broker_app(tmp, dict(confirm_delivery=value)):
             pass
+
+
+@pytest.fixture
+def keep_dead_message_ttl(monkeypatch):
+    # register sets the dramatiq constant, restore it after the test
+    monkeypatch.setattr(dramatiq_rabbitmq, 'DEAD_MESSAGE_TTL', dramatiq_rabbitmq.DEAD_MESSAGE_TTL)
+    return dramatiq_rabbitmq.DEAD_MESSAGE_TTL
+
+
+@pytest.mark.parametrize('rabbitmq', [None, dict(url='amqp://localhost:5672/')], ids=['default', 'partial_block'])
+def test_register_queue_arguments_default(tmp, keep_dead_message_ttl, rabbitmq):
+    import dramatiq
+
+    with broker_app(tmp, rabbitmq):
+        broker = dramatiq.get_broker()
+        # without config the queues look as before: no priority, ttl of dramatiq
+        assert broker.max_priority is None
+        assert 'x-max-priority' not in broker._build_queue_arguments('mail')
+        assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == keep_dead_message_ttl
+
+
+def test_register_queue_arguments_from_config(tmp, keep_dead_message_ttl):
+    import dramatiq
+
+    with broker_app(tmp, dict(max_priority=10, dead_message_ttl='86400000')):
+        broker = dramatiq.get_broker()
+        assert broker.max_priority == 10
+        assert broker._build_queue_arguments('mail')['x-max-priority'] == 10
+        # the priority also reaches queues with single active consumer
+        arguments = broker._build_queue_arguments('mail_unparalleled')
+        assert (arguments['x-max-priority'], arguments['x-single-active-consumer']) == (10, True)
+        assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == 86400000
+
+
+@pytest.mark.parametrize(
+    'key, value',
+    [
+        ('max_priority', 0),
+        ('max_priority', 256),
+        ('max_priority', 'high'),
+        ('dead_message_ttl', 0),
+        ('dead_message_ttl', 'week'),
+        ('dead_message_ttl', True),
+    ],
+)
+def test_register_invalid_queue_arguments(tmp, keep_dead_message_ttl, key, value):
+    with pytest.raises(TokeoDramatiqError, match=f'Invalid dramatiq config rabbitmq.{key}'):
+        with broker_app(tmp, {key: value}):
+            pass
+    assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == keep_dead_message_ttl
