@@ -288,6 +288,9 @@ class TokeoDramatiq(MetaMixin):
                 tls_verify_cert=True,
                 # path to a CA bundle to trust instead of the system store
                 tls_ca=None,
+                # wait for rabbitmq to confirm each sent message; only then a
+                # lost message raises and a deleted queue is declared again
+                confirm_delivery=True,
             ),
             # Tag for dramatiq locks in the cache
             locks_tag='dramatiq_locks',
@@ -368,6 +371,17 @@ class TokeoDramatiq(MetaMixin):
         : Creates an ExtendedRabbitmqBroker instance with the configured URL
             and registers it as the global Dramatiq broker
 
+        : Missing keys of the ```rabbitmq``` config take their defaults, so an
+            app config written before a new key still works
+
+        : With ```confirm_delivery``` (default) each ```send()``` waits for the
+            confirmation of rabbitmq; a message that cannot be delivered
+            raises instead of getting lost
+
+        ### Raises
+
+        - **TokeoDramatiqError**: If ```confirm_delivery``` is not a bool
+
         """
         self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')
         # re-build set of middlewares to use
@@ -386,7 +400,12 @@ class TokeoDramatiq(MetaMixin):
         ]
         # create the broker to RabbitMQ based on config; configured
         # credentials may override any userinfo carried by the url
-        rabbitmq_config = self._config('rabbitmq')
+        # cement does not merge nested defaults, so complete the block here
+        rabbitmq_config = {**self._meta.config_defaults['rabbitmq'], **self._config('rabbitmq')}
+        if not isinstance(rabbitmq_config['confirm_delivery'], bool):
+            raise TokeoDramatiqError(
+                f'Invalid dramatiq config rabbitmq.confirm_delivery: Value {rabbitmq_config["confirm_delivery"]!r} must be true or false!'
+            )
         rabbitmq_broker = ExtendedRabbitmqBroker(
             url=rabbitmq_config['url'],
             auth_identity=rabbitmq_config['auth_identity'],
@@ -394,6 +413,7 @@ class TokeoDramatiq(MetaMixin):
             tls_verify_hostname=rabbitmq_config['tls_verify_hostname'],
             tls_verify_cert=rabbitmq_config['tls_verify_cert'],
             tls_ca=rabbitmq_config['tls_ca'],
+            confirm_delivery=rabbitmq_config['confirm_delivery'],
             middleware=use_middleware,
         )
         # globally set the broker on dramatiq

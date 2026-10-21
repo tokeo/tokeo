@@ -15,6 +15,7 @@ from dramatiq import worker as dramatiq_worker
 from tokeo.main import TokeoTest
 from dramatiq.asyncio import get_event_loop_thread
 from tokeo.ext.dramatiq import TokeoDramatiqError, TokeoAsyncIO
+from tests.ext.test_ext_smtp import make_cert
 
 
 class DramatiqTest(TokeoTest):
@@ -319,3 +320,52 @@ def test_serve_queues_needs_a_name(serve, capsys):
     with pytest.raises(SystemExit):
         serve('--queues')
     assert '--queues' in capsys.readouterr().err
+
+
+# --- broker --------------------------------------------------------------------
+
+
+def broker_app(tmp, rabbitmq):
+    d = init_defaults('diskcache', 'dramatiq')
+    d['diskcache']['directory'] = tmp.dir
+    if rabbitmq is not None:
+        d['dramatiq']['rabbitmq'] = rabbitmq
+    return DramatiqTest(argv=[], config_defaults=d)
+
+
+@pytest.mark.parametrize(
+    'rabbitmq, confirm',
+    [
+        (None, True),
+        # a config block written before the key still gets the default
+        (dict(url='amqp://localhost:5672/'), True),
+        (dict(confirm_delivery=False), False),
+        (dict(confirm_delivery=True), True),
+    ],
+    ids=['default', 'partial_block', 'off', 'on'],
+)
+def test_register_confirm_delivery(tmp, rabbitmq, confirm):
+    import dramatiq
+
+    with broker_app(tmp, rabbitmq):
+        assert dramatiq.get_broker().confirm_delivery is confirm
+
+
+def test_register_confirm_delivery_with_tls_parameters(tmp):
+    import dramatiq
+
+    # amqps with a custom ca builds pika parameters instead of the url
+    rabbitmq = dict(url='amqps://localhost:5671/', tls_ca=os.path.join(tmp.dir, 'ca.pem'))
+    with open(rabbitmq['tls_ca'], 'w') as f:
+        f.write(make_cert('localhost')[0])
+    with broker_app(tmp, rabbitmq):
+        broker = dramatiq.get_broker()
+        assert broker.parameters[0].ssl_options is not None
+        assert broker.confirm_delivery is True
+
+
+@pytest.mark.parametrize('value', ['yes', 1, None])
+def test_register_invalid_confirm_delivery(tmp, value):
+    with pytest.raises(TokeoDramatiqError, match='Invalid dramatiq config rabbitmq.confirm_delivery'):
+        with broker_app(tmp, dict(confirm_delivery=value)):
+            pass
