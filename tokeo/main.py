@@ -1,5 +1,6 @@
 import os
 import sys
+import signal
 import tokeo.core.utils.strict  # noqa: F401
 from cement import App, TestApp
 from cement.core.exc import CaughtSignal
@@ -138,7 +139,7 @@ def main():
     except (TokeoError, AssertionError) as e:
         # a clean message for any error from setup or run; app is already bound,
         # so the application logger is used when it is available
-        if app and app.log and app.log.error:
+        if app and app.log:
             app.log.error(f'{type(e).__name__}:')
             app.log.error(e.args[0] if e.args else str(e))
         else:
@@ -155,9 +156,9 @@ def main():
 
     except CaughtSignal as e:
         # Default Cement signals are SIGINT and SIGTERM, exit 0 (non-error)
-        if e.signum == 2:
+        if e.signum == signal.SIGINT:
             print('\nstopped by Ctrl-C')
-        elif e.signum == 15:
+        elif e.signum == signal.SIGTERM:
             print('\nterminated by SIGTERM')
         else:
             print(f'\n{e}')
