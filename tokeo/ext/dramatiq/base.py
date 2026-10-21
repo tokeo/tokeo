@@ -59,8 +59,8 @@ class TokeoActor(dramatiq.Actor):
         except BrokerConnectionError as e:
             # another broker, e.g. the stub broker of tests, has no address
             address = getattr(self.broker, 'address', None)
-            where = f' at {address}' if address else ''
-            raise TokeoDramatiqConnectionError(f'Cannot send {self.actor_name}, rabbitmq is not reachable{where}!') from e
+            where = f'rabbitmq at {address}' if address else 'the broker'
+            raise TokeoDramatiqConnectionError(f'Cannot send {self.actor_name} to {where} ({type(e).__name__}: {e})!') from e
 
 
 def tokeo_actor(fn=None, **options):

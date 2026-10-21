@@ -27,6 +27,7 @@ class FakeServer:
         self.refuse_publish = False
         self.down = False
         self.declares = 0
+        self.refuse = None
 
     def add(self, name, *bodies, consumers=0, arguments=None):
         self.queues[name] = dict(messages=list(bodies), consumers=consumers, arguments=arguments or {})
@@ -76,6 +77,9 @@ class FakeChannel:
         self.server.queues[routing_key]['messages'].append(body)
 
     def queue_purge(self, queue):
+        if self.server.refuse:
+            self.is_closed = True
+            raise pika.exceptions.ChannelClosedByBroker(*self.server.refuse)
         count = len(self.server.queues[queue]['messages'])
         self.server.queues[queue]['messages'] = []
         return SimpleNamespace(method=SimpleNamespace(message_count=count))
@@ -218,7 +222,7 @@ def test_requeue_dead_keeps_letter_when_publish_fails(app, server):
     server.add('mail')
     server.add('mail.XQ', dead_letter())
     server.refuse_publish = True
-    with pytest.raises(pika.exceptions.UnroutableError):
+    with pytest.raises(TokeoDramatiqError, match='refused the request \\(UnroutableError'):
         app.dramatiq.queues.requeue_dead('mail')
     assert len(server.queues['mail.XQ']['messages']) == 1
 
@@ -289,7 +293,7 @@ def test_error_without_rabbitmq(tmp, broker_app, server, url, address):
     server.down = True
     with broker_app(tmp, dict(url=url)) as app:
         dramatiq.actor(lambda: None, actor_name='send_mail', queue_name='mail', broker=app.dramatiq.broker)
-        with pytest.raises(TokeoDramatiqError, match=f'Cannot connect to rabbitmq at {address}!') as e:
+        with pytest.raises(TokeoDramatiqError, match=rf'Cannot connect to rabbitmq at {address} \(AMQPConnectionError\)!') as e:
             app.dramatiq.queues.state('mail')
     # the error names host and port, never the password of the url
     assert 'secret' not in str(e.value)
@@ -393,3 +397,15 @@ def test_state_cache_per_names_and_cleared_by_changes(app, server):
     assert server.declares == 9
     queues.purge('mail')
     assert queues.state('mail', cache_ttl=60)[0]['ready'] == 0
+
+
+def test_refused_request(app, server):
+    server.add('mail', b'1')
+    server.refuse = (403, "ACCESS_REFUSED - access to queue 'mail' refused")
+    refused = r'Rabbitmq at localhost:5672 refused the request \(ChannelClosedByBroker: .*ACCESS_REFUSED'
+    with pytest.raises(TokeoDramatiqError, match=refused):
+        app.dramatiq.queues.purge('mail')
+    # the next call works on a new channel of the same connection
+    server.refuse = None
+    assert app.dramatiq.queues.purge('mail') == [dict(name='mail', purged=1)]
+    assert server.connections == 1

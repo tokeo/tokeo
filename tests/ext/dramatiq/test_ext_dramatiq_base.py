@@ -255,7 +255,7 @@ def test_actor_send_without_rabbitmq(tmp, broker_app, monkeypatch):
         monkeypatch.setattr(app.dramatiq.broker, 'enqueue', refused)
         with pytest.raises(TokeoDramatiqConnectionError) as e:
             actor.send()
-    assert str(e.value) == 'Cannot send count_words, rabbitmq is not reachable at mq.example:5673!'
+    assert str(e.value) == 'Cannot send count_words to rabbitmq at mq.example:5673 (ConnectionClosed: connection refused)!'
     # main catches it as tokeo error, code catching dramatiq errors still does
     assert isinstance(e.value, TokeoError) and isinstance(e.value, ConnectionClosed)
     assert isinstance(e.value, BrokerConnectionError) and e.value.args[0] == str(e.value)

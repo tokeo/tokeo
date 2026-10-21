@@ -35,7 +35,7 @@ class TokeoDramatiqQueues:
         following calls; a connection closed by rabbitmq in the meantime is
         opened again on the next call
 
-    : Without rabbitmq a call raises ```TokeoDramatiqError```
+    : Errors of rabbitmq and of the connection raise ```TokeoDramatiqError```
 
     """
 
@@ -85,7 +85,12 @@ class TokeoDramatiqQueues:
             except pika.exceptions.AMQPConnectionError as e:
                 self._close()
                 if attempt:
-                    raise TokeoDramatiqError(f'Cannot connect to rabbitmq at {self._dramatiq.broker.address}!') from e
+                    raise TokeoDramatiqError(f'Cannot connect to rabbitmq at {self._dramatiq.broker.address} ({type(e).__name__})!') from e
+            except pika.exceptions.AMQPChannelError as e:
+                # rabbitmq closes the channel on a refused request
+                self._channel = None
+                address = self._dramatiq.broker.address
+                raise TokeoDramatiqError(f'Rabbitmq at {address} refused the request ({type(e).__name__}: {e})!') from e
 
     def _declared(self, queue):
         # passive declare answers without creating a missing queue
