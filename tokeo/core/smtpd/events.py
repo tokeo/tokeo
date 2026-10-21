@@ -214,12 +214,19 @@ class SmtpdEvents:
 
         ### Args
 
-        - **proxy_data** (ProxyData): The parsed PROXY v1/v2 data
+        - **proxy_data** (dict): The parsed PROXY v1 header (```proto```,
+            ```source_ip```, ```source_host```, ```source_port```,
+            ```dest_ip```, ```dest_host```, ```dest_port```)
+
+        ### Returns
+
+        - **dict|None**: A replacement for the stored data, or None to keep it
 
         ### Notes
 
-        : Only fires when ```proxy_protocol``` is enabled for the service; the
+        : Only fires when ```proxy_extension``` is enabled for the service; the
             real client address is then available via ```ctx.server.proxy```
+        : Any exception aborts the connection with 421 (no greeting is sent)
 
         """
         pass
