@@ -42,7 +42,7 @@ def serve(tmp, monkeypatch):
         monkeypatch.delenv(name, raising=False)
     for name in ('CONSUMER_RESTART_DELAY', 'CONSUMER_RESTART_DELAY_SECS', 'QUEUE_PREFETCH', 'DELAY_QUEUE_PREFETCH'):
         monkeypatch.setattr(dramatiq_worker, name, getattr(dramatiq_worker, name))
-    calls = dict(main=[], purge=0, argv=None)
+    calls = dict(main=[], purge=0, argv=None, start_methods=[])
 
     def fake_main(args):
         calls['main'].append(args)
@@ -57,6 +57,12 @@ def serve(tmp, monkeypatch):
         return make_argument_parser()
 
     monkeypatch.setattr('tokeo.ext.dramatiq.cli.make_argument_parser', recording_parser)
+
+    def fake_set_start_method(method, force=False):
+        # never change the start method of the pytest process itself
+        calls['start_methods'].append((method, force))
+
+    monkeypatch.setattr('tokeo.ext.dramatiq.multiprocessing.set_start_method', fake_set_start_method)
 
     def run(*options, config=None):
         with dramatiq_app(tmp, ['dramatiq', 'serve', *options]) as app:
@@ -201,3 +207,17 @@ def test_serve_invalid_config(serve, key, value):
         serve(config={key: value})
     # the error comes before sys.argv is changed and dramatiq is called
     assert sys.argv == ['tokeo']
+
+
+# --- start method --------------------------------------------------------------
+
+
+def test_serve_starts_workers_by_forkserver(serve):
+    calls = serve()
+    assert calls['start_methods'] == [('forkserver', True)]
+
+
+def test_serve_falls_back_to_spawn_without_forkserver(serve, monkeypatch):
+    monkeypatch.setattr('tokeo.ext.dramatiq.multiprocessing.get_all_start_methods', lambda: ['spawn'])
+    calls = serve()
+    assert calls['start_methods'] == [('spawn', True)]

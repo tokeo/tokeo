@@ -50,6 +50,7 @@ def call_external_api(resource_id):
 import os
 import sys
 import argparse
+import multiprocessing
 from os.path import basename, dirname, abspath
 from cement.core.meta import MetaMixin
 from cement import ex
@@ -706,6 +707,10 @@ class TokeoDramatiqController(Controller):
         - With --no-purge the locks are kept, e.g. when further instances
             run on the same diskcache and still hold their locks
 
+        - The worker processes start by forkserver on all python versions,
+            so they never inherit the state of this process. Where
+            forkserver is not available (e.g. Windows) spawn is used
+
         """
         self.app.log.info('Spin up the dramatiq service workers')
         # resolve the worker options first, so an invalid config value
@@ -781,6 +786,13 @@ class TokeoDramatiqController(Controller):
                 self.app.dramatiq.locks.purge()
             except Exception:
                 pass
+        # tokeo sets the start method itself, python before 3.14 would fork
+        # the workers with the state of this process
+        start_method = 'forkserver'
+        if start_method not in multiprocessing.get_all_start_methods():
+            self.app.log.debug(f'dramatiq start method {start_method} is not available, use spawn')
+            start_method = 'spawn'
+        multiprocessing.set_start_method(start_method, force=True)
         # signal hook
         for res in self.app.hook.run('tokeo_dramatiq_pre_start', self.app):
             pass
