@@ -367,3 +367,46 @@ def as_list(value):
     if value is None:
         return []
     return list(value) if isinstance(value, (list, tuple)) else [value]
+
+
+def as_int_or_auto(value, min_value=1):
+    """
+    Normalize a config or argument value to an int or ```'auto'```.
+
+    Lets a config key or an argument take a fixed number or ```'auto'```,
+    where ```'auto'``` leaves the choice to a default of the caller. The
+    keyword is matched case-insensitive and without surrounding blanks.
+
+    ### Args
+
+    - **value** (int|str): A number, a number as text or ```'auto'```
+    - **min_value** (int, optional): The lowest allowed number. Defaults
+        to 1
+
+    ### Returns
+
+    - **int|str**: The number as int, or ```'auto'```
+
+    ### Raises
+
+    - **ValueError**: If the value is neither ```'auto'``` nor an integer
+        of at least ```min_value```
+
+    ### Notes
+
+    : ```'auto'``` is not mapped to ```None```, so a caller can still tell
+        it apart from an unset value
+
+    """
+    if isinstance(value, str) and value.strip().lower() == 'auto':
+        return 'auto'
+    # bool is an int subclass, but True or False is never meant as number
+    if isinstance(value, (int, str)) and not isinstance(value, bool):
+        try:
+            number = int(value)
+        except ValueError:
+            pass
+        else:
+            if number >= min_value:
+                return number
+    raise ValueError(f'Value {value!r} must be "auto" or an integer >= {min_value}!')
