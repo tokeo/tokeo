@@ -41,7 +41,7 @@ def serve(tmp, monkeypatch):
     # serve rewrites sys.argv, the env and the dramatiq worker constants;
     # monkeypatch restores all of them after the test
     monkeypatch.setattr(sys, 'argv', ['tokeo'])
-    for name in ('dramatiq_restart_delay', 'dramatiq_queue_prefetch', 'dramatiq_delay_queue_prefetch'):
+    for name in ('dramatiq_restart_delay', 'dramatiq_queue_prefetch', 'dramatiq_delay_queue_prefetch', 'dramatiq_worker_timeout'):
         monkeypatch.delenv(name, raising=False)
     for name in ('CONSUMER_RESTART_DELAY', 'CONSUMER_RESTART_DELAY_SECS', 'QUEUE_PREFETCH', 'DELAY_QUEUE_PREFETCH'):
         monkeypatch.setattr(dramatiq_worker, name, getattr(dramatiq_worker, name))
@@ -490,3 +490,40 @@ def test_register_invalid_middleware_defaults(tmp, key, value):
     with pytest.raises(TokeoDramatiqError, match=f'Invalid dramatiq config {key}'):
         with middleware_app(tmp, **{key: value}):
             pass
+
+
+# --- worker poll interval ------------------------------------------------------
+
+
+def test_serve_poll_interval_default_keeps_env(serve):
+    serve()
+    # without config tokeo leaves the env of dramatiq alone
+    assert 'dramatiq_worker_timeout' not in os.environ
+
+
+def test_serve_poll_interval_from_config(serve, monkeypatch):
+    # the config wins over an env set from outside, even an invalid one
+    monkeypatch.setenv('dramatiq_worker_timeout', '0')
+    serve(config=dict(worker_poll_interval=250))
+    assert os.environ['dramatiq_worker_timeout'] == '250'
+
+
+def test_serve_poll_interval_valid_env(serve, monkeypatch):
+    monkeypatch.setenv('dramatiq_worker_timeout', '500')
+    calls = serve()
+    assert calls['main']
+    assert os.environ['dramatiq_worker_timeout'] == '500'
+
+
+@pytest.mark.parametrize('value', ['0', '-5', '1s'])
+def test_serve_poll_interval_invalid_env(serve, monkeypatch, value):
+    monkeypatch.setenv('dramatiq_worker_timeout', value)
+    with pytest.raises(TokeoDramatiqError, match='Invalid env dramatiq_worker_timeout'):
+        serve()
+    assert sys.argv == ['tokeo']
+
+
+@pytest.mark.parametrize('value', [0, 'fast', True])
+def test_serve_poll_interval_invalid_config(serve, value):
+    with pytest.raises(TokeoDramatiqError, match='Invalid dramatiq config worker_poll_interval'):
+        serve(config=dict(worker_poll_interval=value))

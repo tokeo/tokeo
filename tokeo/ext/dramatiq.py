@@ -263,6 +263,12 @@ class TokeoDramatiq(MetaMixin):
             worker_shutdown_timeout=600_000,
             # Delay between worker restarts in milliseconds
             restart_delay=3_000,
+            # Milliseconds a worker thread waits for a message or a task
+            # before it checks for due delayed messages and for shutdown;
+            # dramatiq names it worker_timeout (env dramatiq_worker_timeout).
+            # None keeps the value of dramatiq, from the env or else 1000; a
+            # value here wins over the env
+            worker_poll_interval=None,
             # Number of messages to prefetch from queues; auto (or 0) follows
             # the dramatiq defaults
             queue_prefetch='auto',
@@ -580,6 +586,34 @@ def _config_number(key, value, min_value=1, max_value=None, allow_none=True):
     return number
 
 
+def _env_number(name, min_value=1):
+    """
+    Check a number that dramatiq reads from the environment.
+
+    ### Args
+
+    - **name** (str): The name of the environment variable
+    - **min_value** (int, optional): The lowest allowed number. Defaults to 1
+
+    ### Returns
+
+    - **int|None**: The number as int, or None when the variable is not set
+
+    ### Raises
+
+    - **TokeoDramatiqError**: If the variable is set but not an allowed
+        number
+
+    """
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    try:
+        return _worker_value(value, min_value)
+    except ValueError:
+        raise TokeoDramatiqError(f'Invalid env {name}: Value {value!r} must be an integer >= {min_value}!') from None
+
+
 def _worker_value(value, min_value=1, allow_auto=False):
     """
     Check a worker option value from config or command line.
@@ -882,6 +916,11 @@ class TokeoDramatiqController(Controller):
             processes, threads x 2 and threads x 1000 for the prefetch. The
             cpus of the host ignore a cpu limit of a container
         - In the config the prefetch also takes 0 for auto as before
+        - ```worker_poll_interval``` reaches the workers by the env
+            ```dramatiq_worker_timeout```, which dramatiq reads on import.
+            Without the config value an env set from outside applies, so it
+            is checked here; a non number fails earlier, when dramatiq
+            gets imported
         - With --watch, the command monitors the given directory for changes
             and reloads actors when files change
         - In debug mode of the app dramatiq logs on debug level as well,
@@ -919,6 +958,10 @@ class TokeoDramatiqController(Controller):
         shutdown_timeout = self._worker_option('worker_shutdown_timeout', 'worker_shutdown_timeout')
         queue_prefetch = self._worker_option('queue_prefetch', 'queue_prefetch', allow_auto=True, config_min_value=0)
         delay_queue_prefetch = self._worker_option('delay_queue_prefetch', 'delay_queue_prefetch', allow_auto=True, config_min_value=0)
+        worker_poll_interval = _config_number('worker_poll_interval', self.app.dramatiq.config('worker_poll_interval'))
+        if worker_poll_interval is None:
+            # dramatiq takes the env then, check it before the workers start
+            _env_number('dramatiq_worker_timeout')
         use_spawn = self.app.pargs.use_spawn
         if use_spawn is None:
             use_spawn = self.app.dramatiq.config('use_spawn')
@@ -951,6 +994,10 @@ class TokeoDramatiqController(Controller):
         os.environ['dramatiq_restart_delay'] = str(restart_delay)
         os.environ['dramatiq_queue_prefetch'] = str(queue_prefetch)
         os.environ['dramatiq_delay_queue_prefetch'] = str(delay_queue_prefetch)
+        # the worker binds this env as default argument on import, so only
+        # the env reaches the freshly started workers, no constant does
+        if worker_poll_interval is not None:
+            os.environ['dramatiq_worker_timeout'] = str(worker_poll_interval)
         # dramatiq.worker reads the env only once on import into constants;
         # forked workers (default start method before python 3.14) inherit
         # them, so the already imported constants are updated as well
