@@ -36,6 +36,8 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
     - Automatically configured when the extension is loaded
     - Renders text from a Jinja2 template; the output format is whatever the
         template produces
+    - Cement resolves the template handler by the label of the output
+        handler, so the label 'tokeo.jinja2' binds tokeo's template handler
 
     """
 
@@ -45,36 +47,6 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
         """
 
         label = 'tokeo.jinja2'
-
-    def _setup(self, app):
-        """
-        Configure the output handler.
-
-        Initializes the handler and ensures it uses Tokeo's template handler
-        for rendering templates. This override ensures proper integration
-        with the Tokeo Jinja2 template handler.
-
-        ### Args
-
-        - **app** (Application): The Cement application instance
-
-        ### Notes
-
-        : Calls OutputHandler._setup directly to skip Jinja2OutputHandler._setup,
-            which would bind the templater to cement's 'jinja2' handler; tokeo
-            binds its own 'tokeo.jinja2' template handler instead
-
-        """
-        # call the base OutputHandler setup directly and deliberately skip
-        # Jinja2OutputHandler._setup, which would bind self.templater to
-        # cement's 'jinja2' template handler; tokeo uses 'tokeo.jinja2'
-        OutputHandler._setup(self, app)
-        self.templater = self.app.handler.resolve(
-            # fmt: skip
-            'template',
-            'tokeo.jinja2',
-            setup=True,
-        )
 
 
 class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
@@ -116,31 +88,16 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
         """
         Configure the template handler.
 
-        Sets up the Jinja2 environment with application-specific settings
-        from configuration, applying options like keep_trailing_newline and
-        trim_blocks to the environment.
+        Runs the base setup (app, config section and the merge of the config
+        defaults), then applies keep_trailing_newline and trim_blocks from
+        the configuration to the Jinja2 environment.
 
         ### Args
 
         - **app** (Application): The Cement application instance
 
-        ### Notes
-
-        : super()._setup is skipped deliberately; self.env is created in the
-            parent's __init__ (not in _setup), and the base Handler._setup
-            only assigns self.app and defaults config_section when it is None,
-            both of which this method already covers
-
         """
-        # super()._setup intentionally not called (see Notes above)
-        self.app = app
-
-        # prepare the config
-        self.app.config.merge(
-            # fmt: skip
-            {self._meta.config_section: self._meta.config_defaults},
-            override=False,
-        )
+        super()._setup(app)
 
         # use exposed Jinja2 Environment instance to manipulate it
         self.env.keep_trailing_newline = self._config('keep_trailing_newline')
