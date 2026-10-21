@@ -26,6 +26,7 @@ import secrets
 import asyncio
 import inspect
 import os
+import sys
 import socket
 import ipaddress
 from enum import Enum, auto
@@ -413,6 +414,10 @@ class SmtpdServer:
         self.max_processings = settings.get('max_processings', DEFAULT_SMTPD_MAX_PROCESSINGS)
         self.max_connections = settings.get('max_connections', None)
         # validation
+        # immediate TLS needs start_tls to keep the buffered ClientHello (gh-142352)
+        version = sys.version_info[:3]
+        if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not (version >= (3, 14, 4) or (3, 13, 13) <= version < (3, 14)):
+            raise ValueError('Immediate TLS (encrypt_mode TLS_IMMEDIATE) requires Python 3.13.13+ or 3.14.4+!')
         if not (isinstance(self.max_processings, int) and self.max_processings > 0):
             raise ValueError('Number of simultaneous processings (max_processings) must be a positive integer!')
         if self.max_connections is not None:
@@ -754,6 +759,13 @@ class SmtpdServer:
         # False, in any other not matched case yet
         return False
 
+    def _greet_message(self, session):
+        """
+        To be done
+        """
+        # return greet response when in CMD_HELO sequence
+        return f'220 {session.ctx.server.local_response.strip()}' if session.cmd_sequence is CMD_HELO else ''
+
     # ---- per-connection dialog --------------------------
 
     async def serve_client(self, session, reader, writer):
@@ -809,9 +821,8 @@ class SmtpdServer:
                 # initialize \r\n line_break for CRLF_ENSURE and CRLF_STRICT
                 line_break = b'\r\n'
 
-                # greet on connect only without proxy_extension, otherwise
-                # the PROXY header comes first and its answer is the greeting
-                output = '' if session.cmd_sequence is CMD_PROXY else f'220 {ctx.server.local_response.strip()}'
+                # greet on connect only when CMD_HELO and empty ctx.server.helo
+                output = self._greet_message(session)
 
                 while True:
                     if output:
@@ -829,17 +840,24 @@ class SmtpdServer:
                         break
 
                     if session.cmd_sequence is CMD_STARTTLS:
-                        # discard plaintext buffered before the handshake so
-                        # commands injected right after STARTTLS cannot run over
-                        # the encrypted channel (CVE-2011-0411 class)
+                        # STARTTLS discards plaintext buffered before the handshake
+                        # so commands injected right after STARTTLS cannot run over
+                        # the encrypted channel (CVE-2011-0411 class); immediate TLS
+                        # keeps it, start_tls hands the buffered ClientHello over
                         buffered = getattr(reader, '_buffer', None)
-                        if buffered:
+                        if buffered and self.encrypt_mode is not EncryptMode.TLS_IMMEDIATE:
                             del buffered[:]
-                        await writer.start_tls(self.tls.context)
+                        await writer.start_tls(self.tls.context, ssl_handshake_timeout=self.io_cmd_timeout or None)
                         ctx.server.encrypted = utc_now()
                         # client must re-HELO; HELO state dropped (RFC 3207)
                         session.cmd_sequence = CMD_HELO
                         ctx.server.helo = ''
+                        # immediate TLS greets only now, on the encrypted channel
+                        if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
+                            # send the server greeting next
+                            output = self._greet_message(session)
+                            # proceed with loop
+                            continue
 
                     raw = await self._read_line(
                         reader, self.io_proxy_cmd_timeout if session.cmd_sequence is CMD_PROXY else self.io_cmd_timeout
@@ -1017,7 +1035,8 @@ class SmtpdServer:
 
         ### Returns
 
-        - **str**: The SMTP response, or '' for silence (DATA lines, QUIT)
+        - **str**: The SMTP response, or '' for silence (DATA lines, QUIT,
+            PROXY before immediate TLS)
 
         """
         ctx = session.ctx
@@ -1090,9 +1109,17 @@ class SmtpdServer:
                     if return_value:
                         proxy_data = return_value
                 ctx.server.proxy = proxy_data
-                # the server greeting now follows the PROXY header, not the connect
-                session.cmd_sequence = CMD_HELO
-                return f'220 {ctx.server.local_response.strip()}'
+                # the server greeting must follow the PROXY header, not the connect
+                if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
+                    # on TLS_IMMEDIATE the connection must be encrypted next
+                    session.cmd_sequence = CMD_STARTTLS
+                    # do not send the server greeting yet
+                    return ''
+                else:
+                    # continue with the HELO sequence
+                    session.cmd_sequence = CMD_HELO
+                    # send the server greeting next
+                    return self._greet_message(session)
 
             elif self.proxy_extension and re.match(r'^PROXY(\s+)', line, re.IGNORECASE):
                 # PROXY is only valid as first line, a later one is an abuse
@@ -1511,11 +1538,19 @@ class SmtpdServer:
 
         - **session** (SmtpdSession): The session state to reset
         - **connection_initialize** (bool): True on connection start; builds the
-            ctx and sets the sequence to CMD_PROXY or CMD_HELO else CMD_RSET
+            ctx and sets the sequence to CMD_PROXY, CMD_STARTTLS (implicit TLS)
+            or CMD_HELO, else CMD_RSET
 
         """
         # set active command sequence info
-        session.cmd_sequence = (CMD_PROXY if self.proxy_extension else CMD_HELO) if connection_initialize else CMD_RSET
+        if not connection_initialize:
+            session.cmd_sequence = CMD_RSET
+        elif self.proxy_extension:
+            session.cmd_sequence = CMD_PROXY
+        elif self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
+            session.cmd_sequence = CMD_STARTTLS
+        else:
+            session.cmd_sequence = CMD_HELO
         # drop any auth challenge
         session.auth_challenge = {}
         # test existing of ctx

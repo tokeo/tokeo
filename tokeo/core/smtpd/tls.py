@@ -2,10 +2,11 @@
 Tokeo SMTPD TLS Transport Module.
 
 A translation of MidiSmtpServer ```tls-transport.rb```: it builds the
-server ```ssl.SSLContext``` for STARTTLS from a certificate/key (or a generated
-self-signed test certificate when none is configured). The default ciphers and
-TLS floor follow the current Mozilla "Intermediate" profile (TLS 1.2+, ECDHE
-before DHE, AEAD only); the classic method/cipher options can still be supplied.
+server ```ssl.SSLContext``` for STARTTLS and immediate TLS from a
+certificate/key (or a generated self-signed test certificate when none is
+configured). The default ciphers and TLS floor follow the current Mozilla
+"Intermediate" profile (TLS 1.2+, ECDHE before DHE, AEAD only); the classic
+method/cipher options can still be supplied.
 
 ### Notes
 
@@ -94,6 +95,8 @@ class EncryptMode(Enum):
         and accepted on an encrypted channel. Protects credentials against
         a plaintext downgrade
     - ```TLS_REQUIRED```: every dialog beyond EHLO/STARTTLS demands TLS
+    - ```TLS_IMMEDIATE```: SMTPS (immediate TLS, RFC 8314), the handshake runs
+        right on connect (after a PROXY header), STARTTLS is not offered
 
     """
 
@@ -101,11 +104,12 @@ class EncryptMode(Enum):
     TLS_OPTIONAL = auto()
     TLS_WHEN_AUTH = auto()
     TLS_REQUIRED = auto()
+    TLS_IMMEDIATE = auto()
 
 
 class TlsTransport:
     """
-    Builds and holds the server ```SSLContext``` for STARTTLS.
+    Builds and holds the server ```SSLContext``` for STARTTLS and immediate TLS.
 
     ### Args
 

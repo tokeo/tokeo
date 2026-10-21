@@ -306,6 +306,16 @@ encryption is enabled the server upgrades the connection in place on
 command injected ahead of the handshake can never run over the encrypted
 channel.
 
+Set ```encrypt_mode``` to ```'TLS_IMMEDIATE'``` for SMTPS (implicit TLS as in
+RFC 8314, usually port 465): the TLS handshake runs right on connect, or
+right after the PROXY header with ```proxy_extension``` (section 9), and the
+```220``` greeting is the first line on the encrypted channel. STARTTLS is
+not offered then and AUTH is available at once. The handshake has to
+complete within ```io_cmd_timeout```, otherwise the connection is closed.
+Immediate TLS requires Python 3.13.13+ or 3.14.4+: older runtimes lose the
+start of the ClientHello that arrives together with the connect or the PROXY
+header (CPython gh-142352), the server refuses to start there.
+
 ### Certificates
 
 The certificate can be supplied three ways:
@@ -436,7 +446,7 @@ The constructor keeps the original option names. Key ones:
 <tr><td>max_processings</td><td>4</td><td>connections processed simultaneously</td></tr>
 <tr><td>max_connections</td><td>None</td><td>concurrent connections accepted (None = unlimited)</td></tr>
 <tr><td>auth_mode</td><td>'AUTH_FORBIDDEN'</td><td>AUTH_OPTIONAL / AUTH_REQUIRED</td></tr>
-<tr><td>encrypt_mode</td><td>'TLS_FORBIDDEN'</td><td>TLS_OPTIONAL / TLS_WHEN_AUTH / TLS_REQUIRED</td></tr>
+<tr><td>encrypt_mode</td><td>'TLS_FORBIDDEN'</td><td>TLS_OPTIONAL / TLS_WHEN_AUTH / TLS_REQUIRED / TLS_IMMEDIATE</td></tr>
 <tr><td>pipelining_extension</td><td>False</td><td>advertise PIPELINING</td></tr>
 <tr><td>internationalization_extensions</td><td>False</td><td>advertise 8BITMIME and SMTPUTF8</td></tr>
 <tr><td>spool</td><td>None</td><td>path and file name prefix for the spool temp files (section 11)</td></tr>
