@@ -751,6 +751,8 @@ class TokeoDramatiqController(Controller):
         - In the config the prefetch also takes 0 for auto as before
         - With --watch, the command monitors the given directory for changes
             and reloads actors when files change
+        - In debug mode of the app dramatiq logs on debug level as well,
+            unless --skip-logging is given
 
         - Worker processes log to the console; the call blocks until they
             terminate (signal, error or shutdown via the management hooks)
@@ -823,6 +825,11 @@ class TokeoDramatiqController(Controller):
             # add logging parameter
             sys.argv.extend(
                 ['--skip-logging'],
+            )
+        elif self.app.debug:
+            # dramatiq knows only info and debug, a single --verbose is enough
+            sys.argv.extend(
+                ['--verbose'],
             )
         # check for watch parameter
         if self.app.pargs.watch is not None:

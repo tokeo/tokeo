@@ -65,8 +65,8 @@ def serve(tmp, monkeypatch):
 
     monkeypatch.setattr('tokeo.ext.dramatiq.multiprocessing.set_start_method', fake_set_start_method)
 
-    def run(*options, config=None):
-        with dramatiq_app(tmp, ['dramatiq', 'serve', *options]) as app:
+    def run(*options, config=None, debug=False):
+        with dramatiq_app(tmp, ['--debug'] * debug + ['dramatiq', 'serve', *options]) as app:
             for key, value in (config or {}).items():
                 app.config.set('dramatiq', key, value)
 
@@ -274,3 +274,22 @@ def test_register_uses_tokeo_asyncio(tmp):
     with dramatiq_app(tmp, []):
         kinds = [type(m) for m in dramatiq.get_broker().middleware]
     assert TokeoAsyncIO in kinds
+
+
+# --- verbosity -----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    'options, debug, verbose, skip_logging',
+    [
+        ([], False, 0, False),
+        ([], True, 1, False),
+        (['--skip-logging'], True, 0, True),
+        (['--skip-logging'], False, 0, True),
+    ],
+    ids=['default', 'debug', 'debug_skip_logging', 'skip_logging'],
+)
+def test_serve_verbose_follows_debug(serve, options, debug, verbose, skip_logging):
+    calls = serve(*options, debug=debug)
+    args = calls['main'][0]
+    assert (args.verbose, args.skip_logging) == (verbose, skip_logging)
