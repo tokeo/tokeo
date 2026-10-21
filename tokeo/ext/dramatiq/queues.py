@@ -16,7 +16,7 @@ import pika
 from dramatiq.common import dq_name, xq_name, q_name
 from dramatiq.message import Message
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
-from tokeo.ext.dramatiq.base import TokeoDramatiqError
+from tokeo.ext.dramatiq.base import TokeoDramatiqError, TokeoDramatiqConnectionError
 
 #: Characters of the arguments shown by peek_dead
 ARGS_PREVIEW_LENGTH = 500
@@ -35,7 +35,8 @@ class TokeoDramatiqQueues:
         following calls; a connection closed by rabbitmq in the meantime is
         opened again on the next call
 
-    : Errors of rabbitmq and of the connection raise ```TokeoDramatiqError```
+    : A failed connection raises ```TokeoDramatiqConnectionError```, a
+        request refused by rabbitmq ```TokeoDramatiqError```
 
     """
 
@@ -85,7 +86,9 @@ class TokeoDramatiqQueues:
             except pika.exceptions.AMQPConnectionError as e:
                 self._close()
                 if attempt:
-                    raise TokeoDramatiqError(f'Cannot connect to rabbitmq at {self._dramatiq.broker.address} ({type(e).__name__})!') from e
+                    raise TokeoDramatiqConnectionError(
+                        f'Cannot connect to rabbitmq at {self._dramatiq.broker.address} ({type(e).__name__})!'
+                    ) from e
             except pika.exceptions.AMQPChannelError as e:
                 # rabbitmq closes the channel on a refused request
                 self._channel = None

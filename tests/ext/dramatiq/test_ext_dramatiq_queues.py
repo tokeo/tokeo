@@ -14,7 +14,7 @@ import pytest
 import dramatiq
 from dramatiq.message import Message
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
-from tokeo.ext.dramatiq import TokeoDramatiqError
+from tokeo.ext.dramatiq import TokeoDramatiqError, TokeoDramatiqConnectionError
 
 
 class FakeServer:
@@ -297,6 +297,7 @@ def test_error_without_rabbitmq(tmp, broker_app, server, url, address):
             app.dramatiq.queues.state('mail')
     # the error names host and port, never the password of the url
     assert 'secret' not in str(e.value)
+    assert isinstance(e.value, TokeoDramatiqConnectionError)
 
 
 def test_connection_is_kept_and_reopened(app, server):
@@ -409,3 +410,11 @@ def test_refused_request(app, server):
     server.refuse = None
     assert app.dramatiq.queues.purge('mail') == [dict(name='mail', purged=1)]
     assert server.connections == 1
+
+
+def test_refused_request_is_no_connection_error(app, server):
+    server.add('mail')
+    server.refuse = (406, 'PRECONDITION_FAILED - inequivalent arg')
+    with pytest.raises(TokeoDramatiqError) as e:
+        app.dramatiq.queues.purge('mail')
+    assert not isinstance(e.value, TokeoDramatiqConnectionError)
