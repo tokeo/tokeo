@@ -512,6 +512,13 @@ class TokeoDramatiqController(Controller):
                     help='reload actors on changes and restart workers',
                 ),
             ),
+            (
+                ['--no-purge'],
+                dict(
+                    action='store_true',
+                    help='keep the dramatiq locks on start and on restarts by --watch',
+                ),
+            ),
         ],
     )
     def serve(self):
@@ -526,6 +533,8 @@ class TokeoDramatiqController(Controller):
 
         - **--skip-logging** (flag): Skip Dramatiq's default logging configuration
         - **--watch** (str): Path to watch for file changes to reload actors
+        - **--no-purge** (flag): Keep the diskcache locks on start and on
+            restarts by --watch
 
         ### Notes
 
@@ -539,7 +548,10 @@ class TokeoDramatiqController(Controller):
 
         - At service start the diskcache locks are purged best-effort: a
             previous worker generation may have left stale acquires behind
-            that would block actors after restart
+            that would block actors after restart. A restart by --watch
+            starts the service again and purges as well
+        - With --no-purge the locks are kept, e.g. when further instances
+            run on the same diskcache and still hold their locks
 
         """
         self.app.log.info('Spin up the dramatiq service workers')
@@ -599,11 +611,13 @@ class TokeoDramatiqController(Controller):
         # restart, those processes pick the current sys.argv up again
         sys.argv = [sys.argv[0]] + self.app.argv
         # clear stale locks from a previously crashed worker generation;
-        # best-effort since the diskcache extension may not be loaded
-        try:
-            self.app.dramatiq.locks.purge()
-        except Exception:
-            pass
+        # best-effort since the diskcache extension may not be loaded; the
+        # restored argv keeps --no-purge for the restarts by --watch too
+        if not self.app.pargs.no_purge:
+            try:
+                self.app.dramatiq.locks.purge()
+            except Exception:
+                pass
         # signal hook
         for res in self.app.hook.run('tokeo_dramatiq_pre_start', self.app):
             pass
