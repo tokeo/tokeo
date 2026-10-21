@@ -54,6 +54,7 @@ from cement.core.meta import MetaMixin
 from cement import ex
 import dramatiq
 from dramatiq import middleware, cli, actor as dramatiq_actor
+from dramatiq import worker as dramatiq_worker
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 import pika
 from tokeo.core.exc import TokeoError
@@ -559,9 +560,19 @@ class TokeoDramatiqController(Controller):
         )
         # restart_delay and prefetch are env-only on dramatiq's side, no
         # cli flags exist, so pass them via the environment
-        os.environ['dramatiq_restart_delay'] = str(self.app.dramatiq.config('restart_delay'))
-        os.environ['dramatiq_queue_prefetch'] = str(self.app.dramatiq.config('queue_prefetch'))
-        os.environ['dramatiq_delay_queue_prefetch'] = str(self.app.dramatiq.config('delay_queue_prefetch'))
+        restart_delay = int(self.app.dramatiq.config('restart_delay'))
+        queue_prefetch = int(self.app.dramatiq.config('queue_prefetch'))
+        delay_queue_prefetch = int(self.app.dramatiq.config('delay_queue_prefetch'))
+        os.environ['dramatiq_restart_delay'] = str(restart_delay)
+        os.environ['dramatiq_queue_prefetch'] = str(queue_prefetch)
+        os.environ['dramatiq_delay_queue_prefetch'] = str(delay_queue_prefetch)
+        # dramatiq.worker reads the env only once on import into constants;
+        # forked workers (default start method before python 3.14) inherit
+        # them, so the already imported constants are updated as well
+        dramatiq_worker.CONSUMER_RESTART_DELAY = restart_delay
+        dramatiq_worker.CONSUMER_RESTART_DELAY_SECS = restart_delay / 1000
+        dramatiq_worker.QUEUE_PREFETCH = queue_prefetch
+        dramatiq_worker.DELAY_QUEUE_PREFETCH = delay_queue_prefetch
         # check for logging parameter
         if self.app.pargs.skip_logging:
             # add logging parameter
