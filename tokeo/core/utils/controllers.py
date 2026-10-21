@@ -8,14 +8,15 @@ def subcmdmeta(controller):
 
     ### Returns
 
-    - **\\_\\_cement_meta\\_\\_** (Meta): object ref to Meta information of the
-        subcommand
+    - **\\_\\_cement_meta\\_\\_** (CommandMeta|None): object ref to Meta
+        information of the subcommand, None outside a dispatched subcommand
+
+    ### Notes
+
+    : Delegates to ```_command_meta``` of the cement controller (3.0.16+)
 
     """
-    # cement stores the dispatch target as "<controller>.<method>"; take the
-    # method part to resolve the bound subcommand and read its cement meta.
-    # this relies on that dotted format staying "controller.method"
-    return getattr(controller, controller.app.pargs.__dispatch__.split('.')[1]).__cement_meta__
+    return controller._command_meta
 
 
 def defaultmeta(controller):
@@ -29,11 +30,16 @@ def defaultmeta(controller):
 
     ### Returns
 
-    - **\\_\\_cement_meta\\_\\_** (Meta): object ref to Meta information of the
-      _default_ subcommand
+    - **\\_\\_cement_meta\\_\\_** (CommandMeta|None): object ref to Meta
+        information of the _default_ subcommand, None when ```default_func```
+        is not an exposed command
+
+    ### Notes
+
+    : Delegates to ```_default_command_meta``` of the cement controller (3.0.16+)
 
     """
-    return getattr(controller, controller._meta.default_func).__cement_meta__
+    return controller._default_command_meta
 
 
 def controller_log_info_help(controller):

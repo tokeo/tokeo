@@ -112,8 +112,9 @@ class Controller(ArgparseController):
     """
     Base controller class for Tokeo CLI applications.
 
-    Extends Cement's ArgparseController with an improved help formatter and
-    default behavior for commands.
+    Extends Cement's ArgparseController with an improved help formatter. The
+    default behavior without a subcommand stays the one of cement and prints
+    the help of the controller.
 
     ### Attributes
 
@@ -127,13 +128,3 @@ class Controller(ArgparseController):
         """
 
         argument_formatter = TokeoHelpFormatter
-
-    def _default(self):
-        """
-        Default action when no subcommand is specified.
-
-        Displays the help information for the controller when the command is
-        invoked without any subcommands.
-
-        """
-        self._parser.print_help()
