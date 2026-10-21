@@ -148,12 +148,7 @@ def tokeo_jinja2_config(app):
 
     : Template directories can be specified as a string or a list of strings
     """
-    template_handler = app.handler.resolve(
-        # fmt: skip
-        'template',
-        TokeoJinja2TemplateHandler.Meta.label,
-        setup=True,
-    )
+    template_handler = app.handler.resolve('template', TokeoJinja2TemplateHandler.Meta.label, setup=True)
 
     # add template dirs
     t_dirs = template_handler._config('template_dirs', fallback=None)
