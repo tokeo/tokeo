@@ -51,6 +51,9 @@ import dramatiq
 from dramatiq import actor as dramatiq_actor
 from tokeo.ext.dramatiq.base import (  # noqa: F401
     TokeoDramatiqError,
+    TokeoDramatiqConnectionError,
+    TokeoActor,
+    tokeo_actor,
     TokeoAsyncIO,
     ExtendedRabbitmqBroker,
     TokeoDramatiq,
@@ -94,7 +97,7 @@ def tokeo_dramatiq_pdoc_post_render(app):
     """
     dramatiq.actor = dramatiq_actor
     if hasattr(app.dramatiq, 'actor'):
-        app.dramatiq.actor = dramatiq_actor
+        app.dramatiq.actor = tokeo_actor
 
 
 def tokeo_dramatiq_pdoc_render_decorator(app, func, decorator, args, kwargs):

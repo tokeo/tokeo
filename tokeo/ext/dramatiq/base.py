@@ -12,6 +12,7 @@ import os
 from cement.core.meta import MetaMixin
 import dramatiq
 from dramatiq import middleware, actor as dramatiq_actor
+from dramatiq.errors import BrokerConnectionError, ConnectionClosed
 from dramatiq.asyncio import EventLoopThread, set_event_loop_thread
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
@@ -31,6 +32,65 @@ class TokeoDramatiqError(TokeoError):
     """
 
     pass
+
+
+class TokeoDramatiqConnectionError(TokeoDramatiqError, ConnectionClosed):
+    """
+    Raised when a message cannot be sent, rabbitmq is not reachable.
+
+    It is a ```ConnectionClosed``` of dramatiq as well, so code catching that
+    one keeps working.
+
+    """
+
+
+class TokeoActor(dramatiq.Actor):
+    """
+    Actor whose send raises ```TokeoDramatiqConnectionError``` without rabbitmq.
+
+    Only sending changes, the worker runs the actor as before.
+
+    """
+
+    def send_with_options(self, *, args=(), kwargs=None, delay=None, **options):
+        """Send a message, with a tokeo error if rabbitmq is not reachable."""
+        try:
+            return super().send_with_options(args=args, kwargs=kwargs, delay=delay, **options)
+        except BrokerConnectionError as e:
+            address = _broker_address(self.broker)
+            where = f' at {address}' if address else ''
+            raise TokeoDramatiqConnectionError(f'Cannot send {self.actor_name}, rabbitmq is not reachable{where}!') from e
+
+
+def tokeo_actor(fn=None, **options):
+    """
+    Declare an actor like ```dramatiq.actor```, as ```TokeoActor``` by default.
+
+    ### Args
+
+    - **fn** (callable, optional): The function of the actor
+
+    ### Keyword Args
+
+    - **options**: The options of ```dramatiq.actor```; an own
+        ```actor_class``` replaces ```TokeoActor```
+
+    ### Returns
+
+    - **TokeoActor|callable**: The actor, or the decorator without fn
+
+    """
+    options.setdefault('actor_class', TokeoActor)
+    return dramatiq_actor(fn, **options)
+
+
+def _broker_address(broker):
+    """Host and port of the broker, never its url with the password."""
+    parameters = getattr(broker, 'parameters', None)
+    if parameters is None:
+        return None
+    parameters = parameters if isinstance(parameters, list) else [parameters]
+    return ', '.join(f'{p.host}:{p.port}' for p in parameters)
 
 
 class TokeoAsyncIO(middleware.AsyncIO):
@@ -287,7 +347,7 @@ class TokeoDramatiq(MetaMixin):
         # alias dramatiq.actor on the instance: pdoc_pre_render swaps the
         # symbol on both ```dramatiq.actor``` and ```app.dramatiq.actor``` so the
         # generated docs can render decorators that target either path
-        self.actor = dramatiq_actor
+        self.actor = tokeo_actor
         # dramatiq register
         self.register()
         # imported here, the queues module builds on this one

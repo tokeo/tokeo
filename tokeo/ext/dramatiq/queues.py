@@ -16,7 +16,7 @@ import pika
 from dramatiq.common import dq_name, xq_name, q_name
 from dramatiq.message import Message
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
-from tokeo.ext.dramatiq.base import TokeoDramatiqError
+from tokeo.ext.dramatiq.base import TokeoDramatiqError, _broker_address
 
 #: Characters of the arguments shown by peek_dead
 ARGS_PREVIEW_LENGTH = 500
@@ -85,13 +85,7 @@ class TokeoDramatiqQueues:
             except pika.exceptions.AMQPConnectionError as e:
                 self._close()
                 if attempt:
-                    raise TokeoDramatiqError(f'Cannot connect to rabbitmq at {self._address()}!') from e
-
-    def _address(self):
-        # host and port only, the url may carry the password
-        parameters = self._dramatiq.broker.parameters
-        parameters = parameters if isinstance(parameters, list) else [parameters]
-        return ', '.join(f'{p.host}:{p.port}' for p in parameters)
+                    raise TokeoDramatiqError(f'Cannot connect to rabbitmq at {_broker_address(self._dramatiq.broker)}!') from e
 
     def _declared(self, queue):
         # passive declare answers without creating a missing queue

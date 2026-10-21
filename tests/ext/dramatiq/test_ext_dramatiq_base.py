@@ -8,6 +8,7 @@ hands over to dramatiq.
 import os
 
 import pytest
+import dramatiq
 from dramatiq.asyncio import get_event_loop_thread
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
 from tokeo.ext.dramatiq import TokeoDramatiqError, TokeoAsyncIO
@@ -209,3 +210,67 @@ def test_register_dead_message_ttl_config_wins_over_env(tmp, keep_dead_message_t
     monkeypatch.setenv('dramatiq_dead_message_ttl', '0')
     with broker_app(tmp, dict(dead_message_ttl=60000)):
         assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == 60000
+
+
+# --- actor send wrapper --------------------------------------------------------
+
+
+def test_actor_alias_declares_tokeo_actor(tmp, broker_app):
+    from tokeo.ext.dramatiq import TokeoActor
+
+    with broker_app(tmp, None) as app:
+        # both forms of the decorator, the bare one and with options
+        bare = app.dramatiq.actor(lambda: None, actor_name='bare_actor')
+        with_options = app.dramatiq.actor(queue_name='mail', actor_name='mail_actor')(lambda: None)
+        own = app.dramatiq.actor(lambda: None, actor_name='own_actor', actor_class=dramatiq.Actor)
+    assert type(bare) is TokeoActor and type(with_options) is TokeoActor
+    assert with_options.queue_name == 'mail'
+    # an own actor_class stays possible
+    assert type(own) is dramatiq.Actor
+
+
+def test_actor_send_and_run_unchanged(tmp, broker_app, monkeypatch):
+    with broker_app(tmp, None) as app:
+        actor = app.dramatiq.actor(lambda value: value * 2, actor_name='double')
+        sent = []
+        monkeypatch.setattr(app.dramatiq.broker, 'enqueue', lambda message, delay=None: sent.append((message, delay)) or message)
+        message = actor.send_with_options(args=(21,), delay=500, max_retries=1)
+        actor.send(2)
+    assert (message.args, message.options['max_retries'], sent[0][1]) == ((21,), 1, 500)
+    assert len(sent) == 2
+    # the worker calls the actor itself, that path is untouched
+    assert actor(21) == 42
+
+
+def test_actor_send_without_rabbitmq(tmp, broker_app, monkeypatch):
+    from dramatiq.errors import BrokerConnectionError, ConnectionClosed
+    from tokeo.core.exc import TokeoError
+    from tokeo.ext.dramatiq import TokeoDramatiqConnectionError
+
+    def refused(message, delay=None):
+        raise ConnectionClosed('connection refused')
+
+    with broker_app(tmp, dict(url='amqp://user:secret@mq.example:5673/')) as app:
+        actor = app.dramatiq.actor(lambda: None, actor_name='count_words')
+        monkeypatch.setattr(app.dramatiq.broker, 'enqueue', refused)
+        with pytest.raises(TokeoDramatiqConnectionError) as e:
+            actor.send()
+    assert str(e.value) == 'Cannot send count_words, rabbitmq is not reachable at mq.example:5673!'
+    # main catches it as tokeo error, code catching dramatiq errors still does
+    assert isinstance(e.value, TokeoError) and isinstance(e.value, ConnectionClosed)
+    assert isinstance(e.value, BrokerConnectionError) and e.value.args[0] == str(e.value)
+
+
+def test_pdoc_hooks_restore_the_tokeo_actor(tmp, broker_app):
+    from tokeo.core.utils.pdoc import pdoc_replace_decorator
+    from tokeo.ext.dramatiq import tokeo_actor, tokeo_dramatiq_pdoc_pre_render, tokeo_dramatiq_pdoc_post_render
+
+    original = dramatiq.actor
+    with broker_app(tmp, None) as app:
+        assert app.dramatiq.actor is tokeo_actor
+        tokeo_dramatiq_pdoc_pre_render(app)
+        # pdoc renders both decorator forms by the simple stub
+        assert dramatiq.actor is pdoc_replace_decorator and app.dramatiq.actor is pdoc_replace_decorator
+        tokeo_dramatiq_pdoc_post_render(app)
+        assert app.dramatiq.actor is tokeo_actor
+    assert dramatiq.actor is original
