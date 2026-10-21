@@ -33,6 +33,8 @@ class TokeoDramatiqQueues:
         following calls; a connection closed by rabbitmq in the meantime is
         opened again on the next call
 
+    : Without rabbitmq a call raises ```TokeoDramatiqError```
+
     """
 
     def __init__(self, dramatiq):
@@ -74,10 +76,16 @@ class TokeoDramatiqQueues:
                 try:
                     self._open()
                     return func(*args)
-                except pika.exceptions.AMQPConnectionError:
+                except pika.exceptions.AMQPConnectionError as e:
                     self._close()
                     if attempt:
-                        raise
+                        raise TokeoDramatiqError(f'Cannot connect to rabbitmq at {self._address()}!') from e
+
+    def _address(self):
+        # host and port only, the url may carry the password
+        parameters = self._dramatiq.broker.parameters
+        parameters = parameters if isinstance(parameters, list) else [parameters]
+        return ', '.join(f'{p.host}:{p.port}' for p in parameters)
 
     def _declared(self, queue):
         # passive declare answers without creating a missing queue

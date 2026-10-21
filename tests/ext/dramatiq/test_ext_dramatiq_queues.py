@@ -25,6 +25,7 @@ class FakeServer:
         self.connections = 0
         self.drop_next = False
         self.refuse_publish = False
+        self.down = False
 
     def add(self, name, *bodies, consumers=0, arguments=None):
         self.queues[name] = dict(messages=list(bodies), consumers=consumers, arguments=arguments or {})
@@ -84,6 +85,8 @@ class FakeChannel:
 class FakeConnection:
 
     def __init__(self, server):
+        if server.down:
+            raise pika.exceptions.AMQPConnectionError('connection refused')
         server.connections += 1
         self.server = server
         self.is_closed = False
@@ -271,6 +274,23 @@ def test_recreate_refuses_queue_without_actor(app, server):
 
 
 # --- connection ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    'url, address',
+    [
+        ('amqp://user:secret@mq.example:5673/', 'mq.example:5673'),
+        ('amqps://user:secret@mq.example/', 'mq.example:5671'),
+    ],
+)
+def test_error_without_rabbitmq(tmp, broker_app, server, url, address):
+    server.down = True
+    with broker_app(tmp, dict(url=url)) as app:
+        dramatiq.actor(lambda: None, actor_name='send_mail', queue_name='mail', broker=app.dramatiq.broker)
+        with pytest.raises(TokeoDramatiqError, match=f'Cannot connect to rabbitmq at {address}!') as e:
+            app.dramatiq.queues.state('mail')
+    # the error names host and port, never the password of the url
+    assert 'secret' not in str(e.value)
 
 
 def test_connection_is_kept_and_reopened(app, server):
