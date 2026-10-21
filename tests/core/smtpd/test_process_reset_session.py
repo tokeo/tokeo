@@ -5,7 +5,9 @@ Checks the session/ctx content after ```process_reset_session``` (the
 default values for every field), for both connection_initialize True and False.
 """
 
-from tokeo.core.smtpd.server import SmtpdServer, CMD_HELO, CMD_RSET, SmtpdSession
+import pytest
+
+from tokeo.core.smtpd.server import SmtpdServer, CMD_PROXY, CMD_HELO, CMD_RSET, CMD_STARTTLS, SmtpdSession
 from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
 
 
@@ -17,6 +19,24 @@ def test_reset_helo():
     session = SmtpdSession()
     _smtpd().process_reset_session(session, connection_initialize=True)
     assert session.cmd_sequence is CMD_HELO
+
+
+@pytest.mark.parametrize(
+    'settings, expected',
+    [
+        ({'proxy_extension': True}, CMD_PROXY),
+        ({'encrypt_mode': 'TLS_IMMEDIATE'}, CMD_STARTTLS),
+        ({'proxy_extension': True, 'encrypt_mode': 'TLS_IMMEDIATE'}, CMD_PROXY),
+    ],
+)
+def test_reset_initial_sequence(monkeypatch, settings, expected):
+    # a supported runtime is assumed, the version check has its own test
+    monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', (3, 14, 4, 'final', 0))
+    session = SmtpdSession()
+    SmtpdServer(CaptureSmtpdEvents(), settings=dict(settings, tls_cert_cn='localhost')).process_reset_session(
+        session, connection_initialize=True
+    )
+    assert session.cmd_sequence is expected
 
 
 def test_reset_rset():

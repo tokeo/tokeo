@@ -378,8 +378,8 @@ def test_read_line_skips_wait_for_when_line_buffered(monkeypatch):
             raise AssertionError('wait_for must not be used when a line is buffered')
 
         monkeypatch.setattr(asyncio, 'wait_for', boom)
-        assert await srv._read_line(reader) == b'HELO x\r\n'
-        assert await srv._read_line(reader) == b'MAIL FROM:<a@b>\r\n'
+        assert await srv._read_line(reader, srv.io_cmd_timeout) == b'HELO x\r\n'
+        assert await srv._read_line(reader, srv.io_cmd_timeout) == b'MAIL FROM:<a@b>\r\n'
 
     asyncio.run(go())
 
@@ -395,7 +395,7 @@ def test_read_line_times_out_on_partial_buffered_line():
         reader = asyncio.StreamReader()
         reader.feed_data(b'incomplete without newline')
         with pytest.raises(SmtpdIOTimeoutException):
-            await srv._read_line(reader)
+            await srv._read_line(reader, srv.io_cmd_timeout)
 
     asyncio.run(go())
 
@@ -563,25 +563,28 @@ class ProxyEvents(RecordingEvents):
         self.proxy_on_ctx = ctx.server.proxy
 
 
-async def _dialog_raw(events, settings, steps):
+async def _dialog_raw(events, settings, steps, has_server_greeting=True):
     """
     Run a dialog where each step says whether to read a reply.
 
     ### Args
 
     - **steps** (list): tuples ```(bytes_to_send, expect_reply)```; when
-        expect_reply is False nothing is read (PROXY answers with silence)
+        expect_reply is False nothing is read
+    - **has_server_greeting** (bool): read the 220 greeting on connect; False
+        with proxy_extension, where the greeting answers the PROXY header
 
     ### Returns
 
-    - **tuple**: ```(banner, replies, closed)``` -- replies for the steps that
-        expected one, and whether the server closed the connection at the end
+    - **tuple**: ```(greeting, replies, closed)``` -- the greeting on connect
+        (or None), replies for the steps that expected one, and whether the
+        server closed the connection at the end
 
     """
     server, port, task = await _serve(events, settings)
     try:
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        banner = await _reply(reader)
+        greeting = await _reply(reader) if has_server_greeting else None
         replies = []
         for chunk, expect in steps:
             writer.write(chunk)
@@ -596,7 +599,7 @@ async def _dialog_raw(events, settings, steps):
             closed = False
         writer.close()
         await asyncio.sleep(0.02)
-        return banner, replies, closed
+        return greeting, replies, closed
     finally:
         await _stop(server, task)
 
@@ -627,16 +630,18 @@ def test_proxy_tcp4_fills_ctx_and_fires_event():
     ev = ProxyEvents()
 
     async def go():
-        # PROXY answers with silence; the following EHLO gets the 250
-        banner, replies, closed = await _dialog_raw(
+        # no greeting on connect, the PROXY header is answered by it
+        greeting, replies, closed = await _dialog_raw(
             ev,
             {'proxy_extension': True},
-            [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1111 2222\r\n', False), (b'EHLO me\r\n', True)],
+            [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1111 2222\r\n', True), (b'EHLO me\r\n', True)],
+            has_server_greeting=False,
         )
         return replies
 
     replies = asyncio.run(go())
-    assert replies[0][-1] == '250 OK'
+    assert replies[0][0].startswith('220')
+    assert replies[1][-1] == '250 OK'
     assert ev.proxy_seen is not None
     assert ev.proxy_seen['proto'] == 'TCP4'
     assert ev.proxy_seen['source_ip'] == '1.2.3.4' and ev.proxy_seen['source_port'] == 1111
@@ -652,11 +657,13 @@ def test_proxy_unknown_is_accepted():
         return await _dialog_raw(
             ev,
             {'proxy_extension': True},
-            [(b'PROXY UNKNOWN\r\n', False), (b'EHLO me\r\n', True)],
+            [(b'PROXY UNKNOWN\r\n', True), (b'EHLO me\r\n', True)],
+            has_server_greeting=False,
         )
 
     _, replies, _ = asyncio.run(go())
-    assert replies[0][-1] == '250 OK'
+    assert replies[0][0].startswith('220')
+    assert replies[1][-1] == '250 OK'
     assert ev.proxy_seen['proto'] == 'UNKNOWN' and ev.proxy_seen['source_ip'] is None
 
 
@@ -668,7 +675,8 @@ def test_proxy_event_can_rewrite():
         return await _dialog_raw(
             ev,
             {'proxy_extension': True},
-            [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1111 2222\r\n', False), (b'EHLO me\r\n', True)],
+            [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1111 2222\r\n', True), (b'EHLO me\r\n', True)],
+            has_server_greeting=False,
         )
 
     asyncio.run(go())
@@ -677,13 +685,19 @@ def test_proxy_event_can_rewrite():
     assert ev.proxy_on_ctx == {'proto': 'TCP4', 'source_ip': '9.9.9.9'}
 
 
-def test_proxy_after_helo_is_503():
-    _, r = dialog(
-        ProxyEvents(),
-        {'proxy_extension': True},
-        [b'EHLO me\r\n', b'PROXY TCP4 1.2.3.4 5.6.7.8 1 2\r\n'],
-    )
-    assert r[1][0].startswith('503')
+def test_proxy_not_first_aborts_421():
+    # with proxy_extension the PROXY header is mandatory as the first line
+    async def go():
+        return await _dialog_raw(
+            ProxyEvents(),
+            {'proxy_extension': True},
+            [(b'EHLO me\r\n', True)],
+            has_server_greeting=False,
+        )
+
+    _, replies, closed = asyncio.run(go())
+    assert replies[0][0].startswith('421')
+    assert closed is True
 
 
 def test_proxy_illegal_command_aborts_421():
@@ -692,6 +706,7 @@ def test_proxy_illegal_command_aborts_421():
             ProxyEvents(),
             {'proxy_extension': True},
             [(b'PROXY GARBAGE\r\n', True)],
+            has_server_greeting=False,
         )
 
     _, replies, closed = asyncio.run(go())
@@ -706,6 +721,7 @@ def test_proxy_bad_params_abort_421():
             ProxyEvents(),
             {'proxy_extension': True},
             [(b'PROXY TCP4 ::1 ::2 1 2\r\n', True)],
+            has_server_greeting=False,
         )
 
     _, replies, closed = asyncio.run(go())
@@ -718,7 +734,47 @@ def test_proxy_twice_aborts_421():
         return await _dialog_raw(
             ProxyEvents(),
             {'proxy_extension': True},
-            [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1 2\r\n', False), (b'PROXY TCP4 9.9.9.9 8.8.8.8 3 4\r\n', True)],
+            [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1 2\r\n', True), (b'PROXY TCP4 9.9.9.9 8.8.8.8 3 4\r\n', True)],
+            has_server_greeting=False,
+        )
+
+    _, replies, closed = asyncio.run(go())
+    assert replies[0][0].startswith('220')
+    assert replies[1][0].startswith('421')
+    assert closed is True
+
+
+def test_proxy_header_timeout_aborts_421():
+    # the PROXY header has its own short timeout, io_cmd_timeout does not apply
+    async def go():
+        server, port, task = await _serve(ProxyEvents(), {'proxy_extension': True, 'io_proxy_cmd_timeout': 0.2, 'io_cmd_timeout': 30})
+        try:
+            reader, writer = await asyncio.open_connection('127.0.0.1', port)
+            reply = await asyncio.wait_for(_reply(reader), timeout=2)
+            closed = await asyncio.wait_for(reader.read(1), timeout=1) == b''
+            writer.close()
+            return reply, closed
+        finally:
+            await _stop(server, task)
+
+    reply, closed = asyncio.run(go())
+    assert reply[0].startswith('421')
+    assert closed is True
+
+
+def test_proxy_event_error_aborts_421():
+    # any failure on the PROXY header ends the connection, no other reply leaks
+    class RejectingProxyEvents(ProxyEvents):
+
+        def on_proxy_event(self, ctx, proxy_data):
+            raise Smtpd550Exception
+
+    async def go():
+        return await _dialog_raw(
+            RejectingProxyEvents(),
+            {'proxy_extension': True},
+            [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1 2\r\n', True)],
+            has_server_greeting=False,
         )
 
     _, replies, closed = asyncio.run(go())
@@ -778,6 +834,21 @@ def test_shutdown_ends_active_dialog_after_current_command():
     noop, bye = asyncio.run(go())
     assert noop[0] == '250 OK'
     assert bye[0].startswith('221')
+
+
+def test_shutdown_refuses_ungreeted_connection():
+    async def go():
+        srv, port = await _start_server(RecordingEvents(), {})
+        # a scheduled shutdown greets a new connection with 421, not 220
+        srv.shutdown()
+        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        reply = await asyncio.wait_for(_reply(reader), timeout=2)
+        writer.close()
+        await srv.stop(wait_seconds_before_close=0.2)
+        return reply
+
+    reply = asyncio.run(go())
+    assert reply[0].startswith('421')
 
 
 def test_graceful_stop_cancels_idle_connection():

@@ -3,13 +3,14 @@ Ported from the reference suite's test/unit/process_proxy_test.rb.
 
 Checks the PROXY protocol handling in ```process_line```: valid TCP4/TCP6
 (with IPv6 and port normalization), an illegal command, a repeated PROXY, and
-an out-of-sequence PROXY.
+a first line that is not PROXY. Unlike the reference, the PROXY header is
+mandatory as the first line, so that case aborts with 421 instead of 503.
 """
 
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, SmtpdSession
-from tokeo.core.smtpd.exc import Smtpd421Exception, Smtpd503Exception
+from tokeo.core.smtpd.exc import Smtpd421Exception
 from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_helpers import run_line
 
@@ -77,8 +78,7 @@ def test_03_proxy_multiple_proxy_abort():
         run_line(_SMTPD, session, 'PROXY TCP6 003::0003 4::4 000003333 4444')
 
 
-def test_04_proxy_illegal_sequence():
+def test_04_proxy_not_first_aborts():
     session = _session()
-    run_line(_SMTPD, session, 'EHLO SEQUENCE')
-    with pytest.raises(Smtpd503Exception):
-        run_line(_SMTPD, session, 'PROXY UNKNOWN TEST')
+    with pytest.raises(Smtpd421Exception):
+        run_line(_SMTPD, session, 'EHLO SEQUENCE')
