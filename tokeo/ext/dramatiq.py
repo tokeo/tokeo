@@ -425,7 +425,9 @@ class TokeoDramatiq(MetaMixin):
             value, read on import from the env ```dramatiq_dead_message_ttl```
             or else 7 days. A value in the config wins over the env and is
             set on the constant of dramatiq, because the module is imported
-            before the config is read
+            before the config is read. Without the config value an env set
+            from outside is checked; a non number fails earlier, when
+            dramatiq gets imported
 
         : ```time_limit```, ```max_age```, ```notify_shutdown```,
             ```max_retries```, ```min_backoff``` and ```max_backoff``` are the
@@ -437,8 +439,9 @@ class TokeoDramatiq(MetaMixin):
 
         - **TokeoDramatiqError**: If ```confirm_delivery``` is not a bool,
             ```max_priority``` not None or 1 to 255,
-            ```dead_message_ttl``` not None or a positive integer, or a
-            middleware default not allowed
+            ```dead_message_ttl``` not None or a positive integer, the env
+            ```dramatiq_dead_message_ttl``` not a positive integer while
+            used, or a middleware default not allowed
 
         """
         self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')
@@ -477,6 +480,9 @@ class TokeoDramatiq(MetaMixin):
         # happened, so a configured value goes to the constant directly
         if dead_message_ttl is not None:
             dramatiq_rabbitmq.DEAD_MESSAGE_TTL = dead_message_ttl
+        else:
+            # dramatiq takes the env then; 0 would drop every dead letter
+            _env_number('dramatiq_dead_message_ttl')
         rabbitmq_broker = ExtendedRabbitmqBroker(
             url=rabbitmq_config['url'],
             auth_identity=rabbitmq_config['auth_identity'],

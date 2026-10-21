@@ -527,3 +527,28 @@ def test_serve_poll_interval_invalid_env(serve, monkeypatch, value):
 def test_serve_poll_interval_invalid_config(serve, value):
     with pytest.raises(TokeoDramatiqError, match='Invalid dramatiq config worker_poll_interval'):
         serve(config=dict(worker_poll_interval=value))
+
+
+# --- dead message ttl env ------------------------------------------------------
+
+
+def test_register_dead_message_ttl_valid_env(tmp, keep_dead_message_ttl, monkeypatch):
+    monkeypatch.setenv('dramatiq_dead_message_ttl', '86400000')
+    with broker_app(tmp, None):
+        # dramatiq read the env on import already, tokeo only checks it
+        assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == keep_dead_message_ttl
+
+
+@pytest.mark.parametrize('value', ['0', '-1', 'week'])
+def test_register_dead_message_ttl_invalid_env(tmp, keep_dead_message_ttl, monkeypatch, value):
+    monkeypatch.setenv('dramatiq_dead_message_ttl', value)
+    with pytest.raises(TokeoDramatiqError, match='Invalid env dramatiq_dead_message_ttl'):
+        with broker_app(tmp, None):
+            pass
+
+
+def test_register_dead_message_ttl_config_wins_over_env(tmp, keep_dead_message_ttl, monkeypatch):
+    # with the config value the env does not matter, even an invalid one
+    monkeypatch.setenv('dramatiq_dead_message_ttl', '0')
+    with broker_app(tmp, dict(dead_message_ttl=60000)):
+        assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == 60000
