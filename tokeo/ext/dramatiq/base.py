@@ -37,16 +37,10 @@ class TokeoAsyncIO(middleware.AsyncIO):
     """
     AsyncIO middleware whose event loop thread does not block the exit.
 
-    A worker process that gets a second SIGTERM ends by ```sys.exit()```
-    without ```after_worker_shutdown```, so the event loop thread of the
-    standard middleware keeps running and the process hangs forever. This
-    happens whenever SIGTERM reaches the whole process group, e.g. by systemd
-    with the default ```KillMode=control-group```.
+    A worker killed by a second SIGTERM would otherwise hang on the non-daemon
+    event loop thread of the standard middleware.
 
     ### Notes
-
-    : The normal shutdown is unchanged, ```after_worker_shutdown``` still
-        stops and joins the thread
 
     : Remove this class once dramatiq starts the thread as daemon itself
 
@@ -210,43 +204,31 @@ class TokeoDramatiq(MetaMixin):
             actors='actors.module',
             # Number of worker threads per process
             worker_threads=1,
-            # Number of worker processes to run; auto follows the dramatiq
-            # defaults and counts the cpus of the host
+            # Number of worker processes to run (auto: number of cpus)
             worker_processes=2,
             # Worker shutdown timeout in milliseconds
             worker_shutdown_timeout=600_000,
             # Delay between worker restarts in milliseconds
             restart_delay=3_000,
-            # Milliseconds a worker thread waits for a message or a task
-            # before it checks for due delayed messages and for shutdown;
-            # dramatiq names it worker_timeout (env dramatiq_worker_timeout).
-            # None keeps the value of dramatiq, from the env or else 1000; a
-            # value here wins over the env
+            # Worker poll interval in milliseconds (None: dramatiq default)
             worker_poll_interval=None,
-            # Number of messages to prefetch from queues; auto (or 0) follows
-            # the dramatiq defaults
+            # Number of messages to prefetch from queues (auto: dramatiq default)
             queue_prefetch='auto',
-            # Number of messages to prefetch from delay queues; auto (or 0)
-            # follows the dramatiq defaults
+            # Number of delay queue messages to prefetch (auto: dramatiq default)
             delay_queue_prefetch='auto',
             # Start the worker processes by spawn instead of forkserver
             use_spawn=False,
-            # Milliseconds an actor may run per message before it gets
-            # interrupted; dramatiq knows no unlimited run, a long job sets
-            # its own limit on the actor, e.g. time_limit=3_600_000
+            # Time limit per message in milliseconds
             time_limit=600_000,
-            # Milliseconds after sending, a message gets skipped instead of
-            # processed; None processes messages of any age
+            # Max age of a message in milliseconds (None: no limit)
             max_age=None,
-            # Interrupt running actors by a Shutdown exception when the
-            # worker stops; single actors may opt in by notify_shutdown=True
+            # Raise Shutdown in running actors when the worker stops
             notify_shutdown=False,
-            # Retries of a failed message before it goes to the dead letters
+            # Max retries of a failed message
             max_retries=20,
-            # Milliseconds of the first retry delay, it doubles per retry
+            # Min delay of a retry in milliseconds
             min_backoff=15_000,
-            # Milliseconds of the longest retry delay, dramatiq caps it at
-            # 7 days
+            # Max delay of a retry in milliseconds (at most 7 days)
             max_backoff=604_800_000,
             # Broker type (currently only rabbitmq supported)
             broker='rabbitmq',
@@ -266,21 +248,11 @@ class TokeoDramatiq(MetaMixin):
                 tls_verify_cert=True,
                 # path to a CA bundle to trust instead of the system store
                 tls_ca=None,
-                # wait for rabbitmq to confirm each sent message; only then a
-                # lost message raises and a deleted queue is declared again
+                # wait for rabbitmq to confirm each sent message
                 confirm_delivery=True,
-                # highest message priority a queue accepts (x-max-priority, 1 to
-                # 255, at most 10 recommended); None declares queues without
-                # priorities. A message gets its priority by
-                # send_with_options(broker_priority=n). Existing queues keep
-                # their argument until they are deleted and declared again
+                # highest message priority of the queues (None: no priorities)
                 max_priority=None,
-                # milliseconds a dead letter stays in the XQ of every queue
-                # (x-message-ttl); None keeps the value of dramatiq, read from
-                # the env dramatiq_dead_message_ttl or else 7 days. A value here
-                # wins over the env. All senders and workers need the same
-                # value, existing XQs keep theirs until deleted and declared
-                # again
+                # lifetime of dead letters in milliseconds (None: dramatiq default)
                 dead_message_ttl=None,
             ),
             # Tag for dramatiq locks in the cache
@@ -354,48 +326,18 @@ class TokeoDramatiq(MetaMixin):
 
         ### Notes
 
-        : Configures a standard set of middleware components including AgeLimit,
-            TimeLimit, ShutdownNotifications, Callbacks, Pipelines, Retries,
-            CurrentMessage and TokeoAsyncIO (required to run ```async def```
-            actors)
+        : Configures the middleware AgeLimit, TimeLimit, ShutdownNotifications,
+            Callbacks, Pipelines, Retries, CurrentMessage and TokeoAsyncIO
 
         : Creates an ExtendedRabbitmqBroker instance with the configured URL
             and registers it as the global Dramatiq broker
 
-        : Missing keys of the ```rabbitmq``` config take their defaults, so an
-            app config written before a new key still works
-
-        : With ```confirm_delivery``` (default) each ```send()``` waits for the
-            confirmation of rabbitmq; a message that cannot be delivered
-            raises instead of getting lost
-
-        : ```max_priority``` and ```dead_message_ttl``` are arguments of the
-            queues (```x-max-priority```, ```x-message-ttl``` of the XQ), so
-            all senders and workers need the same values. Rabbitmq refuses
-            to declare an existing queue with other arguments; a change
-            needs the queue deleted and declared again
-
-        : Without ```dead_message_ttl``` in the config dramatiq keeps its own
-            value, read on import from the env ```dramatiq_dead_message_ttl```
-            or else 7 days. A value in the config wins over the env and is
-            set on the constant of dramatiq, because the module is imported
-            before the config is read. Without the config value an env set
-            from outside is checked; a non number fails earlier, when
-            dramatiq gets imported
-
-        : ```time_limit```, ```max_age```, ```notify_shutdown```,
-            ```max_retries```, ```min_backoff``` and ```max_backoff``` are the
-            defaults of the middleware for all actors. An actor or a single
-            message (```send_with_options```) still sets its own value, the
-            message first, then the actor, then the config
+        : Missing keys of the ```rabbitmq``` config take their defaults
 
         ### Raises
 
-        - **TokeoDramatiqError**: If ```confirm_delivery``` is not a bool,
-            ```max_priority``` not None or 1 to 255,
-            ```dead_message_ttl``` not None or a positive integer, the env
-            ```dramatiq_dead_message_ttl``` not a positive integer while
-            used, or a middleware default not allowed
+        - **TokeoDramatiqError**: If a config value or a dramatiq env is not
+            allowed
 
         """
         self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')
@@ -430,8 +372,7 @@ class TokeoDramatiq(MetaMixin):
             )
         max_priority = _number('dramatiq config rabbitmq.max_priority', rabbitmq_config['max_priority'], max_value=255, allow_none=True)
         dead_message_ttl = _number('dramatiq config rabbitmq.dead_message_ttl', rabbitmq_config['dead_message_ttl'], allow_none=True)
-        # dramatiq reads the env into this constant on import, which already
-        # happened, so a configured value goes to the constant directly
+        # dramatiq read the env on import already, so set its constant
         if dead_message_ttl is not None:
             dramatiq_rabbitmq.DEAD_MESSAGE_TTL = dead_message_ttl
         else:

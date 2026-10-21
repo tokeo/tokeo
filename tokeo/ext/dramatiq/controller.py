@@ -226,76 +226,43 @@ class TokeoDramatiqController(Controller):
 
         - **--skip-logging** (flag): Skip Dramatiq's default logging configuration
         - **--watch** (str): Path to watch for file changes to reload actors
-        - **--no-purge** (flag): Keep the diskcache locks on start and on
-            restarts by --watch
+        - **--no-purge** (flag): Keep the diskcache locks
         - **-p, --processes** (int|auto): Number of worker processes
         - **-t, --threads** (int): Number of worker threads per process
         - **--queue-prefetch** (int|auto): Messages to prefetch per queue
-        - **--delay-queue-prefetch** (int|auto): Messages to prefetch per
-            delay queue
-        - **--worker-shutdown-timeout** (int): Milliseconds to wait for the
-            workers on shutdown
+        - **--delay-queue-prefetch** (int|auto): Prefetch per delay queue
+        - **--worker-shutdown-timeout** (int): Shutdown timeout in milliseconds
         - **--use-spawn** (flag): Start the worker processes by spawn
-        - **--use-forkserver** (flag): Start the worker processes by
-            forkserver
-        - **--queues** (str): Names of the queues to consume, all queues
-            without this option
+        - **--use-forkserver** (flag): Start the worker processes by forkserver
+        - **--queues** (str): Queues to consume, all queues without it
 
         ### Raises
 
-        - **TokeoDramatiqError**: If a worker switch, a worker option or
-            ```use_spawn``` in the config, or the env of dramatiq is not
-            allowed
+        - **TokeoDramatiqError**: If a switch, a config value or a dramatiq env
+            is not allowed
 
         ### Notes
 
         - Worker configuration includes process count, thread count, shutdown
             timeout, restart delay, and queue prefetch settings
-        - Each worker switch replaces its config value (```worker_processes```,
-            ```worker_threads```, ```queue_prefetch```, ```delay_queue_prefetch```,
-            ```worker_shutdown_timeout```); without the switch the config
-            value applies
-        - With auto the dramatiq defaults apply: the cpus of the host for the
-            processes, threads x 2 and threads x 1000 for the prefetch. The
-            cpus of the host ignore a cpu limit of a container
-        - In the config the prefetch also takes 0 for auto as before
-        - ```worker_poll_interval``` reaches the workers by the env
-            ```dramatiq_worker_timeout```, which dramatiq reads on import.
-            Without the config value an env set from outside applies, so it
-            is checked here; a non number fails earlier, when dramatiq
-            gets imported
+        - Each worker switch replaces its config value
         - With --watch, the command monitors the given directory for changes
             and reloads actors when files change
-        - In debug mode of the app dramatiq logs on debug level as well,
-            unless --skip-logging is given
-        - With --queues the instance still declares all queues of the
-            actors but consumes only the given ones, their delay queues
-            included. A wrong name raises no error, the instance then
-            consumes nothing of it; a queue no instance consumes stays
-            unprocessed
+        - In debug mode dramatiq logs on debug level, unless --skip-logging
 
         - Worker processes log to the console; the call blocks until they
             terminate (signal, error or shutdown via the management hooks)
 
         - At service start the diskcache locks are purged best-effort: a
             previous worker generation may have left stale acquires behind
-            that would block actors after restart. A restart by --watch
-            starts the service again and purges as well
-        - With --no-purge the locks are kept, e.g. when further instances
-            run on the same diskcache and still hold their locks
+            that would block actors after restart
 
-        - The worker processes start by forkserver on all python versions,
-            so they never inherit the state of this process. Where
-            forkserver is not available (e.g. Windows) spawn is used
-        - With ```use_spawn``` or --use-spawn each worker process starts a
-            fresh interpreter instead; --use-forkserver returns to
-            forkserver when the config sets ```use_spawn```. The last of
-            both switches wins
+        - The worker processes start by forkserver, or by spawn if set or
+            if forkserver is not available
 
         """
         self.app.log.info('Spin up the dramatiq service workers')
-        # resolve the worker options first, so an invalid config value
-        # fails before sys.argv gets changed
+        # check all values before sys.argv gets changed
         processes = self._worker_option('processes', 'worker_processes', allow_auto=True)
         threads = self._worker_option('threads', 'worker_threads')
         shutdown_timeout = self._worker_option('worker_shutdown_timeout', 'worker_shutdown_timeout')
@@ -318,8 +285,7 @@ class TokeoDramatiqController(Controller):
         # caller's argv afterwards so internal dramatiq restarts (which
         # re-exec the python process) see the original command line
         sys.argv = [sys.argv[0]]
-        # append some worker settings; without --processes dramatiq takes
-        # its default, the cpus of the host
+        # append some worker settings, without --processes dramatiq takes the cpus
         if processes != 'auto':
             sys.argv.extend(
                 ['--processes', str(processes)],
@@ -331,21 +297,17 @@ class TokeoDramatiqController(Controller):
             ['--worker-shutdown-timeout', str(shutdown_timeout)],
         )
         # restart_delay and prefetch are env-only on dramatiq's side, no
-        # cli flags exist, so pass them via the environment; there 0 means
-        # to follow the threads
+        # cli flags exist, so pass them via the environment
         restart_delay = int(self.app.dramatiq.config('restart_delay'))
         queue_prefetch = 0 if queue_prefetch == 'auto' else queue_prefetch
         delay_queue_prefetch = 0 if delay_queue_prefetch == 'auto' else delay_queue_prefetch
         os.environ['dramatiq_restart_delay'] = str(restart_delay)
         os.environ['dramatiq_queue_prefetch'] = str(queue_prefetch)
         os.environ['dramatiq_delay_queue_prefetch'] = str(delay_queue_prefetch)
-        # the worker binds this env as default argument on import, so only
-        # the env reaches the freshly started workers, no constant does
+        # only the env reaches the workers, they bind the value on import
         if worker_poll_interval is not None:
             os.environ['dramatiq_worker_timeout'] = str(worker_poll_interval)
-        # dramatiq.worker reads the env only once on import into constants;
-        # forked workers (default start method before python 3.14) inherit
-        # them, so the already imported constants are updated as well
+        # dramatiq.worker read the env on import, update its constants too
         dramatiq_worker.CONSUMER_RESTART_DELAY = restart_delay
         dramatiq_worker.CONSUMER_RESTART_DELAY_SECS = restart_delay / 1000
         dramatiq_worker.QUEUE_PREFETCH = queue_prefetch
@@ -374,8 +336,7 @@ class TokeoDramatiqController(Controller):
                 self.app.dramatiq.config('actors'),
             ],
         )
-        # --queues takes any number of values in dramatiq, so it must come
-        # after the broker and actors it would swallow otherwise
+        # --queues takes any number of values, so it follows broker and actors
         if self.app.pargs.queues:
             sys.argv.extend(
                 ['--queues', *self.app.pargs.queues],
@@ -386,16 +347,13 @@ class TokeoDramatiqController(Controller):
         # restart, those processes pick the current sys.argv up again
         sys.argv = [sys.argv[0]] + self.app.argv
         # clear stale locks from a previously crashed worker generation;
-        # best-effort since the diskcache extension may not be loaded; the
-        # restored argv keeps --no-purge for the restarts by --watch too
+        # best-effort since the diskcache extension may not be loaded
         if not self.app.pargs.no_purge:
             try:
                 self.app.dramatiq.locks.purge()
             except Exception:
                 pass
-        # tokeo sets the start method itself, python before 3.14 would fork
-        # the workers with the state of this process; --use-spawn is never
-        # handed to dramatiq, its set_start_method without force would fail
+        # set the start method here, dramatiq would fail on it without force
         start_method = 'spawn' if use_spawn else 'forkserver'
         if start_method not in multiprocessing.get_all_start_methods():
             self.app.log.debug(f'dramatiq start method {start_method} is not available, use spawn')
