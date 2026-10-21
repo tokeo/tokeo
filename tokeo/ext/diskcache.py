@@ -1489,9 +1489,9 @@ def tokeo_diskcache_pdoc_render_decorator(app, func, decorator, args, kwargs):
         if kwargs is not None:
             try:
                 if 'name' in kwargs:
-                    params = f'name="{kwargs['name'].value}"'
+                    params = f'name="{kwargs["name"].value}"'
                 elif 'name_f' in kwargs:
-                    params = f'name_f="{kwargs['name_f'].value}"'
+                    params = f'name_f="{kwargs["name_f"].value}"'
                 else:
                     params = f'name="{func.name}"'
 
@@ -1513,9 +1513,9 @@ def tokeo_diskcache_pdoc_render_decorator(app, func, decorator, args, kwargs):
         if kwargs is not None:
             try:
                 if 'name' in kwargs:
-                    params = f'name="{kwargs['name'].value}"'
+                    params = f'name="{kwargs["name"].value}"'
                 elif 'name_f' in kwargs:
-                    params = f'name_f="{kwargs['name_f'].value}"'
+                    params = f'name_f="{kwargs["name_f"].value}"'
                 else:
                     params = f'name="{func.name}"'
 
