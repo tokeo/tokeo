@@ -57,6 +57,7 @@ from cement import ex
 import dramatiq
 from dramatiq import middleware, cli, actor as dramatiq_actor
 from dramatiq import worker as dramatiq_worker
+from dramatiq.asyncio import EventLoopThread, set_event_loop_thread
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 import pika
 from tokeo.core.exc import TokeoError
@@ -75,6 +76,34 @@ class TokeoDramatiqError(TokeoError):
     """
 
     pass
+
+
+class TokeoAsyncIO(middleware.AsyncIO):
+    """
+    AsyncIO middleware whose event loop thread does not block the exit.
+
+    A worker process that gets a second SIGTERM ends by ```sys.exit()```
+    without ```after_worker_shutdown```, so the event loop thread of the
+    standard middleware keeps running and the process hangs forever. This
+    happens whenever SIGTERM reaches the whole process group, e.g. by systemd
+    with the default ```KillMode=control-group```.
+
+    ### Notes
+
+    : The normal shutdown is unchanged, ```after_worker_shutdown``` still
+        stops and joins the thread
+
+    : Remove this class once dramatiq starts the thread as daemon itself
+
+    """
+
+    def before_worker_boot(self, broker, worker):
+        """Start the event loop thread as daemon for the worker."""
+        event_loop_thread = EventLoopThread(self.logger)
+        # a daemon thread lets a killed worker process end
+        event_loop_thread.daemon = True
+        event_loop_thread.start(timeout=1.0)
+        set_event_loop_thread(event_loop_thread)
 
 
 class ExtendedRabbitmqBroker(RabbitmqBroker):
@@ -333,7 +362,8 @@ class TokeoDramatiq(MetaMixin):
 
         : Configures a standard set of middleware components including AgeLimit,
             TimeLimit, ShutdownNotifications, Callbacks, Pipelines, Retries,
-            CurrentMessage and AsyncIO (required to run ```async def``` actors)
+            CurrentMessage and TokeoAsyncIO (required to run ```async def```
+            actors)
 
         : Creates an ExtendedRabbitmqBroker instance with the configured URL
             and registers it as the global Dramatiq broker
@@ -351,7 +381,7 @@ class TokeoDramatiq(MetaMixin):
                 middleware.Pipelines,
                 middleware.Retries,
                 middleware.CurrentMessage,
-                middleware.AsyncIO,
+                TokeoAsyncIO,
             ]
         ]
         # create the broker to RabbitMQ based on config; configured

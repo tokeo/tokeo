@@ -13,7 +13,8 @@ from cement.utils.misc import init_defaults
 from dramatiq import cli as dramatiq_cli
 from dramatiq import worker as dramatiq_worker
 from tokeo.main import TokeoTest
-from tokeo.ext.dramatiq import TokeoDramatiqError
+from dramatiq.asyncio import get_event_loop_thread
+from tokeo.ext.dramatiq import TokeoDramatiqError, TokeoAsyncIO
 
 
 class DramatiqTest(TokeoTest):
@@ -247,3 +248,29 @@ def test_serve_invalid_use_spawn_config(serve, value):
     with pytest.raises(TokeoDramatiqError, match='Invalid dramatiq config use_spawn'):
         serve(config=dict(use_spawn=value))
     assert sys.argv == ['tokeo']
+
+
+# --- asyncio middleware --------------------------------------------------------
+
+
+def test_asyncio_event_loop_thread_is_daemon():
+    asyncio_middleware = TokeoAsyncIO()
+    asyncio_middleware.before_worker_boot(None, None)
+    try:
+        thread = get_event_loop_thread()
+        # a killed worker process must not wait for the loop thread
+        assert thread.daemon is True
+        assert thread.is_alive()
+    finally:
+        asyncio_middleware.after_worker_shutdown(None, None)
+    # the normal shutdown still stops and joins the thread
+    assert get_event_loop_thread() is None
+    assert not thread.is_alive()
+
+
+def test_register_uses_tokeo_asyncio(tmp):
+    import dramatiq
+
+    with dramatiq_app(tmp, []):
+        kinds = [type(m) for m in dramatiq.get_broker().middleware]
+    assert TokeoAsyncIO in kinds
