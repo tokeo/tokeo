@@ -97,7 +97,7 @@ async def _converse(events, settings, commands):
     server, port, task = await _serve(events, settings)
     try:
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        banner = await _reply(reader)
+        greeting = await _reply(reader)
         replies = []
         for cmd in commands:
             writer.write(cmd)
@@ -105,7 +105,7 @@ async def _converse(events, settings, commands):
             replies.append(await _reply(reader))
         writer.close()
         await asyncio.sleep(0.02)
-        return banner, replies
+        return greeting, replies
     finally:
         await _stop(server, task)
 
@@ -120,7 +120,7 @@ def dialog(events, settings, commands):
 
 def test_full_delivery_and_events():
     ev = RecordingEvents()
-    banner, r = dialog(
+    greeting, r = dialog(
         ev,
         {},
         [
@@ -132,7 +132,7 @@ def test_full_delivery_and_events():
             b'QUIT\r\n',
         ],
     )
-    assert banner[0].startswith('220')
+    assert greeting[0].startswith('220')
     assert r[0][0].startswith('250-') and r[0][-1] == '250 OK'
     assert r[1] == ['250 OK'] and r[2] == ['250 OK']
     assert r[3][0].startswith('354')
@@ -513,7 +513,7 @@ def test_on_connect_fires_even_when_refused():
 
 
 def test_max_processings_waits_for_free_slot():
-    # a new client waits (before its 220 banner) until processings drops
+    # a new client waits (before its 220 greeting) until processings drops
     # below max_processings; with a single slot the second client is blocked
     async def go():
         server, port, task = await _serve(RecordingEvents(), {'max_processings': 1})
@@ -797,7 +797,7 @@ def test_stop_stops_accepting_new_connections():
     async def go():
         srv, port = await _start_server(RecordingEvents(), {})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        banner = await _reply(reader)
+        greeting = await _reply(reader)
         writer.close()
         await srv.stop(wait_seconds_before_close=0.2)
         refused = False
@@ -805,10 +805,10 @@ def test_stop_stops_accepting_new_connections():
             await asyncio.open_connection('127.0.0.1', port)
         except OSError:
             refused = True
-        return banner, refused, srv.stopped()
+        return greeting, refused, srv.stopped()
 
-    banner, refused, stopped = asyncio.run(go())
-    assert banner[0].startswith('220')
+    greeting, refused, stopped = asyncio.run(go())
+    assert greeting[0].startswith('220')
     assert refused is True
     assert stopped is True
 

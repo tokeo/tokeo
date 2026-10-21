@@ -32,9 +32,9 @@ def test_010_tcp_1_connect():
         srv, port = await _serve()
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            banner = await _welcome(reader)
+            greeting = await _welcome(reader)
             writer.close()
-            return banner
+            return greeting
         finally:
             await srv.stop(wait_seconds_before_close=0.2)
 

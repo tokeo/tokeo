@@ -29,7 +29,7 @@ def _plain(authzid, authcid, password):
 
 
 def _ehlo_auth_and_authcmd(settings):
-    banner, r = dialog(
+    greeting, r = dialog(
         AuthEvents(),
         settings,
         [
