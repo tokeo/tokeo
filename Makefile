@@ -75,7 +75,7 @@ doc:
 ifdef verbose
 verbosity=${verbose}
 else
-verbosity=v
+verbosity=vrfEs
 endif
 
 # check for log-level and enable print statement outputs on debug
