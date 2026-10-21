@@ -49,6 +49,7 @@ def call_external_api(resource_id):
 
 import os
 import sys
+import argparse
 from os.path import basename, dirname, abspath
 from cement.core.meta import MetaMixin
 from cement import ex
@@ -60,6 +61,7 @@ import pika
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.url import overload_with_auth as url_overload_with_auth
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
+from tokeo.core.utils.base import as_int_or_auto
 from tokeo.ext.argparse import Controller
 
 
@@ -223,16 +225,19 @@ class TokeoDramatiq(MetaMixin):
             actors='actors.module',
             # Number of worker threads per process
             worker_threads=1,
-            # Number of worker processes to run
+            # Number of worker processes to run; auto follows the dramatiq
+            # defaults and counts the cpus of the host
             worker_processes=2,
             # Worker shutdown timeout in milliseconds
             worker_shutdown_timeout=600_000,
             # Delay between worker restarts in milliseconds
             restart_delay=3_000,
-            # Number of messages to prefetch from queues
-            queue_prefetch=0,
-            # Number of messages to prefetch from delay queues
-            delay_queue_prefetch=0,
+            # Number of messages to prefetch from queues; auto (or 0) follows
+            # the dramatiq defaults
+            queue_prefetch='auto',
+            # Number of messages to prefetch from delay queues; auto (or 0)
+            # follows the dramatiq defaults
+            delay_queue_prefetch='auto',
             # Broker type (currently only rabbitmq supported)
             broker='rabbitmq',
             # RabbitMQ connection settings
@@ -419,6 +424,61 @@ class TokeoDramatiq(MetaMixin):
             raise TokeoDramatiqError('Enable tokeo diskcache extension to allow locks')
 
 
+def _worker_value(value, min_value=1, allow_auto=False):
+    """
+    Check a worker option value from config or command line.
+
+    ### Args
+
+    - **value** (int|str): The value to check
+    - **min_value** (int, optional): The lowest allowed number. Defaults to 1
+    - **allow_auto** (bool, optional): Whether ```'auto'``` is allowed.
+        Defaults to False
+
+    ### Returns
+
+    - **int|str**: The number as int, or ```'auto'```
+
+    ### Raises
+
+    - **ValueError**: If the value is not allowed
+
+    """
+    try:
+        result = as_int_or_auto(value, min_value)
+    except ValueError:
+        result = None
+    if result is None or (result == 'auto' and not allow_auto):
+        expected = f'"auto" or an integer >= {min_value}' if allow_auto else f'an integer >= {min_value}'
+        raise ValueError(f'Value {value!r} must be {expected}!')
+    return result
+
+
+def _worker_argtype(allow_auto=False):
+    """
+    Build an argparse type for a worker option of the serve command.
+
+    ### Args
+
+    - **allow_auto** (bool, optional): Whether ```'auto'``` is allowed.
+        Defaults to False
+
+    ### Returns
+
+    - **callable**: The type function, raising ```ArgumentTypeError```
+
+    """
+
+    def argtype(value):
+        try:
+            return _worker_value(value, allow_auto=allow_auto)
+        except ValueError as e:
+            # argparse shows the message of this error instead of a generic one
+            raise argparse.ArgumentTypeError(str(e)) from None
+
+    return argtype
+
+
 class TokeoDramatiqController(Controller):
     """
     Cement controller that drives Dramatiq workers and locks via CLI.
@@ -443,6 +503,39 @@ class TokeoDramatiqController(Controller):
     def _setup(self, app):
         """Cement controller setup hook; delegates to the parent."""
         super(TokeoDramatiqController, self)._setup(app)
+
+    def _worker_option(self, option, key, allow_auto=False, config_min_value=1):
+        """
+        Get a worker option from the command line or else from the config.
+
+        ### Args
+
+        - **option** (str): The name of the parsed command line option
+        - **key** (str): The config key of the option
+        - **allow_auto** (bool, optional): Whether ```'auto'``` is allowed.
+            Defaults to False
+        - **config_min_value** (int, optional): The lowest number allowed
+            in the config. Defaults to 1
+
+        ### Returns
+
+        - **int|str**: The number as int, or ```'auto'```
+
+        ### Raises
+
+        - **TokeoDramatiqError**: If the config value is not allowed
+
+        """
+        # a given switch replaces the config value, argparse checked it already
+        value = getattr(self.app.pargs, option)
+        if value is not None:
+            return value
+        try:
+            value = _worker_value(self.app.dramatiq.config(key), config_min_value, allow_auto)
+        except ValueError as e:
+            raise TokeoDramatiqError(f'Invalid dramatiq config {key}: {e}') from None
+        # 0 stays valid in the config for prefetch and means auto as before
+        return 'auto' if value == 0 else value
 
     # --------------------------------------------------------------------------------------
 
@@ -519,6 +612,46 @@ class TokeoDramatiqController(Controller):
                     help='keep the dramatiq locks on start and on restarts by --watch',
                 ),
             ),
+            (
+                ['-p', '--processes'],
+                dict(
+                    type=_worker_argtype(allow_auto=True),
+                    metavar='N|auto',
+                    help='number of worker processes, auto follows the dramatiq defaults',
+                ),
+            ),
+            (
+                ['-t', '--threads'],
+                dict(
+                    type=_worker_argtype(),
+                    metavar='N',
+                    help='number of worker threads per process',
+                ),
+            ),
+            (
+                ['--queue-prefetch'],
+                dict(
+                    type=_worker_argtype(allow_auto=True),
+                    metavar='N|auto',
+                    help='messages to prefetch per queue, auto follows the dramatiq defaults',
+                ),
+            ),
+            (
+                ['--delay-queue-prefetch'],
+                dict(
+                    type=_worker_argtype(allow_auto=True),
+                    metavar='N|auto',
+                    help='messages to prefetch per delay queue, auto follows the dramatiq defaults',
+                ),
+            ),
+            (
+                ['--worker-shutdown-timeout'],
+                dict(
+                    type=_worker_argtype(),
+                    metavar='MS',
+                    help='milliseconds to wait for workers on shutdown',
+                ),
+            ),
         ],
     )
     def serve(self):
@@ -535,11 +668,31 @@ class TokeoDramatiqController(Controller):
         - **--watch** (str): Path to watch for file changes to reload actors
         - **--no-purge** (flag): Keep the diskcache locks on start and on
             restarts by --watch
+        - **-p, --processes** (int|auto): Number of worker processes
+        - **-t, --threads** (int): Number of worker threads per process
+        - **--queue-prefetch** (int|auto): Messages to prefetch per queue
+        - **--delay-queue-prefetch** (int|auto): Messages to prefetch per
+            delay queue
+        - **--worker-shutdown-timeout** (int): Milliseconds to wait for the
+            workers on shutdown
+
+        ### Raises
+
+        - **TokeoDramatiqError**: If a worker option in the config is not
+            allowed
 
         ### Notes
 
         - Worker configuration includes process count, thread count, shutdown
             timeout, restart delay, and queue prefetch settings
+        - Each worker switch replaces its config value (```worker_processes```,
+            ```worker_threads```, ```queue_prefetch```, ```delay_queue_prefetch```,
+            ```worker_shutdown_timeout```); without the switch the config
+            value applies
+        - With auto the dramatiq defaults apply: the cpus of the host for the
+            processes, threads x 2 and threads x 1000 for the prefetch. The
+            cpus of the host ignore a cpu limit of a container
+        - In the config the prefetch also takes 0 for auto as before
         - With --watch, the command monitors the given directory for changes
             and reloads actors when files change
 
@@ -555,27 +708,37 @@ class TokeoDramatiqController(Controller):
 
         """
         self.app.log.info('Spin up the dramatiq service workers')
+        # resolve the worker options first, so an invalid config value
+        # fails before sys.argv gets changed
+        processes = self._worker_option('processes', 'worker_processes', allow_auto=True)
+        threads = self._worker_option('threads', 'worker_threads')
+        shutdown_timeout = self._worker_option('worker_shutdown_timeout', 'worker_shutdown_timeout')
+        queue_prefetch = self._worker_option('queue_prefetch', 'queue_prefetch', allow_auto=True, config_min_value=0)
+        delay_queue_prefetch = self._worker_option('delay_queue_prefetch', 'delay_queue_prefetch', allow_auto=True, config_min_value=0)
         # build a synthetic sys.argv that dramatiq's own argparser will
         # consume: cli.make_argument_parser().parse_args() reads from
         # sys.argv directly, so we override it here, then restore the
         # caller's argv afterwards so internal dramatiq restarts (which
         # re-exec the python process) see the original command line
         sys.argv = [sys.argv[0]]
-        # append some worker settings
+        # append some worker settings; without --processes dramatiq takes
+        # its default, the cpus of the host
+        if processes != 'auto':
+            sys.argv.extend(
+                ['--processes', str(processes)],
+            )
         sys.argv.extend(
-            ['--processes', str(self.app.dramatiq.config('worker_processes'))],
+            ['--threads', str(threads)],
         )
         sys.argv.extend(
-            ['--threads', str(self.app.dramatiq.config('worker_threads'))],
-        )
-        sys.argv.extend(
-            ['--worker-shutdown-timeout', str(self.app.dramatiq.config('worker_shutdown_timeout'))],
+            ['--worker-shutdown-timeout', str(shutdown_timeout)],
         )
         # restart_delay and prefetch are env-only on dramatiq's side, no
-        # cli flags exist, so pass them via the environment
+        # cli flags exist, so pass them via the environment; there 0 means
+        # to follow the threads
         restart_delay = int(self.app.dramatiq.config('restart_delay'))
-        queue_prefetch = int(self.app.dramatiq.config('queue_prefetch'))
-        delay_queue_prefetch = int(self.app.dramatiq.config('delay_queue_prefetch'))
+        queue_prefetch = 0 if queue_prefetch == 'auto' else queue_prefetch
+        delay_queue_prefetch = 0 if delay_queue_prefetch == 'auto' else delay_queue_prefetch
         os.environ['dramatiq_restart_delay'] = str(restart_delay)
         os.environ['dramatiq_queue_prefetch'] = str(queue_prefetch)
         os.environ['dramatiq_delay_queue_prefetch'] = str(delay_queue_prefetch)
