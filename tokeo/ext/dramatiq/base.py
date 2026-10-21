@@ -290,6 +290,10 @@ class TokeoDramatiq(MetaMixin):
         self.actor = dramatiq_actor
         # dramatiq register
         self.register()
+        # imported here, the queues module builds on this one
+        from tokeo.ext.dramatiq.queues import TokeoDramatiqQueues
+
+        self.queues = TokeoDramatiqQueues(self)
 
     def _config(self, key, **kwargs):
         """
@@ -391,6 +395,7 @@ class TokeoDramatiq(MetaMixin):
             middleware=use_middleware,
         )
         # globally set the broker on dramatiq
+        self.broker = rabbitmq_broker
         dramatiq.set_broker(rabbitmq_broker)
         self.app.log.debug('ExtendedRabbitmqBroker is registered as dramatiq broker')
 
@@ -408,6 +413,8 @@ class TokeoDramatiq(MetaMixin):
 
         """
         self.app.log.debug('Closing dramatiq registered broker ...')
+        if getattr(self, 'queues', None) is not None:
+            self.queues.close()
         # get the current registered broker
         broker = dramatiq.get_broker()
         # check that is equal to the registered one

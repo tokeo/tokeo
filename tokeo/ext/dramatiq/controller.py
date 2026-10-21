@@ -3,7 +3,7 @@ Tokeo Dramatiq extension controller.
 
 The ```dramatiq``` commands of the app: ```serve``` starts the worker
 processes from the config and its switches, ```locks``` shows or purges the
-diskcache locks of the actors.
+diskcache locks of the actors, ```queues``` shows and maintains the queues.
 
 """
 
@@ -12,6 +12,7 @@ import sys
 import multiprocessing
 from os.path import basename, dirname, abspath
 from cement import ex
+from tokeo.core.utils.json import json_dump
 from dramatiq import cli
 from tokeo.ext.argparse import Controller
 from tokeo.ext.dramatiq.base import TokeoDramatiqError, _number
@@ -111,6 +112,75 @@ class TokeoDramatiqController(Controller):
         else:
             # show the locks info
             self.app.print(f'Dramatiq locks using the cache tag: {self.app.dramatiq.locks._tag}')
+
+    # --------------------------------------------------------------------------------------
+
+    @ex(
+        help='show and maintain the dramatiq queues',
+        description='Show the state of the dramatiq queues of the app and maintain them.',
+        epilog=f'Use "{basename(sys.argv[0])} dramatiq queues" to show the state of all queues of the app.',
+        arguments=[
+            (['names'], dict(nargs='*', metavar='QUEUE', help='queues to handle, all queues of the app without')),
+            (['--json'], dict(action='store_true', help='print the result as json')),
+            (['--dead'], dict(nargs='?', const='10', metavar='N', help='show the first N dead letters (default 10)')),
+            (['--purge'], dict(action='store_true', help='remove the messages and keep the queues')),
+            (['--dead-only'], dict(action='store_true', help='purge only the dead letters')),
+            (['--delete'], dict(action='store_true', help='delete the queues')),
+            (['--recreate'], dict(action='store_true', help='delete the queues and declare them again')),
+            (['--requeue-dead'], dict(action='store_true', help='move the dead letters back into their queue')),
+            (['--limit'], dict(metavar='N', help='dead letters to move by --requeue-dead, all without')),
+            (['--yes'], dict(action='store_true', help='confirm a change of queues or messages')),
+            (['--force'], dict(action='store_true', help='delete or recreate also queues with messages or consumers')),
+        ],
+    )
+    def queues(self):
+        """
+        Show the state of the dramatiq queues and maintain them.
+
+        ### Raises
+
+        - **TokeoDramatiqError**: If the switches do not fit together, a
+            change misses --yes, or a queue refuses the change
+
+        ### Notes
+
+        - Without queue names all queues of the actors of the app are used
+        - A change of queues or messages needs --yes
+
+        """
+        pargs = self.app.pargs
+        queues = self.app.dramatiq.queues
+        names = pargs.names or None
+        actions = [action for action in ('purge', 'delete', 'recreate', 'requeue_dead') if getattr(pargs, action)]
+        if len(actions) > 1:
+            raise TokeoDramatiqError(f'Use only one of {", ".join(_switch(a) for a in actions)}!')
+        if pargs.dead_only and actions != ['purge']:
+            raise TokeoDramatiqError('Use --dead-only together with --purge!')
+        if actions and not pargs.yes:
+            raise TokeoDramatiqError(f'{_switch(actions[0])} changes queues or messages, confirm it by --yes!')
+        if (pargs.requeue_dead or pargs.dead is not None) and not names:
+            raise TokeoDramatiqError('Name the queues for --dead or --requeue-dead!')
+        if actions == ['purge']:
+            result = queues.purge(names, dead_only=pargs.dead_only)
+            lines = [f'{r["name"]}: purged {r["purged"]} messages' for r in result]
+        elif actions == ['delete']:
+            result = queues.delete(names, force=pargs.force)
+            lines = [f'{r["name"]}: {"deleted" if r["deleted"] else "not found"}' for r in result]
+        elif actions == ['recreate']:
+            result = queues.recreate(names, force=pargs.force)
+            lines = [f'{r["name"]}: recreated with {r["arguments"]}' for r in result]
+        elif actions == ['requeue_dead']:
+            limit = _number('switch --limit', pargs.limit, allow_none=True)
+            result = [queues.requeue_dead(name, limit) for name in names]
+            lines = [f'{r["name"]}: requeued {r["requeued"]} dead letters' for r in result]
+        else:
+            result = queues.state(names)
+            if pargs.dead is not None:
+                limit = _number('switch --dead', pargs.dead)
+                for state in result:
+                    state['dead_letters'] = queues.peek_dead(state['name'], limit)
+            lines = _state_lines(result)
+        self.app.print(json_dump(result, indent=2) if pargs.json else '\n'.join(lines))
 
     # --------------------------------------------------------------------------------------
 
@@ -363,3 +433,38 @@ class TokeoDramatiqController(Controller):
             pass
         # signal result as exit code
         self.app.exit_code = result
+
+
+def _switch(action):
+    """Name the switch of a queues action."""
+    return '--' + action.replace('_', '-')
+
+
+def _state_lines(states):
+    """Format the state of queues as table, followed by their dead letters."""
+    rows = [('QUEUE', 'READY', 'DELAYED', 'DEAD', 'CONSUMERS', 'FLAGS')]
+    for state in states:
+        flags = [
+            flag
+            for flag, set_ in (
+                ('missing', not state['exists']),
+                ('unparalleled', state['unparalleled']),
+                ('no consumer', state['exists'] and not state['consumers']),
+                ('no actor', not state['actors']),
+            )
+            if set_
+        ]
+        counts = ['-' if state[key] is None else str(state[key]) for key in ('ready', 'delayed', 'dead', 'consumers')]
+        rows.append((state['name'], *counts, ', '.join(flags)))
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
+    lines = [
+        '  '.join(cell.ljust(width) if i in (0, 5) else cell.rjust(width) for i, (cell, width) in enumerate(zip(row, widths))).rstrip()
+        for row in rows
+    ]
+    for state in states:
+        if state.get('dead_letters'):
+            lines.append(f'\ndead letters of {state["name"]}:')
+            for letter in state['dead_letters']:
+                lines.append(f'  {letter["message_id"]}  {letter["actor"]}  retries={letter["retries"]}  {letter["error"] or ""}'.rstrip())
+                lines.append(f'    args: {letter["args"]}')
+    return lines
