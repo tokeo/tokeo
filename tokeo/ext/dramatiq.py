@@ -324,8 +324,8 @@ class TokeoDramatiq(MetaMixin):
         ### Notes
 
         : Configures a standard set of middleware components including AgeLimit,
-            TimeLimit, ShutdownNotifications, Callbacks, Pipelines, Retries, and
-            CurrentMessage
+            TimeLimit, ShutdownNotifications, Callbacks, Pipelines, Retries,
+            CurrentMessage and AsyncIO (required to run ```async def``` actors)
 
         : Creates an ExtendedRabbitmqBroker instance with the configured URL
             and registers it as the global Dramatiq broker
@@ -343,6 +343,7 @@ class TokeoDramatiq(MetaMixin):
                 middleware.Pipelines,
                 middleware.Retries,
                 middleware.CurrentMessage,
+                middleware.AsyncIO,
             ]
         ]
         # create the broker to RabbitMQ based on config; configured
