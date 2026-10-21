@@ -271,6 +271,23 @@ class TokeoDramatiq(MetaMixin):
             delay_queue_prefetch='auto',
             # Start the worker processes by spawn instead of forkserver
             use_spawn=False,
+            # Milliseconds an actor may run per message before it gets
+            # interrupted; dramatiq knows no unlimited run, a long job sets
+            # its own limit on the actor, e.g. time_limit=3_600_000
+            time_limit=600_000,
+            # Milliseconds after sending, a message gets skipped instead of
+            # processed; None processes messages of any age
+            max_age=None,
+            # Interrupt running actors by a Shutdown exception when the
+            # worker stops; single actors may opt in by notify_shutdown=True
+            notify_shutdown=False,
+            # Retries of a failed message before it goes to the dead letters
+            max_retries=20,
+            # Milliseconds of the first retry delay, it doubles per retry
+            min_backoff=15_000,
+            # Milliseconds of the longest retry delay, dramatiq caps it at
+            # 7 days
+            max_backoff=604_800_000,
             # Broker type (currently only rabbitmq supported)
             broker='rabbitmq',
             # RabbitMQ connection settings
@@ -404,27 +421,41 @@ class TokeoDramatiq(MetaMixin):
             set on the constant of dramatiq, because the module is imported
             before the config is read
 
+        : ```time_limit```, ```max_age```, ```notify_shutdown```,
+            ```max_retries```, ```min_backoff``` and ```max_backoff``` are the
+            defaults of the middleware for all actors. An actor or a single
+            message (```send_with_options```) still sets its own value, the
+            message first, then the actor, then the config
+
         ### Raises
 
         - **TokeoDramatiqError**: If ```confirm_delivery``` is not a bool,
-            ```max_priority``` not None or 1 to 255, or
-            ```dead_message_ttl``` not None or a positive integer
+            ```max_priority``` not None or 1 to 255,
+            ```dead_message_ttl``` not None or a positive integer, or a
+            middleware default not allowed
 
         """
         self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')
+        # defaults of the middleware for all actors from the config
+        time_limit = _config_number('time_limit', self._config('time_limit'), allow_none=False)
+        max_age = _config_number('max_age', self._config('max_age'))
+        notify_shutdown = self._config('notify_shutdown')
+        if not isinstance(notify_shutdown, bool):
+            raise TokeoDramatiqError(f'Invalid dramatiq config notify_shutdown: Value {notify_shutdown!r} must be true or false!')
+        max_retries = _config_number('max_retries', self._config('max_retries'), min_value=0, allow_none=False)
+        min_backoff = _config_number('min_backoff', self._config('min_backoff'), allow_none=False)
+        # dramatiq caps the retry delay at 7 days, a longer one has no effect
+        max_backoff = _config_number('max_backoff', self._config('max_backoff'), max_value=604_800_000, allow_none=False)
         # re-build set of middlewares to use
         use_middleware = [
-            m()
-            for m in [
-                middleware.AgeLimit,
-                middleware.TimeLimit,
-                middleware.ShutdownNotifications,
-                middleware.Callbacks,
-                middleware.Pipelines,
-                middleware.Retries,
-                middleware.CurrentMessage,
-                TokeoAsyncIO,
-            ]
+            middleware.AgeLimit(max_age=max_age),
+            middleware.TimeLimit(time_limit=time_limit),
+            middleware.ShutdownNotifications(notify_shutdown=notify_shutdown),
+            middleware.Callbacks(),
+            middleware.Pipelines(),
+            middleware.Retries(max_retries=max_retries, min_backoff=min_backoff, max_backoff=max_backoff),
+            middleware.CurrentMessage(),
+            TokeoAsyncIO(),
         ]
         # create the broker to RabbitMQ based on config; configured
         # credentials may override any userinfo carried by the url
@@ -512,9 +543,9 @@ class TokeoDramatiq(MetaMixin):
             raise TokeoDramatiqError('Enable tokeo diskcache extension to allow locks')
 
 
-def _config_number(key, value, min_value=1, max_value=None):
+def _config_number(key, value, min_value=1, max_value=None, allow_none=True):
     """
-    Check an optional number from the dramatiq config.
+    Check a number from the dramatiq config.
 
     ### Args
 
@@ -523,6 +554,8 @@ def _config_number(key, value, min_value=1, max_value=None):
     - **min_value** (int, optional): The lowest allowed number. Defaults to 1
     - **max_value** (int, optional): The highest allowed number. Defaults
         to no limit
+    - **allow_none** (bool, optional): Whether None (not set) is allowed.
+        Defaults to True
 
     ### Returns
 
@@ -530,19 +563,20 @@ def _config_number(key, value, min_value=1, max_value=None):
 
     ### Raises
 
-    - **TokeoDramatiqError**: If the value is neither None nor an allowed
-        number
+    - **TokeoDramatiqError**: If the value is not an allowed number, or
+        None while not allowed
 
     """
-    if value is None:
+    if value is None and allow_none:
         return None
     try:
-        number = _worker_value(value, min_value)
+        number = None if value is None else _worker_value(value, min_value)
     except ValueError:
         number = None
     if number is None or (max_value is not None and number > max_value):
         expected = f'{min_value} to {max_value}' if max_value is not None else f'an integer >= {min_value}'
-        raise TokeoDramatiqError(f'Invalid dramatiq config {key}: Value {value!r} must be null or {expected}!')
+        expected = f'null or {expected}' if allow_none else expected
+        raise TokeoDramatiqError(f'Invalid dramatiq config {key}: Value {value!r} must be {expected}!')
     return number
 
 

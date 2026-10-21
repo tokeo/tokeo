@@ -420,3 +420,73 @@ def test_register_invalid_queue_arguments(tmp, keep_dead_message_ttl, key, value
         with broker_app(tmp, {key: value}):
             pass
     assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == keep_dead_message_ttl
+
+
+# --- middleware defaults -------------------------------------------------------
+
+
+def middleware_app(tmp, **config):
+    d = init_defaults('diskcache', 'dramatiq')
+    d['diskcache']['directory'] = tmp.dir
+    d['dramatiq'].update(config)
+    return DramatiqTest(argv=[], config_defaults=d)
+
+
+def middleware_of(kind):
+    import dramatiq
+
+    return [m for m in dramatiq.get_broker().middleware if isinstance(m, kind)][0]
+
+
+def test_register_middleware_defaults(tmp):
+    from dramatiq import middleware
+
+    with middleware_app(tmp):
+        # the defaults are the ones of dramatiq, so nothing changes for apps
+        assert middleware_of(middleware.TimeLimit).time_limit == 600_000
+        assert middleware_of(middleware.AgeLimit).max_age is None
+        assert middleware_of(middleware.ShutdownNotifications).notify_shutdown is False
+        retries = middleware_of(middleware.Retries)
+        assert (retries.max_retries, retries.min_backoff, retries.max_backoff) == (20, 15_000, 604_800_000)
+
+
+def test_register_middleware_from_config(tmp):
+    from dramatiq import middleware
+
+    config = dict(time_limit=5000, max_age='60000', notify_shutdown=True, max_retries=0, min_backoff=200, max_backoff=1000)
+    with middleware_app(tmp, **config):
+        assert middleware_of(middleware.TimeLimit).time_limit == 5000
+        assert middleware_of(middleware.AgeLimit).max_age == 60000
+        assert middleware_of(middleware.ShutdownNotifications).notify_shutdown is True
+        retries = middleware_of(middleware.Retries)
+        assert (retries.max_retries, retries.min_backoff, retries.max_backoff) == (0, 200, 1000)
+
+
+def test_register_actor_options_stay_available(tmp):
+    import dramatiq
+
+    with middleware_app(tmp, time_limit=5000):
+        options = dramatiq.get_broker().actor_options
+    # actors and messages still override the defaults of the config
+    for name in ('time_limit', 'max_age', 'notify_shutdown', 'max_retries', 'min_backoff', 'max_backoff'):
+        assert name in options
+
+
+@pytest.mark.parametrize(
+    'key, value',
+    [
+        ('time_limit', None),
+        ('time_limit', 0),
+        ('time_limit', 'auto'),
+        ('max_age', 0),
+        ('notify_shutdown', 'yes'),
+        ('max_retries', -1),
+        ('max_retries', None),
+        ('min_backoff', 0),
+        ('max_backoff', 604_800_001),
+    ],
+)
+def test_register_invalid_middleware_defaults(tmp, key, value):
+    with pytest.raises(TokeoDramatiqError, match=f'Invalid dramatiq config {key}'):
+        with middleware_app(tmp, **{key: value}):
+            pass
