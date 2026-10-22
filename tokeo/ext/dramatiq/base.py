@@ -1,7 +1,7 @@
 """
 Tokeo Dramatiq extension base.
 
-Everything behind ```app.dramatiq```: the extension error, the asyncio
+Everything behind ```app.dramatiq```: the actor wrapper, the asyncio
 middleware, the RabbitMQ broker with single-active-consumer queues and the
 ```TokeoDramatiq``` object that reads the config, registers the broker with
 its middleware and gives access to the diskcache locks.
@@ -12,36 +12,15 @@ import os
 from cement.core.meta import MetaMixin
 import dramatiq
 from dramatiq import middleware, actor as dramatiq_actor
-from dramatiq.errors import BrokerConnectionError, ConnectionClosed
+from dramatiq.errors import BrokerConnectionError
 from dramatiq.asyncio import EventLoopThread, set_event_loop_thread
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
 import pika
-from tokeo.core.exc import TokeoError
 from tokeo.core.utils.url import overload_with_auth as url_overload_with_auth
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
 from tokeo.core.utils.base import as_int_or_auto
-
-
-class TokeoDramatiqError(TokeoError):
-    """
-    Exception class for Dramatiq-extension-related errors.
-
-    Used for errors specific to this extension.
-
-    """
-
-    pass
-
-
-class TokeoDramatiqConnectionError(TokeoDramatiqError, ConnectionClosed):
-    """
-    Raised when a message cannot be sent, rabbitmq is not reachable.
-
-    It is a ```ConnectionClosed``` of dramatiq as well, so code catching that
-    one keeps working.
-
-    """
+from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError, TokeoDramatiqConnectionError
 
 
 class TokeoActor(dramatiq.Actor):
@@ -58,9 +37,7 @@ class TokeoActor(dramatiq.Actor):
             return super().send_with_options(args=args, kwargs=kwargs, delay=delay, **options)
         except BrokerConnectionError as e:
             # another broker, e.g. the stub broker of tests, has no address
-            address = getattr(self.broker, 'address', None)
-            where = f'rabbitmq at {address}' if address else 'the broker'
-            raise TokeoDramatiqConnectionError(f'Cannot send {self.actor_name} to {where} ({type(e).__name__}: {e})!') from e
+            raise TokeoDramatiqConnectionError(getattr(self.broker, 'address', None), e, actor_name=self.actor_name) from e
 
 
 def tokeo_actor(fn=None, **options):
@@ -398,21 +375,21 @@ class TokeoDramatiq(MetaMixin):
 
         ### Raises
 
-        - **TokeoDramatiqError**: If a config value or a dramatiq env is not
-            allowed
+        - **TokeoDramatiqConfigError**: If a config value or a dramatiq env is
+            not allowed
 
         """
         self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')
         # defaults of the middleware for all actors from the config
-        time_limit = _number('dramatiq config time_limit', self._config('time_limit'))
-        max_age = _number('dramatiq config max_age', self._config('max_age'), allow_none=True)
+        time_limit = _number('config', 'time_limit', self._config('time_limit'))
+        max_age = _number('config', 'max_age', self._config('max_age'), allow_none=True)
         notify_shutdown = self._config('notify_shutdown')
         if not isinstance(notify_shutdown, bool):
-            raise TokeoDramatiqError(f'Invalid dramatiq config notify_shutdown: Value {notify_shutdown!r} must be true or false!')
-        max_retries = _number('dramatiq config max_retries', self._config('max_retries'), min_value=0)
-        min_backoff = _number('dramatiq config min_backoff', self._config('min_backoff'))
+            raise TokeoDramatiqConfigError('config', 'notify_shutdown', notify_shutdown, 'true or false')
+        max_retries = _number('config', 'max_retries', self._config('max_retries'), min_value=0)
+        min_backoff = _number('config', 'min_backoff', self._config('min_backoff'))
         # dramatiq caps the retry delay at 7 days, a longer one has no effect
-        max_backoff = _number('dramatiq config max_backoff', self._config('max_backoff'), max_value=604_800_000)
+        max_backoff = _number('config', 'max_backoff', self._config('max_backoff'), max_value=604_800_000)
         # re-build set of middlewares to use
         use_middleware = [
             middleware.AgeLimit(max_age=max_age),
@@ -429,18 +406,16 @@ class TokeoDramatiq(MetaMixin):
         # cement does not merge nested defaults, so complete the block here
         rabbitmq_config = {**self._meta.config_defaults['rabbitmq'], **self._config('rabbitmq')}
         if not isinstance(rabbitmq_config['confirm_delivery'], bool):
-            raise TokeoDramatiqError(
-                f'Invalid dramatiq config rabbitmq.confirm_delivery: Value {rabbitmq_config["confirm_delivery"]!r} must be true or false!'
-            )
-        max_priority = _number('dramatiq config rabbitmq.max_priority', rabbitmq_config['max_priority'], max_value=255, allow_none=True)
-        dead_message_ttl = _number('dramatiq config rabbitmq.dead_message_ttl', rabbitmq_config['dead_message_ttl'], allow_none=True)
+            raise TokeoDramatiqConfigError('config', 'rabbitmq.confirm_delivery', rabbitmq_config['confirm_delivery'], 'true or false')
+        max_priority = _number('config', 'rabbitmq.max_priority', rabbitmq_config['max_priority'], max_value=255, allow_none=True)
+        dead_message_ttl = _number('config', 'rabbitmq.dead_message_ttl', rabbitmq_config['dead_message_ttl'], allow_none=True)
         # dramatiq read the env on import already, so set its constant
         if dead_message_ttl is not None:
             dramatiq_rabbitmq.DEAD_MESSAGE_TTL = dead_message_ttl
         else:
             # dramatiq takes the env then; 0 would drop every dead letter
             if 'dramatiq_dead_message_ttl' in os.environ:
-                _number('env dramatiq_dead_message_ttl', os.environ['dramatiq_dead_message_ttl'])
+                _number('env', 'dramatiq_dead_message_ttl', os.environ['dramatiq_dead_message_ttl'])
         rabbitmq_broker = ExtendedRabbitmqBroker(
             url=rabbitmq_config['url'],
             auth_identity=rabbitmq_config['auth_identity'],
@@ -516,14 +491,15 @@ class TokeoDramatiq(MetaMixin):
             raise TokeoDramatiqError('Enable tokeo diskcache extension to allow locks')
 
 
-def _number(key, value, min_value=1, max_value=None, allow_none=False, allow_auto=False):
+def _number(source, name, value, min_value=1, max_value=None, allow_none=False, allow_auto=False):
     """
-    Check a number from the config, the env or a switch of the extension.
+    Check a number from the config, an env or a switch of the extension.
 
     ### Args
 
-    - **key** (str): What the value is, e.g. ```dramatiq config time_limit```,
-        used in the error message
+    - **source** (str): Where the value comes from, ```config```, ```env```
+        or ```switch```
+    - **name** (str): The key, env or switch of the value
     - **value** (int|str|None): The value to check
     - **min_value** (int, optional): The lowest allowed number. Defaults to 1
     - **max_value** (int, optional): The highest allowed number. Defaults
@@ -539,7 +515,7 @@ def _number(key, value, min_value=1, max_value=None, allow_none=False, allow_aut
 
     ### Raises
 
-    - **TokeoDramatiqError**: If the value is not allowed
+    - **TokeoDramatiqConfigError**: If the value is not allowed
 
     """
     if value is None and allow_none:
@@ -556,5 +532,5 @@ def _number(key, value, min_value=1, max_value=None, allow_none=False, allow_aut
         expected = f'{min_value} to {max_value}' if max_value is not None else f'an integer >= {min_value}'
         expected = f'"auto" or {expected}' if allow_auto else expected
         expected = f'null or {expected}' if allow_none else expected
-        raise TokeoDramatiqError(f'Invalid {key}: Value {value!r} must be {expected}!')
+        raise TokeoDramatiqConfigError(source, name, value, expected)
     return number

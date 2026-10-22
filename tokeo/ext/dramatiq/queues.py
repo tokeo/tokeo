@@ -16,7 +16,12 @@ import pika
 from dramatiq.common import dq_name, xq_name, q_name
 from dramatiq.message import Message
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
-from tokeo.ext.dramatiq.base import TokeoDramatiqError, TokeoDramatiqConnectionError
+from tokeo.ext.dramatiq.exc import (
+    TokeoDramatiqConfigError,
+    TokeoDramatiqConnectionError,
+    TokeoDramatiqRefusedError,
+    TokeoDramatiqQueueError,
+)
 
 #: Characters of the arguments shown by peek_dead
 ARGS_PREVIEW_LENGTH = 500
@@ -36,7 +41,7 @@ class TokeoDramatiqQueues:
         opened again on the next call
 
     : A failed connection raises ```TokeoDramatiqConnectionError```, a
-        request refused by rabbitmq ```TokeoDramatiqError```
+        request refused by rabbitmq ```TokeoDramatiqRefusedError```
 
     """
 
@@ -86,14 +91,11 @@ class TokeoDramatiqQueues:
             except pika.exceptions.AMQPConnectionError as e:
                 self._close()
                 if attempt:
-                    raise TokeoDramatiqConnectionError(
-                        f'Cannot connect to rabbitmq at {self._dramatiq.broker.address} ({type(e).__name__})!'
-                    ) from e
+                    raise TokeoDramatiqConnectionError(self._dramatiq.broker.address, e) from e
             except pika.exceptions.AMQPChannelError as e:
                 # rabbitmq closes the channel on a refused request
                 self._channel = None
-                address = self._dramatiq.broker.address
-                raise TokeoDramatiqError(f'Rabbitmq at {address} refused the request ({type(e).__name__}: {e})!') from e
+                raise TokeoDramatiqRefusedError(self._dramatiq.broker.address, e) from e
 
     def _declared(self, queue):
         # passive declare answers without creating a missing queue
@@ -115,7 +117,7 @@ class TokeoDramatiqQueues:
             try:
                 importlib.import_module(module)
             except ImportError as e:
-                raise TokeoDramatiqError(f'Cannot import the dramatiq actors {module!r}: {e}') from None
+                raise TokeoDramatiqConfigError('config', 'actors', module, f'an importable module ({e})') from None
         actors = {}
         for name in broker.get_declared_actors():
             actors.setdefault(broker.get_actor(name).queue_name, []).append(name)
@@ -242,7 +244,7 @@ class TokeoDramatiqQueues:
 
         ### Raises
 
-        - **TokeoDramatiqError**: If the queue is missing
+        - **TokeoDramatiqQueueError**: If the queue is missing
 
         ### Notes
 
@@ -255,7 +257,7 @@ class TokeoDramatiqQueues:
     def _requeue_dead(self, name, limit):
         self._cache.clear()
         if self._declared(name) is None:
-            raise TokeoDramatiqError(f'Queue {name} is missing, recreate it before the requeue!')
+            raise TokeoDramatiqQueueError(name, 'is missing, recreate it before the requeue')
         dead = self._declared(xq_name(name))
         # only the dead letters present now, not ones arriving meanwhile
         count = dead.message_count if dead else 0
@@ -334,7 +336,7 @@ class TokeoDramatiqQueues:
 
         ### Raises
 
-        - **TokeoDramatiqError**: If a queue has messages or consumers and
+        - **TokeoDramatiqQueueError**: If a queue has messages or consumers and
             force is not set
 
         """
@@ -346,7 +348,7 @@ class TokeoDramatiqQueues:
             for state in self._state(names, {}):
                 busy = [key for key in ('ready', 'delayed', 'dead', 'consumers') if state[key]]
                 if busy:
-                    raise TokeoDramatiqError(f'Queue {state["name"]} has {", ".join(busy)}, use force to delete it anyway!')
+                    raise TokeoDramatiqQueueError(state['name'], f'has {", ".join(busy)}, use force to delete it anyway')
         result = []
         for name in names:
             deleted = False
@@ -374,7 +376,7 @@ class TokeoDramatiqQueues:
 
         ### Raises
 
-        - **TokeoDramatiqError**: If a queue has no actor, or has messages or
+        - **TokeoDramatiqQueueError**: If a queue has no actor, or has messages or
             consumers and force is not set
 
         """
@@ -382,7 +384,7 @@ class TokeoDramatiqQueues:
         known = self.names()
         for name in names:
             if name not in known:
-                raise TokeoDramatiqError(f'Queue {name} has no actor, its arguments are unknown!')
+                raise TokeoDramatiqQueueError(name, 'has no actor, its arguments are unknown')
         return self._call(self._recreate, names, force)
 
     def _recreate(self, names, force):

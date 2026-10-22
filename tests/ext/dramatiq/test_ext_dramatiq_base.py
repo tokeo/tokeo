@@ -11,7 +11,7 @@ import pytest
 import dramatiq
 from dramatiq.asyncio import get_event_loop_thread
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
-from tokeo.ext.dramatiq import TokeoDramatiqError, TokeoAsyncIO
+from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoAsyncIO
 from tests.ext.test_ext_smtp import make_cert
 
 # --- asyncio middleware --------------------------------------------------------
@@ -76,7 +76,7 @@ def test_register_confirm_delivery_with_tls_parameters(tmp, broker_app):
 
 @pytest.mark.parametrize('value', ['yes', 1, None])
 def test_register_invalid_confirm_delivery(tmp, value, broker_app):
-    with pytest.raises(TokeoDramatiqError, match='Invalid dramatiq config rabbitmq.confirm_delivery'):
+    with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config rabbitmq.confirm_delivery'):
         with broker_app(tmp, dict(confirm_delivery=value)):
             pass
 
@@ -118,7 +118,7 @@ def test_register_queue_arguments_from_config(tmp, keep_dead_message_ttl, broker
     ],
 )
 def test_register_invalid_queue_arguments(tmp, keep_dead_message_ttl, key, value, broker_app):
-    with pytest.raises(TokeoDramatiqError, match=f'Invalid dramatiq config rabbitmq.{key}'):
+    with pytest.raises(TokeoDramatiqConfigError, match=f'Invalid dramatiq config rabbitmq.{key}'):
         with broker_app(tmp, {key: value}):
             pass
     assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == keep_dead_message_ttl
@@ -182,7 +182,7 @@ def test_register_actor_options_stay_available(tmp, middleware_app):
     ],
 )
 def test_register_invalid_middleware_defaults(tmp, key, value, middleware_app):
-    with pytest.raises(TokeoDramatiqError, match=f'Invalid dramatiq config {key}'):
+    with pytest.raises(TokeoDramatiqConfigError, match=f'Invalid dramatiq config {key}'):
         with middleware_app(tmp, **{key: value}):
             pass
 
@@ -200,7 +200,7 @@ def test_register_dead_message_ttl_valid_env(tmp, keep_dead_message_ttl, monkeyp
 @pytest.mark.parametrize('value', ['0', '-1', 'week'])
 def test_register_dead_message_ttl_invalid_env(tmp, keep_dead_message_ttl, monkeypatch, value, broker_app):
     monkeypatch.setenv('dramatiq_dead_message_ttl', value)
-    with pytest.raises(TokeoDramatiqError, match='Invalid env dramatiq_dead_message_ttl'):
+    with pytest.raises(TokeoDramatiqConfigError, match='Invalid env dramatiq_dead_message_ttl'):
         with broker_app(tmp, None):
             pass
 
@@ -259,6 +259,9 @@ def test_actor_send_without_rabbitmq(tmp, broker_app, monkeypatch):
     # main catches it as tokeo error, code catching dramatiq errors still does
     assert isinstance(e.value, TokeoError) and isinstance(e.value, ConnectionClosed)
     assert isinstance(e.value, BrokerConnectionError) and e.value.args[0] == str(e.value)
+    assert (e.value.address, e.value.actor_name) == ('mq.example:5673', 'count_words')
+    assert e.value.cause == 'ConnectionClosed: connection refused'
+    assert isinstance(e.value.__cause__, ConnectionClosed)
 
 
 def test_pdoc_hooks_restore_the_tokeo_actor(tmp, broker_app):

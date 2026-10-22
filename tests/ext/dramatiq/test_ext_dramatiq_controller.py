@@ -10,7 +10,7 @@ import sys
 
 import pytest
 from dramatiq import cli as dramatiq_cli
-from tokeo.ext.dramatiq import TokeoDramatiqError
+from tokeo.ext.dramatiq import TokeoDramatiqConfigError
 
 
 @pytest.fixture
@@ -163,7 +163,7 @@ def test_serve_auto_processes_in_config(serve):
 def test_serve_invalid_switches(serve, options):
     # switches are checked like the config, with the name of the switch
     switch = {'-p': '--processes', '-t': '--threads'}.get(options[0], options[0])
-    with pytest.raises(TokeoDramatiqError, match=f'Invalid switch {switch}: Value .* must be'):
+    with pytest.raises(TokeoDramatiqConfigError, match=f'Invalid switch {switch}: Value .* must be'):
         serve(*options)
     assert sys.argv == ['tokeo']
 
@@ -180,7 +180,7 @@ def test_serve_invalid_switches(serve, options):
     ],
 )
 def test_serve_invalid_config(serve, key, value):
-    with pytest.raises(TokeoDramatiqError, match=f'Invalid dramatiq config {key}'):
+    with pytest.raises(TokeoDramatiqConfigError, match=f'Invalid dramatiq config {key}'):
         serve(config={key: value})
     # the error comes before sys.argv is changed and dramatiq is called
     assert sys.argv == ['tokeo']
@@ -221,7 +221,7 @@ def test_serve_use_spawn(serve, options, config, method):
 
 @pytest.mark.parametrize('value', ['yes', 1, None])
 def test_serve_invalid_use_spawn_config(serve, value):
-    with pytest.raises(TokeoDramatiqError, match='Invalid dramatiq config use_spawn'):
+    with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config use_spawn'):
         serve(config=dict(use_spawn=value))
     assert sys.argv == ['tokeo']
 
@@ -297,12 +297,12 @@ def test_serve_poll_interval_valid_env(serve, monkeypatch):
 @pytest.mark.parametrize('value', ['0', '-5', '1s'])
 def test_serve_poll_interval_invalid_env(serve, monkeypatch, value):
     monkeypatch.setenv('dramatiq_worker_timeout', value)
-    with pytest.raises(TokeoDramatiqError, match='Invalid env dramatiq_worker_timeout'):
+    with pytest.raises(TokeoDramatiqConfigError, match='Invalid env dramatiq_worker_timeout'):
         serve()
     assert sys.argv == ['tokeo']
 
 
 @pytest.mark.parametrize('value', [0, 'fast', True])
 def test_serve_poll_interval_invalid_config(serve, value):
-    with pytest.raises(TokeoDramatiqError, match='Invalid dramatiq config worker_poll_interval'):
+    with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config worker_poll_interval'):
         serve(config=dict(worker_poll_interval=value))

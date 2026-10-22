@@ -49,9 +49,14 @@ def call_external_api(resource_id):
 
 import dramatiq
 from dramatiq import actor as dramatiq_actor
-from tokeo.ext.dramatiq.base import (  # noqa: F401
+from tokeo.ext.dramatiq.exc import (  # noqa: F401
     TokeoDramatiqError,
+    TokeoDramatiqConfigError,
     TokeoDramatiqConnectionError,
+    TokeoDramatiqRefusedError,
+    TokeoDramatiqQueueError,
+)
+from tokeo.ext.dramatiq.base import (  # noqa: F401
     TokeoActor,
     tokeo_actor,
     TokeoAsyncIO,

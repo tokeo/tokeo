@@ -15,7 +15,8 @@ from cement import ex
 from tokeo.core.utils.json import json_dump
 from dramatiq import cli
 from tokeo.ext.argparse import Controller
-from tokeo.ext.dramatiq.base import TokeoDramatiqError, _number
+from tokeo.ext.dramatiq.base import _number
+from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError
 
 
 class TokeoDramatiqController(Controller):
@@ -62,15 +63,15 @@ class TokeoDramatiqController(Controller):
 
         ### Raises
 
-        - **TokeoDramatiqError**: If the switch or the config value is not
-            allowed
+        - **TokeoDramatiqConfigError**: If the switch or the config value is
+            not allowed
 
         """
         # a given switch replaces the config value
         value = getattr(self.app.pargs, option)
         if value is not None:
-            return _number(f'switch --{option.replace("_", "-")}', value, allow_auto=allow_auto)
-        value = _number(f'dramatiq config {key}', self.app.dramatiq.config(key), min_value=config_min_value, allow_auto=allow_auto)
+            return _number('switch', f'--{option.replace("_", "-")}', value, allow_auto=allow_auto)
+        value = _number('config', key, self.app.dramatiq.config(key), min_value=config_min_value, allow_auto=allow_auto)
         # 0 stays valid in the config for prefetch and means auto as before
         return 'auto' if value == 0 else value
 
@@ -170,13 +171,13 @@ class TokeoDramatiqController(Controller):
             result = queues.recreate(names, force=pargs.force)
             lines = [f'{r["name"]}: recreated with {r["arguments"]}' for r in result]
         elif actions == ['requeue_dead']:
-            limit = _number('switch --limit', pargs.limit, allow_none=True)
+            limit = _number('switch', '--limit', pargs.limit, allow_none=True)
             result = [queues.requeue_dead(name, limit) for name in names]
             lines = [f'{r["name"]}: requeued {r["requeued"]} dead letters' for r in result]
         else:
             result = queues.state(names)
             if pargs.dead is not None:
-                limit = _number('switch --dead', pargs.dead)
+                limit = _number('switch', '--dead', pargs.dead)
                 for state in result:
                     state['dead_letters'] = queues.peek_dead(state['name'], limit)
             lines = _state_lines(result)
@@ -307,8 +308,8 @@ class TokeoDramatiqController(Controller):
 
         ### Raises
 
-        - **TokeoDramatiqError**: If a switch, a config value or a dramatiq env
-            is not allowed
+        - **TokeoDramatiqConfigError**: If a switch, a config value or a
+            dramatiq env is not allowed
 
         ### Notes
 
@@ -337,17 +338,15 @@ class TokeoDramatiqController(Controller):
         shutdown_timeout = self._worker_option('worker_shutdown_timeout', 'worker_shutdown_timeout')
         queue_prefetch = self._worker_option('queue_prefetch', 'queue_prefetch', allow_auto=True, config_min_value=0)
         delay_queue_prefetch = self._worker_option('delay_queue_prefetch', 'delay_queue_prefetch', allow_auto=True, config_min_value=0)
-        worker_poll_interval = _number(
-            'dramatiq config worker_poll_interval', self.app.dramatiq.config('worker_poll_interval'), allow_none=True
-        )
+        worker_poll_interval = _number('config', 'worker_poll_interval', self.app.dramatiq.config('worker_poll_interval'), allow_none=True)
         if worker_poll_interval is None and 'dramatiq_worker_timeout' in os.environ:
             # dramatiq takes the env then, check it before the workers start
-            _number('env dramatiq_worker_timeout', os.environ['dramatiq_worker_timeout'])
+            _number('env', 'dramatiq_worker_timeout', os.environ['dramatiq_worker_timeout'])
         use_spawn = self.app.pargs.use_spawn
         if use_spawn is None:
             use_spawn = self.app.dramatiq.config('use_spawn')
             if not isinstance(use_spawn, bool):
-                raise TokeoDramatiqError(f'Invalid dramatiq config use_spawn: Value {use_spawn!r} must be true or false!')
+                raise TokeoDramatiqConfigError('config', 'use_spawn', use_spawn, 'true or false')
         # build a synthetic sys.argv that dramatiq's own argparser will
         # consume: cli.make_argument_parser().parse_args() reads from
         # sys.argv directly, so we override it here, then restore the
