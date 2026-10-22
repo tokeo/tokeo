@@ -9,7 +9,7 @@ still exposed for API parity; the timing behaviour is therefore not applicable.
 """
 
 from tokeo.core.smtpd.server import SmtpdServer, DEFAULT_IO_WAITREADABLE_SLEEP
-from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
 
 def test_io_waitreadable_sleep_is_exposed():

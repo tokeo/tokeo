@@ -1,12 +1,14 @@
 """
 Shared test helpers for the smtpd core-lib tests.
 
-Contains the dialog-engine driver (```run_line```, which calls the async
-```process_line``` synchronously) and the integration helpers: read an RFC
-message from the data folder, generate certificates with ```cryptography```, and
-send mail with Python's ```smtplib``` (with optional STARTTLS and AUTH
-PLAIN/LOGIN), plus a runner that starts the async server, runs the blocking
-client(s) in a thread, and stops the server.
+Contains the events of the tests (```RecordingEvents```, ```AuthEvents```),
+the client dialog against a live server, the dialog-engine driver
+(```run_line```, which calls the async ```process_line``` synchronously) and
+the integration helpers: read an RFC message from the data folder, generate
+certificates with ```cryptography```, and send mail with Python's
+```smtplib``` (with optional STARTTLS and AUTH PLAIN/LOGIN), plus a runner
+that starts the async server, runs the blocking client(s) in a thread, and
+stops the server, and a delivery of raw wire bytes.
 """
 
 import os
@@ -22,6 +24,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from tokeo.core.smtpd.server import SmtpdServer
+from tokeo.core.smtpd.events import SmtpdEvents
+from tokeo.core.smtpd.exc import Smtpd550Exception
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 
@@ -232,3 +236,169 @@ def run_server_client(events, settings, client_fn, listeners=None, settle=0.15):
 
     """
     return asyncio.run(_run(events, settings, client_fn, listeners, settle))
+
+
+# --- events and dialog of the tests --------------------------------------------
+
+
+class RecordingEvents(SmtpdEvents):
+    """A handler that records fired events and delivered messages."""
+
+    def __init__(self, options=None):
+        super().__init__(options)
+        self.fired = []
+        self.messages = []
+        self.reject_rcpt = set()
+        self.rewrite_from = None
+
+    def on_connect_event(self, ctx):
+        self.fired.append('connect')
+
+    def on_disconnect_event(self, ctx):
+        self.fired.append('disconnect')
+
+    def on_helo_event(self, ctx, helo):
+        self.fired.append('helo')
+
+    def on_mail_from_event(self, ctx, mail_from):
+        self.fired.append('mail')
+        return self.rewrite_from
+
+    def on_rcpt_to_event(self, ctx, rcpt_to):
+        self.fired.append('rcpt')
+        if any(s in rcpt_to for s in self.reject_rcpt):
+            raise Smtpd550Exception
+
+    def on_message_data_start_event(self, ctx):
+        self.fired.append('start')
+
+    def on_message_data_headers_event(self, ctx):
+        self.fired.append('headers')
+
+    def on_message_data_receiving_event(self, ctx):
+        self.fired.append('recv')
+
+    def on_message_data_event(self, ctx):
+        self.messages.append((bytes(ctx.message.data), ctx.envelope.mail_from, list(ctx.envelope.rcpt_tos)))
+
+
+async def _reply(reader):
+    """Read a full (possibly multi-line) SMTP reply into a list of lines."""
+    lines = []
+    while True:
+        raw = await reader.readuntil(b'\n')
+        line = raw.decode('latin-1').rstrip('\r\n')
+        lines.append(line)
+        if len(line) < 4 or line[3] != '-':
+            break
+    return lines
+
+
+async def _serve(events, settings):
+    """Start a server on an ephemeral port; return (server, port, task)."""
+    srv = SmtpdServer(events, settings=settings)
+    limit = int(settings.get('io_buffer_max_size', 1 << 20))
+    server = await asyncio.start_server(srv._on_connection, '127.0.0.1', 0, limit=limit)
+    port = server.sockets[0].getsockname()[1]
+    task = asyncio.create_task(server.serve_forever())
+    return server, port, task
+
+
+async def _stop(server, task):
+    """Close a server and cancel its serve task."""
+    server.close()
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+async def _converse(events, settings, commands):
+    """Run one client dialog: send each command, read its reply."""
+    server, port, task = await _serve(events, settings)
+    try:
+        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        greeting = await _reply(reader)
+        replies = []
+        for cmd in commands:
+            writer.write(cmd)
+            await writer.drain()
+            replies.append(await _reply(reader))
+        writer.close()
+        await asyncio.sleep(0.02)
+        return greeting, replies
+    finally:
+        await _stop(server, task)
+
+
+def dialog(events, settings, commands):
+    """Synchronous wrapper around a client dialog for pytest."""
+    return asyncio.run(_converse(events, settings, commands))
+
+
+class AuthEvents(RecordingEvents):
+    """Accepts one fixed credential pair; optionally returns an authz id."""
+
+    def __init__(self, options=None):
+        super().__init__(options)
+        self.auth_calls = []
+        self.authz_return = None
+        self.ctx_auth = None
+
+    def on_auth_event(self, ctx, authorization_id, authentication_id, authentication):
+        self.auth_calls.append((authorization_id, authentication_id, authentication))
+        if authentication_id == 'user' and authentication == 'secret':
+            return self.authz_return
+        from tokeo.core.smtpd.exc import Smtpd535Exception
+
+        raise Smtpd535Exception
+
+    def on_mail_from_event(self, ctx, mail_from):
+        # capture the auth state as later events see it
+        self.ctx_auth = (ctx.server.authenticated, ctx.server.authentication_id, ctx.server.authorization_id)
+        return super().on_mail_from_event(ctx, mail_from)
+
+
+# --- tls client and raw wire ---------------------------------------------------
+
+
+def _tls_client_ctx():
+    """A client SSL context that accepts the self-signed test certificate."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
+_TLS_SETTINGS = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
+
+
+def run_wire(events, settings, wire_body):
+    """Deliver one message with raw wire bytes; returns the reply code."""
+
+    async def go():
+        srv = SmtpdServer(events, settings=settings)
+        await srv.start([{'host': '127.0.0.1', 'port': 0}])
+        port = srv._servers[0].sockets[0].getsockname()[1]
+        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        await reader.readline()
+        try:
+            for cmd in (b'EHLO x\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n'):
+                writer.write(cmd)
+                await writer.drain()
+                line = await reader.readline()
+                while line[3:4] == b'-':
+                    line = await reader.readline()
+            writer.write(wire_body + b'.\r\n')
+            await writer.drain()
+            reply = await reader.readline()
+            writer.write(b'QUIT\r\n')
+            await writer.drain()
+            writer.close()
+            await asyncio.sleep(0.1)
+            return reply[:3]
+        finally:
+            await srv.stop(wait_seconds_before_close=0.2)
+
+    return asyncio.run(go())

@@ -14,7 +14,7 @@ import platform
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer
-from tests.core.smtpd.test_smtpd_server import RecordingEvents, _serve, _reply, _stop, _tls_client_ctx
+from tests.core.smtpd.lib.smtpd_tests_helper import RecordingEvents, _serve, _reply, _stop, _tls_client_ctx
 
 
 _VERSION = sys.version_info[:3]

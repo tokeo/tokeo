@@ -14,15 +14,14 @@ import subprocess
 import pytest
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
-from tokeo.main import TokeoTest
 from tokeo.core.exc import TokeoError
 from tokeo.ext.automate import TokeoAutomateShell
-from tests.ext.test_ext_automate import AutomateTest, defaults
+from tests.ext.automate.automate_tests_helper import AutomateTest
 
 CTRL_C, CTRL_D = '\x03', '\x04'
 
 
-class WithoutTuiTest(TokeoTest):
+class AutomateWithoutTuiTest(AutomateTest):
 
     class Meta:
         extensions = [
@@ -35,7 +34,7 @@ class WithoutTuiTest(TokeoTest):
 def shell(monkeypatch):
     # the shell of an app with a wide output
     monkeypatch.setenv('COLUMNS', '200')
-    with AutomateTest(config_defaults=defaults) as app:
+    with AutomateTest() as app:
         yield TokeoAutomateShell(app)
 
 
@@ -45,12 +44,12 @@ def _lines(capsys):
 
 def test_needs_the_tui_extensions():
     with pytest.raises(TokeoError, match='The extension tokeo.ext.automate needs tokeo.ext.tui.input and tokeo.ext.tui.output, add them'):
-        with WithoutTuiTest(config_defaults=defaults):
+        with AutomateWithoutTuiTest():
             pass
 
 
 def test_shell_switch_no_colors_removed():
-    with AutomateTest(argv=['automate', 'shell', '--no-colors'], config_defaults=defaults) as app:
+    with AutomateTest(argv=['automate', 'shell', '--no-colors']) as app:
         with pytest.raises(SystemExit):
             app.run()
 
@@ -62,7 +61,7 @@ def test_list_tasks(shell, capsys):
     assert lines[1] == 'tasks' and lines[2].split() == ['id', 'name', 'function', 'hosts']
     task2 = next(line for line in lines if line.startswith('task2'))
     hosts = str(len(shell.app.automate.tasks['task2']['connection']['hosts']))
-    assert task2.split() == ['task2', 'Ping', 'our', 'hosts', 'tests.ext.test_ext_automate:task2', hosts]
+    assert task2.split() == ['task2', 'Ping', 'our', 'hosts', 'tests.ext.automate.automate_tests_helper:task2', hosts]
 
 
 def test_list_hosts_without_passwords(shell, capsys):
@@ -133,9 +132,9 @@ def test_shell_in_a_terminal():
 
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 120, 0, 0))
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     env = dict(os.environ, TERM='xterm-256color', PYTHONPATH=os.pathsep.join(filter(None, [root, os.environ.get('PYTHONPATH')])))
-    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'automate_shell_probe.py')
+    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'automate_tests_shell_probe.py')
     process = subprocess.Popen([sys.executable, probe, 'automate', 'shell'], stdin=slave, stdout=slave, stderr=slave, env=env)
     os.close(slave)
     screen = pyte.Screen(120, 24)

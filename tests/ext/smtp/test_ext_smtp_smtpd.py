@@ -22,7 +22,7 @@ from email.header import decode_header, make_header
 import pytest
 
 from tokeo.core.smtpd import SmtpdServer, SmtpdEvents, Smtpd535Exception, Smtpd550Exception
-from tests.ext.test_ext_smtp import smtp_app, make_cert, subjMsg, textMsg, htmlImg
+from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, subjMsg, textMsg, htmlImg
 
 
 _VERSION = sys.version_info[:3]
@@ -129,7 +129,7 @@ def test_smtp_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
             f.write(cert[0])
 
     with BackgroundSmtpd(_tls_settings(mode, cert)) as smtpd:
-        with smtp_app(host='127.0.0.1', port=smtpd.port, timeout=5, **client, **verify) as app:
+        with SmtpTest(host='127.0.0.1', port=smtpd.port, timeout=5, **client, **verify) as app:
             if delivered:
                 assert app.mail.send('body over tls') is True
             else:
@@ -159,7 +159,7 @@ def test_smtp_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
 )
 def test_smtp_closes_connection_on_error(smtp, error):
     with BackgroundSmtpd({'auth_mode': 'AUTH_OPTIONAL'}) as smtpd:
-        with smtp_app(host='127.0.0.1', port=smtpd.port, timeout=5, **smtp) as app:
+        with SmtpTest(host='127.0.0.1', port=smtpd.port, timeout=5, **smtp) as app:
             # the original error reaches the caller ...
             with pytest.raises(error):
                 app.mail.send('body')
@@ -186,7 +186,7 @@ def test_smtp_qp_delivered_to_smtpd(tmp):
 
     with BackgroundSmtpd({}) as smtpd:
         # quoted-printable is set for the config of this app only
-        with smtp_app(host='127.0.0.1', port=smtpd.port, timeout=5, body_encoding='qp') as app:
+        with SmtpTest(host='127.0.0.1', port=smtpd.port, timeout=5, body_encoding='qp') as app:
             sent = app.mail.send(
                 (textMsg, htmlImg),
                 subject=subjMsg,

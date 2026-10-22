@@ -13,7 +13,7 @@ import asyncio
 from tokeo.core.smtpd.server import SmtpdServer, GlobalLimits
 from tokeo.core.smtpd.events import SmtpdEvents
 
-from tests.core.smtpd.lib.smtpd_helpers import send_mail
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
 
 
 class GatedEvents(SmtpdEvents):

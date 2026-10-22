@@ -16,6 +16,7 @@ import pytest
 import dramatiq
 from dramatiq.message import Message
 from tokeo.ext.dramatiq import TokeoDramatiqError
+from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqBrokerTest, DramatiqMiddlewareTest
 
 RABBITMQ_URL = os.environ.get('TOKEO_TEST_RABBITMQ_URL', 'amqp://guest:guest@localhost:5672/')
 
@@ -49,12 +50,12 @@ def raw_channel():
 
 
 @pytest.fixture
-def live(tmp, broker_app, rando):
+def live(tmp, rando):
     """An app on the live rabbitmq with one actor on a queue of its own."""
 
     @contextmanager
     def build(url=RABBITMQ_URL, **rabbitmq):
-        with broker_app(tmp, dict(url=url, **rabbitmq)) as app:
+        with DramatiqBrokerTest(tmp, dict(url=url, **rabbitmq)) as app:
             name = f'tokeo_test_{rando}'
             actor = dramatiq.actor(lambda value: None, actor_name=f'task_{rando}', queue_name=name, broker=app.dramatiq.broker)
             try:
@@ -133,9 +134,9 @@ def test_live_reconnect_after_idle(live):
         assert queues._connection is not first
 
 
-def test_live_monitor_hears_a_worker(tmp, middleware_app, rando):
+def test_live_monitor_hears_a_worker(tmp, rando):
     config = dict(monitoring=True, monitoring_interval=1, monitoring_with_details='on', rabbitmq=dict(url=RABBITMQ_URL))
-    with middleware_app(tmp, **config) as app:
+    with DramatiqMiddlewareTest(tmp, **config) as app:
         name = f'tokeo_test_{rando}'
         actor = dramatiq.actor(
             lambda seconds: time.sleep(seconds), actor_name=f'task_{rando}', queue_name=name, broker=app.dramatiq.broker
@@ -163,8 +164,8 @@ def test_live_monitor_hears_a_worker(tmp, middleware_app, rando):
     assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals']['done'] == 1
 
 
-def test_live_unparalleled_runs_one_message_at_a_time(tmp, broker_app, rando):
-    with broker_app(tmp, dict(url=RABBITMQ_URL)) as app:
+def test_live_unparalleled_runs_one_message_at_a_time(tmp, rando):
+    with DramatiqBrokerTest(tmp, dict(url=RABBITMQ_URL)) as app:
         name = f'tokeo_test_{rando}_unparalleled'
         runs = []
 

@@ -13,7 +13,7 @@ import pytest
 from tokeo.core.smtpd.context import SmtpdContext
 from tokeo.core.smtpd.server import SmtpdServer
 
-from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
 
 class IdCaptureEvents(CaptureSmtpdEvents):

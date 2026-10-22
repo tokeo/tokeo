@@ -11,8 +11,8 @@ import asyncio
 
 from tokeo.core.smtpd.server import SmtpdServer
 
-from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
-from tests.core.smtpd.lib.smtpd_helpers import send_mail
+from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
 
 
 async def _wait_until(pred, timeout=1.0):

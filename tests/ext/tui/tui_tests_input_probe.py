@@ -7,17 +7,13 @@ app.print, the shell ends on the line exit.
 
 import time
 import threading
-from tokeo.main import TokeoTest
+from tests.ext.tui.tui_tests_helper import TuiInputTest
 
 
-class ProbeApp(TokeoTest):
+class TuiInputProbeTest(TuiInputTest):
 
     class Meta:
         label = 'probe'
-        extensions = [
-            'tokeo.ext.print',
-            'tokeo.ext.tui.input',
-        ]
 
 
 def command(line):
@@ -34,6 +30,6 @@ def other_thread(app):
 
 
 if __name__ == '__main__':
-    with ProbeApp() as app:
+    with TuiInputProbeTest() as app:
         threading.Thread(target=other_thread, args=(app,), daemon=True).start()
         app.tui.input.shell(command, prompt='Probe> ')

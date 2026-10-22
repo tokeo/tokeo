@@ -18,7 +18,7 @@ from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents, threaded
 from tokeo.core.smtpd.logger import Severity
 
-from tests.core.smtpd.lib.smtpd_helpers import send_mail
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
 
 
 class SyncLogging(SmtpdEvents):

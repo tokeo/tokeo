@@ -13,7 +13,7 @@ import base64
 
 import pytest
 
-from tests.core.smtpd.test_smtpd_server import (
+from tests.core.smtpd.lib.smtpd_tests_helper import (
     dialog,
     AuthEvents,
     _serve,

@@ -1,5 +1,5 @@
 """
-Tests for tokeo.core.utils.cement.extensions.
+Tests for tokeo.core.utils.cement.
 """
 
 import pytest
@@ -9,7 +9,7 @@ from tokeo.core.exc import TokeoError
 from tokeo.core.utils.cement.extensions import required as extensions_required
 
 
-class OutputTest(TokeoTest):
+class CementTest(TokeoTest):
 
     class Meta:
         extensions = [
@@ -17,8 +17,8 @@ class OutputTest(TokeoTest):
         ]
 
 
-def test_required_names_the_missing_ones():
-    with OutputTest() as app:
+def test_extensions_required_names_the_missing_ones():
+    with CementTest() as app:
         extensions_required(app, 'tokeo.ext.probe', 'tokeo.ext.tui.output')
         with pytest.raises(TokeoError, match='needs tokeo.ext.tui.input and tokeo.ext.x, add them to the extensions of the app!'):
             extensions_required(app, 'tokeo.ext.probe', 'tokeo.ext.tui.input', 'tokeo.ext.tui.output', 'tokeo.ext.x')

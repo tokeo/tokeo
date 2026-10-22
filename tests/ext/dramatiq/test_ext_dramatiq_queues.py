@@ -21,6 +21,7 @@ from tokeo.ext.dramatiq import (
     TokeoDramatiqRefusedError,
     TokeoDramatiqQueueError,
 )
+from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqBrokerTest
 
 
 class FakeServer:
@@ -129,8 +130,8 @@ def server(monkeypatch):
 
 
 @pytest.fixture
-def app(tmp, broker_app):
-    with broker_app(tmp, None) as app:
+def app(tmp):
+    with DramatiqBrokerTest(tmp, None) as app:
         broker = app.dramatiq.broker
         for name, queue in (('send_mail', 'mail'), ('send_report', 'mail'), ('build_order', 'orders_unparalleled')):
             dramatiq.actor(lambda: None, actor_name=name, queue_name=queue, broker=broker)
@@ -148,8 +149,8 @@ def test_names_from_actors(app):
     assert app.dramatiq.queues.names() == ['mail', 'orders_unparalleled']
 
 
-def test_names_import_actors_module(tmp, broker_app):
-    with broker_app(tmp, None) as app:
+def test_names_import_actors_module(tmp):
+    with DramatiqBrokerTest(tmp, None) as app:
         app.config.set('dramatiq', 'actors', 'no.such.actors')
         with pytest.raises(TokeoDramatiqConfigError, match="Invalid dramatiq config actors: Value 'no.such.actors'") as e:
             app.dramatiq.queues.names()
@@ -297,9 +298,9 @@ def test_recreate_refuses_queue_without_actor(app, server):
         ('amqps://user:secret@mq.example/', 'mq.example:5671'),
     ],
 )
-def test_error_without_rabbitmq(tmp, broker_app, server, url, address):
+def test_error_without_rabbitmq(tmp, server, url, address):
     server.down = True
-    with broker_app(tmp, dict(url=url)) as app:
+    with DramatiqBrokerTest(tmp, dict(url=url)) as app:
         dramatiq.actor(lambda: None, actor_name='send_mail', queue_name='mail', broker=app.dramatiq.broker)
         with pytest.raises(TokeoDramatiqConnectionError, match=rf'Cannot connect to rabbitmq at {address} \(AMQPConnectionError: ') as e:
             app.dramatiq.queues.state('mail')
@@ -327,12 +328,12 @@ def test_connection_is_kept_and_reopened(app, server):
 
 
 @pytest.fixture
-def command(tmp, dramatiq_app, server, capsys, monkeypatch):
+def command(tmp, server, capsys, monkeypatch):
     # a wide output, so no table wraps
     monkeypatch.setenv('COLUMNS', '160')
 
     def run(*options):
-        with dramatiq_app(tmp, ['dramatiq', 'queues', *options]) as app:
+        with DramatiqTest(tmp, ['dramatiq', 'queues', *options]) as app:
             dramatiq.actor(lambda: None, actor_name='send_mail', queue_name='mail', broker=app.dramatiq.broker)
             app.run()
         return capsys.readouterr().out

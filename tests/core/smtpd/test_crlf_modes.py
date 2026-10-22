@@ -8,10 +8,8 @@ rejects lines that do not end with CRLF. smtplib normalizes line endings on
 send, so these tests speak to the socket directly.
 """
 
-import asyncio
-
-from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_helper import run_wire
 
 
 class WireCapture(SmtpdEvents):
@@ -32,36 +30,6 @@ class WireCapture(SmtpdEvents):
         if spooler is not None and spooler.path:
             with open(spooler.path, 'rb') as f:
                 self.file = f.read()
-
-
-def run_wire(events, settings, wire_body):
-    """Deliver one message with raw wire bytes; returns the reply code."""
-
-    async def go():
-        srv = SmtpdServer(events, settings=settings)
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
-        reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        await reader.readline()
-        try:
-            for cmd in (b'EHLO x\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n'):
-                writer.write(cmd)
-                await writer.drain()
-                line = await reader.readline()
-                while line[3:4] == b'-':
-                    line = await reader.readline()
-            writer.write(wire_body + b'.\r\n')
-            await writer.drain()
-            reply = await reader.readline()
-            writer.write(b'QUIT\r\n')
-            await writer.drain()
-            writer.close()
-            await asyncio.sleep(0.1)
-            return reply[:3]
-        finally:
-            await srv.stop(wait_seconds_before_close=0.2)
-
-    return asyncio.run(go())
 
 
 #: mixed endings, interior CR, LF-only separator, dot-stuffing, CR before CRLF

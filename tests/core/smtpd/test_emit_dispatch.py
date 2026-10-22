@@ -21,7 +21,7 @@ from tokeo.core.smtpd.events import (
 )
 from tokeo.core.smtpd.exc import Smtpd535Exception
 
-from tests.core.smtpd.lib.smtpd_helpers import send_mail
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
 
 
 class BareEvents(SmtpdEvents):

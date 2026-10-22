@@ -13,25 +13,13 @@ import subprocess
 import pytest
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
-from cement.utils.misc import init_defaults
-from tokeo.main import TokeoTest
 from tokeo.core.exc import TokeoError
+from tests.ext.scheduler.scheduler_tests_helper import SchedulerTest
 
 CTRL_D = '\x04'
 
 
-class SchedulerTest(TokeoTest):
-
-    class Meta:
-        extensions = [
-            'tokeo.ext.print',
-            'tokeo.ext.tui.input',
-            'tokeo.ext.tui.output',
-            'tokeo.ext.scheduler',
-        ]
-
-
-class WithoutTuiTest(TokeoTest):
+class SchedulerWithoutTuiTest(SchedulerTest):
 
     class Meta:
         extensions = [
@@ -39,32 +27,25 @@ class WithoutTuiTest(TokeoTest):
             'tokeo.ext.tui.input',
             'tokeo.ext.scheduler',
         ]
-
-
-def _config():
-    # time.time as task, it is never due during a test
-    config = init_defaults('scheduler')
-    config['scheduler']['tasks'] = {'time': dict(module='time', crontab='0 0 1 1 *', name='the time')}
-    return config
 
 
 @pytest.fixture
 def started(monkeypatch):
     # an app with its scheduler running in the background, no shell
-    with SchedulerTest(config_defaults=_config()) as app:
+    with SchedulerTest() as app:
         app.scheduler.startup(interactive=True)
         yield app
 
 
 def test_needs_the_tui_extensions():
     with pytest.raises(TokeoError, match='The extension tokeo.ext.scheduler needs tokeo.ext.tui.output, add it to the extensions'):
-        with WithoutTuiTest():
+        with SchedulerWithoutTuiTest():
             pass
 
 
 def test_launch_without_shell_by_default(monkeypatch):
     calls = []
-    with SchedulerTest(config_defaults=_config()) as app:
+    with SchedulerTest() as app:
         monkeypatch.setattr(app.scheduler, 'startup', lambda interactive, paused: calls.append(('startup', interactive, paused)))
         monkeypatch.setattr(app.scheduler, 'shell', lambda: calls.append(('shell',)))
         app.scheduler.launch()
@@ -75,7 +56,7 @@ def test_launch_without_shell_by_default(monkeypatch):
 @pytest.mark.parametrize('argv, expected', [([], (False, False)), (['--shell'], (True, False)), (['--shell', '--paused'], (True, True))])
 def test_launch_command(monkeypatch, argv, expected):
     calls = []
-    with SchedulerTest(argv=['scheduler', 'launch', *argv], config_defaults=_config()) as app:
+    with SchedulerTest(argv=['scheduler', 'launch', *argv]) as app:
         monkeypatch.setattr(app.scheduler, 'launch', lambda interactive, paused: calls.append((interactive, paused)))
         app.run()
     assert calls == [expected]
@@ -83,7 +64,7 @@ def test_launch_command(monkeypatch, argv, expected):
 
 @pytest.mark.parametrize('switch', ['--background', '--no-colors'])
 def test_launch_switches_removed(switch):
-    with SchedulerTest(argv=['scheduler', 'launch', switch], config_defaults=_config()) as app:
+    with SchedulerTest(argv=['scheduler', 'launch', switch]) as app:
         with pytest.raises(SystemExit):
             app.run()
 
@@ -159,9 +140,9 @@ def test_shell_shows_logs_of_tasks_above_the_prompt():
 
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 16, 100, 0, 0))
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     env = dict(os.environ, TERM='xterm-256color', PYTHONPATH=os.pathsep.join(filter(None, [root, os.environ.get('PYTHONPATH')])))
-    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scheduler_shell_probe.py')
+    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scheduler_tests_shell_probe.py')
     process = subprocess.Popen([sys.executable, probe, 'scheduler', 'launch', '--shell'], stdin=slave, stdout=slave, stderr=slave, env=env)
     os.close(slave)
     screen = pyte.Screen(100, 16)

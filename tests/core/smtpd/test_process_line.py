@@ -15,8 +15,8 @@ import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, CMD_RSET, CMD_QUIT, SmtpdSession
 from tokeo.core.smtpd.exc import Smtpd503Exception, Smtpd535Exception
-from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
-from tests.core.smtpd.lib.smtpd_helpers import run_line
+from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_helper import run_line
 
 
 class ProcessLineEvents(CaptureSmtpdEvents):

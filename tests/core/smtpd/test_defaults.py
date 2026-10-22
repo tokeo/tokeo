@@ -18,7 +18,7 @@ from tokeo.core.smtpd.server import (
     DEFAULT_IO_BUFFER_CHUNK_SIZE,
     DEFAULT_IO_BUFFER_MAX_SIZE,
 )
-from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
 
 def _smtpd(**kwargs):

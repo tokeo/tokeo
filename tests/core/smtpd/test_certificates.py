@@ -17,8 +17,8 @@ import subprocess
 import pytest
 
 from tokeo.core.smtpd.tls import TLS_METHODS_LEGACY, TLS_CIPHERS_LEGACY
-from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
-from tests.core.smtpd.lib.smtpd_helpers import (
+from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_helper import (
     read_message,
     send_mail,
     run_server_client,

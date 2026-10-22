@@ -7,20 +7,15 @@ The monitor gets a fixed snapshot instead of listening to rabbitmq.
 
 import sys
 import time
-from tokeo.main import Tokeo
+import shutil
+from cement.utils import fs
+from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest
 
 
-class ProbeApp(Tokeo):
+class DramatiqMonitorProbeTest(DramatiqTest):
 
     class Meta:
         label = 'probe'
-        extensions = [
-            'colorlog',
-            'tokeo.ext.print',
-            'tokeo.ext.tui.output',
-            'tokeo.ext.dramatiq',
-        ]
-        config_files = []
 
 
 def snapshot(wait=0):
@@ -31,6 +26,10 @@ def snapshot(wait=0):
 
 
 if __name__ == '__main__':
-    with ProbeApp(argv=sys.argv[1:]) as app:
-        app.dramatiq.monitor.snapshot = snapshot
-        app.run()
+    tmp = fs.Tmp()
+    try:
+        with DramatiqMonitorProbeTest(tmp, sys.argv[1:]) as app:
+            app.dramatiq.monitor.snapshot = snapshot
+            app.run()
+    finally:
+        shutil.rmtree(tmp.dir, ignore_errors=True)

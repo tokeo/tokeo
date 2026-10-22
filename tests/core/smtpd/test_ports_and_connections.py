@@ -9,7 +9,7 @@ refused with the 421 abort message.
 import asyncio
 
 from tokeo.core.smtpd.server import SmtpdServer
-from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
 MSG_WELCOME = '220 127.0.0.1 says welcome!\r\n'
 MSG_ABORT = '421 Service too busy or not available, closing transmission channel\r\n'

@@ -11,10 +11,11 @@ import sys
 import pytest
 from dramatiq import cli as dramatiq_cli
 from tokeo.ext.dramatiq import TokeoDramatiqConfigError
+from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest
 
 
 @pytest.fixture
-def serve(tmp, monkeypatch, dramatiq_app):
+def serve(tmp, monkeypatch):
     """Run the serve command with a recording cli and purge."""
     # serve rewrites sys.argv and the env, monkeypatch restores both
     monkeypatch.setattr(sys, 'argv', ['tokeo'])
@@ -43,7 +44,7 @@ def serve(tmp, monkeypatch, dramatiq_app):
     monkeypatch.setattr('tokeo.ext.dramatiq.controller.multiprocessing.set_start_method', fake_set_start_method)
 
     def run(*options, config=None, debug=False):
-        with dramatiq_app(tmp, ['--debug'] * debug + ['dramatiq', 'serve', *options]) as app:
+        with DramatiqTest(tmp, ['--debug'] * debug + ['dramatiq', 'serve', *options]) as app:
             for key, value in (config or {}).items():
                 app.config.set('dramatiq', key, value)
 

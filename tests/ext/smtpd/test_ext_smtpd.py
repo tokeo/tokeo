@@ -3,7 +3,7 @@ Tests for the smtpd extension: settings mapping, topology planning, shared
 limits across processes and the termination guarantees with real processes.
 
 The termination guarantees are process properties (exit code, port release,
-SIGKILL survival) and are observed from outside: ``smtpd_helper_app.py``
+SIGKILL survival) and are observed from outside: ``smtpd_tests_serve_probe.py``
 runs a real ``TokeoTest`` Cement app in its own process group; the tests
 detect readiness through the SMTP banner on the port and cleanup through
 the process group and the port becoming bindable again.
@@ -28,6 +28,7 @@ from tokeo.ext.smtpd import (
     _resolve_events_handler,
     _plan,
 )
+from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
 
 # --- unit: handler resolving -----------------------------------------------------
@@ -134,17 +135,6 @@ def test_shared_limits_slot_wait_recheck_interval():
 
 
 def test_extension_loads_into_cement_app():
-    from tokeo.main import TokeoTest
-
-    class SmtpdApp(TokeoTest):
-
-        class Meta:
-            extensions = [
-                'tokeo.ext.yaml',
-                'tokeo.ext.print',
-                'tokeo.ext.smtpd',
-            ]
-
     config = dict(
         smtpd=dict(
             services=[
@@ -156,7 +146,7 @@ def test_extension_loads_into_cement_app():
             ]
         )
     )
-    with SmtpdApp(config_defaults=config) as app:
+    with SmtpdTest(config_defaults=config) as app:
         assert app.smtpd is not None
         assert [svc['name'] for svc in app.smtpd.services()] == ['mx-a']
         with pytest.raises(TokeoSmtpdError):
@@ -174,8 +164,8 @@ def test_extension_loads_into_cement_app():
 # --- process tests: real termination behaviour ----------------------------------
 
 
-HELPER = os.path.join(os.path.dirname(__file__), 'lib/smtpd_helper_app.py')
-assert os.path.exists(HELPER), 'smtpd_helper_app.py must live in lib/ next to this test file'
+PROBE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'smtpd_tests_serve_probe.py')
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
 def _free_port():
@@ -201,29 +191,29 @@ def _spawn(config, names=None):
 
     # an own session = an own process group: master and all its workers,
     # observable from outside via os.killpg; all output goes to a file so a
-    # failing helper can report its actual error instead of a blind timeout
-    log = tempfile.NamedTemporaryFile(mode='w+', prefix='smtpd-helper-', suffix='.log', delete=False)
+    # failing probe can report its actual error instead of a blind timeout
+    log = tempfile.NamedTemporaryFile(mode='w+', prefix='smtpd-probe-', suffix='.log', delete=False)
     proc = subprocess.Popen(
-        [sys.executable, HELPER, json.dumps(config), json.dumps(names)],
+        [sys.executable, PROBE, json.dumps(config), json.dumps(names)],
         stdout=log,
         stderr=subprocess.STDOUT,
         start_new_session=True,
-        env=dict(os.environ),
+        env=dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, [ROOT, os.environ.get('PYTHONPATH')]))),
     )
-    proc.helper_log = log.name
+    proc.probe_log = log.name
     return proc
 
 
 def _wait_exit(proc, timeout=8):
-    """Wait for the helper; a hang reports the helper's own story."""
+    """Wait for the probe; a hang reports the probe's own story."""
     try:
         return proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
-        raise AssertionError(f'helper still running after {timeout}s:\n{_helper_log(proc, lines=30)}')
+        raise AssertionError(f'probe still running after {timeout}s:\n{_probe_log(proc, lines=30)}')
 
 
-def _helper_log(proc, lines=15):
-    with open(proc.helper_log) as f:
+def _probe_log(proc, lines=15):
+    with open(proc.probe_log) as f:
         tail = f.readlines()[-lines:]
     return ''.join(tail).strip() or '(no output)'
 
@@ -233,7 +223,7 @@ def _wait_banner(proc, port, timeout=8.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if proc.poll() is not None:
-            raise AssertionError(f'helper exited rc={proc.returncode} before serving:\n{_helper_log(proc)}')
+            raise AssertionError(f'probe exited rc={proc.returncode} before serving:\n{_probe_log(proc)}')
         try:
             with socket.create_connection(('127.0.0.1', port), timeout=1) as sock:
                 if sock.recv(4).startswith(b'220'):
@@ -241,7 +231,7 @@ def _wait_banner(proc, port, timeout=8.0):
         except OSError:
             pass
         time.sleep(0.05)
-    raise AssertionError(f'no smtp banner on port {port}:\n{_helper_log(proc)}')
+    raise AssertionError(f'no smtp banner on port {port}:\n{_probe_log(proc)}')
 
 
 def _child_pids(pid):

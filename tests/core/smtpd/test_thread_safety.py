@@ -11,8 +11,8 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 from tokeo.core.smtpd.server import SmtpdServer
-from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
-from tests.core.smtpd.lib.smtpd_helpers import read_message, send_mail
+from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_helper import read_message, send_mail
 
 
 class ThreadSafetyEvents(CaptureSmtpdEvents):

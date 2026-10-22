@@ -13,7 +13,7 @@ from tokeo.ext.tui import TokeoTuiError, require
 from tokeo.ext.tui.output import TokeoTuiOutput
 
 
-class OutputTest(TokeoTest):
+class TuiOutputTest(TokeoTest):
 
     class Meta:
         extensions = [
@@ -25,13 +25,13 @@ class OutputTest(TokeoTest):
 @pytest.fixture
 def output():
     # writes to a buffer of a fixed width instead of the terminal
-    with OutputTest() as app:
+    with TuiOutputTest() as app:
         buffer = io.StringIO()
         yield TokeoTuiOutput(app, file=buffer, width=60), buffer
 
 
 def test_extension_registers_output_only():
-    with OutputTest() as app:
+    with TuiOutputTest() as app:
         assert isinstance(app.tui.output, TokeoTuiOutput)
         with pytest.raises(TokeoTuiError, match='Enable the extension tokeo.ext.tui.input to use app.tui.input!'):
             app.tui.input

@@ -8,112 +8,24 @@ the security enforcement we own (PIPELINING rejection, CRLF strictness, data_siz
 buffer overrun, command timeout), and the connection/processing limits.
 """
 
-import ssl
 import base64
 import asyncio
 
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer
-from tokeo.core.smtpd.events import SmtpdEvents, threaded
+from tokeo.core.smtpd.events import threaded
 from tokeo.core.smtpd.exc import Smtpd550Exception, Smtpd450Exception, Smtpd421Exception
-
-
-class RecordingEvents(SmtpdEvents):
-    """A handler that records fired events and delivered messages."""
-
-    def __init__(self, options=None):
-        super().__init__(options)
-        self.fired = []
-        self.messages = []
-        self.reject_rcpt = set()
-        self.rewrite_from = None
-
-    def on_connect_event(self, ctx):
-        self.fired.append('connect')
-
-    def on_disconnect_event(self, ctx):
-        self.fired.append('disconnect')
-
-    def on_helo_event(self, ctx, helo):
-        self.fired.append('helo')
-
-    def on_mail_from_event(self, ctx, mail_from):
-        self.fired.append('mail')
-        return self.rewrite_from
-
-    def on_rcpt_to_event(self, ctx, rcpt_to):
-        self.fired.append('rcpt')
-        if any(s in rcpt_to for s in self.reject_rcpt):
-            raise Smtpd550Exception
-
-    def on_message_data_start_event(self, ctx):
-        self.fired.append('start')
-
-    def on_message_data_headers_event(self, ctx):
-        self.fired.append('headers')
-
-    def on_message_data_receiving_event(self, ctx):
-        self.fired.append('recv')
-
-    def on_message_data_event(self, ctx):
-        self.messages.append((bytes(ctx.message.data), ctx.envelope.mail_from, list(ctx.envelope.rcpt_tos)))
-
-
-async def _reply(reader):
-    """Read a full (possibly multi-line) SMTP reply into a list of lines."""
-    lines = []
-    while True:
-        raw = await reader.readuntil(b'\n')
-        line = raw.decode('latin-1').rstrip('\r\n')
-        lines.append(line)
-        if len(line) < 4 or line[3] != '-':
-            break
-    return lines
-
-
-async def _serve(events, settings):
-    """Start a server on an ephemeral port; return (server, port, task)."""
-    srv = SmtpdServer(events, settings=settings)
-    limit = int(settings.get('io_buffer_max_size', 1 << 20))
-    server = await asyncio.start_server(srv._on_connection, '127.0.0.1', 0, limit=limit)
-    port = server.sockets[0].getsockname()[1]
-    task = asyncio.create_task(server.serve_forever())
-    return server, port, task
-
-
-async def _stop(server, task):
-    """Close a server and cancel its serve task."""
-    server.close()
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
-
-
-async def _converse(events, settings, commands):
-    """Run one client dialog: send each command, read its reply."""
-    server, port, task = await _serve(events, settings)
-    try:
-        reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        greeting = await _reply(reader)
-        replies = []
-        for cmd in commands:
-            writer.write(cmd)
-            await writer.drain()
-            replies.append(await _reply(reader))
-        writer.close()
-        await asyncio.sleep(0.02)
-        return greeting, replies
-    finally:
-        await _stop(server, task)
-
-
-def dialog(events, settings, commands):
-    """Synchronous wrapper around a client dialog for pytest."""
-    return asyncio.run(_converse(events, settings, commands))
-
+from tests.core.smtpd.lib.smtpd_tests_helper import (
+    RecordingEvents,
+    AuthEvents,
+    dialog,
+    _reply,
+    _serve,
+    _stop,
+    _tls_client_ctx,
+    _TLS_SETTINGS,
+)
 
 # --- full delivery and events ------------------------------------------------
 
@@ -367,7 +279,7 @@ def test_command_timeout_closes_connection():
 def test_read_line_skips_wait_for_when_line_buffered(monkeypatch):
     # the timeout guards waiting on the wire; with a complete line already in
     # the reader buffer, _read_line must take the direct path (no wait_for)
-    from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
+    from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
     async def go():
         srv = SmtpdServer(CaptureSmtpdEvents(), settings={'io_cmd_timeout': 30})
@@ -388,7 +300,7 @@ def test_read_line_times_out_on_partial_buffered_line():
     # a partial line (no LF) is not "delivered": the wait_for path must apply
     # and the io_cmd_timeout must fire exactly as before
     from tokeo.core.smtpd.exc import SmtpdIOTimeoutException
-    from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
+    from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
     async def go():
         srv = SmtpdServer(CaptureSmtpdEvents(), settings={'io_cmd_timeout': 0.1})
@@ -891,29 +803,6 @@ def test_lifecycle_state_flags():
 # --- AUTH (PLAIN / LOGIN) ------------------------------------------------------
 
 
-class AuthEvents(RecordingEvents):
-    """Accepts one fixed credential pair; optionally returns an authz id."""
-
-    def __init__(self, options=None):
-        super().__init__(options)
-        self.auth_calls = []
-        self.authz_return = None
-        self.ctx_auth = None
-
-    def on_auth_event(self, ctx, authorization_id, authentication_id, authentication):
-        self.auth_calls.append((authorization_id, authentication_id, authentication))
-        if authentication_id == 'user' and authentication == 'secret':
-            return self.authz_return
-        from tokeo.core.smtpd.exc import Smtpd535Exception
-
-        raise Smtpd535Exception
-
-    def on_mail_from_event(self, ctx, mail_from):
-        # capture the auth state as later events see it
-        self.ctx_auth = (ctx.server.authenticated, ctx.server.authentication_id, ctx.server.authorization_id)
-        return super().on_mail_from_event(ctx, mail_from)
-
-
 def _plain(authzid, authcid, password):
     return base64.b64encode(f'{authzid}\x00{authcid}\x00{password}'.encode()).decode()
 
@@ -1111,14 +1000,6 @@ def test_auth_authzid_returned_by_handler():
 # --- STARTTLS --------------------
 
 
-def _tls_client_ctx():
-    """A client SSL context that accepts the self-signed test certificate."""
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
-
-
 class TlsEvents(RecordingEvents):
     """Records whether the connection was encrypted at MAIL time."""
 
@@ -1129,9 +1010,6 @@ class TlsEvents(RecordingEvents):
     def on_mail_from_event(self, ctx, mail_from):
         self.encrypted_at_mail = ctx.server.encrypted
         return super().on_mail_from_event(ctx, mail_from)
-
-
-_TLS_SETTINGS = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
 
 
 def test_starttls_full_flow_delivers_over_tls():

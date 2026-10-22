@@ -8,7 +8,7 @@ default values for every field), for both connection_initialize True and False.
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, CMD_PROXY, CMD_HELO, CMD_RSET, CMD_STARTTLS, SmtpdSession
-from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
 
 def _smtpd():

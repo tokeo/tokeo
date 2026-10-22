@@ -6,12 +6,11 @@ Its task ping logs by app.log; the shell fires it by ```tasks fire 1```.
 """
 
 import sys
-from cement.utils.misc import init_defaults
-from tokeo.main import TokeoTest
 from tokeo.ext.appshare import app
+from tests.ext.scheduler.scheduler_tests_helper import SchedulerTest
 
 
-class ProbeApp(TokeoTest):
+class SchedulerShellProbeTest(SchedulerTest):
 
     class Meta:
         label = 'probe'
@@ -29,7 +28,6 @@ def ping():
 
 
 if __name__ == '__main__':
-    config = init_defaults('scheduler')
-    config['scheduler']['tasks'] = {'ping': dict(module='tests.ext.scheduler_shell_probe', crontab='0 0 1 1 *')}
-    with ProbeApp(argv=sys.argv[1:], config_defaults=config) as probe:
+    tasks = {'ping': dict(module='tests.ext.scheduler.scheduler_tests_shell_probe', crontab='0 0 1 1 *')}
+    with SchedulerShellProbeTest(tasks, argv=sys.argv[1:]) as probe:
         probe.run()

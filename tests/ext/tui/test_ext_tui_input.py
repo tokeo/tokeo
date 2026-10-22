@@ -17,20 +17,11 @@ from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from prompt_toolkit.history import InMemoryHistory
 from cement.core.exc import CaughtSignal
-from tokeo.main import TokeoTest
 from tokeo.ext.tui import TokeoTuiError
 from tokeo.ext.tui.input import TokeoTuiInput
+from tests.ext.tui.tui_tests_helper import TuiInputTest
 
 CTRL_C, CTRL_D = '\x03', '\x04'
-
-
-class InputTest(TokeoTest):
-
-    class Meta:
-        extensions = [
-            'tokeo.ext.print',
-            'tokeo.ext.tui.input',
-        ]
 
 
 @pytest.fixture
@@ -43,7 +34,7 @@ def shell():
             lines.append(line)
             return command(line) if command else True
 
-        with InputTest() as app, create_pipe_input() as keyboard:
+        with TuiInputTest() as app, create_pipe_input() as keyboard:
             keyboard.send_text(keys)
             app.tui.input.shell(record, input=keyboard, output=DummyOutput(), **options)
         return lines
@@ -52,7 +43,7 @@ def shell():
 
 
 def test_extension_registers_input_only():
-    with InputTest() as app:
+    with TuiInputTest() as app:
         assert isinstance(app.tui.input, TokeoTuiInput)
         with pytest.raises(TokeoTuiError, match='Enable the extension tokeo.ext.tui.output'):
             app.tui.output
@@ -143,7 +134,7 @@ def test_output_of_other_threads_appears_above_the_prompt():
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 12, 80, 0, 0))
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     env = dict(os.environ, TERM='xterm-256color', PYTHONPATH=os.pathsep.join(filter(None, [root, os.environ.get('PYTHONPATH')])))
-    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tui_shell_probe.py')
+    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tui_tests_input_probe.py')
     process = subprocess.Popen([sys.executable, probe], stdin=slave, stdout=slave, stderr=slave, env=env)
     os.close(slave)
     screen = pyte.Screen(80, 12)

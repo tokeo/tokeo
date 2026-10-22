@@ -6,7 +6,7 @@ scenarios, each asserting ports, hosts and addresses separately.
 """
 
 from tokeo.core.smtpd.server import SmtpdServer
-from tests.core.smtpd.lib.capture_smtpd_events import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
 
 def _smtpd(ports, hosts):

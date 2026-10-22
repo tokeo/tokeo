@@ -14,19 +14,17 @@ import pika
 import pytest
 import dramatiq
 from dramatiq.brokers.stub import StubBroker
-from cement.utils.misc import init_defaults
 from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoDramatiqConnectionError
 from tokeo.ext.dramatiq import monitoring
 from tokeo.ext.dramatiq.base import _details
 from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
 from tokeo.ext.dramatiq.controller import _duration, _monitor_view
 from tokeo.ext.tui.output import TokeoTuiOutput
-from tokeo.main import TokeoTest
 from tokeo.core.exc import TokeoError
-from conftest import DramatiqTest
+from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqMiddlewareTest
 
 
-class WithoutTuiTest(TokeoTest):
+class DramatiqWithoutTuiTest(DramatiqTest):
 
     class Meta:
         extensions = [
@@ -34,13 +32,6 @@ class WithoutTuiTest(TokeoTest):
             'tokeo.ext.diskcache',
             'tokeo.ext.dramatiq',
         ]
-
-
-def _monitor_app(tmp, argv=None, cls=DramatiqTest, **config):
-    d = init_defaults('diskcache', 'dramatiq')
-    d['diskcache']['directory'] = tmp.dir
-    d['dramatiq'].update(config)
-    return cls(argv=argv or [], config_defaults=d)
 
 
 # --- config -------------------------------------------------------------------
@@ -71,14 +62,14 @@ def _heartbeats(app):
     return [m for m in app.dramatiq.broker.middleware if isinstance(m, TokeoDramatiqHeartbeat)]
 
 
-def test_monitoring_off_adds_no_heartbeat(tmp, middleware_app):
-    with middleware_app(tmp) as app:
+def test_monitoring_off_adds_no_heartbeat(tmp):
+    with DramatiqMiddlewareTest(tmp) as app:
         assert _heartbeats(app) == []
         assert app.dramatiq.config('monitoring') is False and app.dramatiq.monitor.interval == 5
 
 
-def test_monitoring_adds_the_heartbeat(tmp, middleware_app):
-    with middleware_app(tmp, monitoring=True, monitoring_interval=7, monitoring_with_details='on') as app:
+def test_monitoring_adds_the_heartbeat(tmp):
+    with DramatiqMiddlewareTest(tmp, monitoring=True, monitoring_interval=7, monitoring_with_details='on') as app:
         (heartbeat,) = _heartbeats(app)
         assert (heartbeat.exchange, heartbeat.interval, heartbeat.details) == ('tokeo_test.dramatiq.monitoring', 7, True)
         assert heartbeat.app['label'] == 'tokeo_test'
@@ -92,9 +83,9 @@ def test_monitoring_adds_the_heartbeat(tmp, middleware_app):
         (dict(monitoring_with_details='maybe'), 'Invalid dramatiq config monitoring_with_details'),
     ],
 )
-def test_monitoring_config_checked(tmp, middleware_app, config, error):
+def test_monitoring_config_checked(tmp, config, error):
     with pytest.raises(TokeoDramatiqConfigError, match=error):
-        with middleware_app(tmp, **config):
+        with DramatiqMiddlewareTest(tmp, **config):
             pass
 
 
@@ -288,7 +279,7 @@ def _beat(pid, interval=5, state='running', running=(), since=None, details=Fals
 
 @pytest.fixture
 def monitor(tmp, monkeypatch):
-    with _monitor_app(tmp) as app:
+    with DramatiqMiddlewareTest(tmp) as app:
         monitor = app.dramatiq.monitor
         # heartbeats come by receive, not by rabbitmq
         monkeypatch.setattr(monitor, '_collect', lambda wait: None)
@@ -339,7 +330,7 @@ def test_monitor_without_rabbitmq(tmp, monkeypatch):
         raise pika.exceptions.AMQPConnectionError('refused')
 
     monkeypatch.setattr(monitoring.pika, 'BlockingConnection', refused)
-    with _monitor_app(tmp) as app:
+    with DramatiqMiddlewareTest(tmp) as app:
         with pytest.raises(TokeoDramatiqConnectionError, match='Cannot connect to rabbitmq at localhost:5672'):
             app.dramatiq.monitor.workers()
 
@@ -377,7 +368,7 @@ def test_monitor_view(tmp):
         # a worker without details sends no args
         dict(state='gone', seen_ms=20_000, heartbeat=_beat(4712, running=[{k: v for k, v in running[0].items() if k != 'args'}])),
     ]
-    with _monitor_app(tmp) as app:
+    with DramatiqMiddlewareTest(tmp) as app:
         text = _view(app, _snapshot(workers, actors=since), follow=5)
     assert text.startswith('probe dramatiq monitor  ') and 'every 5 s  (Ctrl-C to quit)' in text
     worker_line = next(line for line in text.splitlines() if 'w1:4711' in line and 'ok' in line)
@@ -399,7 +390,7 @@ def test_monitor_view(tmp):
 
 @pytest.mark.parametrize('monitoring, note', [(True, 'No worker heard of yet.'), (False, 'Monitoring is off in the config')])
 def test_monitor_view_without_workers(tmp, monitoring, note):
-    with _monitor_app(tmp) as app:
+    with DramatiqMiddlewareTest(tmp) as app:
         text = _view(app, _snapshot([], monitoring=monitoring))
     assert note in text and 'every' not in text
 
@@ -408,7 +399,7 @@ def test_monitor_view_without_workers(tmp, monitoring, note):
 def command(tmp, monkeypatch):
     # runs the monitor command on a fixed snapshot
     def run(*options):
-        with _monitor_app(tmp, ['dramatiq', 'monitor', *options]) as app:
+        with DramatiqMiddlewareTest(tmp, ['dramatiq', 'monitor', *options]) as app:
             calls = []
 
             def snapshot(wait=0):
@@ -432,7 +423,7 @@ def test_command_json(command):
 
 def test_needs_the_tui_output_extension(tmp):
     with pytest.raises(TokeoError, match='The extension tokeo.ext.dramatiq needs tokeo.ext.tui.output, add it to the extensions'):
-        with _monitor_app(tmp, cls=WithoutTuiTest):
+        with DramatiqWithoutTuiTest(tmp):
             pass
 
 
@@ -476,7 +467,7 @@ def test_command_follow_ends_on_ctrl_c_in_a_terminal():
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 100, 0, 0))
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     env = dict(os.environ, TERM='xterm-256color', PYTHONPATH=os.pathsep.join(filter(None, [root, os.environ.get('PYTHONPATH')])))
-    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dramatiq_monitor_probe.py')
+    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib', 'dramatiq_tests_monitor_probe.py')
     process = subprocess.Popen(
         [sys.executable, probe, 'dramatiq', 'monitor', '--follow', '--interval', '1'],
         stdin=slave,

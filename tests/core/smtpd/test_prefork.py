@@ -6,9 +6,10 @@ Split in two: platform-neutral tests that run wherever ``os.fork`` exists
 and reaping), and Linux-specialised tests for the parent-death signal
 (``PR_SET_PDEATHSIG``) that lets a worker stop itself when the master crashes.
 
-The process scenarios run in a subprocess (``lib/prefork_helper.py``) and are
-observed from outside -- markers on disk, exit codes and the process group --
-so the test runner itself never forks and never receives a signal.
+The process scenarios run in a subprocess
+(``lib/smtpd_tests_prefork_probe.py``) and are observed from outside --
+markers on disk, exit codes and the process group -- so the test runner
+itself never forks and never receives a signal.
 """
 
 import os
@@ -41,13 +42,13 @@ def _read_pdeathsig():
     return out.value
 
 
-HELPER = os.path.join(os.path.dirname(__file__), 'lib', 'prefork_helper.py')
+PROBE = os.path.join(os.path.dirname(__file__), 'lib', 'smtpd_tests_prefork_probe.py')
 
 
 def _spawn(*args):
-    """Run a helper scenario as its own process group."""
+    """Run a probe scenario as its own process group."""
     return subprocess.Popen(
-        [sys.executable, HELPER, *[str(arg) for arg in args]],
+        [sys.executable, PROBE, *[str(arg) for arg in args]],
         start_new_session=True,
         env=dict(os.environ),
     )
@@ -101,7 +102,7 @@ def test_run_prefork_single_process_runs_worker_in_place():
 @requires_fork
 def test_supervise_workers_reaps_and_restores_handlers():
     # workers that exit on their own -> supervise reaps them all and returns,
-    # without ever signalling; the helper asserts handler restore and reaping
+    # without ever signalling; the probe asserts handler restore and reaping
     # in-process, its exit code carries the verdict
     proc = _spawn('supervise')
     assert proc.wait(timeout=8) == 0
