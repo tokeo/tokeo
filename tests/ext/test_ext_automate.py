@@ -421,6 +421,8 @@ class AutomateTest(TokeoTest):
     class Meta:
         extensions = [
             'tokeo.ext.print',
+            'tokeo.ext.tui.input',
+            'tokeo.ext.tui.output',
             'tokeo.ext.automate',
         ]
 

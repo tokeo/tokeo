@@ -12,6 +12,7 @@ when the extension is enabled.
 - A live display that repaints in place in a terminal and appends one block
     per repaint when the output goes to a pipe or a file
 - Data is shown as given, brackets in it are never read as rich markup
+- Indented json, colored in a terminal
 
 ### Example
 
@@ -135,6 +136,19 @@ class TokeoTuiOutput:
 
         """
         self._console.print(_group(renderables))
+
+    def json(self, data):
+        """
+        Print data as indented json, colored in a terminal.
+
+        ### Args
+
+        - **data** (any): The data; values json does not know are shown as text
+
+        """
+        from rich.json import JSON
+
+        self._console.print(JSON.from_data(data, indent=2, default=str))
 
     def render(self, *renderables, width=None):
         """

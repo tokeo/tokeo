@@ -8,6 +8,9 @@ managing hosts, and creating interactive shells for task execution. It supports
 both sequential and parallel execution, SSH-based remote operations, and an
 interactive command-line interface.
 
+The shell and its lists build on the extensions ```tokeo.ext.tui.input``` and
+```tokeo.ext.tui.output```; enable them together with this one.
+
 ### Example:
 
 ```python
@@ -53,20 +56,14 @@ import paramiko.agent
 from paramiko.hostkeys import HostKeys, HostKeyEntry
 from argparse import ArgumentParser
 import shlex
-from prompt_toolkit import prompt
-from prompt_toolkit.patch_stdout import patch_stdout
-from prompt_toolkit.history import InMemoryHistory
-from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-from prompt_toolkit.completion import NestedCompleter, WordCompleter
 from cement.core.meta import MetaMixin
 from cement import ex
-from cement.core.foundation import SIGNALS
-from cement.core.exc import CaughtSignal
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.base import hasprops, getprop, default_when_blank
 from tokeo.core.utils.json import json_dump, TokeoJsonUnknownNoneEncoder
 from tokeo.core.utils import sanitize
 from tokeo.ext.argparse import Controller
+from tokeo.ext.tui import require_extensions
 
 
 class TokeoAutomateError(TokeoError):
@@ -1964,94 +1961,79 @@ class TokeoAutomateShell:
 
     def shell_completion(self):
         """
-        Build tab completion handlers for shell commands.
+        Build tab completion for the shell commands.
 
-        Creates and caches a nested completer for task names, host names,
-        and command options to provide autocompletion in the interactive shell.
+        Completes the commands, the task ids for ```show``` and the task ids,
+        task:host ids and options for ```run```.
 
         ### Returns
 
-        - **NestedCompleter**: Completion handler for shell commands
+        - **dict**: The commands as nested dict for ```app.tui.input```
 
         """
         if self._shell_completion is None:
-            # create a completion set for tasks and tasks by hosts
+            # the shell of app.tui.input has loaded prompt_toolkit already
+            from prompt_toolkit.completion import WordCompleter
+
             tasks_completion = []
             tasks_host_completion = []
             for task_id in self.app.automate.tasks:
                 tasks_completion.append(f'{task_id}')
                 for host_id in self.app.automate.tasks[task_id]['connection']['hosts']:
                     tasks_host_completion.append(f'{task_id}:{host_id["id"]}')
-            # create completer
             wordlist_show = WordCompleter(sorted(set(tasks_completion)))
             wordlist_run = WordCompleter(
                 sorted(set(tasks_completion + tasks_host_completion))
                 + ['--with-hosts', '--with-connection', '--continue', '--verbose', '--as-json', '--without-output', '--threads']
             )
-            self._shell_completion = NestedCompleter.from_nested_dict(
-                {
-                    'list': None,
-                    'show': wordlist_show,
-                    'run': wordlist_run,
-                    'hosts': {
-                        'list': None,
-                    },
-                    'hostgroups': {
-                        'list': None,
-                    },
-                    'connections': {
-                        'list': None,
-                    },
-                    'exit': None,
-                    'quit': None,
-                },
-            )
-        # return the completion set
+            self._shell_completion = {
+                'list': None,
+                'show': wordlist_show,
+                'run': wordlist_run,
+                'hosts': {'list': None},
+                'hostgroups': {'list': None},
+                'connections': {'list': None},
+                'exit': None,
+                'quit': None,
+            }
         return self._shell_completion
 
     def shell_history(self):
         """
-        Create command history for the interactive shell.
-
-        Initializes the shell history with default commands to help
-        users get started.
+        Get the lines the shell history starts with.
 
         ### Returns
 
-        - **InMemoryHistory**: History handler with initial commands
+        - **list**: The lines, to find them by arrow up
 
         """
-        return InMemoryHistory(
-            [
-                'exit',
-                'list',
-            ]
-        )
+        return ['exit', 'list']
 
     def handle_command_list(self, args):
         """
-        Handle the 'list' command to display available tasks.
-
-        Lists all configured tasks with their identifiers and names.
+        Handle the 'list' command to show the configured tasks.
 
         ### Args
 
         - **args** (Namespace): Command arguments from ArgumentParser
 
         """
-        self.app.log.debug(datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %z (%Z)'))
-        for task_id in self.app.automate.tasks:
-            task = self.app.automate.tasks[task_id]
-            if task['id'] == task['name']:
-                print(f'{task["id"]}')
-            else:
-                print(f'{task["id"]} - {task["name"]}')
+        output = self.app.tui.output
+        rows = [
+            [
+                task['id'],
+                task['name'],
+                f'{task["module"]}:{getattr(task["func"], "__name__", task["func"])}',
+                len(task['connection']['hosts']),
+            ]
+            for task in self.app.automate.tasks.values()
+        ]
+        header = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %z (%Z)')
+        output.print(header, output.table([('id', 'left', 'full'), 'name', 'function', ('hosts', 'right')], rows, title='tasks'))
 
     def handle_command_show(self, args):
         """
-        Handle the 'show' command to display task details.
-
-        Shows the configuration details of specified tasks.
+        Handle the 'show' command to show the configuration of tasks.
 
         ### Args
 
@@ -2059,11 +2041,10 @@ class TokeoAutomateShell:
 
         """
         for task_id in args.task:
-            try:
-                task = self.app.automate.tasks[task_id]
-                print(f'{task}')
-            except Exception as err:
-                self.app.log.error(err)
+            if task_id not in self.app.automate.tasks:
+                self.app.log.error(f'Task {task_id} not found!')
+                continue
+            self.app.tui.output.json(self.app.automate.tasks[task_id])
 
     def handle_command_run(self, args):
         """
@@ -2112,32 +2093,33 @@ class TokeoAutomateShell:
 
     def handle_subcommand_commands(self, args):
         """
-        Handle the hosts, hostgroups, and connections list subcommands.
+        Handle the hosts, hostgroups and connections list subcommands.
 
-        Processes subcommands to list hosts, host groups, and connection
-        configurations.
+        Shows them as tables without passwords; which credentials are set
+        shows the column auth.
 
         ### Args
 
         - **args** (Namespace): Command arguments from ArgumentParser
 
         """
-        try:
-            if args.cmd == 'hosts.list':
-                for host in self.app.automate.hosts:
-                    print(f'{host}: {self.app.automate.hosts[host]}')
-            elif args.cmd == 'groups.list':
-                for hostgroup in self.app.automate.hostgroups:
-                    print(f'{hostgroup}: {self.app.automate.hostgroups[hostgroup]}')
-            elif args.cmd == 'conns.list':
-                # print connection list but ensure _defaults is first printed
-                conn = '_defaults'
-                print(f'{conn}: {self.app.automate.connections[conn]}')
-                for conn in self.app.automate.connections:
-                    if conn != '_defaults':
-                        print(f'{conn}: {self.app.automate.connections[conn]}')
-        except Exception as err:
-            self.app.log.error(err)
+        output = self.app.tui.output
+        automate = self.app.automate
+        if args.cmd == 'hosts.list':
+            rows = [[h['id'], h['name'], h['host'], h.get('port'), h.get('user'), _auth(h)] for h in automate.hosts.values()]
+            output.print(output.table([('id', 'left', 'full'), 'name', 'host', ('port', 'right'), 'user', 'auth'], rows, title='hosts'))
+        elif args.cmd == 'groups.list':
+            rows = [[group, _host_ids(hosts)] for group, hosts in automate.hostgroups.items()]
+            output.print(output.table([('group', 'left', 'full'), 'hosts'], rows, title='hostgroups'))
+        elif args.cmd == 'conns.list':
+            # the defaults first
+            names = ['_defaults', *(name for name in automate.connections if name != '_defaults')]
+            rows = [
+                [name, c.get('name'), c.get('user'), c.get('port'), _host_ids(c.get('hosts') or ()), _auth(c)]
+                for name, c in ((name, automate.connections[name]) for name in names)
+            ]
+            columns = [('id', 'left', 'full'), 'name', 'user', ('port', 'right'), 'hosts', 'auth']
+            output.print(output.table(columns, rows, title='connections'))
 
     def handle_subcommand_help(self, args):
         """
@@ -2250,78 +2232,35 @@ class TokeoAutomateShell:
             # if parse was ok but only help, err == 0, else err != 0
             return err.code == 0
 
-        # execute command
+        # a failing command raises, the shell shows the error and keeps the line
         if 'func' in args:
-            try:
-                print('')
-                args.func(args)
-                return True
-            except Exception as err:
-                self.app.log.debug(f'{type(err)}: {err}')
-                return False
+            print('')
+            args.func(args)
+            return True
 
         # unusual empty but valid command, can be added to history
         return True
 
-    def shell(self):
+    def shell(self, **session):
         """
-        Run the interactive shell.
+        Run the interactive shell until ```exit```, ```quit``` or Ctrl-D.
 
-        Starts an interactive loop that processes user commands until
-        the user exits or a signal is caught.
+        ### Args
 
-        ### Notes
-
-        - Uses prompt_toolkit for interactive command input
-        - Handles keyboard interrupts, EOF signals, and exceptions
-        - Maintains command history and provides auto-suggestions
+        - **session**: More options for the shell of ```app.tui.input```
 
         """
-        self.app.log.info('Welcome to automate interactive shell.')
-        # build in-memory history for interactive shell
-        history = self.shell_history()
-        # initilize the user_input
-        user_input = ''
-        # get std.output and prevent ruining interface
-        with patch_stdout(raw=True):
-            # loop interactove shell
-            while True:
-                # catch exceptions
-                try:
-                    user_input = prompt(
-                        'Automate> ',
-                        completer=self.shell_completion(),
-                        history=history,
-                        auto_suggest=AutoSuggestFromHistory(),
-                        default=user_input,
-                    )
-                    if self.command(user_input):
-                        # add input to history when a successful command
-                        # but do not repeat as input
-                        history.store_string(user_input)
-                        user_input = ''
-                    else:
-                        # repeat the error input to edit and correct
-                        pass
 
-                except KeyboardInterrupt:
-                    # we don't support Ctrl-C but reset input
-                    user_input = ''
-                    continue
-                except EOFError:
-                    # we do support Ctrl-D
-                    self.app.log.info('bye bye using automate shell...')
-                    break
-                except CaughtSignal as err:
-                    # check for catched signals and allow shutdown by signals
-                    if err.signum in SIGNALS:
-                        break
-                except Exception as err:
-                    # print out the exception and continue
-                    self.app.log.debug(f'Logged unknown exception: {err}')
-
-                # make one line space
+        def command(line):
+            # an empty line between two commands
+            try:
+                return self.command(line)
+            finally:
                 print('')
+
+        self.app.log.info('Welcome to automate interactive shell.')
+        self.app.tui.input.shell(command, prompt='Automate> ', completer=self.shell_completion(), history=self.shell_history(), **session)
+        self.app.log.info('bye bye using automate shell...')
 
 
 class TokeoAutomateController(Controller):
@@ -2349,38 +2288,6 @@ class TokeoAutomateController(Controller):
 
     def _setup(self, app):
         super(TokeoAutomateController, self)._setup(app)
-
-    def _log_info_bw(self, *args):
-        """Log an info message in black and white (no colors)."""
-        print('INFO:', *args)
-
-    def _log_warning_bw(self, *args):
-        """Log a warning message in black and white (no colors)."""
-        print('WARN:', *args)
-
-    def _log_error_bw(self, *args):
-        """Log an error message in black and white (no colors)."""
-        print('ERR:', *args)
-
-    def _log_debug_bw(self, *args):
-        """Log a debug message in black and white (no colors)."""
-        print('DEBUG:', *args)
-
-    def _log_info(self, *args):
-        """Log an info message with green color."""
-        print('\033[32mINFO:', *args, '\033[39m')
-
-    def _log_warning(self, *args):
-        """Log a warning message with yellow color."""
-        print('\033[33mWARN:', *args, '\033[39m')
-
-    def _log_error(self, *args):
-        """Log an error message with red color."""
-        print('\033[31mERR:', *args, '\033[39m')
-
-    def _log_debug(self, *args):
-        """Log a debug message with purple color."""
-        print('\033[35mDEBUG:', *args, '\033[39m')
 
     @ex(
         help='run task(s)',
@@ -2510,53 +2417,28 @@ class TokeoAutomateController(Controller):
     @ex(
         help='start the automate command shell',
         description='Spin up the interactive automation shell.',
-        arguments=[
-            (
-                ['--no-colors'],
-                dict(
-                    action='store_true',
-                    help='do not use colored output',
-                ),
-            ),
-        ],
     )
     def shell(self):
         """
         Start the interactive automation shell.
 
-        Launches an interactive shell for running automation tasks,
-        listing configurations, and managing automation.
-
-        ### Notes
-
-        - Configures console output colors based on command options
-        - Provides command history and tab completion
-        - Supports both color and monochrome output modes
+        Launches an interactive shell for running automation tasks, listing
+        configurations, and managing automation, with command history and
+        tab completion.
 
         """
-        # on '--shell' every log call is intentionally redirected to terse
-        # colored print() so the whole session is interactive: this is an
-        # explicit choice, not a side effect. it is safe because '--shell'
-        # runs as its own process that ends when the shell exits, so there
-        # is nothing to restore afterwards. note: while in the shell the
-        # output goes to the console only (print), so a configured file
-        # log target does not receive these shell messages.
-
-        # use colored output?
-        if self.app.pargs.no_colors:
-            self.app.log.info = self._log_info_bw
-            self.app.log.warning = self._log_warning_bw
-            self.app.log.error = self._log_error_bw
-            self.app.log.debug = self._log_debug_bw
-        else:
-            self.app.log.info = self._log_info
-            self.app.log.warning = self._log_warning
-            self.app.log.error = self._log_error
-            self.app.log.debug = self._log_debug
-
-        # start the shell
         shell = TokeoAutomateShell(self.app)
         shell.launch()
+
+
+def _host_ids(hosts):
+    """Join the ids of hosts, given as host dicts or as ids."""
+    return ', '.join(host['id'] if isinstance(host, dict) else str(host) for host in hosts)
+
+
+def _auth(entry):
+    """Name the credentials set for a host or connection, never their values."""
+    return ', '.join(key for key in ('identity', 'password', 'sudo') if entry.get(key))
 
 
 def tokeo_automate_extend_app(app):
@@ -2568,6 +2450,7 @@ def tokeo_automate_extend_app(app):
     - **app** (Application): The Cement application instance
 
     """
+    require_extensions(app, 'tokeo.ext.automate', 'tokeo.ext.tui.input', 'tokeo.ext.tui.output')
     app.extend('automate', TokeoAutomate(app))
     app.automate._setup(app)
 

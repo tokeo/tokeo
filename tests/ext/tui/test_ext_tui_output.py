@@ -156,3 +156,15 @@ def test_table_shrinks_further_in_a_narrow_terminal(output):
     table = narrow.table([('queue', 'left', 'full'), 'actor', 'flags'], rows)
     row = next(line for line in narrow.render(table).splitlines() if 'orders_unparalleled' in line)
     assert len(row) <= 40 and row.split()[0] == 'orders_unparalleled' and '…' in row
+
+
+def test_json_indented_and_colored_in_a_terminal_only(output):
+    out, buffer = output
+    data = dict(id='deploy', hosts=['web1', 'web2'], when=object)
+    out.json(data)
+    assert buffer.getvalue().startswith('{\n  "id": "deploy",\n  "hosts": [\n    "web1",')
+    assert '"when": "<class \'object\'>"' in buffer.getvalue() and '\x1b' not in buffer.getvalue()
+    terminal = io.StringIO()
+    out._console = Console(file=terminal, width=60, force_terminal=True)
+    out.json(data)
+    assert '\x1b[' in terminal.getvalue()
