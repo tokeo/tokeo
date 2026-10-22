@@ -144,8 +144,7 @@ class TokeoDramatiqController(Controller):
         ### Raises
 
         - **TokeoDramatiqError**: If the switches do not fit together, a
-            change misses --yes, a queue refuses the change, or the state
-            is shown without the extension tokeo.ext.tui.output
+            change misses --yes, or a queue refuses the change
 
         ### Notes
 
@@ -185,7 +184,7 @@ class TokeoDramatiqController(Controller):
                 for state in result:
                     state['dead_letters'] = queues.peek_dead(state['name'], limit)
             if not pargs.json:
-                output = _tui_output(self.app, 'queues')
+                output = self.app.tui.output
                 output.print(_queue_table(output, result), *_dead_letter_tables(output, result))
                 return
         self.app.print(json_dump(result, indent=2) if pargs.json else '\n'.join(lines))
@@ -206,11 +205,6 @@ class TokeoDramatiqController(Controller):
         """
         Show the dramatiq workers and queues.
 
-        ### Raises
-
-        - **TokeoDramatiqError**: If the extension tokeo.ext.tui.output is not
-            enabled for the display
-
         ### Notes
 
         - The workers send heartbeats only with ```monitoring: true```
@@ -223,7 +217,7 @@ class TokeoDramatiqController(Controller):
         if pargs.json and not pargs.follow:
             self.app.print(json_dump(monitor.snapshot(), indent=2))
             return
-        output = _tui_output(self.app, 'monitor')
+        output = self.app.tui.output
         if not pargs.follow:
             output.print(*_monitor_view(output, monitor.snapshot(), self.app._meta.label))
         elif pargs.json:
@@ -486,14 +480,6 @@ class TokeoDramatiqController(Controller):
 def _switch(action):
     """Name the switch of a queues action."""
     return '--' + action.replace('_', '-')
-
-
-def _tui_output(app, command):
-    """Get the tui output for the display of a command."""
-    tui = getattr(app, 'tui', None)
-    if tui is None:
-        raise TokeoDramatiqError(f'Enable the extension tokeo.ext.tui.output for the dramatiq {command}!')
-    return tui.output
 
 
 #: Hints on a queue and their style

@@ -17,9 +17,10 @@ limits through diskcache locks, and clear errors when RabbitMQ is not reachable.
 
 .. note::
 
-    The displays of ```dramatiq queues``` and ```dramatiq monitor``` need the
-    extension ```tokeo.ext.tui.output``` (and with it the package ```rich```).
-    Their ```--json``` output works without it.
+    The extension builds on ```tokeo.ext.tui.output``` (and with it the
+    package ```rich```) for the displays of ```dramatiq queues``` and
+    ```dramatiq monitor```. Enable both; without it the app stops at start
+    with a ```TokeoTuiError```.
 
 ## 1. How dramatiq works
 
@@ -85,7 +86,8 @@ therefore be safe to run twice (idempotent).
 
 ## 2. Quick start
 
-Enable the extension and point it at your actors and RabbitMQ:
+Enable ```tokeo.ext.tui.output``` and ```tokeo.ext.dramatiq``` in the extensions
+of the app and point it at your actors and RabbitMQ:
 
 ```yaml
 # config/myapp/base.d/dramatiq.yaml

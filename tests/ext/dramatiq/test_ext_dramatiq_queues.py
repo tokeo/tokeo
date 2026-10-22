@@ -331,8 +331,8 @@ def command(tmp, dramatiq_app, server, capsys, monkeypatch):
     # a wide output, so no table wraps
     monkeypatch.setenv('COLUMNS', '160')
 
-    def run(*options, tui=True):
-        with dramatiq_app(tmp, ['dramatiq', 'queues', *options], tui=tui) as app:
+    def run(*options):
+        with dramatiq_app(tmp, ['dramatiq', 'queues', *options]) as app:
             dramatiq.actor(lambda: None, actor_name='send_mail', queue_name='mail', broker=app.dramatiq.broker)
             app.run()
         return capsys.readouterr().out
@@ -355,15 +355,9 @@ def test_command_state_table(command, server):
     assert lines[9].split()[1:] == ['send_mail', '0', "(('a@b.c',),", '{})']
 
 
-def test_command_state_needs_tui_output(command, server):
-    with pytest.raises(TokeoDramatiqError, match='Enable the extension tokeo.ext.tui.output for the dramatiq queues!'):
-        command('mail', tui=False)
-
-
 def test_command_json(command, server):
     server.add('mail', b'1')
-    # json needs no tui
-    (state,) = json.loads(command('--json', tui=False))
+    (state,) = json.loads(command('--json'))
     assert (state['name'], state['ready']) == ('mail', 1)
 
 

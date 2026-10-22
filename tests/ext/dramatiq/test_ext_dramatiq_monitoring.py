@@ -15,27 +15,28 @@ import pytest
 import dramatiq
 from dramatiq.brokers.stub import StubBroker
 from cement.utils.misc import init_defaults
-from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoDramatiqConnectionError, TokeoDramatiqError
+from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoDramatiqConnectionError
 from tokeo.ext.dramatiq import monitoring
 from tokeo.ext.dramatiq.base import _details
 from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
 from tokeo.ext.dramatiq.controller import _duration, _monitor_view
 from tokeo.ext.tui.output import TokeoTuiOutput
+from tokeo.main import TokeoTest
+from tokeo.ext.tui import TokeoTuiError
 from conftest import DramatiqTest
 
 
-class MonitorTest(DramatiqTest):
+class WithoutTuiTest(TokeoTest):
 
     class Meta:
         extensions = [
             'tokeo.ext.print',
             'tokeo.ext.diskcache',
-            'tokeo.ext.tui.output',
             'tokeo.ext.dramatiq',
         ]
 
 
-def _monitor_app(tmp, argv=None, cls=MonitorTest, **config):
+def _monitor_app(tmp, argv=None, cls=DramatiqTest, **config):
     d = init_defaults('diskcache', 'dramatiq')
     d['diskcache']['directory'] = tmp.dir
     d['dramatiq'].update(config)
@@ -406,8 +407,8 @@ def test_monitor_view_without_workers(tmp, monitoring, note):
 @pytest.fixture
 def command(tmp, monkeypatch):
     # runs the monitor command on a fixed snapshot
-    def run(*options, cls=MonitorTest):
-        with _monitor_app(tmp, ['dramatiq', 'monitor', *options], cls=cls) as app:
+    def run(*options):
+        with _monitor_app(tmp, ['dramatiq', 'monitor', *options]) as app:
             calls = []
 
             def snapshot(wait=0):
@@ -416,8 +417,7 @@ def command(tmp, monkeypatch):
 
             monkeypatch.setattr(app.dramatiq.monitor, 'snapshot', snapshot)
             follows = []
-            if hasattr(app, 'tui'):
-                monkeypatch.setattr(app.tui.output, 'follow', lambda render, **kw: follows.append((render(), kw)))
+            monkeypatch.setattr(app.tui.output, 'follow', lambda render, **kw: follows.append((render(), kw)))
             app.run()
             return app, calls, follows
 
@@ -430,14 +430,10 @@ def test_command_json(command):
     assert calls == [0]
 
 
-def test_command_json_needs_no_tui(command):
-    app, calls, _ = command('--json', cls=DramatiqTest)
-    assert json.loads(app.last_rendered[1])['interval'] == 5
-
-
-def test_command_text_needs_tui_output(command):
-    with pytest.raises(TokeoDramatiqError, match='Enable the extension tokeo.ext.tui.output for the dramatiq monitor!'):
-        command(cls=DramatiqTest)
+def test_needs_the_tui_output_extension(tmp):
+    with pytest.raises(TokeoTuiError, match='The extension tokeo.ext.dramatiq needs tokeo.ext.tui.output, add it to the extensions'):
+        with _monitor_app(tmp, cls=WithoutTuiTest):
+            pass
 
 
 def test_command_text(command, capsys):

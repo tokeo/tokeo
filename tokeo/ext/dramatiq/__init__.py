@@ -27,6 +27,7 @@ from tokeo.ext.dramatiq.base import (  # noqa: F401
     TokeoDramatiq,
 )
 from tokeo.ext.dramatiq.controller import TokeoDramatiqController
+from tokeo.ext.tui import require_extensions
 
 
 def tokeo_dramatiq_pdoc_pre_render(app):
@@ -128,7 +129,12 @@ def tokeo_dramatiq_extend_app(app):
     - It creates the TokeoDramatiq instance and attaches it to the app
         as app.dramatiq
 
+    ### Raises
+
+    - **TokeoTuiError**: If the extension tokeo.ext.tui.output is not enabled
+
     """
+    require_extensions(app, 'tokeo.ext.dramatiq', 'tokeo.ext.tui.output')
     app.extend('dramatiq', TokeoDramatiq(app))
     app.dramatiq._setup(app)
 
