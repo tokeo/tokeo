@@ -42,6 +42,7 @@ app.inspect(complex_object, debug=True)
 """
 
 from __future__ import annotations
+import sys
 from typing import Any, Dict, Union, TYPE_CHECKING
 from cement.core import output
 
@@ -88,7 +89,8 @@ def register_tokeo_print(app: App) -> None:
             (prints 40 of these)
 
         """
-        app.render(dict(args=args, name=name, sep=sep, end=end, divider=divider), handler='print')
+        # the current stdout, render binds its default on import
+        app.render(dict(args=args, name=name, sep=sep, end=end, divider=divider), out=sys.stdout, handler='print')
 
     app.extend('print', _print)
 
@@ -136,6 +138,8 @@ def register_tokeo_print(app: App) -> None:
                 debug=debug,
                 divider=divider,
             ),
+            # the current stdout, render binds its default on import
+            out=sys.stdout,
             handler='inspect',
         )
 
