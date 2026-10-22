@@ -41,6 +41,9 @@ class Tokeo(App):
         # call sys.exit() on close
         exit_on_close = True
 
+        # enforce compatibility for cement v3.2+
+        framework_logging = False
+
         # load additional framework extensions
         extensions = [
             'colorlog',

@@ -230,12 +230,16 @@ def test_serve_invalid_use_spawn_config(serve, value):
 # --- verbosity -----------------------------------------------------------------
 
 
+# cement 3.0.x warns on --debug in sys.argv, our --debug is the app debug only
+DEBUG_ARGV = pytest.mark.filterwarnings(r'ignore:App\.Meta\.framework_logging:DeprecationWarning')
+
+
 @pytest.mark.parametrize(
     'options, debug, verbose, skip_logging',
     [
         ([], False, 0, False),
-        ([], True, 1, False),
-        (['--skip-logging'], True, 0, True),
+        pytest.param([], True, 1, False, marks=DEBUG_ARGV),
+        pytest.param(['--skip-logging'], True, 0, True, marks=DEBUG_ARGV),
         (['--skip-logging'], False, 0, True),
     ],
     ids=['default', 'debug', 'debug_skip_logging', 'skip_logging'],

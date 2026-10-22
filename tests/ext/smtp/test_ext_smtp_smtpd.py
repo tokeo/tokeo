@@ -131,7 +131,7 @@ def test_smtp_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
     with BackgroundSmtpd(_tls_settings(mode, cert)) as smtpd:
         with SmtpTest(host='127.0.0.1', port=smtpd.port, timeout=5, **client, **verify) as app:
             if delivered:
-                assert app.mail.send('body over tls') is True
+                assert app.mail.send('body over tls') == {}
             else:
                 # the self-signed certificate is not trusted by the system, the
                 # other one does not match the connected host
@@ -198,7 +198,7 @@ def test_smtp_qp_delivered_to_smtpd(tmp):
                 x_binary=(12, 'hallo', -1),
             )
 
-    assert sent is True
+    assert sent == {}
     assert len(smtpd.events.messages) == 1
     data, _ = smtpd.events.messages[0]
     msg = email.message_from_bytes(data)

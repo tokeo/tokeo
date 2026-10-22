@@ -215,6 +215,16 @@ your_app cache set counter --value 1 --value-type int
 your_app cache get counter
 ```
 
+### Control Debug Logging
+
+```bash
+# App debug logs
+your_app --debug command
+
+# Framework debug logs of cement, --debug does not enable them
+CEMENT_LOG=1 your_app command
+```
+
 <br/>
 
 ## 🤖 Governed AI Agents — the optional tokeo-fundi extension

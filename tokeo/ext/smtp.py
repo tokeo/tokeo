@@ -275,8 +275,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         ### Returns
 
-        - **bool**: ```True``` if message is sent successfully, ```False```
-          otherwise
+        - **dict**: The recipients smtplib refused, each with its error;
+          empty if the message reached all recipients
 
         ### Raises
 
@@ -359,9 +359,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         if len(res) > 0:  # pragma: nocover  # defensive: unreachable - Mailpit accepts everything
             self.app.log.error(f'SMTPHandler Errors: {res}')
-            return False
-        else:
-            return True
+        # enforce compatibility for cement v3.2+
+        return res
 
     def _host_cert_context(self, **params):
         """
@@ -682,7 +681,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         ### Returns
 
-        - **bool**: Result from the send() method
+        - **dict**: Result from the send() method
 
         ### Notes
 
