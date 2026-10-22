@@ -24,11 +24,11 @@ from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError
 
 class TokeoDramatiqController(Controller):
     """
-    Cement controller that drives Dramatiq workers and locks via CLI.
+    The ```dramatiq``` commands of the app.
 
-    Two commands: ```serve``` spawns the configured worker pool (process +
-    thread counts, optional --watch path for actor reload during dev) and
-    ```locks``` inspects or purges the distributed locks held in diskcache.
+    ```serve``` starts the worker pool, ```queues``` shows and maintains the
+    queues, ```monitor``` shows workers and queues, ```locks``` shows or
+    purges the diskcache locks.
 
     """
 

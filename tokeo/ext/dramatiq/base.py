@@ -88,15 +88,13 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
     """
     Extended RabbitMQ broker with support for single-active-consumer queues.
 
-    This class extends the standard Dramatiq RabbitmqBroker to add support for
-    the RabbitMQ single-active-consumer feature. This feature ensures that only
-    one consumer processes messages from a queue at a time, which is useful for
-    tasks that require strict ordering or exclusive access to resources.
+    A queue whose name contains '_unparalleled' is declared with the RabbitMQ
+    single-active-consumer flag: only one worker process consumes it at a
+    time. Inside that process its worker threads still run several messages
+    in parallel; a strict order needs one thread or a prefetch of 1.
 
     ### Notes
 
-    - To use this feature, simply include '_unparalleled' in your queue name,
-        for example: 'my_ordered_tasks_unparalleled'
     - Implementation based on solution from the Dramatiq users group:
         https://groups.io/g/dramatiq-users/topic/77913723
     - Also accepts auth_identity/auth_password and merges them into the

@@ -1,50 +1,13 @@
 """
 Tokeo Dramatiq Extension Module.
 
-Dramatiq integration for asynchronous task processing in Tokeo applications.
+Background tasks for Tokeo applications with dramatiq and RabbitMQ: the broker
+from the app config, ```app.dramatiq.actor``` for actors, the ```dramatiq```
+commands ```serve```, ```queues```, ```monitor``` and ```locks```, queue
+management as ```app.dramatiq.queues```, worker monitoring as
+```app.dramatiq.monitor``` and rate limits by diskcache locks.
 
-Wraps Dramatiq behind a Tokeo extension: a RabbitMQ broker subclass with a
-queue-naming convention for single-active-consumer queues, a Cement
-controller that drives ```dramatiq``` workers from the application config, and
-optional integration with the diskcache locks for cross-worker rate limiting.
-
-### Features
-
-- Single-active-consumer queues via the '_unparalleled' name suffix
-    (RabbitMQ x-single-active-consumer flag set on declare)
-
-- Distributed locks and rate limiting on actors when the diskcache
-    extension is loaded (best-effort: missing without diskcache)
-
-- ```dramatiq serve``` controller with worker process/thread counts and
-    optional --watch path for actor hot-reload during development
-
-- pdoc render hooks that swap the runtime decorator for a doc-friendly
-    stub so generated docs show ```@dramatiq.actor``` signatures cleanly
-
-### Example
-
-```python
-from tokeo.ext.appshare import app
-
-# Register an actor
-@app.dramatiq.actor(queue_name="default")
-def process_data(data_id):
-    # This will be executed by workers asynchronously
-    results = perform_complex_calculations(data_id)
-    store_results(results)
-
-# Enqueue a task
-process_data.send(42)
-
-# For rate-limited actors, use the locks
-@app.dramatiq.actor(queue_name="api_calls")
-@app.dramatiq.locks.throttle(count=10, per_seconds=60)
-def call_external_api(resource_id):
-    # Limited to 10 calls per minute across all workers
-    return make_api_request(resource_id)
-```
-
+.. include:: ./DRAMATIQ.md
 """
 
 import dramatiq
