@@ -5,7 +5,6 @@ The shell gets its keys from a pipe; one test runs a real app in a pseudo
 terminal and reads its screen by pyte, a terminal emulator.
 """
 
-import os
 import sys
 import json
 
@@ -122,10 +121,10 @@ def test_shell_shows_a_failing_command(shell, monkeypatch):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_shell_in_a_terminal():
-    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'automate_tests_shell_probe.py')
+    probe = 'tests.ext.automate.automate_tests_shell_probe'
     # each input waits for the output of the one before and the prompt below it
     steps = [(None, b'list\r'), ('function', b'show nope\r'), ('Task nope not found!', b'exit\r')]
-    with Terminal([sys.executable, probe, 'automate', 'shell'], rows=24, columns=120) as terminal:
+    with Terminal([sys.executable, '-m', probe, 'automate', 'shell'], rows=24, columns=120) as terminal:
         for wait, keys in steps:
             shown = terminal.wait_for(lambda lines: lines[-1] == 'Automate>' and (wait is None or any(wait in line for line in lines)))
             assert shown is not None, '\n'.join(terminal.screen.display)

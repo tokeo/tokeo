@@ -28,6 +28,7 @@ from tokeo.ext.smtpd import (
     _resolve_events_handler,
     _plan,
 )
+from tests.utils import ROOT
 from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
 
@@ -164,8 +165,7 @@ def test_extension_loads_into_cement_app():
 # --- process tests: real termination behaviour ----------------------------------
 
 
-PROBE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'smtpd_tests_serve_probe.py')
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+PROBE = 'tests.ext.smtpd.smtpd_tests_serve_probe'
 
 
 def _free_port():
@@ -194,11 +194,12 @@ def _spawn(config, names=None):
     # failing probe can report its actual error instead of a blind timeout
     log = tempfile.NamedTemporaryFile(mode='w+', prefix='smtpd-probe-', suffix='.log', delete=False)
     proc = subprocess.Popen(
-        [sys.executable, PROBE, json.dumps(config), json.dumps(names)],
+        [sys.executable, '-m', PROBE, json.dumps(config), json.dumps(names)],
         stdout=log,
         stderr=subprocess.STDOUT,
         start_new_session=True,
-        env=dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, [ROOT, os.environ.get('PYTHONPATH')]))),
+        env=dict(os.environ),
+        cwd=ROOT,
     )
     proc.probe_log = log.name
     return proc

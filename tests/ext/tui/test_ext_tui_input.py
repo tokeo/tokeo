@@ -5,7 +5,6 @@ The shell gets its keys from a pipe; one test runs a real app in a pseudo
 terminal and reads its screen by pyte, a terminal emulator.
 """
 
-import os
 import sys
 import signal
 import logging
@@ -122,8 +121,8 @@ def test_log_handlers_write_to_the_shell_meanwhile(shell):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_output_of_other_threads_appears_above_the_prompt():
-    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tui_tests_input_probe.py')
-    with Terminal([sys.executable, probe], rows=12, columns=80) as terminal:
+    probe = 'tests.ext.tui.tui_tests_input_probe'
+    with Terminal([sys.executable, '-m', probe], rows=12, columns=80) as terminal:
         shown = terminal.wait_for(lambda lines: 'MARK-APP-PRINT' in ''.join(lines) and lines[-1] == 'Probe>')
         assert shown is not None, '\n'.join(terminal.screen.display)
         terminal.send(b'exit\r')

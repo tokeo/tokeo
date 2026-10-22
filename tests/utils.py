@@ -6,7 +6,7 @@ import pytest
 from contextlib import contextmanager
 from io import StringIO
 
-# the root of the project, on the path of the programs started by the tests
+# the root of the project, working directory of the programs the tests start
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -37,9 +37,9 @@ class Terminal:
 
         self.master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', self.rows, self.columns, 0, 0))
-        env = dict(os.environ, TERM='xterm-256color', PYTHONPATH=os.pathsep.join(filter(None, [ROOT, os.environ.get('PYTHONPATH')])))
+        env = dict(os.environ, TERM='xterm-256color')
         session = dict(start_new_session=True, preexec_fn=lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0)) if self.ctty else {}
-        self.process = subprocess.Popen(self.args, stdin=slave, stdout=slave, stderr=slave, env=env, **session)
+        self.process = subprocess.Popen(self.args, stdin=slave, stdout=slave, stderr=slave, env=env, cwd=ROOT, **session)
         os.close(slave)
         self.screen = pyte.Screen(self.columns, self.rows)
         self.stream = pyte.ByteStream(self.screen)

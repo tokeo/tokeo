@@ -5,7 +5,6 @@ The heartbeats of the middleware are recorded instead of sent, the monitor
 gets them by ```receive```; the way through rabbitmq is in the live tests.
 """
 
-import os
 import sys
 import json
 import time
@@ -456,8 +455,8 @@ def test_command_interval_checked(command):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_command_follow_ends_on_ctrl_c_in_a_terminal():
-    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib', 'dramatiq_tests_monitor_probe.py')
-    args = [sys.executable, probe, 'dramatiq', 'monitor', '--follow', '--interval', '1']
+    probe = 'tests.ext.dramatiq.lib.dramatiq_tests_monitor_probe'
+    args = [sys.executable, '-m', probe, 'dramatiq', 'monitor', '--follow', '--interval', '1']
     with Terminal(args, rows=24, columns=100, ctty=True) as terminal:
         shown = terminal.wait_for(lambda lines: any('every 1 s  (Ctrl-C to quit)' in line for line in lines))
         assert shown is not None, terminal.raw.decode(errors='replace')[-2000:]

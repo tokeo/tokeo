@@ -5,7 +5,6 @@ The shell gets its keys from a pipe; one test runs a real app in a pseudo
 terminal and reads its screen by pyte, a terminal emulator.
 """
 
-import os
 import sys
 
 import pytest
@@ -130,8 +129,8 @@ def test_shell_shows_a_failing_command(started, monkeypatch):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_shell_shows_logs_of_tasks_above_the_prompt():
-    probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scheduler_tests_shell_probe.py')
-    with Terminal([sys.executable, probe, 'scheduler', 'launch', '--shell'], rows=16, columns=100) as terminal:
+    probe = 'tests.ext.scheduler.scheduler_tests_shell_probe'
+    with Terminal([sys.executable, '-m', probe, 'scheduler', 'launch', '--shell'], rows=16, columns=100) as terminal:
         assert terminal.wait_for(lambda lines: lines[-1] == 'Scheduler>'), '\n'.join(terminal.screen.display)
         terminal.send(b'tasks fire 1\r')
         shown = terminal.wait_for(lambda lines: any(line.endswith('MARK-PING') for line in lines) and lines[-1] == 'Scheduler>')

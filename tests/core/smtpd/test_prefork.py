@@ -26,6 +26,7 @@ from tokeo.core.smtpd.prefork import (
     is_prefork,
     run_prefork,
 )
+from tests.utils import ROOT
 
 
 LINUX = sys.platform.startswith('linux')
@@ -42,15 +43,16 @@ def _read_pdeathsig():
     return out.value
 
 
-PROBE = os.path.join(os.path.dirname(__file__), 'lib', 'smtpd_tests_prefork_probe.py')
+PROBE = 'tests.core.smtpd.lib.smtpd_tests_prefork_probe'
 
 
 def _spawn(*args):
     """Run a probe scenario as its own process group."""
     return subprocess.Popen(
-        [sys.executable, PROBE, *[str(arg) for arg in args]],
+        [sys.executable, '-m', PROBE, *[str(arg) for arg in args]],
         start_new_session=True,
         env=dict(os.environ),
+        cwd=ROOT,
     )
 
 
