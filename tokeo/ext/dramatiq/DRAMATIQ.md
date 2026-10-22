@@ -100,18 +100,6 @@ dramatiq:
     auth_password: guest
 ```
 
-The workers start your app through the ```serve``` entry point, a function that
-sets the app up without running a command:
-
-```python
-# myapp/main.py
-def dramatiq():
-    app = MyApp()
-    # dramatiq handles the signals of its workers itself
-    app._meta.catch_signals = None
-    app.setup()
-```
-
 Write an actor and send it a message:
 
 ```python
@@ -291,7 +279,7 @@ raises instead of being lost silently.
 
 ## 5. Queues
 
-### Single active consumer: ```_unparalleled```
+### One task at a time: ```_unparalleled```
 
 A queue whose name contains ```_unparalleled``` runs **one task at a time**
 across all workers:
@@ -669,9 +657,3 @@ their details as fields:
 ```address``` is host and port, never the url with its password; ```cause``` is
 the text of the underlying error, the error itself stays in ```__cause__```. The
 errors survive copy and pickle, so they also come back from a process pool.
-
-## 12. Documentation with pdoc
-
-With ```tokeo.ext.pdoc``` the extension swaps the actor decorators for a simple
-stub while the docs render, so the functions of your actors appear with their
-own signature and docstring.
