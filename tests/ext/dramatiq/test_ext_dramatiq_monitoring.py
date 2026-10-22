@@ -5,6 +5,7 @@ The heartbeats of the middleware are recorded instead of sent, the monitor
 gets them by ```receive```; the way through rabbitmq is in the live tests.
 """
 
+import os
 import sys
 import json
 import time
@@ -21,6 +22,7 @@ from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
 from tokeo.ext.dramatiq.controller import _duration, _monitor_view
 from tokeo.ext.tui.output import TokeoTuiOutput
 from tokeo.core.exc import TokeoError
+from tests.utils import Terminal
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqMiddlewareTest
 
 
@@ -454,63 +456,16 @@ def test_command_interval_checked(command):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_command_follow_ends_on_ctrl_c_in_a_terminal():
-    pyte = pytest.importorskip('pyte')
-    import os
-    import pty
-    import fcntl
-    import select
-    import struct
-    import termios
-    import subprocess
-
-    master, slave = pty.openpty()
-    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 100, 0, 0))
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    env = dict(os.environ, TERM='xterm-256color', PYTHONPATH=os.pathsep.join(filter(None, [root, os.environ.get('PYTHONPATH')])))
     probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib', 'dramatiq_tests_monitor_probe.py')
-    process = subprocess.Popen(
-        [sys.executable, probe, 'dramatiq', 'monitor', '--follow', '--interval', '1'],
-        stdin=slave,
-        stdout=slave,
-        stderr=slave,
-        env=env,
-        # as controlling terminal the pseudo terminal sends SIGINT on Ctrl-C
-        start_new_session=True,
-        preexec_fn=lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0),
-    )
-    os.close(slave)
-    screen = pyte.Screen(100, 24)
-    stream = pyte.ByteStream(screen)
-    raw, shown, sent = b'', None, None
-    deadline = time.monotonic() + 30
-    try:
-        while time.monotonic() < deadline and process.poll() is None:
-            if select.select([master], [], [], 0.05)[0]:
-                try:
-                    data = os.read(master, 65536)
-                except OSError:
-                    break
-                raw += data
-                stream.feed(data)
-            if shown is None and any('every 1 s  (Ctrl-C to quit)' in line for line in screen.display):
-                shown = [line.rstrip() for line in screen.display if line.strip()]
-                os.write(master, b'\x03')
-                sent = time.monotonic()
-        code = process.wait(10)
-        # the rest written while the app closes
-        while select.select([master], [], [], 0.2)[0]:
-            try:
-                data = os.read(master, 65536)
-            except OSError:
-                break
-            raw += data
-            stream.feed(data)
-    finally:
-        process.kill() if process.poll() is None else None
-        os.close(master)
-    assert shown is not None, raw.decode(errors='replace')[-2000:]
+    args = [sys.executable, probe, 'dramatiq', 'monitor', '--follow', '--interval', '1']
+    with Terminal(args, rows=24, columns=100, ctty=True) as terminal:
+        shown = terminal.wait_for(lambda lines: any('every 1 s  (Ctrl-C to quit)' in line for line in lines))
+        assert shown is not None, terminal.raw.decode(errors='replace')[-2000:]
+        terminal.send(b'\x03')
+        sent = time.monotonic()
+        code = terminal.wait()
     assert shown[0].startswith('probe dramatiq monitor') and any(line.split() == ['total', '0', '0', '0', '1'] for line in shown)
     # Ctrl-C ends the display at once and cleanly, the former screen is back
     assert code == 0 and time.monotonic() - sent < 5
-    assert b'\x1b[?1049h' in raw and b'\x1b[?1049l' in raw and b'Traceback' not in raw
-    assert not any('dramatiq monitor' in line for line in screen.display)
+    assert b'\x1b[?1049h' in terminal.raw and b'\x1b[?1049l' in terminal.raw and b'Traceback' not in terminal.raw
+    assert not any('dramatiq monitor' in line for line in terminal.screen.display)

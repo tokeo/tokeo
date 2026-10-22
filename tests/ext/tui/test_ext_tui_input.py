@@ -7,10 +7,8 @@ terminal and reads its screen by pyte, a terminal emulator.
 
 import os
 import sys
-import time
 import signal
 import logging
-import subprocess
 
 import pytest
 from prompt_toolkit.input import create_pipe_input
@@ -19,6 +17,7 @@ from prompt_toolkit.history import InMemoryHistory
 from cement.core.exc import CaughtSignal
 from tokeo.ext.tui import TokeoTuiError
 from tokeo.ext.tui.input import TokeoTuiInput
+from tests.utils import Terminal
 from tests.ext.tui.tui_tests_helper import TuiInputTest
 
 CTRL_C, CTRL_D = '\x03', '\x04'
@@ -123,45 +122,12 @@ def test_log_handlers_write_to_the_shell_meanwhile(shell):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_output_of_other_threads_appears_above_the_prompt():
-    pyte = pytest.importorskip('pyte')
-    import pty
-    import fcntl
-    import select
-    import struct
-    import termios
-
-    master, slave = pty.openpty()
-    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 12, 80, 0, 0))
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    env = dict(os.environ, TERM='xterm-256color', PYTHONPATH=os.pathsep.join(filter(None, [root, os.environ.get('PYTHONPATH')])))
     probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tui_tests_input_probe.py')
-    process = subprocess.Popen([sys.executable, probe], stdin=slave, stdout=slave, stderr=slave, env=env)
-    os.close(slave)
-    screen = pyte.Screen(80, 12)
-    stream = pyte.ByteStream(screen)
-    shown = None
-    deadline = time.monotonic() + 30
-    try:
-        while time.monotonic() < deadline and process.poll() is None:
-            if select.select([master], [], [], 0.05)[0]:
-                try:
-                    data = os.read(master, 65536)
-                except OSError:
-                    # the probe ended and closed the terminal
-                    break
-                stream.feed(data)
-                # answer the cursor position requests like a terminal
-                for _ in range(data.count(b'\x1b[6n')):
-                    os.write(master, f'\x1b[{screen.cursor.y + 1};{screen.cursor.x + 1}R'.encode())
-            lines = [line.rstrip() for line in screen.display if line.strip()]
-            if shown is None and 'MARK-APP-PRINT' in ''.join(lines) and lines[-1] == 'Probe>':
-                shown = lines
-                os.write(master, b'exit\r')
-    finally:
-        process.kill() if process.poll() is None else None
-        process.wait(10)
-        os.close(master)
-    assert shown is not None, '\n'.join(screen.display)
+    with Terminal([sys.executable, probe], rows=12, columns=80) as terminal:
+        shown = terminal.wait_for(lambda lines: 'MARK-APP-PRINT' in ''.join(lines) and lines[-1] == 'Probe>')
+        assert shown is not None, '\n'.join(terminal.screen.display)
+        terminal.send(b'exit\r')
+        terminal.wait()
     # each output on its own line above the prompt, the prompt untouched
     assert 'MARK-PRINT' in shown
     assert any(line.endswith('MARK-LOG') and 'Probe>' not in line for line in shown)

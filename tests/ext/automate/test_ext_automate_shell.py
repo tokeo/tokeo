@@ -8,14 +8,13 @@ terminal and reads its screen by pyte, a terminal emulator.
 import os
 import sys
 import json
-import time
-import subprocess
 
 import pytest
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from tokeo.core.exc import TokeoError
 from tokeo.ext.automate import TokeoAutomateShell
+from tests.utils import Terminal
 from tests.ext.automate.automate_tests_helper import AutomateTest
 
 CTRL_C, CTRL_D = '\x03', '\x04'
@@ -123,47 +122,15 @@ def test_shell_shows_a_failing_command(shell, monkeypatch):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_shell_in_a_terminal():
-    pyte = pytest.importorskip('pyte')
-    import pty
-    import fcntl
-    import select
-    import struct
-    import termios
-
-    master, slave = pty.openpty()
-    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 120, 0, 0))
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    env = dict(os.environ, TERM='xterm-256color', PYTHONPATH=os.pathsep.join(filter(None, [root, os.environ.get('PYTHONPATH')])))
     probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'automate_tests_shell_probe.py')
-    process = subprocess.Popen([sys.executable, probe, 'automate', 'shell'], stdin=slave, stdout=slave, stderr=slave, env=env)
-    os.close(slave)
-    screen = pyte.Screen(120, 24)
-    stream = pyte.ByteStream(screen)
     # each input waits for the output of the one before and the prompt below it
     steps = [(None, b'list\r'), ('function', b'show nope\r'), ('Task nope not found!', b'exit\r')]
-    shown = None
-    deadline = time.monotonic() + 30
-    try:
-        while time.monotonic() < deadline and process.poll() is None:
-            if select.select([master], [], [], 0.05)[0]:
-                try:
-                    data = os.read(master, 65536)
-                except OSError:
-                    break
-                stream.feed(data)
-                # answer the cursor position requests like a terminal
-                for _ in range(data.count(b'\x1b[6n')):
-                    os.write(master, f'\x1b[{screen.cursor.y + 1};{screen.cursor.x + 1}R'.encode())
-            lines = [line.rstrip() for line in screen.display if line.strip()]
-            if steps and lines and lines[-1] == 'Automate>' and (steps[0][0] is None or any(steps[0][0] in line for line in lines)):
-                if len(steps) == 1:
-                    shown = lines
-                os.write(master, steps.pop(0)[1])
-        code = process.wait(10)
-    finally:
-        process.kill() if process.poll() is None else None
-        os.close(master)
-    assert shown is not None, '\n'.join(screen.display)
+    with Terminal([sys.executable, probe, 'automate', 'shell'], rows=24, columns=120) as terminal:
+        for wait, keys in steps:
+            shown = terminal.wait_for(lambda lines: lines[-1] == 'Automate>' and (wait is None or any(wait in line for line in lines)))
+            assert shown is not None, '\n'.join(terminal.screen.display)
+            terminal.send(keys)
+        code = terminal.wait()
     # the table of the tasks, then the error of show above the prompt
     assert any(line.split()[:4] == ['id', 'name', 'function', 'hosts'] for line in shown)
     assert any(line.endswith('Task nope not found!') and 'Automate>' not in line for line in shown)

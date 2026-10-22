@@ -7,13 +7,12 @@ terminal and reads its screen by pyte, a terminal emulator.
 
 import os
 import sys
-import time
-import subprocess
 
 import pytest
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from tokeo.core.exc import TokeoError
+from tests.utils import Terminal
 from tests.ext.scheduler.scheduler_tests_helper import SchedulerTest
 
 CTRL_D = '\x04'
@@ -131,47 +130,14 @@ def test_shell_shows_a_failing_command(started, monkeypatch):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_shell_shows_logs_of_tasks_above_the_prompt():
-    pyte = pytest.importorskip('pyte')
-    import pty
-    import fcntl
-    import select
-    import struct
-    import termios
-
-    master, slave = pty.openpty()
-    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 16, 100, 0, 0))
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    env = dict(os.environ, TERM='xterm-256color', PYTHONPATH=os.pathsep.join(filter(None, [root, os.environ.get('PYTHONPATH')])))
     probe = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scheduler_tests_shell_probe.py')
-    process = subprocess.Popen([sys.executable, probe, 'scheduler', 'launch', '--shell'], stdin=slave, stdout=slave, stderr=slave, env=env)
-    os.close(slave)
-    screen = pyte.Screen(100, 16)
-    stream = pyte.ByteStream(screen)
-    sent, shown = None, None
-    deadline = time.monotonic() + 30
-    try:
-        while time.monotonic() < deadline and process.poll() is None:
-            if select.select([master], [], [], 0.05)[0]:
-                try:
-                    data = os.read(master, 65536)
-                except OSError:
-                    break
-                stream.feed(data)
-                # answer the cursor position requests like a terminal
-                for _ in range(data.count(b'\x1b[6n')):
-                    os.write(master, f'\x1b[{screen.cursor.y + 1};{screen.cursor.x + 1}R'.encode())
-            lines = [line.rstrip() for line in screen.display if line.strip()]
-            if sent is None and lines and lines[-1] == 'Scheduler>':
-                os.write(master, b'tasks fire 1\r')
-                sent = time.monotonic()
-            if shown is None and any(line.endswith('MARK-PING') for line in lines) and lines[-1] == 'Scheduler>':
-                shown = lines
-                os.write(master, b'exit\r')
-        code = process.wait(10)
-    finally:
-        process.kill() if process.poll() is None else None
-        os.close(master)
-    assert shown is not None, '\n'.join(screen.display)
+    with Terminal([sys.executable, probe, 'scheduler', 'launch', '--shell'], rows=16, columns=100) as terminal:
+        assert terminal.wait_for(lambda lines: lines[-1] == 'Scheduler>'), '\n'.join(terminal.screen.display)
+        terminal.send(b'tasks fire 1\r')
+        shown = terminal.wait_for(lambda lines: any(line.endswith('MARK-PING') for line in lines) and lines[-1] == 'Scheduler>')
+        assert shown is not None, '\n'.join(terminal.screen.display)
+        terminal.send(b'exit\r')
+        code = terminal.wait()
     # the log line of the task stands on its own line, the prompt below it
     assert any(line.endswith('MARK-PING') and 'Scheduler>' not in line for line in shown)
     assert shown[-1] == 'Scheduler>' and code == 0
