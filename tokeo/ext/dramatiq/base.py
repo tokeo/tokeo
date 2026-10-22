@@ -265,6 +265,12 @@ class TokeoDramatiq(MetaMixin):
             min_backoff=15_000,
             # Max delay of a retry in milliseconds (at most 7 days)
             max_backoff=604_800_000,
+            # Send a heartbeat of each worker process for the monitor
+            monitoring=False,
+            # Seconds between two heartbeats
+            monitoring_interval=5,
+            # Send task arguments and error texts: off, on or debug (with --debug)
+            monitoring_with_details='debug',
             # Broker type (currently only rabbitmq supported)
             broker='rabbitmq',
             # RabbitMQ connection settings
@@ -325,10 +331,12 @@ class TokeoDramatiq(MetaMixin):
         self.actor = tokeo_actor
         # dramatiq register
         self.register()
-        # imported here, the queues module builds on this one
+        # imported here, the queues and monitoring modules build on this one
         from tokeo.ext.dramatiq.queues import TokeoDramatiqQueues
+        from tokeo.ext.dramatiq.monitoring import TokeoDramatiqMonitor
 
         self.queues = TokeoDramatiqQueues(self)
+        self.monitor = TokeoDramatiqMonitor(self)
 
     def _config(self, key, **kwargs):
         """
@@ -366,7 +374,8 @@ class TokeoDramatiq(MetaMixin):
         ### Notes
 
         : Configures the middleware AgeLimit, TimeLimit, ShutdownNotifications,
-            Callbacks, Pipelines, Retries, CurrentMessage and TokeoAsyncIO
+            Callbacks, Pipelines, Retries, CurrentMessage and TokeoAsyncIO,
+            with ```monitoring``` also TokeoDramatiqHeartbeat
 
         : Creates an ExtendedRabbitmqBroker instance with the configured URL
             and registers it as the global Dramatiq broker
@@ -401,6 +410,9 @@ class TokeoDramatiq(MetaMixin):
             middleware.CurrentMessage(),
             TokeoAsyncIO(),
         ]
+        heartbeat = self._heartbeat()
+        if heartbeat is not None:
+            use_middleware.append(heartbeat)
         # create the broker to RabbitMQ based on config; configured
         # credentials may override any userinfo carried by the url
         # cement does not merge nested defaults, so complete the block here
@@ -432,6 +444,21 @@ class TokeoDramatiq(MetaMixin):
         dramatiq.set_broker(rabbitmq_broker)
         self.app.log.debug('ExtendedRabbitmqBroker is registered as dramatiq broker')
 
+    def _heartbeat(self):
+        """Build the heartbeat middleware, None without monitoring."""
+        monitoring = self._config('monitoring')
+        if not isinstance(monitoring, bool):
+            raise TokeoDramatiqConfigError('config', 'monitoring', monitoring, 'true or false')
+        interval = _number('config', 'monitoring_interval', self._config('monitoring_interval'))
+        details = _details(self._config('monitoring_with_details'), self.app.debug)
+        if not monitoring:
+            return None
+        # imported here, the monitoring module builds on this one
+        from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat, exchange_name, _app_version
+
+        app = dict(label=self.app._meta.label, version=_app_version(self.app))
+        return TokeoDramatiqHeartbeat(exchange_name(self.app), interval, details, app)
+
     def close(self):
         """
         Close the Dramatiq broker connection.
@@ -448,6 +475,8 @@ class TokeoDramatiq(MetaMixin):
         self.app.log.debug('Closing dramatiq registered broker ...')
         if getattr(self, 'queues', None) is not None:
             self.queues.close()
+        if getattr(self, 'monitor', None) is not None:
+            self.monitor.close()
         # get the current registered broker
         broker = dramatiq.get_broker()
         # check that is equal to the registered one
@@ -534,3 +563,32 @@ def _number(source, name, value, min_value=1, max_value=None, allow_none=False, 
         expected = f'null or {expected}' if allow_none else expected
         raise TokeoDramatiqConfigError(source, name, value, expected)
     return number
+
+
+def _details(value, debug):
+    """
+    Read the config ```monitoring_with_details```.
+
+    ### Args
+
+    - **value** (bool|str|None): The config value
+    - **debug** (bool): Whether the app runs with --debug
+
+    ### Returns
+
+    - **bool**: Whether the heartbeats carry the details
+
+    ### Raises
+
+    - **TokeoDramatiqConfigError**: If the value is not allowed
+
+    """
+    # yaml reads unquoted on, off, yes and no as booleans already
+    text = 'null' if value is None else str(value).lower()
+    if text in ('true', 'on', 'yes'):
+        return True
+    if text in ('false', 'off', 'no', 'null'):
+        return False
+    if text == 'debug':
+        return bool(debug)
+    raise TokeoDramatiqConfigError('config', 'monitoring_with_details', value, 'off, on or debug')

@@ -131,3 +131,33 @@ def test_live_reconnect_after_idle(live):
         time.sleep(3.5)
         assert queues.state(name)[0]['name'] == name
         assert queues._connection is not first
+
+
+def test_live_monitor_hears_a_worker(tmp, middleware_app, rando):
+    config = dict(monitoring=True, monitoring_interval=1, monitoring_with_details='on', rabbitmq=dict(url=RABBITMQ_URL))
+    with middleware_app(tmp, **config) as app:
+        name = f'tokeo_test_{rando}'
+        actor = dramatiq.actor(
+            lambda seconds: time.sleep(seconds), actor_name=f'task_{rando}', queue_name=name, broker=app.dramatiq.broker
+        )
+        monitor = app.dramatiq.monitor
+        worker = dramatiq.Worker(app.dramatiq.broker, worker_threads=1, worker_timeout=100, queues={name})
+
+        def mine(wait):
+            return [w for w in monitor.workers(wait) if w['heartbeat']['worker']['pid'] == os.getpid()]
+
+        try:
+            worker.start()
+            actor.send(2)
+            deadline = time.monotonic() + 15
+            while time.monotonic() < deadline and not (mine(0.5) and mine(0)[0]['heartbeat']['running']):
+                pass
+            (running,) = mine(0)
+            worker.stop()
+            (stopped,) = mine(1)
+        finally:
+            worker.stop()
+            app.dramatiq.queues.delete(name, force=True)
+    (task,) = running['heartbeat']['running']
+    assert running['state'] == 'ok' and task['actor'] == f'task_{rando}' and task['args'] == '((2,), {})'
+    assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals']['done'] == 1

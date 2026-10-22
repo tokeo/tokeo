@@ -3,12 +3,15 @@ Tokeo Dramatiq extension controller.
 
 The ```dramatiq``` commands of the app: ```serve``` starts the worker
 processes from the config and its switches, ```locks``` shows or purges the
-diskcache locks of the actors, ```queues``` shows and maintains the queues.
+diskcache locks of the actors, ```queues``` shows and maintains the queues,
+```monitor``` shows the workers and queues, also continuously.
 
 """
 
 import os
 import sys
+import json
+import time
 import multiprocessing
 from os.path import basename, dirname, abspath
 from cement import ex
@@ -182,6 +185,51 @@ class TokeoDramatiqController(Controller):
                     state['dead_letters'] = queues.peek_dead(state['name'], limit)
             lines = _state_lines(result)
         self.app.print(json_dump(result, indent=2) if pargs.json else '\n'.join(lines))
+
+    # --------------------------------------------------------------------------------------
+
+    @ex(
+        help='monitor the dramatiq workers and queues',
+        description='Show the worker processes heard of by their heartbeats and the state of the queues.',
+        epilog=f'Use "{basename(sys.argv[0])} dramatiq monitor --follow" to watch the workers and queues until Ctrl-C.',
+        arguments=[
+            (['--follow'], dict(action='store_true', help='show the state again and again until Ctrl-C')),
+            (['--json'], dict(action='store_true', help='print the state as json, with --follow one line each time')),
+            (['--interval'], dict(metavar='N', help='seconds between two displays of --follow, monitoring_interval without')),
+        ],
+    )
+    def monitor(self):
+        """
+        Show the dramatiq workers and queues.
+
+        ### Raises
+
+        - **TokeoDramatiqError**: If the extension tokeo.ext.tui.output is not
+            enabled for the display
+
+        ### Notes
+
+        - The workers send heartbeats only with ```monitoring: true```
+        - The first display waits one interval to hear each running worker
+
+        """
+        pargs = self.app.pargs
+        monitor = self.app.dramatiq.monitor
+        interval = monitor.interval if pargs.interval is None else _number('switch', '--interval', pargs.interval)
+        if pargs.json and not pargs.follow:
+            self.app.print(json_dump(monitor.snapshot(), indent=2))
+            return
+        tui = getattr(self.app, 'tui', None)
+        if tui is None:
+            raise TokeoDramatiqError('Enable the extension tokeo.ext.tui.output for the dramatiq monitor!')
+        output = tui.output
+        if not pargs.follow:
+            output.print(*_monitor_view(output, monitor.snapshot(), self.app._meta.label))
+        elif pargs.json:
+            output.follow(lambda: json.dumps(monitor.snapshot(wait=interval)), interval=0, repaint=False)
+        else:
+            # listening fills the time between two displays
+            output.follow(lambda: _monitor_view(output, monitor.snapshot(wait=interval), self.app._meta.label, interval), interval=0)
 
     # --------------------------------------------------------------------------------------
 
@@ -467,3 +515,79 @@ def _state_lines(states):
                 lines.append(f'  {letter["message_id"]}  {letter["actor"]}  retries={letter["retries"]}  {letter["error"] or ""}'.rstrip())
                 lines.append(f'    args: {letter["args"]}')
     return lines
+
+
+def _duration(ms):
+    """Format milliseconds short, e.g. 850 ms, 1.4 s, 3m 5s or 1h 2m."""
+    if ms < 1000:
+        return f'{ms} ms'
+    if ms < 60_000:
+        return f'{ms / 1000:.1f} s'
+    minutes, seconds = divmod(ms // 1000, 60)
+    hours, minutes = divmod(minutes, 60)
+    return f'{hours}h {minutes}m' if hours else f'{minutes}m {seconds}s'
+
+
+def _monitor_view(output, snapshot, label, follow=None):
+    """
+    Format a monitor snapshot as header and tables.
+
+    ### Args
+
+    - **output** (TokeoTuiOutput): Builds the tables
+    - **snapshot** (dict): The snapshot of ```app.dramatiq.monitor```
+    - **label** (str): The app label for the header
+    - **follow** (int, optional): The interval of --follow for the header
+
+    ### Returns
+
+    - **list**: The header line and the tables
+
+    """
+    at = snapshot['at']
+    header = f'{label} dramatiq monitor  {time.strftime("%H:%M:%S", time.localtime(at / 1000))}'
+    view = [header + (f'  every {follow} s  (Ctrl-C to quit)' if follow else '')]
+    workers = snapshot['workers']
+    if not workers:
+        view.append(
+            'No worker heard of yet.' if snapshot['monitoring'] else 'Monitoring is off in the config, the workers send no heartbeats.'
+        )
+    else:
+        rows, tasks = [], []
+        for worker in workers:
+            beat = worker['heartbeat']
+            name = f'{beat["worker"]["host"]}:{beat["worker"]["pid"]}'
+            last = beat['since_last']['actors'].values()
+            done, failed = sum(a.get('done', 0) for a in last), sum(a.get('failed', 0) for a in last)
+            rows.append(
+                [
+                    name,
+                    _duration(at - beat['worker']['started_at']),
+                    worker['state'],
+                    f'{len(beat["running"])}/{beat["worker"]["threads"]}',
+                    beat['totals']['done'],
+                    beat['totals']['failed'],
+                    beat['totals']['dead'],
+                    f'{done} done, {failed} failed' if done or failed else '',
+                ]
+            )
+            # a running task went on since its heartbeat
+            gone_on = worker['seen_ms'] if worker['state'] in ('ok', 'late') else 0
+            for task in beat['running']:
+                args = task.get('args', '' if beat['worker']['details'] else 'details off')
+                tasks.append([name, task['actor'], task['queue'], _duration(task['runtime_ms'] + gone_on), task['retries'], args])
+        columns = ['worker', 'up', 'state', ('running', 'right'), ('done', 'right'), ('failed', 'right'), ('dead', 'right'), 'last']
+        view.append(output.table(columns, rows, title='workers'))
+        if tasks:
+            columns = ['worker', 'actor', 'queue', ('runtime', 'right'), ('retries', 'right'), 'args']
+            view.append(output.table(columns, tasks, title='running'))
+    if snapshot['actors']:
+        actors = snapshot['actors'].items()
+        rows = [[name, a['done'], a['failed'], _duration(a['max_runtime_ms']), a.get('last_error', '')] for name, a in actors]
+        columns = ['actor', ('done', 'right'), ('failed', 'right'), ('longest', 'right'), 'last error']
+        view.append(output.table(columns, rows, title='actors (last heartbeat of each worker)'))
+    keys = ('ready', 'delayed', 'dead', 'consumers')
+    rows = [[q['name'], *(q[key] for key in keys)] for q in snapshot['queues']]
+    rows.append(['total', *(snapshot['queue_totals'][key] for key in keys)])
+    view.append(output.table(['queue', *((key, 'right') for key in keys)], rows, title='queues'))
+    return view
