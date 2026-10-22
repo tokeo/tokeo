@@ -5,7 +5,7 @@ bound ``self.log``.
 ``on_logging_event`` is free to be a plain ``def``, an ``async def`` or a
 ``@threaded def``; the bridge hands the ``_emit`` coroutine to the event loop,
 so the execution model stays with the precomputed dispatcher. Every event, in
-any of its three forms, logs the same way: ``self.log.warn(...)`` -- never
+any of its three forms, logs the same way: ``self.log.warning(...)`` -- never
 awaited.
 """
 
@@ -61,8 +61,8 @@ def test_logger_reaches_every_logging_event_form(handler_cls):
     # completion in place, whatever the declared form of on_logging_event
     events = handler_cls()
     smtpd = SmtpdServer(events)
-    smtpd.logger.warn('bridge me')
-    assert events.captured == [(Severity.WARN, 'bridge me')]
+    smtpd.logger.warning('bridge me')
+    assert events.captured == [(Severity.WARNING, 'bridge me')]
 
 
 def test_handler_log_is_bound_to_the_server_logger():

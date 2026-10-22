@@ -1,16 +1,17 @@
 """
 Tokeo SMTPD Logger Module.
 
-The log severities handed to ```on_logging_event``` -- a translation of
-standard ```Logger::DEBUG/INFO/WARN/ERROR/FATAL``` levels. The enum
+The log severities handed to ```on_logging_event``` -- the levels of
+Python's ```logging``` (```DEBUG/INFO/WARNING/ERROR/CRITICAL```). The enum
 values are Python's ```logging``` level integers, so a handler can pass
 ```severity.value``` straight to ```logging```/```app.log``` and levels compare
 numerically, while the members themselves still compare by identity.
 
 ### Notes
 
-: This mirrors both Ruby's ```Logger``` (ordered integer levels) and Python's
-    ```logging```; ```WARN```/```FATAL``` map onto ```WARNING```/```CRITICAL```.
+: The member names are the level names of ```logging```, so
+    ```severity.name.lower()``` names the matching log method, e.g.
+    ```getattr(app.log, severity.name.lower())```.
 
 """
 
@@ -23,17 +24,17 @@ class Severity(Enum):
 
     DEBUG = logging.DEBUG
     INFO = logging.INFO
-    WARN = logging.WARNING
+    WARNING = logging.WARNING
     ERROR = logging.ERROR
-    FATAL = logging.CRITICAL
+    CRITICAL = logging.CRITICAL
 
 
 class ForwardingLogger:
     """
     A logger that forwards every call to ```on_logging_event```.
 
-    The ```ForwardingLogger```: ```info```/```warn```/
-    ```error```/```fatal```/```debug``` push the message to the given
+    The ```ForwardingLogger```: ```debug```/```info```/```warning```/
+    ```error```/```critical``` push the message to the given
     ```on_logging_event``` callable with the matching ```Severity``` and a nil
     context.
 
@@ -50,17 +51,17 @@ class ForwardingLogger:
         """Log msg at INFO severity."""
         self._on_logging_event(None, Severity.INFO, msg)
 
-    def warn(self, msg):
-        """Log msg at WARN severity."""
-        self._on_logging_event(None, Severity.WARN, msg)
+    def warning(self, msg):
+        """Log msg at WARNING severity."""
+        self._on_logging_event(None, Severity.WARNING, msg)
 
     def error(self, msg):
         """Log msg at ERROR severity."""
         self._on_logging_event(None, Severity.ERROR, msg)
 
-    def fatal(self, msg):
-        """Log msg at FATAL severity."""
-        self._on_logging_event(None, Severity.FATAL, msg)
+    def critical(self, msg):
+        """Log msg at CRITICAL severity."""
+        self._on_logging_event(None, Severity.CRITICAL, msg)
 
     def debug(self, msg):
         """Log msg at DEBUG severity."""

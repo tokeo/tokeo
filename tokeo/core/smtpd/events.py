@@ -16,10 +16,10 @@ dispatches to these methods and turns any raised SMTP exception into a response.
 - Two import-time guards: ```@threaded``` on an ```async def``` is rejected, and
     ```@threaded``` on ```on_message_data_receiving_event``` (the per-line hot
     path) is rejected -- both fail before any service starts
-- ```self.log``` on every handler: call ```self.log.warn(...)``` (or debug/
-    info/error/fatal) from any event -- never awaited, identical in ```def```,
-    ```async def``` and ```@threaded def``` events; the server binds its
-    logger at construction and bridges into ```on_logging_event```
+- ```self.log``` on every handler: call ```self.log.warning(...)``` (or
+    debug/info/error/critical) from any event -- never awaited, identical in
+    ```def```, ```async def``` and ```@threaded def``` events; the server binds
+    its logger at construction and bridges into ```on_logging_event```
 - No class-wide threading default on purpose; every method decides for itself
 - The full set of event methods as overridable no-ops
 

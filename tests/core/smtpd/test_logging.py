@@ -46,10 +46,10 @@ def test_log_info():
     _expect(events, Severity.INFO, 'A simple info message.')
 
 
-def test_log_warn():
+def test_log_warning():
     smtpd, events = _server()
-    smtpd.logger.warn('A simple warn message.')
-    _expect(events, Severity.WARN, 'A simple warn message.')
+    smtpd.logger.warning('A simple warning message.')
+    _expect(events, Severity.WARNING, 'A simple warning message.')
 
 
 def test_log_error():
@@ -58,10 +58,10 @@ def test_log_error():
     _expect(events, Severity.ERROR, 'A simple error message.')
 
 
-def test_log_fatal():
+def test_log_critical():
     smtpd, events = _server()
-    smtpd.logger.fatal('A simple fatal message.')
-    _expect(events, Severity.FATAL, 'A simple fatal message.')
+    smtpd.logger.critical('A simple critical message.')
+    _expect(events, Severity.CRITICAL, 'A simple critical message.')
 
 
 def test_log_debug():
@@ -72,10 +72,10 @@ def test_log_debug():
 
 def test_on_logging_event_with_context_and_err():
     _, events = _server()
-    events.on_logging_event({'ctx': True}, Severity.FATAL, 'A simple fatal message.', err={'err': 1})
+    events.on_logging_event({'ctx': True}, Severity.CRITICAL, 'A simple critical message.', err={'err': 1})
     assert events.log_ctx['ctx'] is True
-    assert events.log_severity is Severity.FATAL
-    assert events.log_msg == 'A simple fatal message.'
+    assert events.log_severity is Severity.CRITICAL
+    assert events.log_msg == 'A simple critical message.'
     assert events.log_err['err'] == 1
 
 

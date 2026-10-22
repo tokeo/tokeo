@@ -538,8 +538,8 @@ what lets you restart or redeploy without dropping a message mid-delivery.
 
 ## 13. Logging
 
-The server exposes a ```logger``` whose ```info```/```warn```/```error```/
-```fatal```/```debug``` calls are forwarded to your handler's
+The server exposes a ```logger``` whose ```debug```/```info```/```warning```/
+```error```/```critical``` calls are forwarded to your handler's
 ```on_logging_event(ctx, severity, msg, err=None)```. Override that one event to
 route every server and handler log line wherever you want:
 
