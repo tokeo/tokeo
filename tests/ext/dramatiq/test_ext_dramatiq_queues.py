@@ -327,13 +327,15 @@ def test_connection_is_kept_and_reopened(app, server):
 
 
 @pytest.fixture
-def command(tmp, dramatiq_app, server):
-    def run(*options):
-        with dramatiq_app(tmp, ['dramatiq', 'queues', *options]) as app:
+def command(tmp, dramatiq_app, server, capsys, monkeypatch):
+    # a wide output, so no table wraps
+    monkeypatch.setenv('COLUMNS', '160')
+
+    def run(*options, tui=True):
+        with dramatiq_app(tmp, ['dramatiq', 'queues', *options], tui=tui) as app:
             dramatiq.actor(lambda: None, actor_name='send_mail', queue_name='mail', broker=app.dramatiq.broker)
             app.run()
-            # cement renders to the stdout it bound on import, so read the text
-            return app.last_rendered[1]
+        return capsys.readouterr().out
 
     return run
 
@@ -341,16 +343,27 @@ def command(tmp, dramatiq_app, server):
 def test_command_state_table(command, server):
     server.add('mail', b'1', consumers=0)
     server.add('mail.XQ', dead_letter())
-    lines = command('mail', '--dead').splitlines()
-    assert lines[0].split() == ['QUEUE', 'READY', 'DELAYED', 'DEAD', 'CONSUMERS', 'FLAGS']
-    assert lines[1].split() == ['mail', '1', '-', '1', '0', 'no', 'consumer']
-    assert 'dead letters of mail:' in lines
-    assert lines[-1].strip() == "args: (('a@b.c',), {})"
+    lines = [line.strip() for line in command('mail', 'old', '--dead').splitlines() if line.strip()]
+    assert lines[0] == 'queues'
+    assert lines[1].split() == ['queue', 'ready', 'delayed', 'dead', 'consumers', 'flags']
+    assert lines[3].split() == ['mail', '1', '-', '1', '0', 'no', 'consumer']
+    assert lines[4].split() == ['old', '-', '-', '-', '-', 'missing,', 'no', 'actor']
+    assert lines[5].split() == ['total', '1', '0', '1', '0']
+    # the dead letters follow in a table of their queue
+    assert lines[6] == 'dead letters of mail'
+    assert lines[7].split() == ['message_id', 'actor', 'retries', 'error', 'args']
+    assert lines[9].split()[1:] == ['send_mail', '0', "(('a@b.c',),", '{})']
+
+
+def test_command_state_needs_tui_output(command, server):
+    with pytest.raises(TokeoDramatiqError, match='Enable the extension tokeo.ext.tui.output for the dramatiq queues!'):
+        command('mail', tui=False)
 
 
 def test_command_json(command, server):
     server.add('mail', b'1')
-    (state,) = json.loads(command('--json'))
+    # json needs no tui
+    (state,) = json.loads(command('--json', tui=False))
     assert (state['name'], state['ready']) == ('mail', 1)
 
 

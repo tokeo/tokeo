@@ -7,7 +7,8 @@ when the extension is enabled.
 
 ### Features
 
-- Tables with column alignment, cut to the terminal width
+- Tables with column alignment fit to the terminal width, long values end
+    with an ellipsis unless their column is never cut
 - A live display that repaints in place in a terminal and appends one block
     per repaint when the output goes to a pipe or a file
 - Data is shown as given, brackets in it are never read as rich markup
@@ -30,6 +31,9 @@ import time
 from cement.core.exc import CaughtSignal
 from cement.core.foundation import SIGNALS
 from tokeo.ext.tui import register, require
+
+#: Width a column with long values may shrink to in a narrow terminal
+SHRINK_WIDTH = 12
 
 
 class TokeoTuiOutput:
@@ -67,9 +71,11 @@ class TokeoTuiOutput:
 
         ### Args
 
-        - **columns** (list): Column names, or tuples of name and alignment
-            (```left```, ```center``` or ```right```)
-        - **rows** (list): The rows, each a list of values; None shows empty
+        - **columns** (list): Column names, or tuples of name, alignment
+            (```left```, ```center``` or ```right```) and optionally ```full```
+            for a column that is never cut
+        - **rows** (list): The rows, each a list of values; None shows empty,
+            a value too long for its column ends with an ellipsis
         - **title** (str, optional): A title above the table
 
         ### Returns
@@ -80,13 +86,44 @@ class TokeoTuiOutput:
         from rich import box
         from rich.table import Table
 
+        rows = [[_text(value) for value in row] for row in rows]
+        specs = [(column, 'left') if isinstance(column, str) else column for column in columns]
+        widths, minimums, lasts = [], [], []
+        for index, (name, justify, *full) in enumerate(specs):
+            longest = max([len(name), *(row[index].cell_len for row in rows)])
+            widths.append(longest)
+            # short values stay whole, a full column never shrinks
+            minimums.append(longest if full == ['full'] else min(longest, max(len(name), SHRINK_WIDTH)))
+            lasts.append(longest if full == ['full'] else min(longest, 3))
+        # the box takes a space at both edges and three between two columns
+        available = self._console.width - 3 * len(specs) - 1
+        # in a very narrow terminal the columns shrink further, a full one never
+        widths = _fit(_fit(widths, minimums, available), lasts, available)
         table = Table(title=title, box=box.SIMPLE_HEAD, title_justify='left')
-        for column in columns:
-            name, justify = (column, 'left') if isinstance(column, str) else column
-            table.add_column(name, justify=justify)
+        for (name, justify, *_), width in zip(specs, widths):
+            table.add_column(name, justify=justify, no_wrap=True, overflow='ellipsis', width=width)
         for row in rows:
-            table.add_row(*(_text(value) for value in row))
+            table.add_row(*row)
         return table
+
+    def text(self, value, style=None):
+        """
+        Build a text shown as it is, optionally styled.
+
+        ### Args
+
+        - **value** (any): The value, None shows empty
+        - **style** (str, optional): A rich style, e.g. ```red``` or ```bold red```
+
+        ### Returns
+
+        - **rich.text.Text**: The text, for tables or print
+
+        """
+        text = _text(value)
+        if style:
+            text.stylize(style)
+        return text
 
     def print(self, *renderables):
         """
@@ -174,6 +211,17 @@ def _text(value):
     if is_renderable(value) and not isinstance(value, str):
         return value
     return Text('' if value is None else str(value))
+
+
+def _fit(widths, minimums, available):
+    """Shrink the widest columns to their minimum until all fit the width."""
+    widths = list(widths)
+    while sum(widths) > available:
+        shrinkable = [index for index, width in enumerate(widths) if width > minimums[index]]
+        if not shrinkable:
+            break
+        widths[max(shrinkable, key=lambda index: widths[index])] -= 1
+    return widths
 
 
 def _group(renderables):

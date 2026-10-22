@@ -144,7 +144,8 @@ class TokeoDramatiqController(Controller):
         ### Raises
 
         - **TokeoDramatiqError**: If the switches do not fit together, a
-            change misses --yes, or a queue refuses the change
+            change misses --yes, a queue refuses the change, or the state
+            is shown without the extension tokeo.ext.tui.output
 
         ### Notes
 
@@ -183,7 +184,10 @@ class TokeoDramatiqController(Controller):
                 limit = _number('switch', '--dead', pargs.dead)
                 for state in result:
                     state['dead_letters'] = queues.peek_dead(state['name'], limit)
-            lines = _state_lines(result)
+            if not pargs.json:
+                output = _tui_output(self.app, 'queues')
+                output.print(_queue_table(output, result), *_dead_letter_tables(output, result))
+                return
         self.app.print(json_dump(result, indent=2) if pargs.json else '\n'.join(lines))
 
     # --------------------------------------------------------------------------------------
@@ -219,10 +223,7 @@ class TokeoDramatiqController(Controller):
         if pargs.json and not pargs.follow:
             self.app.print(json_dump(monitor.snapshot(), indent=2))
             return
-        tui = getattr(self.app, 'tui', None)
-        if tui is None:
-            raise TokeoDramatiqError('Enable the extension tokeo.ext.tui.output for the dramatiq monitor!')
-        output = tui.output
+        output = _tui_output(self.app, 'monitor')
         if not pargs.follow:
             output.print(*_monitor_view(output, monitor.snapshot(), self.app._meta.label))
         elif pargs.json:
@@ -487,34 +488,50 @@ def _switch(action):
     return '--' + action.replace('_', '-')
 
 
-def _state_lines(states):
-    """Format the state of queues as table, followed by their dead letters."""
-    rows = [('QUEUE', 'READY', 'DELAYED', 'DEAD', 'CONSUMERS', 'FLAGS')]
+def _tui_output(app, command):
+    """Get the tui output for the display of a command."""
+    tui = getattr(app, 'tui', None)
+    if tui is None:
+        raise TokeoDramatiqError(f'Enable the extension tokeo.ext.tui.output for the dramatiq {command}!')
+    return tui.output
+
+
+#: Hints on a queue and their style
+QUEUE_FLAGS = (
+    ('missing', lambda q: q.get('exists') is False, 'bold red'),
+    ('unparalleled', lambda q: q.get('unparalleled'), None),
+    ('no consumer', lambda q: q.get('exists') is not False and q.get('consumers') == 0, 'yellow'),
+    ('no actor', lambda q: q.get('actors') == [], 'yellow'),
+)
+
+
+def _queue_table(output, states):
+    """Format the state of queues as table with their hints and a total."""
+    keys = ('ready', 'delayed', 'dead', 'consumers')
+    rows = []
     for state in states:
-        flags = [
-            flag
-            for flag, set_ in (
-                ('missing', not state['exists']),
-                ('unparalleled', state['unparalleled']),
-                ('no consumer', state['exists'] and not state['consumers']),
-                ('no actor', not state['actors']),
-            )
-            if set_
-        ]
-        counts = ['-' if state[key] is None else str(state[key]) for key in ('ready', 'delayed', 'dead', 'consumers')]
-        rows.append((state['name'], *counts, ', '.join(flags)))
-    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
-    lines = [
-        '  '.join(cell.ljust(width) if i in (0, 5) else cell.rjust(width) for i, (cell, width) in enumerate(zip(row, widths))).rstrip()
-        for row in rows
+        flags = [(flag, style) for flag, applies, style in QUEUE_FLAGS if applies(state)]
+        # the cell takes the style of its most severe hint
+        style = next((style for _, style in flags if style), None)
+        counts = ['-' if state.get(key) is None else state[key] for key in keys]
+        rows.append([state['name'], *counts, output.text(', '.join(flag for flag, _ in flags), style)])
+    rows.append(['total', *(sum(state.get(key) or 0 for state in states) for key in keys), ''])
+    return output.table([('queue', 'left', 'full'), *((key, 'right') for key in keys), 'flags'], rows, title='queues')
+
+
+def _dead_letter_tables(output, states):
+    """Format the dead letters of queues as one table per queue."""
+    # a cut message id is of no use, json shows errors and args in full
+    columns = [('message_id', 'left', 'full'), 'actor', ('retries', 'right'), 'error', 'args']
+    return [
+        output.table(
+            columns,
+            [[d['message_id'], d['actor'], d['retries'], d['error'], d['args']] for d in s['dead_letters']],
+            title=f'dead letters of {s["name"]}',
+        )
+        for s in states
+        if s.get('dead_letters')
     ]
-    for state in states:
-        if state.get('dead_letters'):
-            lines.append(f'\ndead letters of {state["name"]}:')
-            for letter in state['dead_letters']:
-                lines.append(f'  {letter["message_id"]}  {letter["actor"]}  retries={letter["retries"]}  {letter["error"] or ""}'.rstrip())
-                lines.append(f'    args: {letter["args"]}')
-    return lines
 
 
 def _duration(ms):
@@ -576,18 +593,24 @@ def _monitor_view(output, snapshot, label, follow=None):
             for task in beat['running']:
                 args = task.get('args', '' if beat['worker']['details'] else 'details off')
                 tasks.append([name, task['actor'], task['queue'], _duration(task['runtime_ms'] + gone_on), task['retries'], args])
-        columns = ['worker', 'up', 'state', ('running', 'right'), ('done', 'right'), ('failed', 'right'), ('dead', 'right'), 'last']
+        columns = [
+            ('worker', 'left', 'full'),
+            'up',
+            'state',
+            ('running', 'right'),
+            ('done', 'right'),
+            ('failed', 'right'),
+            ('dead', 'right'),
+            'last',
+        ]
         view.append(output.table(columns, rows, title='workers'))
         if tasks:
-            columns = ['worker', 'actor', 'queue', ('runtime', 'right'), ('retries', 'right'), 'args']
+            columns = [('worker', 'left', 'full'), 'actor', 'queue', ('runtime', 'right'), ('retries', 'right'), 'args']
             view.append(output.table(columns, tasks, title='running'))
     if snapshot['actors']:
         actors = snapshot['actors'].items()
         rows = [[name, a['done'], a['failed'], _duration(a['max_runtime_ms']), a.get('last_error', '')] for name, a in actors]
         columns = ['actor', ('done', 'right'), ('failed', 'right'), ('longest', 'right'), 'last error']
         view.append(output.table(columns, rows, title='actors (last heartbeat of each worker)'))
-    keys = ('ready', 'delayed', 'dead', 'consumers')
-    rows = [[q['name'], *(q[key] for key in keys)] for q in snapshot['queues']]
-    rows.append(['total', *(snapshot['queue_totals'][key] for key in keys)])
-    view.append(output.table(['queue', *((key, 'right') for key in keys)], rows, title='queues'))
+    view.append(_queue_table(output, snapshot['queues']))
     return view

@@ -21,10 +21,21 @@ class DramatiqTest(TokeoTest):
         ]
 
 
-def _dramatiq_app(tmp, argv):
+class DramatiqTuiTest(TokeoTest):
+
+    class Meta:
+        extensions = [
+            'tokeo.ext.print',
+            'tokeo.ext.diskcache',
+            'tokeo.ext.tui.output',
+            'tokeo.ext.dramatiq',
+        ]
+
+
+def _dramatiq_app(tmp, argv, tui=False):
     d = init_defaults('diskcache')
     d['diskcache']['directory'] = tmp.dir
-    return DramatiqTest(argv=argv, config_defaults=d)
+    return (DramatiqTuiTest if tui else DramatiqTest)(argv=argv, config_defaults=d)
 
 
 def _broker_app(tmp, rabbitmq):

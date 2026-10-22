@@ -115,3 +115,35 @@ def test_follow_passes_other_signals(output):
 
     with pytest.raises(CaughtSignal):
         out.follow(render, interval=0)
+
+
+def test_text_is_styled_in_a_terminal_only(output):
+    out, buffer = output
+    out.print(out.text('[x] missing', 'bold red'))
+    assert buffer.getvalue() == '[x] missing\n'
+    terminal = io.StringIO()
+    out._console = Console(file=terminal, width=60, force_terminal=True)
+    out.print(out.text('missing', 'bold red'), out.text(None))
+    assert '\x1b[1;31mmissing' in terminal.getvalue()
+
+
+def test_table_cuts_long_values_and_keeps_full_columns(output):
+    out = TokeoTuiOutput(output[0].app, file=io.StringIO(), width=100)
+    message_id = '3f2a9c1e-77b0-4c4e-9d1a-0c6a1e2b9f11'
+    error = 'LookupError: user anna@example.com not found in the customer table'
+    table = out.table([('message_id', 'left', 'full'), 'actor', ('retries', 'right'), 'error'], [[message_id, 'send_mail', 20, error]])
+    text = out.render(table)
+    row = next(line for line in text.splitlines() if message_id in line)
+    # one line per row in the width, the full column and short values stay whole
+    assert max(len(line) for line in text.splitlines()) <= 100
+    assert row.split()[:3] == [message_id, 'send_mail', '20'] and row.rstrip().endswith('…')
+    assert error not in text
+
+
+def test_table_shrinks_further_in_a_narrow_terminal(output):
+    out, _ = output
+    narrow = TokeoTuiOutput(out.app, file=io.StringIO(), width=40)
+    rows = [['orders_unparalleled', 'take_order', 'unparalleled, no consumer']]
+    table = narrow.table([('queue', 'left', 'full'), 'actor', 'flags'], rows)
+    row = next(line for line in narrow.render(table).splitlines() if 'orders_unparalleled' in line)
+    assert len(row) <= 40 and row.split()[0] == 'orders_unparalleled' and '…' in row
