@@ -4,8 +4,8 @@ the function.
 
 ### Actor Configuration
 
-- **queue_name** (str): The queue of its messages (_default_); a name with
-  _unparalleled has a single active consumer
+- **queue_name** (str): The queue of its messages (_default_); a queue with
+  _unparalleled in its name runs one task at a time
 - **actor_name** (str): A unique name of the actor (_the function name_)
 - **priority** (int): Order among messages a worker already fetched, lower
   runs first (_0_)

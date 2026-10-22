@@ -160,7 +160,7 @@ The decorator takes these arguments:
 </thead>
 <tbody>
 <tr><td>actor_name</td><td>the function name</td><td>unique name of the actor; messages refer to it, so renaming an actor orphans the messages in the queues</td></tr>
-<tr><td>queue_name</td><td>'default'</td><td>the queue of its messages; a name with '_unparalleled' gets a single active consumer (section 5)</td></tr>
+<tr><td>queue_name</td><td>'default'</td><td>the queue of its messages; a queue with '_unparalleled' in its name runs one task at a time (section 5)</td></tr>
 <tr><td>priority</td><td>0</td><td>order inside a worker among messages it already fetched; <b>lower runs first</b> (section 4)</td></tr>
 <tr><td>broker</td><td>the app broker</td><td>rarely needed</td></tr>
 <tr><td>actor_class</td><td>TokeoActor</td><td>the actor class</td></tr>
@@ -293,32 +293,38 @@ raises instead of being lost silently.
 
 ### Single active consumer: ```_unparalleled```
 
-A queue whose name contains ```_unparalleled``` is declared with RabbitMQ's
-```x-single-active-consumer```: of all workers, **only one process** consumes it
-at a time. The others stand by and take over when it stops. Use it for tasks
-that must not run on two machines at once or that need their order.
+A queue whose name contains ```_unparalleled``` runs **one task at a time**
+across all workers:
+
+- It is declared with RabbitMQ's ```x-single-active-consumer```: of all
+  workers, only one process consumes it. The others stand by and take over
+  when it stops.
+- That process consumes it with a prefetch of 1, whatever
+  ```queue_prefetch``` says: RabbitMQ hands out the next message only after
+  the previous one is done. The other worker threads stay free for the other
+  queues.
+
+Use it for tasks that must not run twice at the same time, like the bookings
+of one account or calls to an API that allows one request at a time.
 
 ```mermaid
 flowchart LR
-    Q["orders_unparalleled"] -->|active consumer| W1["worker process 1<br/>thread 1 · thread 2"]
+    Q["orders_unparalleled"] -->|"active consumer<br/>one message at a time"| W1["worker process 1"]
     Q -.->|standby| W2["worker process 2"]
     Q -.->|standby| W3["worker process 3"]
 ```
 
 .. caution::
 
-    One process does not mean one task at a time. The active process fetches
-    up to ```queue_prefetch``` messages and runs them in all its worker
-    threads. With 2 threads two orders run in parallel. For a strict one after
-    another, run that queue in its own workers with one thread:
+    One task at a time does not keep the order. A message that fails waits in
+    the DQ for its retry while the next messages run; a delayed message runs
+    when it is due. Messages that are sent one after the other and never fail
+    run in that order. Where the order matters, give the actor
+    ```max_retries=0``` and handle a failure in the actor itself.
 
-    ```bash
-    myapp dramatiq serve --queues orders_unparalleled -t 1
-    myapp dramatiq serve --queues mail reports
-    ```
-
-    ```queue_prefetch: 1``` gives a strict order as well, but slows down all
-    other queues of those workers.
+The delay queue of an unparalleled queue keeps its prefetch: the workers hold
+its delayed messages until they are due and move them back into the queue,
+where they wait for their turn.
 
 ### Delayed messages
 
@@ -386,7 +392,7 @@ flowchart TB
 <tr><td>-p, --processes N|auto</td><td>worker processes; auto follows the dramatiq default (number of CPUs)</td></tr>
 <tr><td>-t, --threads N</td><td>worker threads per process</td></tr>
 <tr><td>--queues QUEUE ...</td><td>consume only these queues; all queues of the actors without it</td></tr>
-<tr><td>--queue-prefetch N|auto</td><td>messages to fetch ahead per queue; auto is threads × 2</td></tr>
+<tr><td>--queue-prefetch N|auto</td><td>messages to fetch ahead per queue; auto is threads × 2; unparalleled queues always fetch 1</td></tr>
 <tr><td>--delay-queue-prefetch N|auto</td><td>messages to fetch ahead per DQ; auto is threads × 1000</td></tr>
 <tr><td>--worker-shutdown-timeout MS</td><td>how long a stopping worker waits for running actors</td></tr>
 <tr><td>--use-spawn / --use-forkserver</td><td>how the worker processes start; forkserver is the default</td></tr>
@@ -451,7 +457,7 @@ with a ```TokeoDramatiqConfigError``` that names the key.
 <tr><td>worker_shutdown_timeout</td><td>600_000</td><td>milliseconds a stopping worker waits for running actors</td></tr>
 <tr><td>restart_delay</td><td>3_000</td><td>milliseconds before a consumer reconnects after losing RabbitMQ</td></tr>
 <tr><td>worker_poll_interval</td><td>None</td><td>milliseconds idle worker threads wake up; None uses dramatiq_worker_timeout or 1000</td></tr>
-<tr><td>queue_prefetch</td><td>'auto'</td><td>messages fetched ahead per queue; auto (or 0) is threads × 2</td></tr>
+<tr><td>queue_prefetch</td><td>'auto'</td><td>messages fetched ahead per queue; auto (or 0) is threads × 2; unparalleled queues always fetch 1</td></tr>
 <tr><td>delay_queue_prefetch</td><td>'auto'</td><td>messages fetched ahead per DQ; auto (or 0) is threads × 1000</td></tr>
 <tr><td>use_spawn</td><td>False</td><td>start the worker processes by spawn instead of forkserver</td></tr>
 <tr><td>time_limit</td><td>600_000</td><td>default time_limit of the actors in milliseconds</td></tr>

@@ -161,3 +161,31 @@ def test_live_monitor_hears_a_worker(tmp, middleware_app, rando):
     (task,) = running['heartbeat']['running']
     assert running['state'] == 'ok' and task['actor'] == f'task_{rando}' and task['args'] == '((2,), {})'
     assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals']['done'] == 1
+
+
+def test_live_unparalleled_runs_one_message_at_a_time(tmp, broker_app, rando):
+    with broker_app(tmp, dict(url=RABBITMQ_URL)) as app:
+        name = f'tokeo_test_{rando}_unparalleled'
+        runs = []
+
+        def task(value):
+            start = time.monotonic()
+            time.sleep(0.3)
+            runs.append((start, time.monotonic()))
+
+        actor = dramatiq.actor(task, actor_name=f'task_{rando}', queue_name=name, broker=app.dramatiq.broker)
+        # more threads than one, they must not run the queue in parallel
+        worker = dramatiq.Worker(app.dramatiq.broker, worker_threads=3, worker_timeout=100, queues={name})
+        try:
+            worker.start()
+            for value in range(4):
+                actor.send(value)
+            deadline = time.monotonic() + 20
+            while len(runs) < 4 and time.monotonic() < deadline:
+                time.sleep(0.05)
+        finally:
+            worker.stop()
+            app.dramatiq.queues.delete(name, force=True)
+    runs.sort()
+    assert len(runs) == 4
+    assert all(previous[1] <= following[0] for previous, following in zip(runs, runs[1:]))

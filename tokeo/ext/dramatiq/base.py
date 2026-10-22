@@ -16,6 +16,7 @@ from dramatiq.errors import BrokerConnectionError
 from dramatiq.asyncio import EventLoopThread, set_event_loop_thread
 from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
+from dramatiq.common import q_name
 import pika
 from tokeo.core.utils.url import overload_with_auth as url_overload_with_auth
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
@@ -89,9 +90,8 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
     Extended RabbitMQ broker with support for single-active-consumer queues.
 
     A queue whose name contains '_unparalleled' is declared with the RabbitMQ
-    single-active-consumer flag: only one worker process consumes it at a
-    time. Inside that process its worker threads still run several messages
-    in parallel; a strict order needs one thread or a prefetch of 1.
+    single-active-consumer flag and consumed with a prefetch of 1: only one
+    worker process consumes it, one message at a time.
 
     ### Notes
 
@@ -176,6 +176,28 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
         """Host and port of the broker, never its url with the password."""
         parameters = self.parameters if isinstance(self.parameters, list) else [self.parameters]
         return ', '.join(f'{p.host}:{p.port}' for p in parameters)
+
+    def consume(self, queue_name, prefetch=1, timeout=5000):
+        """
+        Create a consumer, with a prefetch of 1 for unparalleled queues.
+
+        ### Args
+
+        - **queue_name** (str): The queue to consume
+        - **prefetch** (int, optional): Messages to fetch ahead. Defaults to 1
+        - **timeout** (int, optional): Milliseconds to wait for a message.
+            Defaults to 5000
+
+        ### Returns
+
+        - **Consumer**: The consumer of the queue
+
+        """
+        # one message at a time; their delay queues keep the prefetch, a far
+        # delayed message would hold back the earlier ones otherwise
+        if '_unparalleled' in queue_name.lower() and queue_name == q_name(queue_name):
+            prefetch = 1
+        return super().consume(queue_name, prefetch=prefetch, timeout=timeout)
 
     def _build_queue_arguments(self, queue_name):
         """

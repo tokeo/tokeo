@@ -93,6 +93,26 @@ def test_register_queue_arguments_default(tmp, keep_dead_message_ttl, rabbitmq, 
         assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == keep_dead_message_ttl
 
 
+@pytest.mark.parametrize(
+    'queue, prefetch, expected',
+    [
+        ('orders_unparalleled', 8, 1),
+        ('Orders_UNPARALLELED', 8, 1),
+        # the delay queue keeps its prefetch for the delayed messages
+        ('orders_unparalleled.DQ', 8000, 8000),
+        ('mail', 8, 8),
+    ],
+)
+def test_unparalleled_queues_consume_one_message_at_a_time(tmp, broker_app, monkeypatch, queue, prefetch, expected):
+    consumed = []
+    monkeypatch.setattr(
+        dramatiq_rabbitmq.RabbitmqBroker, 'consume', lambda self, name, prefetch=1, timeout=5000: consumed.append(prefetch)
+    )
+    with broker_app(tmp, None) as app:
+        app.dramatiq.broker.consume(queue, prefetch=prefetch)
+    assert consumed == [expected]
+
+
 def test_register_queue_arguments_from_config(tmp, keep_dead_message_ttl, broker_app):
     import dramatiq
 
