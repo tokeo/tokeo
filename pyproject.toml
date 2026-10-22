@@ -38,9 +38,11 @@ dev = [
     "coverage>=7.10.0",
     "pyink>=25.0.0",
     "flake8>=7.0.0",
+    "pyte",
     # packages necessary to run all macros
     "lazy_loader",
     "prompt_toolkit",
+    "rich",
     "diskcache",
     "dramatiq>=2.2.1",
     "dramatiq[rabbitmq]",
