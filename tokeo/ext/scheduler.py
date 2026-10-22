@@ -9,6 +9,9 @@ The extension orchestrates the execution of background tasks with precise
 timing controls and offers both programmatic and interactive management
 of the task scheduler.
 
+The shell and its lists build on the extensions ```tokeo.ext.tui.input``` and
+```tokeo.ext.tui.output```; enable them together with this one.
+
 ### Features
 
 - Cron-style scheduling with optional jitter and delay
@@ -27,8 +30,6 @@ from os.path import basename
 from tokeo.ext.argparse import Controller
 from cement.core.meta import MetaMixin
 from cement import ex
-from cement.core.foundation import SIGNALS
-from cement.core.exc import CaughtSignal
 from apscheduler.schedulers.base import STATE_RUNNING
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -37,12 +38,8 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.triggers.cron import CronTrigger
 from argparse import ArgumentParser
 import shlex
-from prompt_toolkit import PromptSession
-from prompt_toolkit.patch_stdout import patch_stdout
-from prompt_toolkit.history import InMemoryHistory
-from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-from prompt_toolkit.completion import NestedCompleter
 from datetime import datetime, timezone, timedelta
+from tokeo.ext.tui import require_extensions
 
 
 class TokeoCronAndFireTrigger(CronTrigger):
@@ -274,9 +271,8 @@ class TokeoScheduler(MetaMixin):
         super(TokeoScheduler, self).__init__(*args, **kw)
         self.app = app
         self._command_parser = None
-        self._shell_completion = None
         self._scheduler = None
-        self._interactive = True
+        self._interactive = False
         self._tasks = None
         self._taskid = 0
 
@@ -547,7 +543,7 @@ class TokeoScheduler(MetaMixin):
                     max_running_jobs=task['max_running_jobs'] if 'max_running_jobs' in task else None,
                 )
 
-    def startup(self, interactive=True, paused=False):
+    def startup(self, interactive=False, paused=False):
         """
         Start the scheduler.
 
@@ -599,7 +595,7 @@ class TokeoScheduler(MetaMixin):
             self._scheduler.shutdown()
             self._scheduler.remove_all_jobs()
 
-    def launch(self, interactive=True, paused=False):
+    def launch(self, interactive=False, paused=False):
         """
         Launch the scheduler and optionally start the interactive shell.
 
@@ -614,10 +610,8 @@ class TokeoScheduler(MetaMixin):
 
         ### Notes
 
-        : This method combines scheduler startup and interactive shell launch.
-            When interactive is True, it will block until the shell is exited.
-            When interactive is False, it will return immediately after starting
-            the scheduler.
+        : Both modes block: with interactive until the shell ends, without
+            until the scheduler is stopped.
 
         """
         self.app.scheduler.startup(interactive=interactive, paused=paused)
@@ -626,88 +620,70 @@ class TokeoScheduler(MetaMixin):
 
     def shell_completion(self):
         """
-        Get shell command completions for the interactive shell.
-
-        Creates and returns command completion definitions for the prompt_toolkit
-        interactive shell. This enables tab-completion of commands and subcommands.
+        Get the completion of the shell commands.
 
         ### Returns
 
-        - **NestedCompleter**: Command completer instance for prompt_toolkit
-
-        ### Notes
-
-        : The completer is built once and cached for future use. It defines
-            completions for all available shell commands and their subcommands.
+        - **dict**: The commands and their subcommands as nested dict
 
         """
-        if self._shell_completion is None:
-            self._shell_completion = NestedCompleter.from_nested_dict(
-                {
-                    'list': None,
-                    'pause': None,
-                    'resume': None,
-                    'reload': {
-                        '--restart': None,
-                    },
-                    'restart': None,
-                    'wakeup': None,
-                    'tasks': {
-                        'pause': None,
-                        'resume': None,
-                        'remove': None,
-                        'fire': None,
-                    },
-                    'exit': None,
-                    'quit': None,
-                },
-            )
-        # return the completion set
-        return self._shell_completion
+        return {
+            'list': None,
+            'pause': None,
+            'resume': None,
+            'reload': {
+                '--restart': None,
+            },
+            'restart': None,
+            'wakeup': None,
+            'tasks': {
+                'pause': None,
+                'resume': None,
+                'remove': None,
+                'fire': None,
+            },
+            'exit': None,
+            'quit': None,
+        }
 
     def shell_history(self):
         """
-        Get command history for the interactive shell.
-
-        Creates an in-memory command history for the interactive shell with
-        some predefined common commands.
+        Get the lines the shell history starts with.
 
         ### Returns
 
-        - **InMemoryHistory**: Command history instance for prompt_toolkit
-
-        ### Notes
-
-        : The history is initialized with common commands like 'exit' to
-            provide convenient history recall from the start. As the user
-            enters more commands, they are added to this history.
+        - **list**: The lines, ```exit``` to find it by arrow up
 
         """
-        return InMemoryHistory(
-            [
-                'exit',
-            ]
-        )
+        return ['exit']
 
     def handle_command_list(self, args):
         """
-        Handle the 'list' command to show scheduled tasks.
+        Handle the 'list' command to show the scheduled tasks.
 
-        Displays all currently scheduled tasks including their next run time,
-        trigger information, and status.
+        Shows the time and the state of the scheduler, then a table of the
+        tasks with id, name, trigger, next run and state.
 
         ### Args
 
         - **args**: Command arguments from the parser
 
-        ### Notes
-
-        : This command prints the current time followed by a detailed list of all
-            scheduled jobs with their IDs, names, next run times, and status.
-
         """
-        self.app.log.debug(datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %z (%Z)'))
-        self._scheduler.print_jobs()
+        output = self.app.tui.output
+        state = 'running' if self._scheduler.state == STATE_RUNNING else 'not running'
+        header = f'{datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %z (%Z)")}  scheduler {state}'
+        rows = [
+            [
+                job.id,
+                job.name,
+                str(job.trigger),
+                job.next_run_time.strftime('%Y-%m-%d %H:%M:%S %z') if job.next_run_time else '',
+                'active' if job.next_run_time else 'paused',
+            ]
+            for job in self._scheduler.get_jobs()
+        ]
+        columns = [('id', 'left', 'full'), 'name', 'trigger', 'next run', 'state']
+        output.print(header, output.table(columns, rows, title='tasks'))
 
     def handle_command_pause(self, args):
         """
@@ -998,6 +974,7 @@ class TokeoScheduler(MetaMixin):
         ### Raises
 
         - **EOFError**: If the exit or quit command is entered
+        - **Exception**: The error of a failing command
 
         ### Notes
 
@@ -1011,7 +988,8 @@ class TokeoScheduler(MetaMixin):
 
             - exit, quit: Raise EOFError to terminate the shell
             - Empty commands or commands that show help: Return True
-            - Commands that fail to parse or execute: Return False
+            - Commands that fail to parse: Return False
+            - Commands that fail to execute: Raise their error
 
         """
         # signal bye bye to interactive shell
@@ -1026,39 +1004,25 @@ class TokeoScheduler(MetaMixin):
             # if parse was ok but only help, err == 0, else err != 0
             return err.code == 0
 
-        # execute command
+        # a failing command raises, the shell shows the error and keeps the line
         if 'func' in args:
-            try:
-                print('')
-                args.func(args)
-                return True
-            except Exception as err:
-                self.app.log.debug(f'{type(err)}: {err}')
-                return False
+            print('')
+            args.func(args)
+            return True
 
         # unusual empty but valid command, can be added to history
         return True
 
-    def shell(self):
+    def shell(self, **session):
         """
         Start the interactive shell for scheduler management.
 
-        Provides an interactive command prompt for managing the scheduler and its
-        tasks. The shell supports command history, tab completion, and showing the
-        scheduler's current state in the prompt.
+        The prompt shows whether the scheduler is running. ```exit```,
+        ```quit``` or Ctrl-D end the shell.
 
-        ### Notes
+        ### Args
 
-        : The interactive shell provides a command-line interface for managing
-            the scheduler at runtime. It displays the scheduler's current state
-            (running or paused) in the prompt and supports various commands for
-            listing, pausing, resuming, and manipulating tasks.
-
-        : The shell captures Ctrl+D to exit cleanly and handles various error
-            conditions gracefully. Command history is maintained between commands
-            and can be navigated with up/down arrows.
-
-        : This method blocks until the shell is exited.
+        - **session**: More options for the shell of ```app.tui.input```
 
         ### Example
 
@@ -1077,61 +1041,20 @@ class TokeoScheduler(MetaMixin):
         ```
 
         """
-        self.app.log.info('Welcome to scheduler interactive shell.')
-        # one prompt session for the whole shell: it holds the in-memory
-        # history, the command completer, the from-history auto-suggest, and
-        # complete-while-typing (the completion menu pops up as you type),
-        # built once instead of rebuilt on every iteration. the dynamic
-        # prompt text and the edit-in-place default are passed per call below.
-        # note: enable_history_search would silently disable complete-while-
-        # typing (they are mutually exclusive in prompt_toolkit), so the
-        # completer takes precedence and it is deliberately not set
-        session = PromptSession(
-            history=self.shell_history(),
-            completer=self.shell_completion(),
-            auto_suggest=AutoSuggestFromHistory(),
-            complete_while_typing=True,
-        )
-        # initialize the user_input
-        user_input = ''
-        # get std.output and prevent ruining interface
-        with patch_stdout(raw=True):
-            # loop interactive shell
-            while True:
-                # catch exceptions
-                try:
-                    user_input = session.prompt(
-                        'Scheduler> ' if self._scheduler.state == STATE_RUNNING else '(not running) Scheduler> ',
-                        default=user_input,
-                    )
-                    # prompt_toolkit already appended the accepted line to the
-                    # history on Enter, so there is nothing to store by hand.
-                    # on a successful command clear the edit buffer; on a
-                    # failed one keep it so it re-appears for correction
-                    if self.command(user_input):
-                        user_input = ''
 
-                except KeyboardInterrupt:
-                    # we don't support Ctrl-C but reset input
-                    user_input = ''
-                    continue
-                except EOFError:
-                    # we do support Ctrl-D
-                    self.app.log.info('bye bye using scheduler...')
-                    break
-                except CaughtSignal as err:
-                    # allow shutdown by the configured signals; re-raise any
-                    # other caught signal instead of silently swallowing it
-                    if err.signum in SIGNALS:
-                        break
-                    raise
-                except Exception as err:
-                    # surface the error (not only at debug level) so a broken
-                    # command handler is visible, then keep the shell alive
-                    self.app.log.error(f'scheduler shell command failed: {err}')
+        def prompt():
+            return 'Scheduler> ' if self._scheduler.state == STATE_RUNNING else '(not running) Scheduler> '
 
-                # make one line space
+        def command(line):
+            # an empty line between two commands
+            try:
+                return self.command(line)
+            finally:
                 print('')
+
+        self.app.log.info('Welcome to scheduler interactive shell.')
+        self.app.tui.input.shell(command, prompt=prompt, completer=self.shell_completion(), history=self.shell_history(), **session)
+        self.app.log.info('bye bye using scheduler...')
 
 
 class TokeoSchedulerController(Controller):
@@ -1155,17 +1078,14 @@ class TokeoSchedulerController(Controller):
     ### Example
 
     ```bash
-    # Start the scheduler with interactive shell
+    # Start the scheduler, it runs until stopped
     myapp scheduler launch
 
-    # Start the scheduler in the background
-    myapp scheduler launch --background
+    # Start the scheduler with the interactive shell
+    myapp scheduler launch --shell
 
     # Start in paused mode
-    myapp scheduler launch --paused
-
-    # Start with plain text output (no colors)
-    myapp scheduler launch --no-colors
+    myapp scheduler launch --shell --paused
     ```
 
     """
@@ -1193,7 +1113,7 @@ class TokeoSchedulerController(Controller):
             'repeating tasks. Utilize a range of scheduler commands '
             'and a shell for an interactive task handling.'
         )
-        epilog = f'Example: {basename(argv[0])} scheduler launch --background'
+        epilog = f'Example: {basename(argv[0])} scheduler launch --shell'
 
     def _setup(self, app):
         """
@@ -1215,143 +1135,15 @@ class TokeoSchedulerController(Controller):
         """
         super(TokeoSchedulerController, self)._setup(app)
 
-    def log_info_bw(self, *args):
-        """
-        Log info message in black and white.
-
-        ### Args
-
-        - **args**: Message parts to log
-
-        ### Notes
-
-        : This is a plain text alternative to the colored logging methods.
-            It's used when the --no-colors flag is specified.
-
-        """
-        print('INFO:', *args)
-
-    def log_warning_bw(self, *args):
-        """
-        Log warning message in black and white.
-
-        ### Args
-
-        - **args**: Message parts to log
-
-        ### Notes
-
-        : This is a plain text alternative to the colored logging methods.
-            It's used when the --no-colors flag is specified.
-
-        """
-        print('WARN:', *args)
-
-    def log_error_bw(self, *args):
-        """
-        Log error message in black and white.
-
-        ### Args
-
-        - **args**: Message parts to log
-
-        ### Notes
-
-        : This is a plain text alternative to the colored logging methods.
-            It's used when the --no-colors flag is specified.
-
-        """
-        print('ERR:', *args)
-
-    def log_debug_bw(self, *args):
-        """
-        Log debug message in black and white.
-
-        ### Args
-
-        - **args**: Message parts to log
-
-        ### Notes
-
-        : This is a plain text alternative to the colored logging methods.
-            It's used when the --no-colors flag is specified.
-
-        """
-        print('DEBUG:', *args)
-
-    def log_info(self, *args):
-        """
-        Log info message in color (green).
-
-        ### Args
-
-        - **args**: Message parts to log
-
-        ### Notes
-
-        : This method uses ANSI color codes to display info messages in green.
-            It's the default logging method unless --no-colors is specified.
-
-        """
-        print('\033[32mINFO:', *args, '\033[39m')
-
-    def log_warning(self, *args):
-        """
-        Log warning message in color (yellow).
-
-        ### Args
-
-        - **args**: Message parts to log
-
-        ### Notes
-
-        : This method uses ANSI color codes to display warning messages in yellow.
-            It's the default logging method unless --no-colors is specified.
-
-        """
-        print('\033[33mWARN:', *args, '\033[39m')
-
-    def log_error(self, *args):
-        """
-        Log error message in color (red).
-
-        ### Args
-
-        - **args**: Message parts to log
-
-        ### Notes
-
-        : This method uses ANSI color codes to display error messages in red.
-            It's the default logging method unless --no-colors is specified.
-
-        """
-        print('\033[31mERR:', *args, '\033[39m')
-
-    def log_debug(self, *args):
-        """
-        Log debug message in color (magenta).
-
-        ### Args
-
-        - **args**: Message parts to log
-
-        ### Notes
-
-        : This method uses ANSI color codes to display debug messages in magenta.
-            It's the default logging method unless --no-colors is specified.
-
-        """
-        print('\033[35mDEBUG:', *args, '\033[39m')
-
     @ex(
         help='start the scheduler service',
         description='Spin up the scheduler.',
         arguments=[
             (
-                ['--background'],
+                ['--shell'],
                 dict(
                     action='store_true',
-                    help='do not startup in interactive shell',
+                    help='start with the interactive shell',
                 ),
             ),
             (
@@ -1361,55 +1153,18 @@ class TokeoSchedulerController(Controller):
                     help='start the scheduler in paused mode',
                 ),
             ),
-            (
-                ['--no-colors'],
-                dict(
-                    action='store_true',
-                    help='do not use colored output',
-                ),
-            ),
         ],
     )
     def launch(self):
         """
         Start the scheduler service.
 
-        This command initializes and starts the scheduler with the
-        configured options, including interactive shell if requested.
-
-        ### Notes
-
-        : This method is exposed as a CLI command and handles the command-line
-            arguments for starting the scheduler. It can run the scheduler in
-            interactive mode with a command shell or in background mode.
-
-        : When running in interactive mode, it replaces the default log methods
-            with console-friendly versions (with or without colors) to ensure
-            proper display in the interactive shell.
-
-        : Command-line options:
-
-            - --background: Start without interactive shell
-            - --paused: Start in paused state
-            - --no-colors: Use plain text output without ANSI colors
+        Without --shell the scheduler runs in the foreground until it is
+        stopped; with --shell it runs in the background of the interactive
+        shell.
 
         """
-        # rewrite the output log handler for interactive
-        # to run well with prompt toolkit
-        if not self.app.pargs.background:
-            # use colored output?
-            if self.app.pargs.no_colors:
-                self.app.log.info = self.log_info_bw
-                self.app.log.warning = self.log_warning_bw
-                self.app.log.error = self.log_error_bw
-                self.app.log.debug = self.log_debug_bw
-            else:
-                self.app.log.info = self.log_info
-                self.app.log.warning = self.log_warning
-                self.app.log.error = self.log_error
-                self.app.log.debug = self.log_debug
-        # start the scheduler
-        self.app.scheduler.launch(interactive=not self.app.pargs.background, paused=self.app.pargs.paused)
+        self.app.scheduler.launch(interactive=self.app.pargs.shell, paused=self.app.pargs.paused)
 
 
 def tokeo_scheduler_extend_app(app):
@@ -1431,6 +1186,7 @@ def tokeo_scheduler_extend_app(app):
         attaches it to the application as the 'scheduler' attribute.
 
     """
+    require_extensions(app, 'tokeo.ext.scheduler', 'tokeo.ext.tui.input', 'tokeo.ext.tui.output')
     app.extend('scheduler', TokeoScheduler(app))
     app.scheduler._setup(app)
 
@@ -1475,6 +1231,8 @@ def load(app):
     class MyApp(App):
         class Meta:
             extensions = [
+                'tokeo.ext.tui.input',
+                'tokeo.ext.tui.output',
                 'tokeo.ext.scheduler',
                 # other extensions...
             ]

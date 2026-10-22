@@ -62,7 +62,8 @@ class TokeoTuiInput:
             redraw, e.g. to show a state
         - **completer** (dict|Completer, optional): A nested dict of words
             like ```{'tasks': {'pause': None}}```, or a prompt_toolkit completer
-        - **history** (History, optional): The history, a new one without
+        - **history** (list|History, optional): The history, a list of lines to
+            start with, or a prompt_toolkit history; a new one without
         - **session**: More options for the prompt_toolkit ```PromptSession```
 
         ### Notes
@@ -79,9 +80,11 @@ class TokeoTuiInput:
 
         if isinstance(completer, dict):
             completer = NestedCompleter.from_nested_dict(completer)
+        if history is None or isinstance(history, (list, tuple)):
+            history = InMemoryHistory(history or [])
         # complete while typing excludes history search, so it is not set
         prompt_session = PromptSession(
-            history=history or InMemoryHistory(),
+            history=history,
             completer=completer,
             auto_suggest=AutoSuggestFromHistory(),
             complete_while_typing=True,

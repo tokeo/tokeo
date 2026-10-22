@@ -67,6 +67,11 @@ def test_lines_until_ctrl_d(shell):
     assert list(history.get_strings()) == ['list', 'tasks pause 1']
 
 
+def test_history_from_a_list(shell):
+    # arrow up brings the first line of the list
+    assert shell(f'\x1b[A\r{CTRL_D}', history=['exit', 'list']) == ['list']
+
+
 def test_failed_line_stays_until_ctrl_c(shell):
     # False keeps the line, the next enter sends it again; Ctrl-C clears it
     assert shell(f'typo\r\r{CTRL_C}ok\r{CTRL_D}', command=lambda line: line != 'typo') == ['typo', 'typo', 'ok']
