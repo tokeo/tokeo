@@ -22,7 +22,7 @@ from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
 from tokeo.ext.dramatiq.controller import _duration, _monitor_view
 from tokeo.ext.tui.output import TokeoTuiOutput
 from tokeo.main import TokeoTest
-from tokeo.ext.tui import TokeoTuiError
+from tokeo.core.exc import TokeoError
 from conftest import DramatiqTest
 
 
@@ -431,7 +431,7 @@ def test_command_json(command):
 
 
 def test_needs_the_tui_output_extension(tmp):
-    with pytest.raises(TokeoTuiError, match='The extension tokeo.ext.dramatiq needs tokeo.ext.tui.output, add it to the extensions'):
+    with pytest.raises(TokeoError, match='The extension tokeo.ext.dramatiq needs tokeo.ext.tui.output, add it to the extensions'):
         with _monitor_app(tmp, cls=WithoutTuiTest):
             pass
 

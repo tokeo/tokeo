@@ -15,7 +15,7 @@ import pytest
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from tokeo.main import TokeoTest
-from tokeo.ext.tui import TokeoTuiError
+from tokeo.core.exc import TokeoError
 from tokeo.ext.automate import TokeoAutomateShell
 from tests.ext.test_ext_automate import AutomateTest, defaults
 
@@ -44,9 +44,7 @@ def _lines(capsys):
 
 
 def test_needs_the_tui_extensions():
-    with pytest.raises(
-        TokeoTuiError, match='The extension tokeo.ext.automate needs tokeo.ext.tui.input and tokeo.ext.tui.output, add them'
-    ):
+    with pytest.raises(TokeoError, match='The extension tokeo.ext.automate needs tokeo.ext.tui.input and tokeo.ext.tui.output, add them'):
         with WithoutTuiTest(config_defaults=defaults):
             pass
 

@@ -37,15 +37,6 @@ def test_extension_registers_output_only():
             app.tui.input
 
 
-def test_require_extensions_names_the_missing_ones():
-    from tokeo.ext.tui import require_extensions
-
-    with OutputTest() as app:
-        require_extensions(app, 'tokeo.ext.probe', 'tokeo.ext.tui.output')
-        with pytest.raises(TokeoTuiError, match='needs tokeo.ext.tui.input and tokeo.ext.x, add them to the extensions of the app!'):
-            require_extensions(app, 'tokeo.ext.probe', 'tokeo.ext.tui.input', 'tokeo.ext.tui.output', 'tokeo.ext.x')
-
-
 def test_require_names_the_missing_package():
     with pytest.raises(TokeoTuiError, match='The extension tokeo.ext.tui.output needs the package nope, add it'):
         require('tokeo_no_such_module', 'nope', 'tokeo.ext.tui.output')

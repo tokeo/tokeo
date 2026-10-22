@@ -42,7 +42,7 @@ def defaultmeta(controller):
     return controller._default_command_meta
 
 
-def controller_log_info_help(controller):
+def log_info_help(controller):
     """
     Log the help (dry) from subcmd's \\_\\_cement_meta\\_\\_.
 

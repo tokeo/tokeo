@@ -20,7 +20,7 @@ limits through diskcache locks, and clear errors when RabbitMQ is not reachable.
     The extension builds on ```tokeo.ext.tui.output``` (and with it the
     package ```rich```) for the displays of ```dramatiq queues``` and
     ```dramatiq monitor```. Enable both; without it the app stops at start
-    with a ```TokeoTuiError```.
+    with a ```TokeoError```.
 
 ## 1. How dramatiq works
 

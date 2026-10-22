@@ -63,7 +63,7 @@ from tokeo.core.utils.base import hasprops, getprop, default_when_blank
 from tokeo.core.utils.json import json_dump, TokeoJsonUnknownNoneEncoder
 from tokeo.core.utils import sanitize
 from tokeo.ext.argparse import Controller
-from tokeo.ext.tui import require_extensions
+from tokeo.core.utils.cement.extensions import required as extensions_required
 
 
 class TokeoAutomateError(TokeoError):
@@ -2450,7 +2450,7 @@ def tokeo_automate_extend_app(app):
     - **app** (Application): The Cement application instance
 
     """
-    require_extensions(app, 'tokeo.ext.automate', 'tokeo.ext.tui.input', 'tokeo.ext.tui.output')
+    extensions_required(app, 'tokeo.ext.automate', 'tokeo.ext.tui.input', 'tokeo.ext.tui.output')
     app.extend('automate', TokeoAutomate(app))
     app.automate._setup(app)
 

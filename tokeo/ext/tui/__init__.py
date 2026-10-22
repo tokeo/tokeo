@@ -87,27 +87,6 @@ def register(app, name, part):
     app.tui._parts[name] = part
 
 
-def require_extensions(app, extension, *needed):
-    """
-    Check that the tui extensions an extension builds on are enabled.
-
-    ### Args
-
-    - **app** (Application): The Cement application instance
-    - **extension** (str): The extension that needs them
-    - **needed** (str): The extensions it needs, e.g. ```tokeo.ext.tui.output```
-
-    ### Raises
-
-    - **TokeoTuiError**: If one of them is not enabled
-
-    """
-    missing = [name for name in needed if name not in app.ext.get_loaded_extensions()]
-    if missing:
-        names, them = ' and '.join(missing), 'it' if len(missing) == 1 else 'them'
-        raise TokeoTuiError(f'The extension {extension} needs {names}, add {them} to the extensions of the app!')
-
-
 def require(module, package, extension):
     """
     Import the library of a tui extension.

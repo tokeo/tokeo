@@ -15,7 +15,7 @@ from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
-from tokeo.ext.tui import TokeoTuiError
+from tokeo.core.exc import TokeoError
 
 CTRL_D = '\x04'
 
@@ -57,7 +57,7 @@ def started(monkeypatch):
 
 
 def test_needs_the_tui_extensions():
-    with pytest.raises(TokeoTuiError, match='The extension tokeo.ext.scheduler needs tokeo.ext.tui.output, add it to the extensions'):
+    with pytest.raises(TokeoError, match='The extension tokeo.ext.scheduler needs tokeo.ext.tui.output, add it to the extensions'):
         with WithoutTuiTest():
             pass
 
