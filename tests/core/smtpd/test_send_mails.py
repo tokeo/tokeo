@@ -27,7 +27,9 @@ SETTINGS = {
 }
 
 
-def test_net_smtp_simple_send_1_mail():
+def test_simple_send_1_mail():
+    # MidiSmtpServer sends this once by Net::SMTP and once by the Mail gem, two
+    # client components; Python has smtplib only, so one test remains
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
     run_server_client(ev, SETTINGS, lambda port: send_mail(port, ENVELOPE_FROM, ENVELOPE_TO, mail))
@@ -85,15 +87,6 @@ def test_net_smtp_auth_plain_fail():
                 port, ENVELOPE_FROM, ENVELOPE_TO, mail, authentication_id='administrator', password='error_password', auth_type='plain'
             ),
         )
-
-
-def test_mikel_mail_simple_send_1_mail():
-    # Ruby drives this via the Mail gem; Python has one SMTP client, so this
-    # mirrors the plain send as a second, independent delivery
-    ev = CaptureSmtpdEvents()
-    mail = read_message('simple_mail.msg')
-    run_server_client(ev, SETTINGS, lambda port: send_mail(port, ENVELOPE_FROM, ENVELOPE_TO, mail))
-    assert ev.ev_message_data == mail.encode()
 
 
 def test_mikel_mail_simple_send_1_mail_starttls():

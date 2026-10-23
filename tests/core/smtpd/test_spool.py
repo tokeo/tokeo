@@ -20,8 +20,7 @@ import pytest
 from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents
 
-from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
-from tests.core.smtpd.lib.smtpd_tests_helper import run_wire, wait_until
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, run_wire, wait_until
 
 MESSAGE = 'Subject: spool test\r\n' 'From: a@x.org\r\n' '\r\n' 'line one\r\n' '.leading dot gets stuffed by the client\r\n' 'last line'
 
@@ -356,7 +355,6 @@ def test_keep_called_twice_returns_none(tmp_path):
     first, second = events.seen[0]['first'], events.seen[0]['second']
     assert first is not None and os.path.exists(first)
     assert second is None
-    os.unlink(first)
 
 
 def test_empty_body_message_matches_ram_mode(tmp_path):

@@ -65,8 +65,6 @@ def test_asyncio_event_loop_thread_is_daemon():
 
 
 def test_register_uses_tokeo_asyncio(tmp):
-    import dramatiq
-
     with DramatiqTest(tmp, []):
         kinds = [type(m) for m in dramatiq.get_broker().middleware]
     assert TokeoAsyncIO in kinds
@@ -87,15 +85,11 @@ def test_register_uses_tokeo_asyncio(tmp):
     ids=['default', 'partial_block', 'off', 'on'],
 )
 def test_register_confirm_delivery(tmp, rabbitmq, confirm):
-    import dramatiq
-
     with DramatiqBrokerTest(tmp, rabbitmq):
         assert dramatiq.get_broker().confirm_delivery is confirm
 
 
 def test_register_confirm_delivery_with_tls_parameters(tmp):
-    import dramatiq
-
     # amqps with a custom ca builds pika parameters instead of the url
     rabbitmq = dict(url='amqps://localhost:5671/', tls_ca=os.path.join(tmp.dir, 'ca.pem'))
     with open(rabbitmq['tls_ca'], 'w') as f:
@@ -115,8 +109,6 @@ def test_register_invalid_confirm_delivery(tmp, value):
 
 @pytest.mark.parametrize('rabbitmq', [None, dict(url='amqp://localhost:5672/')], ids=['default', 'partial_block'])
 def test_register_queue_arguments_default(tmp, keep_dead_message_ttl, rabbitmq):
-    import dramatiq
-
     with DramatiqBrokerTest(tmp, rabbitmq):
         broker = dramatiq.get_broker()
         # without config the queues look as before: no priority, ttl of dramatiq
@@ -147,8 +139,6 @@ def test_unparalleled_queues_consume_one_message_at_a_time(tmp, monkeypatch, que
 
 @pytest.mark.usefixtures('keep_dead_message_ttl')
 def test_register_queue_arguments_from_config(tmp):
-    import dramatiq
-
     with DramatiqBrokerTest(tmp, dict(max_priority=10, dead_message_ttl='86400000')):
         broker = dramatiq.get_broker()
         assert broker.max_priority == 10
@@ -181,8 +171,6 @@ def test_register_invalid_queue_arguments(tmp, keep_dead_message_ttl, key, value
 
 
 def middleware_of(kind):
-    import dramatiq
-
     return [m for m in dramatiq.get_broker().middleware if isinstance(m, kind)][0]
 
 
@@ -211,8 +199,6 @@ def test_register_middleware_from_config(tmp):
 
 
 def test_register_actor_options_stay_available(tmp):
-    import dramatiq
-
     with DramatiqMiddlewareTest(tmp, time_limit=5000):
         options = dramatiq.get_broker().actor_options
     # actors and messages still override the defaults of the config

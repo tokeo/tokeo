@@ -23,7 +23,8 @@ class HelpersController(Controller):
 
     def _record(self):
         self.app.seen.update(subcmd=subcmdmeta(self), default=defaultmeta(self))
-        log_info_help(self) if subcmdmeta(self) else None
+        if subcmdmeta(self):
+            log_info_help(self)
 
     @ex(help='the help of command')
     def command(self):

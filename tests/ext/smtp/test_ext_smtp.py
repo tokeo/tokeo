@@ -11,10 +11,6 @@ from unittest import mock
 import pytest
 from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, subjMsg, textMsg, htmlImg
 
-htmlMsg = '<html><body><h1 style="color: #aa0;">Welcome</h1><p>Hello world [äöü]!</p></body></html>'
-
-body = [textMsg, htmlMsg]
-
 
 def test_qp_message(tmp):
     # the message build needs no credentials and no network: embedded dummy
@@ -56,7 +52,7 @@ def _parts(msg):
     return [(part.get_content_type(), part) for part in msg.walk() if not part.is_multipart()]
 
 
-# --- 1. connection parameters ------------------------------------------------
+# --- connection parameters ---------------------------------------------------
 
 
 @pytest.mark.parametrize('use_ssl', [False, True], ids=['smtp', 'smtp_ssl'])
@@ -92,7 +88,7 @@ def test_starttls_and_login():
     server.send_message.assert_called_once()
 
 
-# --- 2. host certificate context ---------------------------------------------
+# --- host certificate context ------------------------------------------------
 
 
 def test_host_cert_context(tmp):
@@ -119,7 +115,7 @@ def test_host_cert_context(tmp):
             context(host_cert_verify=True, host_cert_ca=os.path.join(tmp.dir, 'missing.pem'))
 
 
-# --- 4. x-headers ------------------------------------------------------------
+# --- x-headers ---------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -137,7 +133,7 @@ def test_x_headers(header_encoding, encoded):
     assert f'X-API-Key: {encoded}\n' in msg.as_string()
 
 
-# --- 5. attachments ----------------------------------------------------------
+# --- attachments -------------------------------------------------------------
 
 
 def test_attachment_names(tmp):
@@ -190,7 +186,7 @@ def test_inline_image_unsupported(tmp):
             app.mail._make_message(('text', '<img src="cid:logo">'), **params)
 
 
-# --- 6. mime structure -------------------------------------------------------
+# --- mime structure ----------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -218,7 +214,7 @@ def test_mime_structure(tmp, body, with_file, content_type):
     assert len(related) == (1 if with_file and isinstance(body, tuple) else 0)
 
 
-# --- 7. invalid body ---------------------------------------------------------
+# --- invalid body ------------------------------------------------------------
 
 
 @pytest.mark.parametrize('body', [5, {'text': None}, (5, '')], ids=['int', 'dict_none', 'tuple_int'])
@@ -228,7 +224,7 @@ def test_invalid_body(body):
             app.mail._make_message(body, **app.mail._get_params())
 
 
-# --- 9. date and message-id --------------------------------------------------
+# --- date and message-id -----------------------------------------------------
 
 
 def test_date_and_message_id():

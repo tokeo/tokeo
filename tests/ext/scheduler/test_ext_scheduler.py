@@ -28,7 +28,7 @@ class SchedulerWithoutTuiTest(SchedulerTest):
 
 
 @pytest.fixture
-def started(monkeypatch):
+def started():
     # an app with its scheduler running in the background, no shell
     with SchedulerTest() as app:
         app.scheduler.startup(interactive=True)

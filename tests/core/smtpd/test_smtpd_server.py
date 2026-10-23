@@ -11,6 +11,7 @@ limits, the PROXY protocol, the graceful shutdown, AUTH PLAIN/LOGIN and STARTTLS
 
 import base64
 import asyncio
+import threading
 
 import pytest
 
@@ -364,8 +365,13 @@ def test_max_connections_refuses_with_421():
 def test_threaded_event_runs_off_loop():
     class E(RecordingEvents):
 
+        def on_connect_event(self, ctx):
+            # a plain event runs on the thread of the loop
+            self.loop_thread = threading.get_ident()
+
         @threaded
         def on_message_data_event(self, ctx):
+            self.data_thread = threading.get_ident()
             self.messages.append((bytes(ctx.message.data), ctx.envelope.mail_from, list(ctx.envelope.rcpt_tos)))
 
     ev = E()
@@ -382,6 +388,7 @@ def test_threaded_event_runs_off_loop():
     )
     assert r[4][0].startswith('250')
     assert ev.messages and ev.messages[0][0] == b'hi'
+    assert ev.data_thread != ev.loop_thread
 
 
 @pytest.mark.parametrize('mode', ['CRLF_ENSURE', 'CRLF_LEAVE', 'CRLF_STRICT'])
@@ -468,6 +475,7 @@ class ProxyEvents(RecordingEvents):
         super().__init__(options)
         self.proxy_seen = None
         self.proxy_rewrite = None
+        self.proxy_on_ctx = None
 
     def on_proxy_event(self, ctx, proxy_data):
         self.proxy_seen = dict(proxy_data)
