@@ -35,7 +35,7 @@ def test_token_hex_rejects_non_str_prefix():
 
 
 def test_token_hex_is_random():
-    # two draws must differ (collision at 32 bit is ~1e-7)
+    # two draws must differ (collision at 32 bit is ~2.3e-10)
     assert get_token_hex(4) != get_token_hex(4)
 
 
