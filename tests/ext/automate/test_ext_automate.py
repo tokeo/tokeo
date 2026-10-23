@@ -3,6 +3,7 @@ Tests for tokeo.ext.automate: the hosts, hostgroups, connections and tasks
 read from the config and the results of a task run.
 """
 
+import io
 import copy
 
 import invoke
@@ -10,7 +11,6 @@ import pytest
 from cement.utils.misc import init_defaults
 from tokeo.core.utils.base import hasprops, anyprop, getprop
 from tokeo.ext.automate import TokeoAutomateError, TokeoAutomateResult
-from tests.utils import use_disabled_stdin_capture
 from tests.ext.automate.automate_tests_helper import (
     AutomateTest,
     defaults,
@@ -62,12 +62,14 @@ def test_tasks_simple():
         assert tasks == defaults_automate_tasks(validate=True)
 
 
-def test_tasks_task1_runs_locally():
+def test_tasks_task1_runs_locally(monkeypatch):
     # task1 runs uname by invoke on the local host and returns its result
     with AutomateTest() as app:
         task = app.automate.tasks['task1']
         connection = invoke.Context(config=invoke.Config(overrides={}))
-        with use_disabled_stdin_capture():
+        with monkeypatch.context() as patch:
+            # invoke hands stdin on, pytest blocks reading it
+            patch.setattr('sys.stdin', io.StringIO(''))
             ran = task['func'](app, connection, **task['kwargs'])
         result = TokeoAutomateResult('task1', task['connection']['id'], 'local', result=ran)
         assert result.exited == 0
