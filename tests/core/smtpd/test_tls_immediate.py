@@ -16,7 +16,6 @@ import pytest
 from tokeo.core.smtpd.server import SmtpdServer
 from tests.core.smtpd.lib.smtpd_tests_helper import RecordingEvents, start_server, read_reply, stop_server, insecure_tls_context
 
-
 _VERSION = sys.version_info[:3]
 _SUPPORTED = _VERSION >= (3, 14, 4) or (3, 13, 13) <= _VERSION < (3, 14)
 

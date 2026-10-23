@@ -12,7 +12,6 @@ import pytest
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_tests_helper import read_message, send_mail, run_server_client, insecure_tls_context
 
-
 ENVELOPE_FROM = 'integration@local.local'
 ENVELOPE_TO = 'out@local.local'
 

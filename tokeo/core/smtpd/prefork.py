@@ -23,7 +23,6 @@ import sys
 import ctypes
 import signal
 
-
 #: ``prctl`` option number for the parent-death signal (Linux ``<sys/prctl.h>``)
 _PR_SET_PDEATHSIG = 1
 

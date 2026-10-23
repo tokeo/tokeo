@@ -23,7 +23,6 @@ from tokeo.core.smtpd.events import SmtpdEvents
 from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
 from tests.core.smtpd.lib.smtpd_tests_helper import run_wire, wait_until
 
-
 MESSAGE = 'Subject: spool test\r\n' 'From: a@x.org\r\n' '\r\n' 'line one\r\n' '.leading dot gets stuffed by the client\r\n' 'last line'
 
 

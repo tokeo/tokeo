@@ -24,7 +24,6 @@ import pytest
 from tokeo.core.smtpd import SmtpdServer, SmtpdEvents, Smtpd535Exception, Smtpd550Exception
 from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, subjMsg, textMsg, htmlImg
 
-
 _VERSION = sys.version_info[:3]
 _SUPPORTED = _VERSION >= (3, 14, 4) or (3, 13, 13) <= _VERSION < (3, 14)
 

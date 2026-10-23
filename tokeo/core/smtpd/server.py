@@ -57,7 +57,6 @@ from .exc import (
     Tls530Exception,
 )
 
-
 # default constants
 DEFAULT_SMTPD_HOST = '127.0.0.1'
 DEFAULT_SMTPD_PORT = 2525

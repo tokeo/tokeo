@@ -35,7 +35,6 @@ from argparse import SUPPRESS
 from tokeo.ext.argparse import Controller
 from tokeo.core.exc import TokeoError
 
-
 #: A yaml comment marker at the start of a line: one run of `#` plus at most
 #: one following space. Only the marker is removed, so a documentation line
 #: written as `### ### Heading` keeps its Markdown `###` and still renders as

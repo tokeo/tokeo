@@ -27,7 +27,6 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     make_cert,
 )
 
-
 ENVELOPE_FROM = 'integration@local.local'
 ENVELOPE_TO = 'out@local.local'
 

@@ -79,7 +79,6 @@ from .server import (
     AuthMode,
 )
 
-
 __all__ = [
     'Severity',
     'ForwardingLogger',

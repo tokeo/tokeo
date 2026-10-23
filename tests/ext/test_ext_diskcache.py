@@ -13,7 +13,6 @@ import pytest
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
 
-
 # --------------------------------------------------------------------------------------
 # helpers
 # --------------------------------------------------------------------------------------

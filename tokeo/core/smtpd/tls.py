@@ -36,7 +36,6 @@ from datetime import datetime, timedelta, timezone
 from .logger import Severity
 from tokeo.core.utils.memfd import memory_paths
 
-
 # Cipher strings and TLS floor presets, roughly Mozilla Modern / Intermediate /
 # Old. The defaults (ADVANCED*) follow the current "Intermediate" profile (ECDHE
 # preferred over DHE, AEAD only, ChaCha20 for clients without AES-NI); see

@@ -29,7 +29,6 @@ from cement.utils import fs
 import glob
 from tokeo.core.utils.sort import sort_key_by_lex_and_num_ordered
 
-
 # Environment constants
 PRODUCTION = 'production'
 STAGING = 'staging'

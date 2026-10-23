@@ -16,7 +16,6 @@ from tokeo.core.smtpd.exc import Smtpd421Exception
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_tests_helper import run_line
 
-
 _SMTPD = SmtpdServer(
     CaptureSmtpdEvents(),
     settings={

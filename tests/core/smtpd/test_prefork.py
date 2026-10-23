@@ -28,7 +28,6 @@ from tokeo.core.smtpd.prefork import (
 )
 from tests.utils import ROOT
 
-
 LINUX = sys.platform.startswith('linux')
 HAS_FORK = hasattr(os, 'fork')
 

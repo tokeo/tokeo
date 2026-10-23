@@ -123,7 +123,7 @@ endif
 fmt:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	# align with https://google.github.io/styleguide/pyguide.html
-	pyink --pyink-use-majority-quotes --line-length 139 --include "\.py" --exclude="/(\.git|__pycache__)/" $(sources)
+	pyink --pyink-use-majority-quotes --line-length 139 --target-version py311 --include "\.py" --exclude="/(\.git|__pycache__)/" $(sources)
 
 lint:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} == "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi

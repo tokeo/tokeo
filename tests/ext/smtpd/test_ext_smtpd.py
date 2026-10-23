@@ -31,7 +31,6 @@ from tokeo.ext.smtpd import (
 from tests.utils import ROOT
 from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
-
 # --- unit: handler resolving -----------------------------------------------------
 
 
