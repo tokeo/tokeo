@@ -12,6 +12,7 @@ import asyncio
 
 from tokeo.core.smtpd.server import SmtpdServer
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_helper import wait_until
 
 MSG_WELCOME = '220 127.0.0.1 says welcome!\r\n'
 MSG_ABORT = '421 Service too busy or not available, closing transmission channel\r\n'
@@ -49,9 +50,8 @@ def test_020_tcp_2_simultan_connects():
         try:
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
             b1 = await _welcome(r1)
-            await asyncio.sleep(0.1)
             r2, w2 = await asyncio.open_connection('127.0.0.1', port)
-            await asyncio.sleep(0.1)
+            assert await wait_until(lambda: srv.connections == 2)
             # channel 2 waits for a processing slot -> no welcome yet
             blocked = False
             try:
@@ -78,11 +78,9 @@ def test_030_tcp_3_simultan_connects_and_1_abort():
         try:
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
             b1 = await _welcome(r1)
-            await asyncio.sleep(0.1)
             r2, w2 = await asyncio.open_connection('127.0.0.1', port)
-            await asyncio.sleep(0.1)
+            assert await wait_until(lambda: srv.connections == 2)
             r3, w3 = await asyncio.open_connection('127.0.0.1', port)
-            await asyncio.sleep(0.1)
             # channel 3 exceeds max_connections -> abort message + close
             b3 = await asyncio.wait_for(_welcome(r3), timeout=2)
             closed3 = (await r3.read(1)) == b''

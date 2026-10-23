@@ -12,16 +12,7 @@ import asyncio
 from tokeo.core.smtpd.server import SmtpdServer
 
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
-from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
-
-
-async def _wait_until(pred, timeout=1.0):
-    """Poll ```pred``` until true or the timeout elapses; return its final value."""
-    loop = asyncio.get_event_loop()
-    deadline = loop.time() + timeout
-    while loop.time() < deadline and not pred():
-        await asyncio.sleep(0.02)
-    return pred()
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, wait_until
 
 
 def test_counters_are_zero_when_idle():
@@ -45,13 +36,13 @@ def test_connections_counter_tracks_open_clients():
                 reader, writer = await asyncio.open_connection('127.0.0.1', port)
                 writers.append(writer)
                 await reader.readline()  # consume the 220 greeting
-                assert await _wait_until(lambda e=expected: srv.connections == e)
+                assert await wait_until(lambda e=expected: srv.connections == e)
                 assert srv.has_connections() is True
             # closing them one by one lowers it back to zero
             for closed, writer in enumerate(writers, start=1):
                 writer.close()
                 remaining = len(writers) - closed
-                assert await _wait_until(lambda r=remaining: srv.connections == r)
+                assert await wait_until(lambda r=remaining: srv.connections == r)
             assert srv.has_connections() is False
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
@@ -93,7 +84,7 @@ def test_processings_counter_tracks_message_processing():
             assert events.processings_during >= 1
             assert events.has_processings_during is True
             # and released again after delivery
-            assert await _wait_until(lambda: srv.processings == 0)
+            assert await wait_until(lambda: srv.processings == 0)
             assert srv.has_processings() is False
         finally:
             await srv.stop(wait_seconds_before_close=0.3)

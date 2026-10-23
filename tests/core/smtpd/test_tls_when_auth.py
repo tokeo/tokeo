@@ -75,7 +75,7 @@ def test_when_auth_after_starttls_offers_and_accepts_auth():
             await writer.drain()
             auth_reply = await read_reply(reader)
             writer.close()
-            await asyncio.sleep(0.05)
+            await writer.wait_closed()
             return ehlo1, ehlo2, auth_reply
         finally:
             await stop_server(server, task)

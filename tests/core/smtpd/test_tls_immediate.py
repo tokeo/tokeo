@@ -68,7 +68,7 @@ def test_delivers_over_tls():
             greeting = await read_reply(reader)
             replies = await _deliver(reader, writer)
             writer.close()
-            await asyncio.sleep(0.05)
+            await writer.wait_closed()
             return greeting, replies
         finally:
             await stop_server(server, task)
@@ -99,7 +99,7 @@ def test_behind_proxy():
             greeting = await read_reply(reader)
             replies = await _deliver(reader, writer)
             writer.close()
-            await asyncio.sleep(0.05)
+            await writer.wait_closed()
             return greeting, replies
         finally:
             await stop_server(server, task)

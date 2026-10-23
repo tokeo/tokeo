@@ -21,7 +21,7 @@ from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents
 
 from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
-from tests.core.smtpd.lib.smtpd_tests_helper import run_wire
+from tests.core.smtpd.lib.smtpd_tests_helper import run_wire, wait_until
 
 
 MESSAGE = 'Subject: spool test\r\n' 'From: a@x.org\r\n' '\r\n' 'line one\r\n' '.leading dot gets stuffed by the client\r\n' 'last line'
@@ -296,7 +296,7 @@ def _abort_mid_data(tmp_path, debug):
 
         try:
             await loop.run_in_executor(None, client)
-            await asyncio.sleep(0.4)
+            assert await wait_until(lambda: srv.connections == 0)
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
@@ -334,7 +334,7 @@ def test_data_size_cap_works_in_spool_mode(tmp_path):
 
         try:
             await loop.run_in_executor(None, client)
-            await asyncio.sleep(0.2)
+            assert await wait_until(lambda: srv.connections == 0)
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 

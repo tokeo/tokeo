@@ -13,7 +13,7 @@ import asyncio
 from tokeo.core.smtpd.server import SmtpdServer, GlobalLimits
 from tokeo.core.smtpd.events import SmtpdEvents
 
-from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, wait_until
 
 
 class GatedEvents(SmtpdEvents):
@@ -57,14 +57,12 @@ def test_release_on_service_a_wakes_waiter_on_service_b():
         try:
             mail_a = loop.run_in_executor(None, lambda: send_mail(port_a, 'a@x.org', 'to@x.org', 'Subject: a\r\n\r\nA'))
             # wait until A really holds the one global slot
-            deadline = loop.time() + 3.0
-            while loop.time() < deadline and gl.active_processings < 1:
-                await asyncio.sleep(0.02)
-            assert gl.active_processings == 1
+            assert await wait_until(lambda: gl.active_processings == 1, timeout=3.0)
 
             mail_b = loop.run_in_executor(None, lambda: send_mail(port_b, 'b@x.org', 'to@x.org', 'Subject: b\r\n\r\nB'))
-            await asyncio.sleep(0.3)  # B is now waiting for the slot
-            assert events_b.delivered == []  # ... and did not get through yet
+            # B is connected and waits for the slot ...
+            assert await wait_until(lambda: srv_b.connections == 1)
+            assert srv_b.processings == 0 and events_b.delivered == []  # ... and did not get through yet
 
             events_a.gate.set()  # A finishes -> releases the slot
             events_b.gate.set()  # let B pass once admitted
@@ -107,8 +105,8 @@ def test_external_counter_release_is_seen_via_slot_wait_override():
         try:
             gl.active_processings = 1  # as if another process holds the slot
             mail = loop.run_in_executor(None, lambda: send_mail(port, 'a@x.org', 'to@x.org', 'Subject: x\r\n\r\nhi'))
-            await asyncio.sleep(0.3)
-            assert events.delivered == []  # throttled by the "foreign" slot
+            assert await wait_until(lambda: srv.connections == 1)
+            assert srv.processings == 0 and events.delivered == []  # throttled by the "foreign" slot
 
             gl.active_processings = 0  # foreign process releases: NO event
             code, _ = await asyncio.wait_for(mail, 5.0)

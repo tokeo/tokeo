@@ -416,7 +416,8 @@ def test_on_connect_fires_even_when_refused():
             b2 = await read_reply(r2)
             w1.close()
             w2.close()
-            await asyncio.sleep(0.05)
+            await w1.wait_closed()
+            await w2.wait_closed()
             return b2
         finally:
             await stop_server(server, task)
@@ -512,7 +513,7 @@ async def _dialog_raw(events, settings, steps, has_server_greeting=True):
         except asyncio.TimeoutError:
             closed = False
         writer.close()
-        await asyncio.sleep(0.02)
+        await writer.wait_closed()
         return greeting, replies, closed
     finally:
         await stop_server(server, task)
@@ -1038,7 +1039,7 @@ def test_starttls_full_flow_delivers_over_tls():
             await writer.drain()
             final = await read_reply(reader)
             writer.close()
-            await asyncio.sleep(0.05)
+            await writer.wait_closed()
             return ehlo1, tls_reply, ehlo2, final
         finally:
             await stop_server(server, task)

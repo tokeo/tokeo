@@ -18,7 +18,7 @@ from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents, threaded
 from tokeo.core.smtpd.logger import Severity
 
-from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, wait_until
 
 
 class SyncLogging(SmtpdEvents):
@@ -105,7 +105,8 @@ def test_self_log_from_sync_and_async_events_with_async_logging():
                 lambda: send_mail(port, 'from@example.org', 'to@example.org', 'Subject: x\r\n\r\nhi'),
             )
             assert code == 250
-            await asyncio.sleep(0.1)  # let fire-and-forget tasks run
+            # the fire-and-forget log tasks run on the loop
+            assert await wait_until(lambda: 'rcpt_to (async event)' in [m for _, m in events.captured])
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
@@ -138,7 +139,7 @@ def test_self_log_from_threaded_event_reaches_loop_threadsafe():
                 lambda: send_mail(port, 'from@example.org', 'to@example.org', 'Subject: x\r\n\r\nhi'),
             )
             assert code == 250
-            await asyncio.sleep(0.2)
+            assert await wait_until(lambda: 'data (threaded event)' in [m for _, m in events.captured])
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
@@ -162,7 +163,8 @@ def test_base_auth_deny_logs_via_bound_self_log():
     async def call():
         with pytest.raises(Smtpd535Exception):
             await smtpd._emit(SmtpdEvent.ON_AUTH_EVENT, ctx, '', 'user', 'secret')
-        await asyncio.sleep(0.05)  # let the scheduled deny log run
+        # the scheduled deny log runs on the loop
+        assert await wait_until(lambda: any('Deny access' in m for _, m in events.captured))
 
     asyncio.run(call())
     assert any('Deny access' in m for _, m in events.captured)

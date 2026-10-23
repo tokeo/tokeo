@@ -244,6 +244,15 @@ def run_server_client(events, settings, client_fn, listeners=None, settle=0.15):
 # --- events and dialog of the tests --------------------------------------------
 
 
+async def wait_until(pred, timeout=2.0):
+    """Poll ```pred``` until true or the timeout elapses; return its final value."""
+    loop = asyncio.get_event_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline and not pred():
+        await asyncio.sleep(0.02)
+    return pred()
+
+
 class RecordingEvents(SmtpdEvents):
     """A handler that records fired events and delivered messages."""
 
@@ -329,7 +338,7 @@ async def _converse(events, settings, commands):
             await writer.drain()
             replies.append(await read_reply(reader))
         writer.close()
-        await asyncio.sleep(0.02)
+        await writer.wait_closed()
         return greeting, replies
     finally:
         await stop_server(server, task)
@@ -396,7 +405,7 @@ def run_wire(events, settings, wire_body):
             writer.write(b'QUIT\r\n')
             await writer.drain()
             writer.close()
-            await asyncio.sleep(0.1)
+            await writer.wait_closed()
             return reply[:3]
         finally:
             await srv.stop(wait_seconds_before_close=0.2)
