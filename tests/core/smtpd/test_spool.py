@@ -20,7 +20,7 @@ import pytest
 from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents
 
-from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, run_wire, wait_until
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, run_wire, start_smtpd, wait_until
 
 MESSAGE = 'Subject: spool test\r\n' 'From: a@x.org\r\n' '\r\n' 'line one\r\n' '.leading dot gets stuffed by the client\r\n' 'last line'
 
@@ -97,9 +97,7 @@ class RenameCapture(Capture):
 
 def _run(events, settings, messages=(MESSAGE,), debug=False):
     async def go():
-        srv = SmtpdServer(events, settings=settings, debug=debug)
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(events, settings=settings, debug=debug)
         loop = asyncio.get_event_loop()
         try:
             for msg in messages:
@@ -198,9 +196,7 @@ def test_two_messages_one_connection_get_fresh_files(tmp_path):
     events = Capture()
 
     async def go():
-        srv = SmtpdServer(events, settings={'spool': str(tmp_path) + '/'}, debug=True)
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(events, settings={'spool': str(tmp_path) + '/'}, debug=True)
         loop = asyncio.get_event_loop()
 
         def client():
@@ -275,9 +271,7 @@ def test_manual_rename_takeover_still_safe(tmp_path):
 
 def _abort_mid_data(tmp_path, debug):
     async def go():
-        srv = SmtpdServer(Capture(), settings={'spool': str(tmp_path) + '/'}, debug=debug)
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(Capture(), settings={'spool': str(tmp_path) + '/'}, debug=debug)
         loop = asyncio.get_event_loop()
 
         def client():
@@ -315,9 +309,7 @@ def test_data_size_cap_works_in_spool_mode(tmp_path):
     import smtplib
 
     async def go():
-        srv = SmtpdServer(Capture(), settings={'spool': str(tmp_path) + '/', 'data_size': 64})
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(Capture(), settings={'spool': str(tmp_path) + '/', 'data_size': 64})
         loop = asyncio.get_event_loop()
 
         def client():

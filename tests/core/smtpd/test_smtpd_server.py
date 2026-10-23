@@ -26,6 +26,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     read_reply,
     start_server,
     stop_server,
+    start_smtpd,
     insecure_tls_context,
     TLS_SETTINGS,
 )
@@ -710,17 +711,9 @@ def test_proxy_event_error_aborts_421():
 # --- graceful shutdown -------------------------------------------------------
 
 
-async def _start_smtpd(events, settings):
-    """Start a server in the background on an ephemeral port; return (srv, port)."""
-    srv = SmtpdServer(events, settings=settings)
-    await srv.start([{'host': '127.0.0.1', 'port': 0}])
-    port = srv._servers[0].sockets[0].getsockname()[1]
-    return srv, port
-
-
 def test_stop_stops_accepting_new_connections():
     async def go():
-        srv, port = await _start_smtpd(RecordingEvents(), {})
+        srv, port = await start_smtpd(RecordingEvents(), settings={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         greeting = await read_reply(reader)
         writer.close()
@@ -740,7 +733,7 @@ def test_stop_stops_accepting_new_connections():
 
 def test_shutdown_ends_active_dialog_after_current_command():
     async def go():
-        srv, port = await _start_smtpd(RecordingEvents(), {})
+        srv, port = await start_smtpd(RecordingEvents(), settings={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
         writer.write(b'EHLO me\r\n')
@@ -763,7 +756,7 @@ def test_shutdown_ends_active_dialog_after_current_command():
 
 def test_shutdown_refuses_ungreeted_connection():
     async def go():
-        srv, port = await _start_smtpd(RecordingEvents(), {})
+        srv, port = await start_smtpd(RecordingEvents(), settings={})
         # a scheduled shutdown greets a new connection with 421, not 220
         srv.shutdown()
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
@@ -778,7 +771,7 @@ def test_shutdown_refuses_ungreeted_connection():
 
 def test_graceful_stop_cancels_idle_connection():
     async def go():
-        srv, port = await _start_smtpd(RecordingEvents(), {})
+        srv, port = await start_smtpd(RecordingEvents(), settings={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
         active_before = len(srv._sessions)

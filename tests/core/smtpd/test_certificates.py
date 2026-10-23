@@ -23,6 +23,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     insecure_tls_context,
     verifying_tls_context,
     make_cert,
+    start_smtpd,
 )
 
 ENVELOPE_FROM = 'integration@local.local'
@@ -202,12 +203,8 @@ def _peer_certificate(settings, hosts=None):
     import smtplib
     from cryptography import x509
 
-    from tokeo.core.smtpd.server import SmtpdServer
-
     async def go():
-        srv = SmtpdServer(CaptureSmtpdEvents(), settings=settings, hosts=hosts)
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(CaptureSmtpdEvents(), settings=settings, hosts=hosts)
         loop = asyncio.get_event_loop()
 
         def client():

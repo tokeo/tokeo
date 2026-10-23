@@ -13,7 +13,7 @@ import asyncio
 from tokeo.core.smtpd.server import SmtpdServer, GlobalLimits
 from tokeo.core.smtpd.events import SmtpdEvents
 
-from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, wait_until
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, start_smtpd, wait_until
 
 
 class GatedEvents(SmtpdEvents):
@@ -47,12 +47,8 @@ def test_release_on_service_a_wakes_waiter_on_service_b():
     gl = GlobalLimits(max_processings=1)
 
     async def scenario():
-        srv_a = SmtpdServer(events_a, global_limits=gl)
-        srv_b = SmtpdServer(events_b, global_limits=gl)
-        await srv_a.start([{'host': '127.0.0.1', 'port': 0}])
-        await srv_b.start([{'host': '127.0.0.1', 'port': 0}])
-        port_a = srv_a._servers[0].sockets[0].getsockname()[1]
-        port_b = srv_b._servers[0].sockets[0].getsockname()[1]
+        srv_a, port_a = await start_smtpd(events_a, global_limits=gl)
+        srv_b, port_b = await start_smtpd(events_b, global_limits=gl)
         loop = asyncio.get_event_loop()
         try:
             mail_a = loop.run_in_executor(None, lambda: send_mail(port_a, 'a@x.org', 'to@x.org', 'Subject: a\r\n\r\nA'))
@@ -98,9 +94,7 @@ def test_external_counter_release_is_seen_via_slot_wait_override():
     gl = PollingLimits(max_processings=1)
 
     async def scenario():
-        srv = SmtpdServer(events, global_limits=gl)
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(events, global_limits=gl)
         loop = asyncio.get_event_loop()
         try:
             gl.active_processings = 1  # as if another process holds the slot

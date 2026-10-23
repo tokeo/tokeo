@@ -12,7 +12,7 @@ import asyncio
 from tokeo.core.smtpd.server import SmtpdServer
 
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
-from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, wait_until
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, start_smtpd, wait_until
 
 
 def test_counters_are_zero_when_idle():
@@ -25,9 +25,7 @@ def test_counters_are_zero_when_idle():
 
 def test_connections_counter_tracks_open_clients():
     async def scenario():
-        srv = SmtpdServer(CaptureSmtpdEvents(), settings={})
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(CaptureSmtpdEvents(), settings={})
         writers = []
         try:
             assert srv.connections == 0 and srv.has_connections() is False
@@ -69,10 +67,8 @@ def test_processings_counter_tracks_message_processing():
     events = _RecordingEvents()
 
     async def scenario():
-        srv = SmtpdServer(events, settings={})
+        srv, port = await start_smtpd(events, settings={})
         events.server_ref = srv
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
         loop = asyncio.get_event_loop()
         try:
             assert srv.processings == 0 and srv.has_processings() is False

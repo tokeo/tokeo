@@ -216,10 +216,15 @@ def send_mail(
             client.close()
 
 
-async def _run(events, settings, client_fn, listeners, settle):
-    srv = SmtpdServer(events, settings=settings)
+async def start_smtpd(events, listeners=None, **kwargs):
+    """Start a server on a free port of 127.0.0.1 by default, return (srv, port)."""
+    srv = SmtpdServer(events, **kwargs)
     await srv.start(listeners or [{'host': '127.0.0.1', 'port': 0}])
-    port = srv._servers[0].sockets[0].getsockname()[1]
+    return srv, srv._servers[0].sockets[0].getsockname()[1]
+
+
+async def _run(events, settings, client_fn, listeners, settle):
+    srv, port = await start_smtpd(events, listeners, settings=settings)
     loop = asyncio.get_event_loop()
     try:
         result = await loop.run_in_executor(None, lambda: client_fn(port))
@@ -387,9 +392,7 @@ def run_wire(events, settings, wire_body):
     """Deliver one message with raw wire bytes; returns the reply code."""
 
     async def go():
-        srv = SmtpdServer(events, settings=settings)
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(events, settings=settings)
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await reader.readline()
         try:

@@ -14,6 +14,7 @@ from tokeo.core.smtpd.context import SmtpdContext
 from tokeo.core.smtpd.server import SmtpdServer
 
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
+from tests.core.smtpd.lib.smtpd_tests_helper import start_smtpd
 
 
 class IdCaptureEvents(CaptureSmtpdEvents):
@@ -32,9 +33,7 @@ class IdCaptureEvents(CaptureSmtpdEvents):
 
 def _run(events, client_calls, **server_kwargs):
     async def go():
-        srv = SmtpdServer(events, **server_kwargs)
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(events, **server_kwargs)
         loop = asyncio.get_event_loop()
         try:
             await loop.run_in_executor(None, client_calls, port)

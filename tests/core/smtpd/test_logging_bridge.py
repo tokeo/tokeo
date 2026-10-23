@@ -18,7 +18,7 @@ from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents, threaded
 from tokeo.core.smtpd.logger import Severity
 
-from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, wait_until
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, start_smtpd, wait_until
 
 
 class SyncLogging(SmtpdEvents):
@@ -95,9 +95,7 @@ def test_self_log_from_sync_and_async_events_with_async_logging():
     events = Handler()
 
     async def scenario():
-        srv = SmtpdServer(events, settings={})
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(events, settings={})
         loop = asyncio.get_event_loop()
         try:
             code, _ = await loop.run_in_executor(
@@ -129,9 +127,7 @@ def test_self_log_from_threaded_event_reaches_loop_threadsafe():
     events = Handler()
 
     async def scenario():
-        srv = SmtpdServer(events, settings={})
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(events, settings={})
         loop = asyncio.get_event_loop()
         try:
             code, _ = await loop.run_in_executor(

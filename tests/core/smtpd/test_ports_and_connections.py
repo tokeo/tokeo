@@ -10,9 +10,8 @@ refused with the 421 abort message.
 
 import asyncio
 
-from tokeo.core.smtpd.server import SmtpdServer
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
-from tests.core.smtpd.lib.smtpd_tests_helper import wait_until
+from tests.core.smtpd.lib.smtpd_tests_helper import start_smtpd, wait_until
 
 MSG_WELCOME = '220 127.0.0.1 says welcome!\r\n'
 MSG_ABORT = '421 Service too busy or not available, closing transmission channel\r\n'
@@ -21,9 +20,7 @@ SETTINGS = {'max_processings': 1, 'max_connections': 2, 'do_dns_reverse_lookup':
 
 
 async def _start_limited():
-    srv = SmtpdServer(CaptureSmtpdEvents(), settings=SETTINGS)
-    await srv.start([{'host': '127.0.0.1', 'port': 0}])
-    return srv, srv._servers[0].sockets[0].getsockname()[1]
+    return await start_smtpd(CaptureSmtpdEvents(), settings=SETTINGS)
 
 
 async def _welcome(reader):

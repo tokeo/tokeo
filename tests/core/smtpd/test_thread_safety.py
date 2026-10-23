@@ -10,9 +10,8 @@ connection task, the fail counter must stay zero.
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-from tokeo.core.smtpd.server import SmtpdServer
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
-from tests.core.smtpd.lib.smtpd_tests_helper import read_message, send_mail, wait_until
+from tests.core.smtpd.lib.smtpd_tests_helper import read_message, send_mail, start_smtpd, wait_until
 
 
 class ThreadSafetyEvents(CaptureSmtpdEvents):
@@ -42,9 +41,7 @@ def test_thread_safety_with_multiple_connections():
     count = 100
 
     async def go():
-        srv = SmtpdServer(ev, settings=SETTINGS)
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(ev, settings=SETTINGS)
         loop = asyncio.get_event_loop()
 
         def one(index):

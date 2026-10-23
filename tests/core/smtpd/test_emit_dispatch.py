@@ -21,7 +21,7 @@ from tokeo.core.smtpd.events import (
 )
 from tokeo.core.smtpd.exc import Smtpd535Exception
 
-from tests.core.smtpd.lib.smtpd_tests_helper import send_mail
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, start_smtpd
 
 
 class BareEvents(SmtpdEvents):
@@ -103,9 +103,7 @@ def test_mail_flows_end_to_end_with_bare_handler():
     # with no overrides every no-op event is skipped; the dialog must still
     # accept and deliver a message exactly as before
     async def scenario():
-        srv = SmtpdServer(BareEvents(), settings={})
-        await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        port = srv._servers[0].sockets[0].getsockname()[1]
+        srv, port = await start_smtpd(BareEvents(), settings={})
         loop = asyncio.get_event_loop()
         try:
             code, _ = await loop.run_in_executor(
