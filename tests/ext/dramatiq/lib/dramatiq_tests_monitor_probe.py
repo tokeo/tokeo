@@ -25,10 +25,8 @@ def snapshot(wait=0):
 
 
 if __name__ == '__main__':
-    tmp = fs.Tmp()
-    try:
-        with DramatiqMonitorProbeTest(tmp, sys.argv[1:]) as app:
-            app.dramatiq.monitor.snapshot = snapshot
-            app.run()
-    finally:
-        tmp.remove()
+    # the first argument is the directory of the test, its tmp stays there
+    tmp = fs.Tmp(dir=sys.argv[1])
+    with DramatiqMonitorProbeTest(tmp, sys.argv[2:]) as app:
+        app.dramatiq.monitor.snapshot = snapshot
+        app.run()

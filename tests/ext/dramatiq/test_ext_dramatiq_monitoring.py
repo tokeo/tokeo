@@ -454,9 +454,9 @@ def test_command_interval_checked(command):
 
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
-def test_command_follow_ends_on_ctrl_c_in_a_terminal():
+def test_command_follow_ends_on_ctrl_c_in_a_terminal(tmp):
     probe = 'tests.ext.dramatiq.lib.dramatiq_tests_monitor_probe'
-    args = [sys.executable, '-m', probe, 'dramatiq', 'monitor', '--follow', '--interval', '1']
+    args = [sys.executable, '-m', probe, tmp.dir, 'dramatiq', 'monitor', '--follow', '--interval', '1']
     with Terminal(args, rows=24, columns=100, ctty=True) as terminal:
         shown = terminal.wait_for(lambda lines: any('every 1 s  (Ctrl-C to quit)' in line for line in lines))
         assert shown is not None, terminal.raw.decode(errors='replace')[-2000:]
