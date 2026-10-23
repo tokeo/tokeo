@@ -11,7 +11,8 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
-from tests.core.smtpd.lib.smtpd_tests_helper import read_message, send_mail, start_smtpd, wait_until
+from tests.utils import wait_until_async
+from tests.core.smtpd.lib.smtpd_tests_helper import read_message, send_mail, start_smtpd
 
 
 class ThreadSafetyEvents(CaptureSmtpdEvents):
@@ -51,7 +52,7 @@ def test_thread_safety_with_multiple_connections():
         try:
             with ThreadPoolExecutor(max_workers=count) as pool:
                 await asyncio.gather(*(loop.run_in_executor(pool, one, i) for i in range(count)))
-            assert await wait_until(lambda: srv.processings == 0)
+            assert await wait_until_async(lambda: srv.processings == 0)
         finally:
             await srv.stop(wait_seconds_before_close=1.0)
 

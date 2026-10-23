@@ -249,15 +249,6 @@ def run_server_client(events, settings, client_fn, listeners=None, settle=0.15):
 # --- events and dialog of the tests --------------------------------------------
 
 
-async def wait_until(pred, timeout=2.0):
-    """Poll ```pred``` until true or the timeout elapses; return its final value."""
-    loop = asyncio.get_event_loop()
-    deadline = loop.time() + timeout
-    while loop.time() < deadline and not pred():
-        await asyncio.sleep(0.02)
-    return pred()
-
-
 class RecordingEvents(SmtpdEvents):
     """A handler that records fired events and delivered messages."""
 

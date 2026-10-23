@@ -4,6 +4,7 @@ The helpers for all tests of the app.
 
 import os
 import time
+import asyncio
 import select
 import subprocess
 import pytest
@@ -13,6 +14,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # the stress tests run only with STRESSTESTS=1, e.g. make test STRESSTESTS=1
 stresstest = pytest.mark.skipif(os.environ.get('STRESSTESTS', '0') != '1', reason='set STRESSTESTS=1 to run the stress tests')
+
+
+async def wait_until_async(check, timeout=5.0, interval=0.02):
+    """Like wait_until inside a coroutine, the event loop goes on meanwhile."""
+    deadline = time.monotonic() + timeout
+    while not (result := check()) and time.monotonic() < deadline:
+        await asyncio.sleep(interval)
+    return result
 
 
 class Terminal:
