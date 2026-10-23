@@ -2,8 +2,6 @@
 The fixtures for all tests of the app.
 """
 
-import os
-import shutil
 import pytest
 from io import StringIO
 from cement.utils.misc import rando as _rando
@@ -15,9 +13,8 @@ def tmp(request):
     t = fs.Tmp()
     yield t
 
-    # cleanup
-    if os.path.exists(t.dir) and t.cleanup is True:
-        shutil.rmtree(t.dir)
+    # cleanup of the directory and the file
+    t.remove()
 
 
 @pytest.fixture(scope="function")

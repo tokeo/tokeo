@@ -26,13 +26,16 @@ def test_single_blob_is_readable():
 def test_multiple_blobs_are_independent():
     with memory_paths(b'first', b'second') as (a, b):
         assert a != b
-        assert open(a, 'rb').read() == b'first'
-        assert open(b, 'rb').read() == b'second'
+        with open(a, 'rb') as f:
+            assert f.read() == b'first'
+        with open(b, 'rb') as f:
+            assert f.read() == b'second'
 
 
 def test_str_is_encoded_utf8():
     with memory_paths('grüße') as (path,):
-        assert open(path, 'rb').read() == 'grüße'.encode('utf-8')
+        with open(path, 'rb') as f:
+            assert f.read() == 'grüße'.encode('utf-8')
 
 
 def test_no_blobs_yields_empty():
@@ -83,7 +86,8 @@ def test_devfd_pipe_backing_when_no_memfd(monkeypatch):
     monkeypatch.delattr(os, 'memfd_create', raising=False)
     with memory_paths(b'over a pipe') as (path,):
         assert path.startswith('/dev/fd/')
-        assert open(path, 'rb').read() == b'over a pipe'
+        with open(path, 'rb') as f:
+            assert f.read() == b'over a pipe'
 
 
 def test_raises_when_no_backing(monkeypatch):

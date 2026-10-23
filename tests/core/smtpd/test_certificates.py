@@ -192,8 +192,10 @@ def test_in_memory_certificate_string():
     # strings (tls_cert/tls_key) and loaded in memory (memfd), never via disk
     certs = _certs()
     ev = CaptureSmtpdEvents()
-    cert_pem = open(certs['simple_cert']).read()
-    key_pem = open(certs['simple_key']).read()
+    with open(certs['simple_cert']) as handle:
+        cert_pem = handle.read()
+    with open(certs['simple_key']) as handle:
+        key_pem = handle.read()
     settings = {
         'max_processings': 1,
         'do_dns_reverse_lookup': False,

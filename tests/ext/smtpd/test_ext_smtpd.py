@@ -184,23 +184,23 @@ def _service(name, port, pre_fork=0):
     return svc
 
 
-def _spawn(config, names=None):
+def _spawn(tmp_path, config, names=None):
     import json
-    import tempfile
 
     # an own session = an own process group: master and all its workers,
     # observable from outside via os.killpg; all output goes to a file so a
     # failing probe can report its actual error instead of a blind timeout
-    log = tempfile.NamedTemporaryFile(mode='w+', prefix='smtpd-probe-', suffix='.log', delete=False)
-    proc = subprocess.Popen(
-        [sys.executable, '-m', PROBE, json.dumps(config), json.dumps(names)],
-        stdout=log,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-        env=dict(os.environ),
-        cwd=ROOT,
-    )
-    proc.probe_log = log.name
+    probe_log = tmp_path / 'smtpd-probe.log'
+    with open(probe_log, 'w') as log:
+        proc = subprocess.Popen(
+            [sys.executable, '-m', PROBE, json.dumps(config), json.dumps(names)],
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env=dict(os.environ),
+            cwd=ROOT,
+        )
+    proc.probe_log = probe_log
     return proc
 
 
@@ -265,9 +265,9 @@ def _assert_group_gone(pgid, timeout=5.0):
     raise AssertionError(f'process group {pgid} still has members')
 
 
-def test_term_single_service_in_main_process():
+def test_term_single_service_in_main_process(tmp_path):
     port = _free_port()
-    proc = _spawn({'services': [_service('mx1', port)]}, names=None)
+    proc = _spawn(tmp_path, {'services': [_service('mx1', port)]}, names=None)
     try:
         _wait_banner(proc, port)
         _ehlo_ok(port)
@@ -279,10 +279,10 @@ def test_term_single_service_in_main_process():
         proc.kill()
 
 
-def test_term_single_service_prefork_group():
+def test_term_single_service_prefork_group(tmp_path):
     # pre_fork 3 with one service: main process is worker #1 plus 2 forks
     port = _free_port()
-    proc = _spawn({'services': [_service('mx1', port, pre_fork=3)]}, names=None)
+    proc = _spawn(tmp_path, {'services': [_service('mx1', port, pre_fork=3)]}, names=None)
     try:
         _wait_banner(proc, port)
         if sys.platform.startswith('linux'):
@@ -297,11 +297,11 @@ def test_term_single_service_prefork_group():
 
 
 @pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the parent-death signal is Linux-only')
-def test_kill_master_takes_workers_down():
+def test_kill_master_takes_workers_down(tmp_path):
     # a SIGKILL on the master cannot forward anything; the workers must end
     # through the parent-death signal
     port = _free_port()
-    proc = _spawn({'services': [_service('mx1', port, pre_fork=3)]}, names=None)
+    proc = _spawn(tmp_path, {'services': [_service('mx1', port, pre_fork=3)]}, names=None)
     try:
         _wait_banner(proc, port)
         assert len(_child_pids(proc.pid)) == 2
@@ -312,7 +312,7 @@ def test_kill_master_takes_workers_down():
         proc.kill()
 
 
-def test_term_mixed_services_with_shared_limits():
+def test_term_mixed_services_with_shared_limits(tmp_path):
     # mx1 as a 2-worker group, mx2 in the main loop, a global cap forces the
     # shared limits path; one SIGTERM must end the whole invocation
     port_a, port_b = _free_port(), _free_port()
@@ -320,7 +320,7 @@ def test_term_mixed_services_with_shared_limits():
         'max_connections': 10,
         'services': [_service('mx1', port_a, pre_fork=2), _service('mx2', port_b)],
     }
-    proc = _spawn(config, names=None)
+    proc = _spawn(tmp_path, config, names=None)
     try:
         _wait_banner(proc, port_a)
         _wait_banner(proc, port_b)
@@ -344,11 +344,11 @@ def _broken_service(name):
     }
 
 
-def test_failed_service_start_aborts_and_stops_started_ones():
+def test_failed_service_start_aborts_and_stops_started_ones(tmp_path):
     # the second service cannot bind: the invocation must end with an error
     # and release the already bound port of the first one
     port_a = _free_port()
-    proc = _spawn({'services': [_service('mx1', port_a), _broken_service('mx2')]}, names=None)
+    proc = _spawn(tmp_path, {'services': [_service('mx1', port_a), _broken_service('mx2')]}, names=None)
     try:
         assert _wait_exit(proc) != 0
         _assert_group_gone(proc.pid)
@@ -357,11 +357,11 @@ def test_failed_service_start_aborts_and_stops_started_ones():
         proc.kill()
 
 
-def test_failed_start_terminates_forked_workers():
+def test_failed_start_terminates_forked_workers(tmp_path):
     # a healthy 2-worker group plus a broken in-loop service: the abort must
     # SIGTERM the forked workers instead of hanging in the reap
     port_a = _free_port()
-    proc = _spawn({'services': [_service('mx1', port_a, pre_fork=2), _broken_service('mx2')]}, names=None)
+    proc = _spawn(tmp_path, {'services': [_service('mx1', port_a, pre_fork=2), _broken_service('mx2')]}, names=None)
     try:
         assert _wait_exit(proc) != 0
         _assert_group_gone(proc.pid)

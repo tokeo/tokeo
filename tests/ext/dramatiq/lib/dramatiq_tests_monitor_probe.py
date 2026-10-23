@@ -7,7 +7,6 @@ The monitor gets a fixed snapshot instead of listening to rabbitmq.
 
 import sys
 import time
-import shutil
 from cement.utils import fs
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest
 
@@ -32,4 +31,4 @@ if __name__ == '__main__':
             app.dramatiq.monitor.snapshot = snapshot
             app.run()
     finally:
-        shutil.rmtree(tmp.dir, ignore_errors=True)
+        tmp.remove()
