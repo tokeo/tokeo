@@ -1188,6 +1188,34 @@ def render_minimal(tmp_path, monkeypatch, package_name, clean):
         booted.pdoc.render(clean=clean)
 
 
+def test_render_logs_the_skipped_modules_with_their_reason(tmp_path, monkeypatch):
+    # a missing module is info, any other import error is a warning
+    import pdoc.doc
+
+    package = tmp_path / 'skippkg'
+    write(package / '__init__.py', '"""Sample."""\n')
+    write(package / 'optional_a.py', 'import not_installed_pkg\n')
+    write(package / 'optional_b.py', 'import not_installed_pkg.sub\n')
+    write(package / 'broken.py', 'raise RuntimeError("broken on import")\n')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.syspath_prepend(str(tmp_path))
+    pdoc.doc.Module.from_name.cache_clear()
+
+    lines = []
+    with PdocTest(tmp_path, modules=['skippkg'], show_config=False) as booted:
+        booted.run()
+        for level in ('info', 'warning'):
+            monkeypatch.setattr(booted.log, level, lambda msg, level=level, **kw: lines.append((level, str(msg))))
+        booted.pdoc.render()
+
+    assert (
+        'info',
+        'pdoc: skipped 2 module(s) with missing optional modules: '
+        'skippkg.optional_a (missing module not_installed_pkg), skippkg.optional_b (missing module not_installed_pkg)',
+    ) in lines
+    assert ('warning', 'pdoc: skipped a module that failed to import: skippkg.broken (RuntimeError: broken on import)') in lines
+
+
 def test_clean_wipes_the_output_dir(tmp_path, monkeypatch):
     # pages of modules that no longer exist would otherwise stay reachable
     stale = tmp_path / 'html' / 'stale.html'

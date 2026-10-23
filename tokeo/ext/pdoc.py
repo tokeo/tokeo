@@ -616,18 +616,21 @@ class TokeoPdoc(Handler):
                     ordered_specs.append(spec)
 
         all_modules = {}
-        skipped = []
+        skipped, errors = [], []
         for spec in ordered_specs:
             try:
                 all_modules[spec] = pdoc.doc.Module.from_name(spec)
-            except Exception:
-                skipped.append(spec)
+            except Exception as err:
+                # pdoc wraps the import error in a RuntimeError of its own
+                cause = err.__cause__ or err
+                if isinstance(cause, ModuleNotFoundError) and cause.name:
+                    skipped.append(f'{spec} (missing module {cause.name})')
+                else:
+                    errors.append(f'{spec} ({type(cause).__name__}: {cause})')
         if skipped:
-            self.app.log.info(
-                f'pdoc: skipped {len(skipped)} module(s) that could not be '
-                f'imported (missing optional dependencies): '
-                f'{", ".join(skipped)}'
-            )
+            self.app.log.info(f'pdoc: skipped {len(skipped)} module(s) with missing optional modules: {", ".join(skipped)}')
+        for error in errors:
+            self.app.log.warning(f'pdoc: skipped a module that failed to import: {error}')
 
         # optional external-docstring injection (replaces md-injection)
         for mod in all_modules.values():
