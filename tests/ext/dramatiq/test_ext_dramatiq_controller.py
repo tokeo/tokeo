@@ -20,7 +20,9 @@ def serve(tmp, monkeypatch):
     # serve rewrites sys.argv and the env, monkeypatch restores both
     monkeypatch.setattr(sys, 'argv', ['tokeo'])
     for name in ('dramatiq_restart_delay', 'dramatiq_queue_prefetch', 'dramatiq_delay_queue_prefetch', 'dramatiq_worker_timeout'):
-        monkeypatch.delenv(name, raising=False)
+        # announced first, so a variable that serve sets is removed again
+        monkeypatch.setenv(name, '')
+        monkeypatch.delenv(name)
     calls = dict(main=[], purge=0, argv=None, start_methods=[])
 
     def fake_main(args):
