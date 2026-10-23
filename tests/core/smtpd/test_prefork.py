@@ -26,7 +26,7 @@ from tokeo.core.smtpd.prefork import (
     is_prefork,
     run_prefork,
 )
-from tests.utils import ROOT
+from tests.utils import ROOT, wait_until
 
 LINUX = sys.platform.startswith('linux')
 HAS_FORK = hasattr(os, 'fork')
@@ -116,10 +116,7 @@ def test_run_prefork_forks_supervises_and_reaps(tmp_path):
     # forward to every worker, reap them, and let the master exit cleanly
     proc = _spawn('run_prefork', tmp_path, 3)
     try:
-        deadline = time.time() + 3.0
-        while time.time() < deadline and len(list(tmp_path.glob('pid_*'))) < 3:
-            time.sleep(0.02)
-        assert len(list(tmp_path.glob('pid_*'))) == 3
+        assert wait_until(lambda: len(list(tmp_path.glob('pid_*'))) == 3, 3.0)
         proc.send_signal(signal.SIGTERM)
         assert proc.wait(timeout=8) == 0
         # every worker saw the forwarded SIGTERM and the group is gone
@@ -158,14 +155,10 @@ def test_worker_self_terminates_when_master_crashes(tmp_path):
     # still stop itself through the armed parent-death signal
     proc = _spawn('run_prefork', tmp_path, 2)
     try:
-        deadline = time.time() + 3.0
-        while time.time() < deadline and len(list(tmp_path.glob('pid_*'))) < 2:
-            time.sleep(0.02)
+        wait_until(lambda: len(list(tmp_path.glob('pid_*'))) == 2, 3.0)
         proc.kill()
         proc.wait(timeout=8)
-        deadline = time.time() + 3.0
-        while time.time() < deadline and len(list(tmp_path.glob('stopped_*'))) < 2:
-            time.sleep(0.05)
+        wait_until(lambda: len(list(tmp_path.glob('stopped_*'))) == 2, 3.0)
         # every worker observed the parent death and the group is gone
         assert len(list(tmp_path.glob('stopped_*'))) == 2
         _assert_group_gone(proc.pid)

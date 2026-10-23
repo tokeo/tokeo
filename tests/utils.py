@@ -16,6 +16,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 stresstest = pytest.mark.skipif(os.environ.get('STRESSTESTS', '0') != '1', reason='set STRESSTESTS=1 to run the stress tests')
 
 
+def wait_until(check, timeout=5.0, interval=0.02):
+    """Call check until it holds or the timeout ends, return its last value."""
+    deadline = time.monotonic() + timeout
+    while not (result := check()) and time.monotonic() < deadline:
+        time.sleep(interval)
+    return result
+
+
 async def wait_until_async(check, timeout=5.0, interval=0.02):
     """Like wait_until inside a coroutine, the event loop goes on meanwhile."""
     deadline = time.monotonic() + timeout

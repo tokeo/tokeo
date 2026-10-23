@@ -21,7 +21,7 @@ from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
 from tokeo.ext.dramatiq.controller import _duration, _monitor_view
 from tokeo.ext.tui.output import TokeoTuiOutput
 from tokeo.core.exc import TokeoError
-from tests.utils import Terminal
+from tests.utils import Terminal, wait_until
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqMiddlewareTest
 
 
@@ -169,9 +169,7 @@ def test_heartbeat_shows_running_tasks(worker, details):
     w.start()
     try:
         actors['waits'].send('anna@example.com')
-        deadline = time.monotonic() + 5
-        while not heartbeat.heartbeat()['running'] and time.monotonic() < deadline:
-            time.sleep(0.02)
+        wait_until(lambda: heartbeat.heartbeat()['running'], 5)
         (task,) = heartbeat.heartbeat()['running']
         release.set()
         _join(broker)

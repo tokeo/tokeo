@@ -11,7 +11,6 @@ quoted-printable message with attachments, inline image and X-headers.
 import os
 import ssl
 import sys
-import time
 import email
 import asyncio
 import smtplib
@@ -22,6 +21,7 @@ from email.header import decode_header, make_header
 import pytest
 
 from tokeo.core.smtpd import SmtpdServer, SmtpdEvents, Smtpd535Exception, Smtpd550Exception
+from tests.utils import wait_until
 from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, subjMsg, textMsg, htmlImg
 
 _VERSION = sys.version_info[:3]
@@ -164,10 +164,7 @@ def test_closes_connection_on_error(smtp, error):
                 app.mail.send('body')
         # ... and the connection was closed anyway
         assert smtpd.events.disconnected.wait(2)
-        deadline = time.monotonic() + 2
-        while smtpd.server.connections and time.monotonic() < deadline:
-            time.sleep(0.01)
-        assert smtpd.server.connections == 0
+        assert wait_until(lambda: smtpd.server.connections == 0, 2)
 
     assert smtpd.events.messages == []
 

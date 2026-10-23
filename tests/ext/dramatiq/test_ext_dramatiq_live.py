@@ -16,6 +16,7 @@ import pytest
 import dramatiq
 from dramatiq.message import Message
 from tokeo.ext.dramatiq import TokeoDramatiqError
+from tests.utils import wait_until
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqBrokerTest, DramatiqMiddlewareTest
 
 RABBITMQ_URL = os.environ.get('TOKEO_TEST_RABBITMQ_URL', 'amqp://guest:guest@localhost:5672/')
@@ -150,9 +151,7 @@ def test_monitor_hears_a_worker(tmp, rando):
         try:
             worker.start()
             actor.send(2)
-            deadline = time.monotonic() + 15
-            while time.monotonic() < deadline and not (mine(0.5) and mine(0)[0]['heartbeat']['running']):
-                pass
+            wait_until(lambda: mine(0.5) and mine(0)[0]['heartbeat']['running'], 15)
             (running,) = mine(0)
             worker.stop()
             (stopped,) = mine(1)
@@ -181,9 +180,7 @@ def test_unparalleled_runs_one_message_at_a_time(tmp, rando):
             worker.start()
             for value in range(4):
                 actor.send(value)
-            deadline = time.monotonic() + 20
-            while len(runs) < 4 and time.monotonic() < deadline:
-                time.sleep(0.05)
+            wait_until(lambda: len(runs) >= 4, 20)
         finally:
             worker.stop()
             app.dramatiq.queues.delete(name, force=True)
