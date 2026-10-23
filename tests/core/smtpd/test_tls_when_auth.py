@@ -18,6 +18,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     auth_plain,
     start_server,
     read_reply,
+    send_command,
     stop_server,
     insecure_tls_context,
     TLS_SETTINGS,
@@ -61,19 +62,11 @@ def test_when_auth_after_starttls_offers_and_accepts_auth():
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
-            writer.write(b'EHLO me\r\n')
-            await writer.drain()
-            ehlo1 = await read_reply(reader)
-            writer.write(b'STARTTLS\r\n')
-            await writer.drain()
-            await read_reply(reader)
+            ehlo1 = await send_command(reader, writer, b'EHLO me\r\n')
+            await send_command(reader, writer, b'STARTTLS\r\n')
             await writer.start_tls(insecure_tls_context())
-            writer.write(b'EHLO secure\r\n')
-            await writer.drain()
-            ehlo2 = await read_reply(reader)
-            writer.write(b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n')
-            await writer.drain()
-            auth_reply = await read_reply(reader)
+            ehlo2 = await send_command(reader, writer, b'EHLO secure\r\n')
+            auth_reply = await send_command(reader, writer, b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n')
             writer.close()
             await writer.wait_closed()
             return ehlo1, ehlo2, auth_reply

@@ -302,6 +302,13 @@ async def read_reply(reader):
     return lines
 
 
+async def send_command(reader, writer, line):
+    """Send one command line and return the lines of its reply."""
+    writer.write(line)
+    await writer.drain()
+    return await read_reply(reader)
+
+
 async def start_server(events, settings):
     """Start a server on an ephemeral port; return (server, port, task)."""
     srv = SmtpdServer(events, settings=settings)
@@ -330,9 +337,7 @@ async def _converse(events, settings, commands):
         greeting = await read_reply(reader)
         replies = []
         for cmd in commands:
-            writer.write(cmd)
-            await writer.drain()
-            replies.append(await read_reply(reader))
+            replies.append(await send_command(reader, writer, cmd))
         writer.close()
         await writer.wait_closed()
         return greeting, replies

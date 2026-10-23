@@ -24,6 +24,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     dialog,
     auth_plain,
     read_reply,
+    send_command,
     start_server,
     stop_server,
     start_smtpd,
@@ -198,9 +199,7 @@ def test_pipelining_rejected_when_disabled():
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
-            writer.write(b'EHLO me\r\n')
-            await writer.drain()
-            await read_reply(reader)
+            await send_command(reader, writer, b'EHLO me\r\n')
             # two commands in one segment -> the first sees a buffered next line
             writer.write(b'NOOP\r\nNOOP\r\n')
             await writer.drain()
@@ -220,9 +219,7 @@ def test_pipelining_allowed_when_enabled():
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
-            writer.write(b'EHLO me\r\n')
-            await writer.drain()
-            await read_reply(reader)
+            await send_command(reader, writer, b'EHLO me\r\n')
             writer.write(b'NOOP\r\nNOOP\r\n')
             await writer.drain()
             a = await read_reply(reader)
@@ -736,14 +733,10 @@ def test_shutdown_ends_active_dialog_after_current_command():
         srv, port = await start_smtpd(RecordingEvents(), settings={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
-        writer.write(b'EHLO me\r\n')
-        await writer.drain()
-        await read_reply(reader)
+        await send_command(reader, writer, b'EHLO me\r\n')
         # request a graceful shutdown; the next command is answered, then 221
         srv.shutdown()
-        writer.write(b'NOOP\r\n')
-        await writer.drain()
-        noop = await read_reply(reader)
+        noop = await send_command(reader, writer, b'NOOP\r\n')
         bye = await read_reply(reader)
         writer.close()
         await srv.stop(wait_seconds_before_close=0.2)
@@ -1022,20 +1015,12 @@ def test_starttls_full_flow_delivers_over_tls():
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
-            writer.write(b'EHLO me\r\n')
-            await writer.drain()
-            ehlo1 = await read_reply(reader)
-            writer.write(b'STARTTLS\r\n')
-            await writer.drain()
-            tls_reply = await read_reply(reader)
+            ehlo1 = await send_command(reader, writer, b'EHLO me\r\n')
+            tls_reply = await send_command(reader, writer, b'STARTTLS\r\n')
             await writer.start_tls(insecure_tls_context())
-            writer.write(b'EHLO secure\r\n')
-            await writer.drain()
-            ehlo2 = await read_reply(reader)
+            ehlo2 = await send_command(reader, writer, b'EHLO secure\r\n')
             for cmd in (b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n'):
-                writer.write(cmd)
-                await writer.drain()
-                await read_reply(reader)
+                await send_command(reader, writer, cmd)
             writer.write(b'body over tls\r\n.\r\n')
             await writer.drain()
             final = await read_reply(reader)
@@ -1071,19 +1056,11 @@ def test_starttls_twice_already_encrypted_503():
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
-            writer.write(b'EHLO me\r\n')
-            await writer.drain()
-            await read_reply(reader)
-            writer.write(b'STARTTLS\r\n')
-            await writer.drain()
-            await read_reply(reader)
+            await send_command(reader, writer, b'EHLO me\r\n')
+            await send_command(reader, writer, b'STARTTLS\r\n')
             await writer.start_tls(insecure_tls_context())
-            writer.write(b'EHLO secure\r\n')
-            await writer.drain()
-            await read_reply(reader)
-            writer.write(b'STARTTLS\r\n')
-            await writer.drain()
-            second = await read_reply(reader)
+            await send_command(reader, writer, b'EHLO secure\r\n')
+            second = await send_command(reader, writer, b'STARTTLS\r\n')
             writer.close()
             return second
         finally:
@@ -1099,22 +1076,12 @@ def test_tls_required_gates_mail_until_starttls():
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
-            writer.write(b'EHLO me\r\n')
-            await writer.drain()
-            await read_reply(reader)
-            writer.write(b'MAIL FROM:<a@x>\r\n')
-            await writer.drain()
-            before = await read_reply(reader)
-            writer.write(b'STARTTLS\r\n')
-            await writer.drain()
-            await read_reply(reader)
+            await send_command(reader, writer, b'EHLO me\r\n')
+            before = await send_command(reader, writer, b'MAIL FROM:<a@x>\r\n')
+            await send_command(reader, writer, b'STARTTLS\r\n')
             await writer.start_tls(insecure_tls_context())
-            writer.write(b'EHLO secure\r\n')
-            await writer.drain()
-            await read_reply(reader)
-            writer.write(b'MAIL FROM:<a@x>\r\n')
-            await writer.drain()
-            after = await read_reply(reader)
+            await send_command(reader, writer, b'EHLO secure\r\n')
+            after = await send_command(reader, writer, b'MAIL FROM:<a@x>\r\n')
             writer.close()
             return before, after
         finally:
@@ -1136,17 +1103,13 @@ def test_starttls_flushes_injected_plaintext():
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
-            writer.write(b'EHLO me\r\n')
-            await writer.drain()
-            await read_reply(reader)
+            await send_command(reader, writer, b'EHLO me\r\n')
             # STARTTLS plus an injected QUIT in the same plaintext segment
             writer.write(b'STARTTLS\r\nQUIT\r\n')
             await writer.drain()
             tls_reply = await read_reply(reader)
             await writer.start_tls(insecure_tls_context())
-            writer.write(b'EHLO secure\r\n')
-            await writer.drain()
-            ehlo = await read_reply(reader)
+            ehlo = await send_command(reader, writer, b'EHLO secure\r\n')
             writer.close()
             return tls_reply, ehlo
         finally:

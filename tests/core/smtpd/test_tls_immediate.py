@@ -13,7 +13,14 @@ import platform
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, tls_immediate_supported
-from tests.core.smtpd.lib.smtpd_tests_helper import RecordingEvents, start_server, read_reply, stop_server, insecure_tls_context
+from tests.core.smtpd.lib.smtpd_tests_helper import (
+    RecordingEvents,
+    start_server,
+    read_reply,
+    send_command,
+    stop_server,
+    insecure_tls_context,
+)
 
 needs_tls_immediate = pytest.mark.skipif(
     not tls_immediate_supported(),
@@ -45,9 +52,7 @@ async def _deliver(reader, writer):
     """Run EHLO, STARTTLS and one transaction; return the replies."""
     replies = []
     for cmd in (b'EHLO me\r\n', b'STARTTLS\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n', b'body\r\n.\r\n'):
-        writer.write(cmd)
-        await writer.drain()
-        replies.append(await read_reply(reader))
+        replies.append(await send_command(reader, writer, cmd))
     return replies
 
 
