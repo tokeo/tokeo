@@ -239,6 +239,19 @@ def test_connections_stay_open_when_released_in_another_thread():
 
 
 # --------------------------------------------------------------------------------------
+# locks
+# --------------------------------------------------------------------------------------
+
+
+def test_locks_acquire_returns_true(tmp):
+    with DiskcacheTest(tmp.dir) as app:
+        assert app.cache.locks.acquire('acquire') is True
+        assert app.cache.locks.locked('acquire') is True
+        app.cache.locks.release('acquire')
+        assert app.cache.locks.locked('acquire') is False
+
+
+# --------------------------------------------------------------------------------------
 # temper: five essential points
 # --------------------------------------------------------------------------------------
 

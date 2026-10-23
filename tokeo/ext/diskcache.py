@@ -199,7 +199,7 @@ class TokeoDiskCacheLocksHandler:
 
     def acquire(self, key, expire=None):
         """
-        Acquire a lock with the given key.
+        Acquire a lock with the given key, waits until the lock is free.
 
         ### Args
 
@@ -209,11 +209,12 @@ class TokeoDiskCacheLocksHandler:
 
         ### Returns
 
-        - **bool**: True if the lock was acquired, False otherwise
+        - **bool**: True once the lock is acquired
 
         """
         lock = diskcache.Lock(self._cache, self._key_prefix + key, expire=expire, tag=self._tag)
-        return lock.acquire()
+        lock.acquire()
+        return True
 
     def release(self, key):
         """
