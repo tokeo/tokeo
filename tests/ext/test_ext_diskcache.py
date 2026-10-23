@@ -251,6 +251,65 @@ def test_locks_acquire_returns_true(tmp):
         assert app.cache.locks.locked('acquire') is False
 
 
+def warnings_of(app, monkeypatch):
+    # collect the warnings the app logs
+    logged = []
+    monkeypatch.setattr(app.log, 'warning', lambda msg, **kw: logged.append(msg))
+    return logged
+
+
+def test_locks_lock_releases_its_own_lock(tmp, monkeypatch):
+    with DiskcacheTest(tmp.dir) as app:
+        logged = warnings_of(app, monkeypatch)
+        with app.cache.locks.lock('own'):
+            assert app.cache.locks.locked('own') is True
+        assert app.cache.locks.locked('own') is False
+        assert logged == []
+
+
+def test_locks_lock_lost_by_purge_warns(tmp, monkeypatch):
+    with DiskcacheTest(tmp.dir) as app:
+        logged = warnings_of(app, monkeypatch)
+        with app.cache.locks.lock('lost'):
+            app.cache.locks.purge()
+        assert logged == ['lock dc_lost was lost before release (missing)']
+
+
+def test_locks_lock_keeps_the_lock_of_another(tmp, monkeypatch):
+    with DiskcacheTest(tmp.dir) as app:
+        logged = warnings_of(app, monkeypatch)
+        with app.cache.locks.lock('other'):
+            app.cache.locks.purge()
+            # another holder takes the lock after the purge
+            app.cache.locks.acquire('other')
+        assert app.cache.locks.locked('other') is True
+        assert logged == ['lock dc_other was lost before release (taken by another)']
+
+
+def test_locks_lock_keeps_the_lock_of_another_after_expire(tmp, monkeypatch):
+    with DiskcacheTest(tmp.dir) as app:
+        logged = warnings_of(app, monkeypatch)
+        with app.cache.locks.lock('expire', expire=0.05):
+            time.sleep(0.1)
+            app.cache.locks.acquire('expire')
+        assert app.cache.locks.locked('expire') is True
+        assert logged == ['lock dc_expire was lost before release (taken by another)']
+
+
+def test_locks_lock_failing_acquire_keeps_the_lock_of_another(tmp, monkeypatch):
+    with DiskcacheTest(tmp.dir) as app:
+        app.cache.locks.acquire('busy')
+
+        def interrupt(seconds):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr('tokeo.ext.diskcache.time.sleep', interrupt)
+        with pytest.raises(KeyboardInterrupt):
+            with app.cache.locks.lock('busy'):
+                pass
+        assert app.cache.locks.locked('busy') is True
+
+
 # --------------------------------------------------------------------------------------
 # temper: five essential points
 # --------------------------------------------------------------------------------------

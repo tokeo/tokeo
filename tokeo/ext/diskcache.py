@@ -42,6 +42,7 @@ suitable for web applications, microservices, and other distributed systems.
 """
 
 import sys
+import uuid
 import threading
 import weakref
 from os.path import basename
@@ -73,6 +74,10 @@ class TokeoDiskCacheLockError(TokeoError):
     """
 
     pass
+
+
+# the default of a missing key, a lock of diskcache holds None
+_missing = object()
 
 
 class _ThreadConnection:
@@ -218,15 +223,11 @@ class TokeoDiskCacheLocksHandler:
 
     def release(self, key):
         """
-        Release a previously acquired lock.
+        Release a lock, regardless of who holds it.
 
         ### Args
 
         - **key** (str): The lock key to release
-
-        ### Raises
-
-        - **TokeoDiskCacheLockError**: If the lock cannot be released
 
         """
         lock = diskcache.Lock(self._cache, self._key_prefix + key, tag=self._tag)
@@ -266,9 +267,11 @@ class TokeoDiskCacheLocksHandler:
 
         - **None**: Control is yielded to the block inside the with statement
 
-        ### Raises
+        ### Notes
 
-        - **TokeoDiskCacheLockError**: If the lock cannot be acquired or released
+        : The lock releases only itself; when a purge or its expire took it
+            before the end of the block, it logs a warning and leaves any
+            lock of another holder in place
 
         ### Example
 
@@ -279,12 +282,21 @@ class TokeoDiskCacheLocksHandler:
         # Lock is automatically released here
         ```
         """
+        key = self._key_prefix + key
+        # the own token tells on release whether the lock is still ours
+        token = uuid.uuid4().hex
+        while not self._cache.add(key, token, expire=expire, tag=self._tag, retry=True):
+            time.sleep(0.001)
         try:
-            lock = diskcache.Lock(self._cache, self._key_prefix + key, expire=expire, tag=self._tag)
-            lock.acquire()
             yield
         finally:
-            lock.release()
+            with self._cache.transact(retry=True):
+                value = self._cache.get(key, default=_missing)
+                if value == token:
+                    self._cache.delete(key)
+            if value != token:
+                lost = 'missing' if value is _missing else 'taken by another'
+                self.app.log.warning(f'lock {key} was lost before release ({lost})')
 
     # --------------------------------------------------------------------------------------
 
