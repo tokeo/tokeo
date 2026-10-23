@@ -24,6 +24,24 @@ def wait_until(check, timeout=5.0, interval=0.02):
     return result
 
 
+def wait_process_group_ended(pgid, timeout=5.0):
+    """
+    Wait until every process of the group ended, return whether they did.
+
+    A program started with ```start_new_session=True``` leads its own group,
+    its pid is the id of the group, its forked workers belong to it.
+    """
+
+    def ended():
+        try:
+            os.killpg(pgid, 0)
+        except ProcessLookupError:
+            return True
+        return False
+
+    return wait_until(ended, timeout)
+
+
 async def wait_until_async(check, timeout=5.0, interval=0.02):
     """Like wait_until inside a coroutine, the event loop goes on meanwhile."""
     deadline = time.monotonic() + timeout

@@ -28,7 +28,7 @@ from tokeo.ext.smtpd import (
     _resolve_events_handler,
     _plan,
 )
-from tests.utils import ROOT
+from tests.utils import ROOT, wait_process_group_ended
 from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
 # --- unit: handler resolving -----------------------------------------------------
@@ -253,18 +253,6 @@ def _assert_port_free(port):
         sock.bind(('127.0.0.1', port))
 
 
-def _assert_group_gone(pgid, timeout=5.0):
-    """The whole process group of the invocation has ended."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            os.killpg(pgid, 0)
-        except ProcessLookupError:
-            return
-        time.sleep(0.05)
-    raise AssertionError(f'process group {pgid} still has members')
-
-
 def test_term_single_service_in_main_process(tmp_path):
     port = _free_port()
     proc = _spawn(tmp_path, {'services': [_service('mx1', port)]}, names=None)
@@ -273,7 +261,7 @@ def test_term_single_service_in_main_process(tmp_path):
         _ehlo_ok(port)
         proc.send_signal(signal.SIGTERM)
         assert proc.wait(timeout=8) == 0
-        _assert_group_gone(proc.pid)
+        assert wait_process_group_ended(proc.pid)
         _assert_port_free(port)
     finally:
         proc.kill()
@@ -290,7 +278,7 @@ def test_term_single_service_prefork_group(tmp_path):
         _ehlo_ok(port)
         proc.send_signal(signal.SIGTERM)
         assert proc.wait(timeout=8) == 0
-        _assert_group_gone(proc.pid)
+        assert wait_process_group_ended(proc.pid)
         _assert_port_free(port)
     finally:
         proc.kill()
@@ -307,7 +295,7 @@ def test_kill_master_takes_workers_down(tmp_path):
         assert len(_child_pids(proc.pid)) == 2
         proc.kill()
         proc.wait(timeout=8)
-        _assert_group_gone(proc.pid)
+        assert wait_process_group_ended(proc.pid)
     finally:
         proc.kill()
 
@@ -328,7 +316,7 @@ def test_term_mixed_services_with_shared_limits(tmp_path):
         _ehlo_ok(port_b)
         proc.send_signal(signal.SIGTERM)
         assert proc.wait(timeout=8) == 0
-        _assert_group_gone(proc.pid)
+        assert wait_process_group_ended(proc.pid)
         _assert_port_free(port_a)
         _assert_port_free(port_b)
     finally:
@@ -351,7 +339,7 @@ def test_failed_service_start_aborts_and_stops_started_ones(tmp_path):
     proc = _spawn(tmp_path, {'services': [_service('mx1', port_a), _broken_service('mx2')]}, names=None)
     try:
         assert _wait_exit(proc) != 0
-        _assert_group_gone(proc.pid)
+        assert wait_process_group_ended(proc.pid)
         _assert_port_free(port_a)
     finally:
         proc.kill()
@@ -364,7 +352,7 @@ def test_failed_start_terminates_forked_workers(tmp_path):
     proc = _spawn(tmp_path, {'services': [_service('mx1', port_a, pre_fork=2), _broken_service('mx2')]}, names=None)
     try:
         assert _wait_exit(proc) != 0
-        _assert_group_gone(proc.pid)
+        assert wait_process_group_ended(proc.pid)
         _assert_port_free(port_a)
     finally:
         proc.kill()

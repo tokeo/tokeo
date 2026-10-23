@@ -14,7 +14,6 @@ itself never forks and never receives a signal.
 
 import os
 import sys
-import time
 import signal
 import ctypes
 import subprocess
@@ -26,7 +25,7 @@ from tokeo.core.smtpd.prefork import (
     is_prefork,
     run_prefork,
 )
-from tests.utils import ROOT, wait_until
+from tests.utils import ROOT, wait_until, wait_process_group_ended
 
 LINUX = sys.platform.startswith('linux')
 HAS_FORK = hasattr(os, 'fork')
@@ -53,18 +52,6 @@ def _spawn(*args):
         env=dict(os.environ),
         cwd=ROOT,
     )
-
-
-def _assert_group_gone(pgid, timeout=5.0):
-    """The whole process group of the scenario has ended."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            os.killpg(pgid, 0)
-        except ProcessLookupError:
-            return
-        time.sleep(0.05)
-    raise AssertionError(f'process group {pgid} still has members')
 
 
 # --------------------------------------------------------------------------
@@ -107,7 +94,7 @@ def test_supervise_workers_reaps_and_restores_handlers():
     # in-process, its exit code carries the verdict
     proc = _spawn('supervise')
     assert proc.wait(timeout=8) == 0
-    _assert_group_gone(proc.pid)
+    assert wait_process_group_ended(proc.pid)
 
 
 @requires_fork
@@ -121,7 +108,7 @@ def test_run_prefork_forks_supervises_and_reaps(tmp_path):
         assert proc.wait(timeout=8) == 0
         # every worker saw the forwarded SIGTERM and the group is gone
         assert len(list(tmp_path.glob('stopped_*'))) == 3
-        _assert_group_gone(proc.pid)
+        assert wait_process_group_ended(proc.pid)
     finally:
         proc.kill()
 
@@ -161,6 +148,6 @@ def test_worker_self_terminates_when_master_crashes(tmp_path):
         wait_until(lambda: len(list(tmp_path.glob('stopped_*'))) == 2, 3.0)
         # every worker observed the parent death and the group is gone
         assert len(list(tmp_path.glob('stopped_*'))) == 2
-        _assert_group_gone(proc.pid)
+        assert wait_process_group_ended(proc.pid)
     finally:
         proc.kill()
