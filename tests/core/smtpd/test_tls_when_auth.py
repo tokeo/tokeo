@@ -9,23 +9,19 @@ line is hidden and an AUTH command answers 530; after STARTTLS it follows
 """
 
 import asyncio
-import base64
 
 import pytest
 
 from tests.core.smtpd.lib.smtpd_tests_helper import (
     dialog,
     AuthEvents,
-    _serve,
-    _reply,
-    _stop,
-    _tls_client_ctx,
-    _TLS_SETTINGS,
+    auth_plain,
+    start_server,
+    read_reply,
+    stop_server,
+    insecure_tls_context,
+    TLS_SETTINGS,
 )
-
-
-def _plain(authzid, authcid, password):
-    return base64.b64encode(f'{authzid}\x00{authcid}\x00{password}'.encode()).decode()
 
 
 def _ehlo_auth_and_authcmd(settings):
@@ -34,7 +30,7 @@ def _ehlo_auth_and_authcmd(settings):
         settings,
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + _plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
         ],
     )
     ehlo_lines = r[0]
@@ -57,32 +53,32 @@ def test_when_auth_on_plain_hides_auth_but_offers_starttls():
 
 def test_when_auth_after_starttls_offers_and_accepts_auth():
     ev = AuthEvents()
-    settings = dict(_TLS_SETTINGS)
+    settings = dict(TLS_SETTINGS)
     settings.update({'encrypt_mode': 'TLS_WHEN_AUTH', 'auth_mode': 'AUTH_OPTIONAL'})
 
     async def go():
-        server, port, task = await _serve(ev, settings)
+        server, port, task = await start_server(ev, settings)
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'EHLO me\r\n')
             await writer.drain()
-            ehlo1 = await _reply(reader)
+            ehlo1 = await read_reply(reader)
             writer.write(b'STARTTLS\r\n')
             await writer.drain()
-            await _reply(reader)
-            await writer.start_tls(_tls_client_ctx())
+            await read_reply(reader)
+            await writer.start_tls(insecure_tls_context())
             writer.write(b'EHLO secure\r\n')
             await writer.drain()
-            ehlo2 = await _reply(reader)
-            writer.write(b'AUTH PLAIN ' + _plain('', 'user', 'secret').encode() + b'\r\n')
+            ehlo2 = await read_reply(reader)
+            writer.write(b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n')
             await writer.drain()
-            auth_reply = await _reply(reader)
+            auth_reply = await read_reply(reader)
             writer.close()
             await asyncio.sleep(0.05)
             return ehlo1, ehlo2, auth_reply
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     ehlo1, ehlo2, auth_reply = asyncio.run(go())
     assert not any('AUTH' in ln for ln in ehlo1)  # hidden while plaintext

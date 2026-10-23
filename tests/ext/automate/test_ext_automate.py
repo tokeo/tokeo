@@ -1,3 +1,8 @@
+"""
+Tests for tokeo.ext.automate: the hosts, hostgroups, connections and tasks
+read from the config and the results of a task run.
+"""
+
 import pytest
 import invoke
 import copy
@@ -15,7 +20,7 @@ from tests.ext.automate.automate_tests_helper import (
 )
 
 
-def test_hosts_simple(rando):
+def test_hosts_simple():
     'Test for reading a list of hosts'
     with AutomateTest() as app:
 
@@ -23,7 +28,7 @@ def test_hosts_simple(rando):
         assert hosts == defaults_automate_hosts(validate=True)
 
 
-def test_hostgroups_simple(rando):
+def test_hostgroups_simple():
     """
     Test for reading and expanding hostgroups
     """
@@ -33,7 +38,7 @@ def test_hostgroups_simple(rando):
         assert hostgroups == defaults_automate_hostgroups(validate=True)
 
 
-def test_reserved_local_key(rando):
+def test_reserved_local_key():
     """
     Test to prevent use of the word "local" as key/id for a host or a hostgroup
     """
@@ -54,7 +59,7 @@ def test_reserved_local_key(rando):
             _ = app.automate.hostgroups
 
 
-def test_connections_simple(rando):
+def test_connections_simple():
     """
     Test for reading connections
     """
@@ -64,7 +69,7 @@ def test_connections_simple(rando):
         assert connections == defaults_automate_connections(validate=True)
 
 
-def test_tasks_simple(rando):
+def test_tasks_simple():
     """
     Test for reading and expanding the tasks
     """
@@ -84,7 +89,7 @@ def test_tasks_simple(rando):
         assert tasks == defaults_automate_tasks(validate=True)
 
 
-def test_tasks_task1(rando):
+def test_tasks_task1():
     """
     Test for reading and expanding the tasks
     """
@@ -107,7 +112,7 @@ def test_tasks_task1(rando):
         # app.inspect(result.stdout, divider='*')
 
 
-def test_tasks_local_default_resolves_without_local_host(rando):
+def test_tasks_local_default_resolves_without_local_host():
     """
     Without a hosts "local" entry the task default resolves to the bare local host
     """
@@ -123,7 +128,7 @@ def test_tasks_local_default_resolves_without_local_host(rando):
         assert hosts == tuple((dict(id='local', name='local', host='local'),))
 
 
-def test_tasks_local_default_resolves_with_local_host(rando):
+def test_tasks_local_default_resolves_with_local_host():
     """
     With a configured hosts "local" entry the task default to local resolves
     """
@@ -140,7 +145,7 @@ def test_tasks_local_default_resolves_with_local_host(rando):
         assert hosts == tuple((dict(id='local', name='local', host='local', shell='/bin/sh'),))
 
 
-def test_automate_result(rando):
+def test_automate_result():
 
     with AutomateTest() as app:
 

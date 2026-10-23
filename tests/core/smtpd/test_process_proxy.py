@@ -7,6 +7,8 @@ a first line that is not PROXY. Unlike the reference, the PROXY header is
 mandatory as the first line, so that case aborts with 421 instead of 503.
 """
 
+# test rules exception: numbered test names mirror the midi-smtp-server suite
+
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, SmtpdSession

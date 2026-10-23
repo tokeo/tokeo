@@ -14,7 +14,7 @@ import platform
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer
-from tests.core.smtpd.lib.smtpd_tests_helper import RecordingEvents, _serve, _reply, _stop, _tls_client_ctx
+from tests.core.smtpd.lib.smtpd_tests_helper import RecordingEvents, start_server, read_reply, stop_server, insecure_tls_context
 
 
 _VERSION = sys.version_info[:3]
@@ -52,26 +52,26 @@ async def _deliver(reader, writer):
     for cmd in (b'EHLO me\r\n', b'STARTTLS\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n', b'body\r\n.\r\n'):
         writer.write(cmd)
         await writer.drain()
-        replies.append(await _reply(reader))
+        replies.append(await read_reply(reader))
     return replies
 
 
 @needs_tls_immediate
-def test_tls_immediate_delivers_over_tls():
+def test_delivers_over_tls():
     ev = ImmediateEvents()
 
     async def go():
-        server, port, task = await _serve(ev, _SETTINGS)
+        server, port, task = await start_server(ev, _SETTINGS)
         try:
             # the client speaks TLS from the first byte on
-            reader, writer = await asyncio.open_connection('127.0.0.1', port, ssl=_tls_client_ctx())
-            greeting = await _reply(reader)
+            reader, writer = await asyncio.open_connection('127.0.0.1', port, ssl=insecure_tls_context())
+            greeting = await read_reply(reader)
             replies = await _deliver(reader, writer)
             writer.close()
             await asyncio.sleep(0.05)
             return greeting, replies
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     greeting, (ehlo, starttls, *_, final) = asyncio.run(go())
     assert greeting[0].startswith('220')
@@ -84,25 +84,25 @@ def test_tls_immediate_delivers_over_tls():
 
 
 @needs_tls_immediate
-def test_tls_immediate_behind_proxy():
+def test_behind_proxy():
     ev = ImmediateEvents()
 
     async def go():
-        server, port, task = await _serve(ev, dict(_SETTINGS, proxy_extension=True))
+        server, port, task = await start_server(ev, dict(_SETTINGS, proxy_extension=True))
         try:
             # PROXY header and ClientHello are buffered together by the server,
             # the handshake must still see the whole ClientHello
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             writer.write(b'PROXY TCP4 9.8.7.6 1.2.3.4 4711 465\r\n')
             await writer.drain()
-            await writer.start_tls(_tls_client_ctx())
-            greeting = await _reply(reader)
+            await writer.start_tls(insecure_tls_context())
+            greeting = await read_reply(reader)
             replies = await _deliver(reader, writer)
             writer.close()
             await asyncio.sleep(0.05)
             return greeting, replies
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     greeting, replies = asyncio.run(go())
     assert greeting[0].startswith('220')
@@ -121,7 +121,7 @@ def test_tls_immediate_behind_proxy():
     ],
     ids=lambda value: '.'.join(map(str, value)) if isinstance(value, tuple) else str(value),
 )
-def test_tls_immediate_python_version(monkeypatch, version, supported):
+def test_required_python_version(monkeypatch, version, supported):
     monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', version + ('final', 0))
     if supported:
         assert SmtpdServer(RecordingEvents(), settings=_SETTINGS).tls is not None

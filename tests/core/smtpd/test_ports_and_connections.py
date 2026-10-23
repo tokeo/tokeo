@@ -6,6 +6,8 @@ waits (before its welcome) until the first frees the slot, and a third is
 refused with the 421 abort message.
 """
 
+# test rules exception: numbered test names mirror the midi-smtp-server suite
+
 import asyncio
 
 from tokeo.core.smtpd.server import SmtpdServer
@@ -17,7 +19,7 @@ MSG_ABORT = '421 Service too busy or not available, closing transmission channel
 SETTINGS = {'max_processings': 1, 'max_connections': 2, 'do_dns_reverse_lookup': False}
 
 
-async def _serve():
+async def _start_limited():
     srv = SmtpdServer(CaptureSmtpdEvents(), settings=SETTINGS)
     await srv.start([{'host': '127.0.0.1', 'port': 0}])
     return srv, srv._servers[0].sockets[0].getsockname()[1]
@@ -29,7 +31,7 @@ async def _welcome(reader):
 
 def test_010_tcp_1_connect():
     async def go():
-        srv, port = await _serve()
+        srv, port = await _start_limited()
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             greeting = await _welcome(reader)
@@ -43,7 +45,7 @@ def test_010_tcp_1_connect():
 
 def test_020_tcp_2_simultan_connects():
     async def go():
-        srv, port = await _serve()
+        srv, port = await _start_limited()
         try:
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
             b1 = await _welcome(r1)
@@ -72,7 +74,7 @@ def test_020_tcp_2_simultan_connects():
 
 def test_030_tcp_3_simultan_connects_and_1_abort():
     async def go():
-        srv, port = await _serve()
+        srv, port = await _start_limited()
         try:
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
             b1 = await _welcome(r1)

@@ -1,3 +1,7 @@
+"""
+The helpers for all tests of the app.
+"""
+
 import os
 import time
 import select

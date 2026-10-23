@@ -1,11 +1,12 @@
 """
-Tests for tokeo.ext.smtpd.server (the own asyncio SMTP server, no TLS/AUTH).
+Tests for tokeo.core.smtpd.server (the own asyncio SMTP server).
 
 Everything is exercised over a real SMTP conversation against a live server:
 the full dialog and reference-faithful behaviour (null sender, de-dot-stuffing,
 byte-exact body, multiple transactions, sequence enforcement, handler rejects),
 the security enforcement we own (PIPELINING rejection, CRLF strictness, data_size,
-buffer overrun, command timeout), and the connection/processing limits.
+buffer overrun, command timeout), internationalization, the connection/processing
+limits, the PROXY protocol, the graceful shutdown, AUTH PLAIN/LOGIN and STARTTLS.
 """
 
 import base64
@@ -20,11 +21,12 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     RecordingEvents,
     AuthEvents,
     dialog,
-    _reply,
-    _serve,
-    _stop,
-    _tls_client_ctx,
-    _TLS_SETTINGS,
+    auth_plain,
+    read_reply,
+    start_server,
+    stop_server,
+    insecure_tls_context,
+    TLS_SETTINGS,
 )
 
 # --- full delivery and events ------------------------------------------------
@@ -190,21 +192,21 @@ def test_handler_bug_contained_as_500():
 
 def test_pipelining_rejected_when_disabled():
     async def go():
-        server, port, task = await _serve(RecordingEvents(), {})
+        server, port, task = await start_server(RecordingEvents(), {})
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'EHLO me\r\n')
             await writer.drain()
-            await _reply(reader)
+            await read_reply(reader)
             # two commands in one segment -> the first sees a buffered next line
             writer.write(b'NOOP\r\nNOOP\r\n')
             await writer.drain()
-            first = await _reply(reader)
+            first = await read_reply(reader)
             writer.close()
             return first
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     first = asyncio.run(go())
     assert first[0].startswith('500')
@@ -212,21 +214,21 @@ def test_pipelining_rejected_when_disabled():
 
 def test_pipelining_allowed_when_enabled():
     async def go():
-        server, port, task = await _serve(RecordingEvents(), {'pipelining_extension': True})
+        server, port, task = await start_server(RecordingEvents(), {'pipelining_extension': True})
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'EHLO me\r\n')
             await writer.drain()
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'NOOP\r\nNOOP\r\n')
             await writer.drain()
-            a = await _reply(reader)
-            b = await _reply(reader)
+            a = await read_reply(reader)
+            b = await read_reply(reader)
             writer.close()
             return a, b
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     a, b = asyncio.run(go())
     assert a == ['250 OK'] and b == ['250 OK']
@@ -261,16 +263,16 @@ def test_buffer_overrun_421():
 
 def test_command_timeout_closes_connection():
     async def go():
-        server, port, task = await _serve(RecordingEvents(), {'io_cmd_timeout': 0.2})
+        server, port, task = await start_server(RecordingEvents(), {'io_cmd_timeout': 0.2})
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            await _reply(reader)
+            await read_reply(reader)
             # send nothing; the server must time out and answer 421
-            reply = await asyncio.wait_for(_reply(reader), timeout=2)
+            reply = await asyncio.wait_for(read_reply(reader), timeout=2)
             writer.close()
             return reply
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     reply = asyncio.run(go())
     assert reply[0].startswith('421')
@@ -342,17 +344,17 @@ def test_body_param_rejected_without_intl():
 
 def test_max_connections_refuses_with_421():
     async def go():
-        server, port, task = await _serve(RecordingEvents(), {'max_connections': 1, 'max_processings': 1})
+        server, port, task = await start_server(RecordingEvents(), {'max_connections': 1, 'max_processings': 1})
         try:
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
-            b1 = await _reply(r1)
+            b1 = await read_reply(r1)
             r2, w2 = await asyncio.open_connection('127.0.0.1', port)
-            b2 = await _reply(r2)
+            b2 = await read_reply(r2)
             w1.close()
             w2.close()
             return b1, b2
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     b1, b2 = asyncio.run(go())
     assert b1[0].startswith('220')
@@ -406,18 +408,18 @@ def test_on_connect_fires_even_when_refused():
     ev = RecordingEvents()
 
     async def go():
-        server, port, task = await _serve(ev, {'max_connections': 1, 'max_processings': 1})
+        server, port, task = await start_server(ev, {'max_connections': 1, 'max_processings': 1})
         try:
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
-            await _reply(r1)
+            await read_reply(r1)
             r2, w2 = await asyncio.open_connection('127.0.0.1', port)
-            b2 = await _reply(r2)
+            b2 = await read_reply(r2)
             w1.close()
             w2.close()
             await asyncio.sleep(0.05)
             return b2
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     b2 = asyncio.run(go())
     assert b2[0].startswith('421')
@@ -428,26 +430,26 @@ def test_max_processings_waits_for_free_slot():
     # a new client waits (before its 220 greeting) until processings drops
     # below max_processings; with a single slot the second client is blocked
     async def go():
-        server, port, task = await _serve(RecordingEvents(), {'max_processings': 1})
+        server, port, task = await start_server(RecordingEvents(), {'max_processings': 1})
         try:
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
-            b1 = await _reply(r1)
+            b1 = await read_reply(r1)
             r2, w2 = await asyncio.open_connection('127.0.0.1', port)
             blocked = False
             try:
-                await asyncio.wait_for(_reply(r2), timeout=0.3)
+                await asyncio.wait_for(read_reply(r2), timeout=0.3)
             except asyncio.TimeoutError:
                 blocked = True
             # free the slot by ending the first dialog
             w1.write(b'QUIT\r\n')
             await w1.drain()
-            await _reply(r1)
+            await read_reply(r1)
             w1.close()
-            b2 = await asyncio.wait_for(_reply(r2), timeout=2)
+            b2 = await asyncio.wait_for(read_reply(r2), timeout=2)
             w2.close()
             return b1, blocked, b2
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     b1, blocked, b2 = asyncio.run(go())
     assert b1[0].startswith('220')
@@ -493,16 +495,16 @@ async def _dialog_raw(events, settings, steps, has_server_greeting=True):
         server closed the connection at the end
 
     """
-    server, port, task = await _serve(events, settings)
+    server, port, task = await start_server(events, settings)
     try:
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        greeting = await _reply(reader) if has_server_greeting else None
+        greeting = await read_reply(reader) if has_server_greeting else None
         replies = []
         for chunk, expect in steps:
             writer.write(chunk)
             await writer.drain()
             if expect:
-                replies.append(await _reply(reader))
+                replies.append(await read_reply(reader))
         closed = False
         try:
             tail = await asyncio.wait_for(reader.read(1), timeout=0.2)
@@ -513,7 +515,7 @@ async def _dialog_raw(events, settings, steps, has_server_greeting=True):
         await asyncio.sleep(0.02)
         return greeting, replies, closed
     finally:
-        await _stop(server, task)
+        await stop_server(server, task)
 
 
 def test_proxy_disabled_is_unknown_command():
@@ -659,15 +661,17 @@ def test_proxy_twice_aborts_421():
 def test_proxy_header_timeout_aborts_421():
     # the PROXY header has its own short timeout, io_cmd_timeout does not apply
     async def go():
-        server, port, task = await _serve(ProxyEvents(), {'proxy_extension': True, 'io_proxy_cmd_timeout': 0.2, 'io_cmd_timeout': 30})
+        server, port, task = await start_server(
+            ProxyEvents(), {'proxy_extension': True, 'io_proxy_cmd_timeout': 0.2, 'io_cmd_timeout': 30}
+        )
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            reply = await asyncio.wait_for(_reply(reader), timeout=2)
+            reply = await asyncio.wait_for(read_reply(reader), timeout=2)
             closed = await asyncio.wait_for(reader.read(1), timeout=1) == b''
             writer.close()
             return reply, closed
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     reply, closed = asyncio.run(go())
     assert reply[0].startswith('421')
@@ -697,7 +701,7 @@ def test_proxy_event_error_aborts_421():
 # --- graceful shutdown -------------------------------------------------------
 
 
-async def _start_server(events, settings):
+async def _start_smtpd(events, settings):
     """Start a server in the background on an ephemeral port; return (srv, port)."""
     srv = SmtpdServer(events, settings=settings)
     await srv.start([{'host': '127.0.0.1', 'port': 0}])
@@ -707,9 +711,9 @@ async def _start_server(events, settings):
 
 def test_stop_stops_accepting_new_connections():
     async def go():
-        srv, port = await _start_server(RecordingEvents(), {})
+        srv, port = await _start_smtpd(RecordingEvents(), {})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        greeting = await _reply(reader)
+        greeting = await read_reply(reader)
         writer.close()
         await srv.stop(wait_seconds_before_close=0.2)
         refused = False
@@ -727,18 +731,18 @@ def test_stop_stops_accepting_new_connections():
 
 def test_shutdown_ends_active_dialog_after_current_command():
     async def go():
-        srv, port = await _start_server(RecordingEvents(), {})
+        srv, port = await _start_smtpd(RecordingEvents(), {})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        await _reply(reader)
+        await read_reply(reader)
         writer.write(b'EHLO me\r\n')
         await writer.drain()
-        await _reply(reader)
+        await read_reply(reader)
         # request a graceful shutdown; the next command is answered, then 221
         srv.shutdown()
         writer.write(b'NOOP\r\n')
         await writer.drain()
-        noop = await _reply(reader)
-        bye = await _reply(reader)
+        noop = await read_reply(reader)
+        bye = await read_reply(reader)
         writer.close()
         await srv.stop(wait_seconds_before_close=0.2)
         return noop, bye
@@ -750,11 +754,11 @@ def test_shutdown_ends_active_dialog_after_current_command():
 
 def test_shutdown_refuses_ungreeted_connection():
     async def go():
-        srv, port = await _start_server(RecordingEvents(), {})
+        srv, port = await _start_smtpd(RecordingEvents(), {})
         # a scheduled shutdown greets a new connection with 421, not 220
         srv.shutdown()
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        reply = await asyncio.wait_for(_reply(reader), timeout=2)
+        reply = await asyncio.wait_for(read_reply(reader), timeout=2)
         writer.close()
         await srv.stop(wait_seconds_before_close=0.2)
         return reply
@@ -765,9 +769,9 @@ def test_shutdown_refuses_ungreeted_connection():
 
 def test_graceful_stop_cancels_idle_connection():
     async def go():
-        srv, port = await _start_server(RecordingEvents(), {})
+        srv, port = await _start_smtpd(RecordingEvents(), {})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        await _reply(reader)
+        await read_reply(reader)
         active_before = len(srv._sessions)
         # the connection is idle (blocked reading); a graceful stop drains it
         await srv.stop(wait_seconds_before_close=0.3)
@@ -803,16 +807,12 @@ def test_lifecycle_state_flags():
 # --- AUTH (PLAIN / LOGIN) ------------------------------------------------------
 
 
-def _plain(authzid, authcid, password):
-    return base64.b64encode(f'{authzid}\x00{authcid}\x00{password}'.encode()).decode()
-
-
 def _b64(text):
     return base64.b64encode(text.encode()).decode()
 
 
 def test_auth_forbidden_by_default_is_500():
-    _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'AUTH PLAIN ' + _plain('', 'u', 'p').encode() + b'\r\n'])
+    _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'AUTH PLAIN ' + auth_plain('', 'u', 'p').encode() + b'\r\n'])
     assert r[1][0].startswith('500')
 
 
@@ -828,7 +828,7 @@ def test_auth_plain_inline_success_and_ctx():
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + _plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
             b'MAIL FROM:<a@x>\r\n',
         ],
     )
@@ -849,7 +849,7 @@ def test_auth_plain_wrong_credentials_535():
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + _plain('', 'user', 'WRONG').encode() + b'\r\n',
+            b'AUTH PLAIN ' + auth_plain('', 'user', 'WRONG').encode() + b'\r\n',
         ],
     )
     assert r[1][0].startswith('535')
@@ -863,7 +863,7 @@ def test_auth_plain_prompt_form():
         [
             b'EHLO me\r\n',
             b'AUTH PLAIN\r\n',
-            _plain('', 'user', 'secret').encode() + b'\r\n',
+            auth_plain('', 'user', 'secret').encode() + b'\r\n',
         ],
     )
     # the bare AUTH PLAIN is answered with '334 ' (space included)
@@ -911,7 +911,7 @@ def test_auth_default_handler_denies_535():
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + _plain('', 'any', 'thing').encode() + b'\r\n',
+            b'AUTH PLAIN ' + auth_plain('', 'any', 'thing').encode() + b'\r\n',
         ],
     )
     assert r[1][0].startswith('535')
@@ -938,7 +938,7 @@ def test_auth_before_helo_503():
         AuthEvents(),
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
-            b'AUTH PLAIN ' + _plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
         ],
     )
     assert r[0][0].startswith('503')
@@ -951,8 +951,8 @@ def test_auth_twice_503():
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + _plain('', 'user', 'secret').encode() + b'\r\n',
-            b'AUTH PLAIN ' + _plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
         ],
     )
     assert r[1][0] == '235 OK'
@@ -972,7 +972,7 @@ def test_auth_required_gates_mail():
         [
             b'EHLO me\r\n',
             b'MAIL FROM:<a@x>\r\n',  # not authenticated -> 530
-            b'AUTH PLAIN ' + _plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
             b'MAIL FROM:<a@x>\r\n',  # authenticated -> 250
         ],
     )
@@ -989,7 +989,7 @@ def test_auth_authzid_returned_by_handler():
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + _plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
             b'MAIL FROM:<a@x>\r\n',
         ],
     )
@@ -1016,32 +1016,32 @@ def test_starttls_full_flow_delivers_over_tls():
     ev = TlsEvents()
 
     async def go():
-        server, port, task = await _serve(ev, _TLS_SETTINGS)
+        server, port, task = await start_server(ev, TLS_SETTINGS)
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'EHLO me\r\n')
             await writer.drain()
-            ehlo1 = await _reply(reader)
+            ehlo1 = await read_reply(reader)
             writer.write(b'STARTTLS\r\n')
             await writer.drain()
-            tls_reply = await _reply(reader)
-            await writer.start_tls(_tls_client_ctx())
+            tls_reply = await read_reply(reader)
+            await writer.start_tls(insecure_tls_context())
             writer.write(b'EHLO secure\r\n')
             await writer.drain()
-            ehlo2 = await _reply(reader)
+            ehlo2 = await read_reply(reader)
             for cmd in (b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n'):
                 writer.write(cmd)
                 await writer.drain()
-                await _reply(reader)
+                await read_reply(reader)
             writer.write(b'body over tls\r\n.\r\n')
             await writer.drain()
-            final = await _reply(reader)
+            final = await read_reply(reader)
             writer.close()
             await asyncio.sleep(0.05)
             return ehlo1, tls_reply, ehlo2, final
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     ehlo1, tls_reply, ehlo2, final = asyncio.run(go())
     assert any('STARTTLS' in ln for ln in ehlo1)
@@ -1059,33 +1059,33 @@ def test_starttls_forbidden_is_500():
 
 
 def test_starttls_before_helo_is_503():
-    _, r = dialog(RecordingEvents(), _TLS_SETTINGS, [b'STARTTLS\r\n'])
+    _, r = dialog(RecordingEvents(), TLS_SETTINGS, [b'STARTTLS\r\n'])
     assert r[0][0].startswith('503')
 
 
 def test_starttls_twice_already_encrypted_503():
     async def go():
-        server, port, task = await _serve(RecordingEvents(), _TLS_SETTINGS)
+        server, port, task = await start_server(RecordingEvents(), TLS_SETTINGS)
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'EHLO me\r\n')
             await writer.drain()
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'STARTTLS\r\n')
             await writer.drain()
-            await _reply(reader)
-            await writer.start_tls(_tls_client_ctx())
+            await read_reply(reader)
+            await writer.start_tls(insecure_tls_context())
             writer.write(b'EHLO secure\r\n')
             await writer.drain()
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'STARTTLS\r\n')
             await writer.drain()
-            second = await _reply(reader)
+            second = await read_reply(reader)
             writer.close()
             return second
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     second = asyncio.run(go())
     assert second[0].startswith('503')
@@ -1093,30 +1093,30 @@ def test_starttls_twice_already_encrypted_503():
 
 def test_tls_required_gates_mail_until_starttls():
     async def go():
-        server, port, task = await _serve(RecordingEvents(), dict(_TLS_SETTINGS, encrypt_mode='TLS_REQUIRED'))
+        server, port, task = await start_server(RecordingEvents(), dict(TLS_SETTINGS, encrypt_mode='TLS_REQUIRED'))
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'EHLO me\r\n')
             await writer.drain()
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'MAIL FROM:<a@x>\r\n')
             await writer.drain()
-            before = await _reply(reader)
+            before = await read_reply(reader)
             writer.write(b'STARTTLS\r\n')
             await writer.drain()
-            await _reply(reader)
-            await writer.start_tls(_tls_client_ctx())
+            await read_reply(reader)
+            await writer.start_tls(insecure_tls_context())
             writer.write(b'EHLO secure\r\n')
             await writer.drain()
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'MAIL FROM:<a@x>\r\n')
             await writer.drain()
-            after = await _reply(reader)
+            after = await read_reply(reader)
             writer.close()
             return before, after
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     before, after = asyncio.run(go())
     assert before[0].startswith('530')
@@ -1130,25 +1130,25 @@ def test_starttls_flushes_injected_plaintext():
     # Inject QUIT: if it leaked, the server would close; with the flush the
     # connection stays alive and a fresh EHLO over TLS still succeeds.
     async def go():
-        server, port, task = await _serve(RecordingEvents(), dict(_TLS_SETTINGS, pipelining_extension=True))
+        server, port, task = await start_server(RecordingEvents(), dict(TLS_SETTINGS, pipelining_extension=True))
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            await _reply(reader)
+            await read_reply(reader)
             writer.write(b'EHLO me\r\n')
             await writer.drain()
-            await _reply(reader)
+            await read_reply(reader)
             # STARTTLS plus an injected QUIT in the same plaintext segment
             writer.write(b'STARTTLS\r\nQUIT\r\n')
             await writer.drain()
-            tls_reply = await _reply(reader)
-            await writer.start_tls(_tls_client_ctx())
+            tls_reply = await read_reply(reader)
+            await writer.start_tls(insecure_tls_context())
             writer.write(b'EHLO secure\r\n')
             await writer.drain()
-            ehlo = await _reply(reader)
+            ehlo = await read_reply(reader)
             writer.close()
             return tls_reply, ehlo
         finally:
-            await _stop(server, task)
+            await stop_server(server, task)
 
     tls_reply, ehlo = asyncio.run(go())
     assert tls_reply[0] == '220 Ready to start TLS'

@@ -36,7 +36,7 @@ class WireCapture(SmtpdEvents):
 NASTY = b'Subject: t\n' b'X: a\rb\r\n' b'\n' b'A\r\n' b'B\n' b'..C\r\n' b'D\r\r\n'
 
 
-def test_crlf_leave_preserves_wire_bytes():
+def test_leave_preserves_wire_bytes():
     events = WireCapture()
     reply = run_wire(events, {'crlf_mode': 'CRLF_LEAVE'}, NASTY)
     assert reply == b'250'
@@ -46,7 +46,7 @@ def test_crlf_leave_preserves_wire_bytes():
     assert events.crlf == b'\r\n'
 
 
-def test_crlf_ensure_normalizes_lines():
+def test_ensure_normalizes_lines():
     events = WireCapture()
     reply = run_wire(events, {'crlf_mode': 'CRLF_ENSURE'}, NASTY)
     assert reply == b'250'
@@ -54,7 +54,7 @@ def test_crlf_ensure_normalizes_lines():
     assert events.data == b'Subject: t\r\nX: ab\r\n\r\nA\r\nB\r\n.C\r\nD'
 
 
-def test_crlf_strict_rejects_bare_lf():
+def test_strict_rejects_bare_lf():
     events = WireCapture()
     reply = run_wire(events, {'crlf_mode': 'CRLF_STRICT'}, b'Subject: t\n')
     assert reply == b'500'

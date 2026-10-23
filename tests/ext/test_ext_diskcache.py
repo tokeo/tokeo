@@ -1,3 +1,8 @@
+"""
+Tests for tokeo.ext.diskcache: the locks temper (concurrency limit) and
+throttle (rate limit), alone, across threads and across processes.
+"""
+
 import time
 import threading
 import multiprocessing as mp
@@ -32,6 +37,7 @@ def max_overlap(intervals):
 
 
 class DiskcacheTest(TokeoTest):
+    """A test app with the diskcache in the given directory."""
 
     class Meta:
         extensions = [
@@ -39,13 +45,12 @@ class DiskcacheTest(TokeoTest):
             'tokeo.ext.diskcache',
         ]
 
-
-def cache_defaults(directory):
-    # pin the diskcache to a fixed directory so that threads and separate
-    # processes coordinate through the very same cache database
-    d = init_defaults('diskcache')
-    d['diskcache']['directory'] = directory
-    return d
+    def __init__(self, directory, **kw):
+        # pin the diskcache to a fixed directory so that threads and separate
+        # processes coordinate through the very same cache database
+        config = init_defaults('diskcache')
+        config['diskcache']['directory'] = directory
+        super().__init__(config_defaults=config, **kw)
 
 
 def spawn_context():
@@ -89,7 +94,7 @@ def temper_worker(directory, count, hold, result_queue):
     # each process opens its own app pointing at the same cache directory;
     # report a payload either way so the parent never waits forever
     try:
-        with DiskcacheTest(config_defaults=cache_defaults(directory)) as app:
+        with DiskcacheTest(directory) as app:
 
             @app.cache.locks.temper(count=count, name='mp_temper', verbose=False)
             def job():
@@ -106,7 +111,7 @@ def throttle_worker(directory, count, per_seconds, result_queue):
     # each process opens its own app pointing at the same cache directory;
     # report a payload either way so the parent never waits forever
     try:
-        with DiskcacheTest(config_defaults=cache_defaults(directory)) as app:
+        with DiskcacheTest(directory) as app:
 
             @app.cache.locks.throttle(
                 count=count,
@@ -130,7 +135,7 @@ def throttle_worker(directory, count, per_seconds, result_queue):
 
 def test_temper_acquire_and_release(tmp):
     # 1) a single call runs, returns its result and restores the slot
-    with DiskcacheTest(config_defaults=cache_defaults(tmp.dir)) as app:
+    with DiskcacheTest(tmp.dir) as app:
 
         @app.cache.locks.temper(count=1, name='single', verbose=False)
         def job():
@@ -145,7 +150,7 @@ def test_temper_acquire_and_release(tmp):
 
 def test_temper_callback_when_no_slot(tmp):
     # 2) when no slot is free the callback fires instead of the function
-    with DiskcacheTest(config_defaults=cache_defaults(tmp.dir)) as app:
+    with DiskcacheTest(tmp.dir) as app:
         runs = []
         entered = threading.Event()
         release = threading.Event()
@@ -176,7 +181,7 @@ def test_temper_callback_when_no_slot(tmp):
 
 def test_temper_releases_on_exception(tmp):
     # 3) an exception inside the body still releases the slot (try/finally)
-    with DiskcacheTest(config_defaults=cache_defaults(tmp.dir)) as app:
+    with DiskcacheTest(tmp.dir) as app:
 
         @app.cache.locks.temper(count=1, name='boom', verbose=False)
         def boom():
@@ -200,7 +205,7 @@ def test_temper_thread_concurrency_cap(tmp):
     # 4) across many threads, never more than count run at the same time
     count = 2
     workers = 8
-    with DiskcacheTest(config_defaults=cache_defaults(tmp.dir)) as app:
+    with DiskcacheTest(tmp.dir) as app:
         intervals = []
         guard = threading.Lock()
 
@@ -257,7 +262,7 @@ def test_temper_process_concurrency_cap(tmp):
 
 def test_throttle_allows_burst_up_to_count(tmp):
     # 1) the first count calls pass, the next ones are rate limited
-    with DiskcacheTest(config_defaults=cache_defaults(tmp.dir)) as app:
+    with DiskcacheTest(tmp.dir) as app:
 
         @app.cache.locks.throttle(
             count=3,
@@ -276,7 +281,7 @@ def test_throttle_allows_burst_up_to_count(tmp):
 
 def test_throttle_refills_over_time(tmp):
     # 2) after enough time a fresh token becomes available again
-    with DiskcacheTest(config_defaults=cache_defaults(tmp.dir)) as app:
+    with DiskcacheTest(tmp.dir) as app:
 
         @app.cache.locks.throttle(
             count=1,
@@ -298,7 +303,7 @@ def test_throttle_refills_over_time(tmp):
 
 def test_throttle_blocking_delays(tmp):
     # 3) without a callback extra calls block for about (extra / rate)
-    with DiskcacheTest(config_defaults=cache_defaults(tmp.dir)) as app:
+    with DiskcacheTest(tmp.dir) as app:
 
         # count=2, per_seconds=2 -> rate 1/s; 4 calls = 2 burst + 2 waits ~2s
         @app.cache.locks.throttle(count=2, per_seconds=2, name='blocking', verbose=False)
@@ -316,7 +321,7 @@ def test_throttle_thread_rate_cap(tmp):
     # 4) many threads at once -> only count run, the rest are limited
     count = 3
     workers = 10
-    with DiskcacheTest(config_defaults=cache_defaults(tmp.dir)) as app:
+    with DiskcacheTest(tmp.dir) as app:
 
         @app.cache.locks.throttle(
             count=count,

@@ -5,6 +5,8 @@ Checks the ports/hosts parsing and the resulting bind addresses for three
 scenarios, each asserting ports, hosts and addresses separately.
 """
 
+# test rules exception: numbered test names mirror the midi-smtp-server suite
+
 from tokeo.core.smtpd.server import SmtpdServer
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 

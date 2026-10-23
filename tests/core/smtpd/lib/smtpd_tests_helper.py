@@ -13,6 +13,7 @@ stops the server, and a delivery of raw wire bytes.
 
 import os
 import ssl
+import base64
 import asyncio
 import smtplib
 import ipaddress
@@ -51,6 +52,7 @@ def run_line(smtpd, session, line, line_break=b'\r\n'):
     return asyncio.run(smtpd.process_line(session, line, line_break))
 
 
+# test rules exception: kept in the helper on purpose, more cert tests will use it
 def make_cert(common_name, san_ips=(), san_dns=(), issuer_cert=None, issuer_key=None, is_ca=False):
     """
     Generate a certificate and key with ```cryptography``` (no subprocess).
@@ -148,6 +150,7 @@ def insecure_tls_context():
     return ctx
 
 
+# test rules exception: kept in the helper on purpose, more cert tests will use it
 def verifying_tls_context(ca_file):
     """A client TLS context that verifies the peer and its hostname via ca_file."""
     ctx = ssl.create_default_context(cafile=ca_file)
@@ -282,7 +285,7 @@ class RecordingEvents(SmtpdEvents):
         self.messages.append((bytes(ctx.message.data), ctx.envelope.mail_from, list(ctx.envelope.rcpt_tos)))
 
 
-async def _reply(reader):
+async def read_reply(reader):
     """Read a full (possibly multi-line) SMTP reply into a list of lines."""
     lines = []
     while True:
@@ -294,7 +297,7 @@ async def _reply(reader):
     return lines
 
 
-async def _serve(events, settings):
+async def start_server(events, settings):
     """Start a server on an ephemeral port; return (server, port, task)."""
     srv = SmtpdServer(events, settings=settings)
     limit = int(settings.get('io_buffer_max_size', 1 << 20))
@@ -304,7 +307,7 @@ async def _serve(events, settings):
     return server, port, task
 
 
-async def _stop(server, task):
+async def stop_server(server, task):
     """Close a server and cancel its serve task."""
     server.close()
     task.cancel()
@@ -316,20 +319,20 @@ async def _stop(server, task):
 
 async def _converse(events, settings, commands):
     """Run one client dialog: send each command, read its reply."""
-    server, port, task = await _serve(events, settings)
+    server, port, task = await start_server(events, settings)
     try:
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
-        greeting = await _reply(reader)
+        greeting = await read_reply(reader)
         replies = []
         for cmd in commands:
             writer.write(cmd)
             await writer.drain()
-            replies.append(await _reply(reader))
+            replies.append(await read_reply(reader))
         writer.close()
         await asyncio.sleep(0.02)
         return greeting, replies
     finally:
-        await _stop(server, task)
+        await stop_server(server, task)
 
 
 def dialog(events, settings, commands):
@@ -360,18 +363,15 @@ class AuthEvents(RecordingEvents):
         return super().on_mail_from_event(ctx, mail_from)
 
 
+def auth_plain(authzid, authcid, password):
+    """The base64 credentials of AUTH PLAIN."""
+    return base64.b64encode(f'{authzid}\x00{authcid}\x00{password}'.encode()).decode()
+
+
 # --- tls client and raw wire ---------------------------------------------------
 
 
-def _tls_client_ctx():
-    """A client SSL context that accepts the self-signed test certificate."""
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
-
-
-_TLS_SETTINGS = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
+TLS_SETTINGS = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
 
 
 def run_wire(events, settings, wire_body):

@@ -121,7 +121,7 @@ _CASES = [
 
 @pytest.mark.parametrize('mode, client', _MODES)
 @pytest.mark.parametrize('cert, verify, delivered', _CASES)
-def test_smtp_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
+def test_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
     verify = dict(verify)
     if verify.get('host_cert_ca') == 'file':
         verify['host_cert_ca'] = os.path.join(tmp.dir, 'ca.pem')
@@ -157,7 +157,7 @@ def test_smtp_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
         pytest.param(dict(to=['reject@example.com']), smtplib.SMTPRecipientsRefused, id='send_message'),
     ],
 )
-def test_smtp_closes_connection_on_error(smtp, error):
+def test_closes_connection_on_error(smtp, error):
     with BackgroundSmtpd({'auth_mode': 'AUTH_OPTIONAL'}) as smtpd:
         with SmtpTest(host='127.0.0.1', port=smtpd.port, timeout=5, **smtp) as app:
             # the original error reaches the caller ...
@@ -176,7 +176,7 @@ def test_smtp_closes_connection_on_error(smtp, error):
 # --- delivery of a complete message ------------------------------------------
 
 
-def test_smtp_qp_delivered_to_smtpd(tmp):
+def test_qp_delivered_to_smtpd(tmp):
     pdf = os.path.join(tmp.dir, 'invoice.pdf')
     with open(pdf, 'wb') as f:
         f.write(b'%PDF-1.4 dummy invoice')

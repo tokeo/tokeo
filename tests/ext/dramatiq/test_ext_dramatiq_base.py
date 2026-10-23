@@ -145,7 +145,8 @@ def test_unparalleled_queues_consume_one_message_at_a_time(tmp, monkeypatch, que
     assert consumed == [expected]
 
 
-def test_register_queue_arguments_from_config(tmp, keep_dead_message_ttl):
+@pytest.mark.usefixtures('keep_dead_message_ttl')
+def test_register_queue_arguments_from_config(tmp):
     import dramatiq
 
     with DramatiqBrokerTest(tmp, dict(max_priority=10, dead_message_ttl='86400000')):
@@ -249,15 +250,17 @@ def test_register_dead_message_ttl_valid_env(tmp, keep_dead_message_ttl, monkeyp
         assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == keep_dead_message_ttl
 
 
+@pytest.mark.usefixtures('keep_dead_message_ttl')
 @pytest.mark.parametrize('value', ['0', '-1', 'week'])
-def test_register_dead_message_ttl_invalid_env(tmp, keep_dead_message_ttl, monkeypatch, value):
+def test_register_dead_message_ttl_invalid_env(tmp, monkeypatch, value):
     monkeypatch.setenv('dramatiq_dead_message_ttl', value)
     with pytest.raises(TokeoDramatiqConfigError, match='Invalid env dramatiq_dead_message_ttl'):
         with DramatiqBrokerTest(tmp, None):
             pass
 
 
-def test_register_dead_message_ttl_config_wins_over_env(tmp, keep_dead_message_ttl, monkeypatch):
+@pytest.mark.usefixtures('keep_dead_message_ttl')
+def test_register_dead_message_ttl_config_wins_over_env(tmp, monkeypatch):
     # with the config value the env does not matter, even an invalid one
     monkeypatch.setenv('dramatiq_dead_message_ttl', '0')
     with DramatiqBrokerTest(tmp, dict(dead_message_ttl=60000)):

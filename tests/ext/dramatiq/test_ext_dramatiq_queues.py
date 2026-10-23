@@ -283,7 +283,8 @@ def test_recreate(app, server, monkeypatch):
     assert server.queues['orders_unparalleled.XQ']['arguments'] == {'x-message-ttl': 60000}
 
 
-def test_recreate_refuses_queue_without_actor(app, server):
+@pytest.mark.usefixtures('server')
+def test_recreate_refuses_queue_without_actor(app):
     with pytest.raises(TokeoDramatiqQueueError, match='Queue old has no actor'):
         app.dramatiq.queues.recreate(['mail', 'old'])
 

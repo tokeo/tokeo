@@ -1,3 +1,9 @@
+"""
+Tests for the app itself, its run and its debug mode.
+"""
+
+# test rules exception: single file in tests/app/ as in the app template
+
 from tokeo.main import TokeoTest
 
 

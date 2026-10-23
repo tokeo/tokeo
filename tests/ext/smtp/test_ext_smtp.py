@@ -1,3 +1,8 @@
+"""
+Tests for tokeo.ext.smtp without a server: the built messages (encodings,
+headers, attachments, inline images, mime structure) and the smtplib calls.
+"""
+
 import os
 import ssl
 import base64
@@ -11,7 +16,7 @@ htmlMsg = '<html><body><h1 style="color: #aa0;">Welcome</h1><p>Hello world [äö
 body = [textMsg, htmlMsg]
 
 
-def test_smtp_qp_message(rando, tmp):
+def test_qp_message(tmp):
     # the message build needs no credentials and no network: embedded dummy
     # settings and generated attachment files keep this half runnable anywhere
     pdf = os.path.join(tmp.dir, 'invoice.pdf')
@@ -55,7 +60,7 @@ def _parts(msg):
 
 
 @pytest.mark.parametrize('use_ssl', [False, True], ids=['smtp', 'smtp_ssl'])
-def test_smtp_connection_params(use_ssl):
+def test_connection_params(use_ssl):
     # local_hostname and source_address come from the config only, an empty
     # value is passed as None and the source port is chosen by the system
     with mock.patch('smtplib.SMTP') as smtp, mock.patch('smtplib.SMTP_SSL') as smtp_ssl:
@@ -75,7 +80,7 @@ def test_smtp_connection_params(use_ssl):
     assert used.call_args_list[1] == mock.call('localhost', '25', **empty)
 
 
-def test_smtp_starttls_and_login():
+def test_starttls_and_login():
     with mock.patch('smtplib.SMTP') as smtp:
         with SmtpTest(tls=True, auth=True, auth_identity='user', auth_password='secret', host_cert_verify=True) as app:
             app.mail.send('body')
@@ -90,7 +95,7 @@ def test_smtp_starttls_and_login():
 # --- 2. host certificate context ---------------------------------------------
 
 
-def test_smtp_host_cert_context(tmp):
+def test_host_cert_context(tmp):
     cert_pem, _ = make_cert('localhost')
     ca_file = os.path.join(tmp.dir, 'ca.pem')
     with open(ca_file, 'w') as f:
@@ -121,7 +126,7 @@ def test_smtp_host_cert_context(tmp):
     'header_encoding, encoded',
     [(None, '1'), ('base64', '=?utf-8?b?MQ==?='), ('qp', '=?utf-8?q?1?=')],
 )
-def test_smtp_x_headers(header_encoding, encoded):
+def test_x_headers(header_encoding, encoded):
     with SmtpTest(header_encoding=header_encoding) as app:
         params = app.mail._get_params(X_API_Key='1', x_my_header='2')
         msg = app.mail._make_message('body', **params)
@@ -135,7 +140,7 @@ def test_smtp_x_headers(header_encoding, encoded):
 # --- 5. attachments ----------------------------------------------------------
 
 
-def test_smtp_attachment_names(tmp):
+def test_attachment_names(tmp):
     pdf = os.path.join(tmp.dir, 'invoice.pdf')
     with open(pdf, 'wb') as f:
         f.write(b'%PDF-1.4 dummy')
@@ -149,7 +154,7 @@ def test_smtp_attachment_names(tmp):
     assert names == ['docs/2026/q3.pdf', 'invoice.pdf', 'invoice.pdf']
 
 
-def test_smtp_inline_image(tmp):
+def test_inline_image(tmp):
     png = os.path.join(tmp.dir, 'logo.png')
     with open(png, 'wb') as f:
         f.write(PNG)
@@ -174,7 +179,7 @@ def test_smtp_inline_image(tmp):
     assert attachment['Content-ID'] is None
 
 
-def test_smtp_inline_image_unsupported(tmp):
+def test_inline_image_unsupported(tmp):
     svg = os.path.join(tmp.dir, 'logo.svg')
     with open(svg, 'w') as f:
         f.write('<svg xmlns="http://www.w3.org/2000/svg"/>')
@@ -199,7 +204,7 @@ def test_smtp_inline_image_unsupported(tmp):
     ],
     ids=['text', 'html', 'alternative', 'mixed', 'mixed_related'],
 )
-def test_smtp_mime_structure(tmp, body, with_file, content_type):
+def test_mime_structure(tmp, body, with_file, content_type):
     pdf = os.path.join(tmp.dir, 'invoice.pdf')
     with open(pdf, 'wb') as f:
         f.write(b'%PDF-1.4 dummy')
@@ -217,7 +222,7 @@ def test_smtp_mime_structure(tmp, body, with_file, content_type):
 
 
 @pytest.mark.parametrize('body', [5, {'text': None}, (5, '')], ids=['int', 'dict_none', 'tuple_int'])
-def test_smtp_invalid_body(body):
+def test_invalid_body(body):
     with SmtpTest() as app:
         with pytest.raises(TypeError):
             app.mail._make_message(body, **app.mail._get_params())
@@ -226,7 +231,7 @@ def test_smtp_invalid_body(body):
 # --- 9. date and message-id --------------------------------------------------
 
 
-def test_smtp_date_and_message_id():
+def test_date_and_message_id():
     with SmtpTest(msgid_domain='example.com') as app:
         enforced = app.mail._make_message('body', **app.mail._get_params())
         given = app.mail._make_message(

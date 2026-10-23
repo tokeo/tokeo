@@ -1,3 +1,7 @@
+"""
+The fixtures for all tests of the app.
+"""
+
 import os
 import shutil
 import pytest

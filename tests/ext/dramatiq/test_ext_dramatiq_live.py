@@ -66,7 +66,7 @@ def live(tmp, rando):
     return build
 
 
-def test_live_state(live):
+def test_state(live):
     with live() as (app, name, actor):
         queues = app.dramatiq.queues
         # a missing queue is reported and not created by the state
@@ -80,7 +80,7 @@ def test_live_state(live):
         assert (state['exists'], state['ready'], state['delayed'], state['dead'], state['consumers']) == (True, 2, 1, 0, 0)
 
 
-def test_live_dead_letters(live):
+def test_dead_letters(live):
     with live() as (app, name, actor):
         queues = app.dramatiq.queues
         actor.send(1)
@@ -99,7 +99,7 @@ def test_live_dead_letters(live):
         assert 'retries' not in requeued.options and 'traceback' not in requeued.options
 
 
-def test_live_purge_and_delete(live):
+def test_purge_and_delete(live):
     with live() as (app, name, actor):
         queues = app.dramatiq.queues
         actor.send(1)
@@ -111,7 +111,7 @@ def test_live_purge_and_delete(live):
         assert queues.state(name)[0]['exists'] is False
 
 
-def test_live_recreate_with_priority(live):
+def test_recreate_with_priority(live):
     with live(max_priority=5) as (app, name, actor):
         actor.send(1)
         (result,) = app.dramatiq.queues.recreate(name, force=True)
@@ -123,7 +123,7 @@ def test_live_recreate_with_priority(live):
                 channel.queue_declare(name, durable=True, arguments=dict(result['arguments'], **{'x-max-priority': 3}))
 
 
-def test_live_reconnect_after_idle(live):
+def test_reconnect_after_idle(live):
     # a short heartbeat lets rabbitmq close the idle connection quickly
     with live(url=RABBITMQ_URL + ('&' if '?' in RABBITMQ_URL else '?') + 'heartbeat=1') as (app, name, actor):
         queues = app.dramatiq.queues
@@ -134,7 +134,7 @@ def test_live_reconnect_after_idle(live):
         assert queues._connection is not first
 
 
-def test_live_monitor_hears_a_worker(tmp, rando):
+def test_monitor_hears_a_worker(tmp, rando):
     config = dict(monitoring=True, monitoring_interval=1, monitoring_with_details='on', rabbitmq=dict(url=RABBITMQ_URL))
     with DramatiqMiddlewareTest(tmp, **config) as app:
         name = f'tokeo_test_{rando}'
@@ -164,7 +164,7 @@ def test_live_monitor_hears_a_worker(tmp, rando):
     assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals']['done'] == 1
 
 
-def test_live_unparalleled_runs_one_message_at_a_time(tmp, rando):
+def test_unparalleled_runs_one_message_at_a_time(tmp, rando):
     with DramatiqBrokerTest(tmp, dict(url=RABBITMQ_URL)) as app:
         name = f'tokeo_test_{rando}_unparalleled'
         runs = []

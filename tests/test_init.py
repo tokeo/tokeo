@@ -1,4 +1,6 @@
-# ensure we don't break imports from cement namespace
+"""
+The imports from the cement namespace keep working.
+"""
 
 
 def test_cement_import():
