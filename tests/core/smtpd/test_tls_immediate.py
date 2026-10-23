@@ -7,20 +7,16 @@ channel. The mode needs a runtime whose ```start_tls``` keeps the buffered
 ClientHello (CPython gh-142352), so the dialog tests are skipped on older ones.
 """
 
-import sys
 import asyncio
 import platform
 
 import pytest
 
-from tokeo.core.smtpd.server import SmtpdServer
+from tokeo.core.smtpd.server import SmtpdServer, tls_immediate_supported
 from tests.core.smtpd.lib.smtpd_tests_helper import RecordingEvents, start_server, read_reply, stop_server, insecure_tls_context
 
-_VERSION = sys.version_info[:3]
-_SUPPORTED = _VERSION >= (3, 14, 4) or (3, 13, 13) <= _VERSION < (3, 14)
-
 needs_tls_immediate = pytest.mark.skipif(
-    not _SUPPORTED,
+    not tls_immediate_supported(),
     reason=f'TLS_IMMEDIATE requires Python 3.13.13+ or 3.14.4+ (gh-142352), running {platform.python_version()}',
 )
 
@@ -127,3 +123,22 @@ def test_required_python_version(monkeypatch, version, supported):
     else:
         with pytest.raises(ValueError, match='requires Python 3.13.13\\+ or 3.14.4\\+'):
             SmtpdServer(RecordingEvents(), settings=_SETTINGS)
+
+
+@pytest.mark.parametrize(
+    'version, supported',
+    [
+        ((3, 12, 13), False),
+        ((3, 13, 12), False),
+        ((3, 13, 13), True),
+        ((3, 14, 0), False),
+        ((3, 14, 3), False),
+        ((3, 14, 4), True),
+        ((3, 15, 0), True),
+    ],
+    ids=lambda value: '.'.join(map(str, value)) if isinstance(value, tuple) else str(value),
+)
+def test_tls_immediate_supported(monkeypatch, version, supported):
+    """Only 3.13.13+ of the 3.13 line and 3.14.4+ onwards support TLS_IMMEDIATE."""
+    monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', version + ('final', 0))
+    assert tls_immediate_supported() is supported

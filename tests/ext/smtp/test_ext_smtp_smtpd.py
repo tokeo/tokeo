@@ -10,7 +10,6 @@ quoted-printable message with attachments, inline image and X-headers.
 
 import os
 import ssl
-import sys
 import email
 import asyncio
 import smtplib
@@ -20,15 +19,12 @@ from email.header import decode_header, make_header
 
 import pytest
 
-from tokeo.core.smtpd import SmtpdServer, SmtpdEvents, Smtpd535Exception, Smtpd550Exception
+from tokeo.core.smtpd import SmtpdServer, SmtpdEvents, Smtpd535Exception, Smtpd550Exception, tls_immediate_supported
 from tests.utils import wait_until
 from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, subjMsg, textMsg, htmlImg
 
-_VERSION = sys.version_info[:3]
-_SUPPORTED = _VERSION >= (3, 14, 4) or (3, 13, 13) <= _VERSION < (3, 14)
-
 needs_tls_immediate = pytest.mark.skipif(
-    not _SUPPORTED,
+    not tls_immediate_supported(),
     reason=f'TLS_IMMEDIATE requires Python 3.13.13+ or 3.14.4+ (gh-142352), running {platform.python_version()}',
 )
 

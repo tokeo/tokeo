@@ -120,6 +120,24 @@ def _parse_mode(enum_cls, value, default, label):
         raise ValueError(f'{label} must be one of {allowed}, got {value!r}')
 
 
+def tls_immediate_supported():
+    """
+    Tell whether this Python supports the encrypt mode TLS_IMMEDIATE.
+
+    ### Returns
+
+    - **bool**: True on Python 3.13.13+ or 3.14.4+
+
+    ### Notes
+
+    : Immediate TLS needs a ```start_tls``` that keeps the ClientHello the
+        server read already (gh-142352), older versions lose it
+
+    """
+    version = sys.version_info[:3]
+    return version >= (3, 14, 4) or (3, 13, 13) <= version < (3, 14)
+
+
 # short module-level aliases for the :CMD_* symbol names
 CMD_PROXY = CmdSequence.PROXY
 CMD_HELO = CmdSequence.HELO
@@ -413,9 +431,7 @@ class SmtpdServer:
         self.max_processings = settings.get('max_processings', DEFAULT_SMTPD_MAX_PROCESSINGS)
         self.max_connections = settings.get('max_connections', None)
         # validation
-        # immediate TLS needs start_tls to keep the buffered ClientHello (gh-142352)
-        version = sys.version_info[:3]
-        if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not (version >= (3, 14, 4) or (3, 13, 13) <= version < (3, 14)):
+        if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not tls_immediate_supported():
             raise ValueError('Immediate TLS (encrypt_mode TLS_IMMEDIATE) requires Python 3.13.13+ or 3.14.4+!')
         if not (isinstance(self.max_processings, int) and self.max_processings > 0):
             raise ValueError('Number of simultaneous processings (max_processings) must be a positive integer!')
