@@ -13,6 +13,9 @@ from io import StringIO
 # the root of the project, working directory of the programs the tests start
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# the stress tests run only with STRESSTESTS=1, e.g. make test STRESSTESTS=1
+stresstest = pytest.mark.skipif(os.environ.get('STRESSTESTS', '0') != '1', reason='set STRESSTESTS=1 to run the stress tests')
+
 
 @contextmanager
 def use_disabled_stdin_capture():

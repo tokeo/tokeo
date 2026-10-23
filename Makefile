@@ -13,7 +13,7 @@ help:
 	@echo "  dev - install dev components"
 	@echo "  prod - install prod components"
 	@echo "  doc - create and (serve) documentation"
-	@echo "  test (debug=1) files=tests/file - run tests"
+	@echo "  test (debug=1) (STRESSTESTS=1) files=tests/file - run tests"
 	@echo "  fmt (source=module) = run formatter"
 	@echo "  lint (source=module) = run linter"
 	@echo "  docker - create docker image"
@@ -99,6 +99,11 @@ ifndef files
 files=tests/
 endif
 
+# run the stress tests too by STRESSTESTS=1
+ifndef STRESSTESTS
+STRESSTESTS=0
+endif
+
 # limit the tests to run by files and tests filters
 # make test files=test_logging.py tests=logging debug=1
 test:
@@ -106,6 +111,7 @@ test:
 	rm -rf tmp/tests
 	mkdir -p tmp/tests
 	CEMENT_LOG=0 \
+	STRESSTESTS=$(STRESSTESTS) \
 	python -m pytest \
 		-${verbosity} \
 		$(allow_print) \
