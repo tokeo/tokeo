@@ -146,10 +146,12 @@ def dead_letter(actor='send_mail', queue='mail', args=('a@b.c',), **options):
 
 
 def test_names_from_actors(app):
+    """The queue names come from the actors, sorted and unique."""
     assert app.dramatiq.queues.names() == ['mail', 'orders_unparalleled']
 
 
 def test_names_import_actors_module(tmp):
+    """An actors module that does not import raises the config error."""
     with DramatiqBrokerTest(tmp, None) as app:
         app.config.set('dramatiq', 'actors', 'no.such.actors')
         with pytest.raises(TokeoDramatiqConfigError, match="Invalid dramatiq config actors: Value 'no.such.actors'") as e:
@@ -158,6 +160,7 @@ def test_names_import_actors_module(tmp):
 
 
 def test_state(app, server):
+    """state counts ready, delayed, dead and consumers, makes no queue."""
     server.add('mail', b'1', b'2', consumers=2)
     server.add('mail.DQ', b'3')
     server.add('mail.XQ', b'4', b'5', b'6')
@@ -180,6 +183,7 @@ def test_state(app, server):
 
 
 def test_state_of_queue_without_actor(app, server):
+    """A queue without actor, named by its .XQ, is reported without actors."""
     server.add('old')
     (state,) = app.dramatiq.queues.state('old.XQ')
     assert (state['name'], state['exists'], state['actors']) == ('old', True, [])
@@ -189,6 +193,7 @@ def test_state_of_queue_without_actor(app, server):
 
 
 def test_peek_dead_leaves_letters(app, server):
+    """peek_dead shows actor, retries and error, args cut, letters stay."""
     long_args = ('x' * 600,)
     server.add('mail.XQ', dead_letter(retries=3, traceback='Traceback\n  ...\nValueError: bad'), dead_letter(args=long_args))
     letters = app.dramatiq.queues.peek_dead('mail')
@@ -200,6 +205,7 @@ def test_peek_dead_leaves_letters(app, server):
 
 
 def test_peek_dead_limit_and_missing(app, server):
+    """peek_dead stops at the limit and gives [] for a missing queue."""
     server.add('mail.XQ', dead_letter(), dead_letter(), dead_letter())
     assert len(app.dramatiq.queues.peek_dead('mail', limit=2)) == 2
     assert len(server.queues['mail.XQ']['messages']) == 3
@@ -207,6 +213,7 @@ def test_peek_dead_limit_and_missing(app, server):
 
 
 def test_requeue_dead_resets_retries(app, server):
+    """requeue_dead moves letters back without retries, traceback and eta."""
     server.add('mail')
     server.add('mail.XQ', dead_letter(queue='mail.DQ', retries=20, traceback='tb', eta=1, broker_priority=3), dead_letter())
     assert app.dramatiq.queues.requeue_dead('mail', limit=1) == dict(name='mail', requeued=1)
@@ -219,6 +226,7 @@ def test_requeue_dead_resets_retries(app, server):
 
 
 def test_requeue_dead_refuses_missing_queue(app, server):
+    """requeue_dead to a missing queue raises and keeps the letters."""
     server.add('mail.XQ', dead_letter())
     with pytest.raises(TokeoDramatiqQueueError, match='Queue mail is missing') as e:
         app.dramatiq.queues.requeue_dead('mail')
@@ -227,7 +235,7 @@ def test_requeue_dead_refuses_missing_queue(app, server):
 
 
 def test_requeue_dead_keeps_letter_when_publish_fails(app, server):
-    # a refused message goes back to the dead letters at once
+    """A refused publish raises and puts the letter back at once."""
     server.add('mail')
     server.add('mail.XQ', dead_letter())
     server.refuse_publish = True
@@ -240,6 +248,7 @@ def test_requeue_dead_keeps_letter_when_publish_fails(app, server):
 
 
 def test_purge(app, server):
+    """purge empties a queue with its .DQ and .XQ, dead_only only the .XQ."""
     for name in ('mail', 'mail.DQ', 'mail.XQ'):
         server.add(name, b'1', b'2')
     assert app.dramatiq.queues.purge('mail', dead_only=True) == [dict(name='mail', purged=2)]
@@ -258,6 +267,7 @@ def test_purge(app, server):
     ],
 )
 def test_delete_refuses_busy_queue(app, server, setup, busy):
+    """delete without force refuses a queue with ready, dead or consumers."""
     server.add(setup['name'], *setup['bodies'], consumers=setup.get('consumers', 0))
     with pytest.raises(TokeoDramatiqQueueError, match=f'Queue mail has {busy}, use force'):
         app.dramatiq.queues.delete('mail')
@@ -265,6 +275,7 @@ def test_delete_refuses_busy_queue(app, server, setup, busy):
 
 
 def test_delete(app, server):
+    """delete with force removes a queue with its .DQ and .XQ."""
     for name in ('mail', 'mail.DQ', 'mail.XQ'):
         server.add(name, b'1', consumers=1)
     assert app.dramatiq.queues.delete(['mail', 'old'], force=True) == [dict(name='mail', deleted=True), dict(name='old', deleted=False)]
@@ -272,6 +283,7 @@ def test_delete(app, server):
 
 
 def test_recreate(app, server, monkeypatch):
+    """recreate sets priority, single consumer and the ttl of the .XQ."""
     monkeypatch.setattr(dramatiq_rabbitmq, 'DEAD_MESSAGE_TTL', 60000)
     monkeypatch.setattr(app.dramatiq.broker, 'max_priority', 5)
     server.add('orders_unparalleled', arguments={'old': True})
@@ -285,6 +297,7 @@ def test_recreate(app, server, monkeypatch):
 
 @pytest.mark.usefixtures('server')
 def test_recreate_refuses_queue_without_actor(app):
+    """recreate of a queue without actor raises the queue error."""
     with pytest.raises(TokeoDramatiqQueueError, match='Queue old has no actor'):
         app.dramatiq.queues.recreate(['mail', 'old'])
 
@@ -300,6 +313,7 @@ def test_recreate_refuses_queue_without_actor(app):
     ],
 )
 def test_error_without_rabbitmq(tmp, server, url, address):
+    """Without rabbitmq the error names host and port, never the password."""
     server.down = True
     with DramatiqBrokerTest(tmp, dict(url=url)) as app:
         dramatiq.actor(lambda: None, actor_name='send_mail', queue_name='mail', broker=app.dramatiq.broker)
@@ -313,6 +327,7 @@ def test_error_without_rabbitmq(tmp, server, url, address):
 
 
 def test_connection_is_kept_and_reopened(app, server):
+    """The connection is kept, reopened when lost and dropped by close."""
     queues = app.dramatiq.queues
     queues.state()
     queues.state()
@@ -343,6 +358,7 @@ def command(tmp, server, capsys, monkeypatch):
 
 
 def test_command_state_table(command, server):
+    """dramatiq queues shows the state table and the dead letters of a queue."""
     server.add('mail', b'1', consumers=0)
     server.add('mail.XQ', dead_letter())
     lines = [line.strip() for line in command('mail', 'old', '--dead').splitlines() if line.strip()]
@@ -358,12 +374,14 @@ def test_command_state_table(command, server):
 
 
 def test_command_json(command, server):
+    """dramatiq queues --json prints the state as json."""
     server.add('mail', b'1')
     (state,) = json.loads(command('--json'))
     assert (state['name'], state['ready']) == ('mail', 1)
 
 
 def test_command_purge(command, server):
+    """dramatiq queues mail --purge --yes prints the purged count."""
     server.add('mail', b'1', b'2')
     assert command('mail', '--purge', '--yes').strip() == 'mail: purged 2 messages'
 
@@ -379,6 +397,7 @@ def test_command_purge(command, server):
     ],
 )
 def test_command_refuses(command, options, error):
+    """Wrong combinations of switches raise with a hint."""
     with pytest.raises(TokeoDramatiqError, match=error):
         command(*options)
 
@@ -387,12 +406,14 @@ def test_command_refuses(command, options, error):
 
 
 def test_state_without_cache_asks_each_time(app, server):
+    """Without cache_ttl every state call asks rabbitmq."""
     app.dramatiq.queues.state('mail')
     app.dramatiq.queues.state('mail')
     assert server.declares == 6
 
 
 def test_state_cache(app, server, monkeypatch):
+    """Within cache_ttl state comes from the cache, as a copy."""
     now = [100.0]
     monkeypatch.setattr('tokeo.ext.dramatiq.queues.time.monotonic', lambda: now[0])
     server.add('mail', b'1')
@@ -410,6 +431,7 @@ def test_state_cache(app, server, monkeypatch):
 
 
 def test_state_cache_per_names_and_cleared_by_changes(app, server):
+    """The cache keeps the names apart and a purge clears it."""
     server.add('mail', b'1')
     queues = app.dramatiq.queues
     queues.state('mail', cache_ttl=60)
@@ -420,6 +442,7 @@ def test_state_cache_per_names_and_cleared_by_changes(app, server):
 
 
 def test_refused_request(app, server):
+    """A refused request raises, the next call works on a new channel."""
     server.add('mail', b'1')
     server.refuse = (403, "ACCESS_REFUSED - access to queue 'mail' refused")
     refused = r'Rabbitmq at localhost:5672 refused the request \(ChannelClosedByBroker: .*ACCESS_REFUSED'
@@ -433,6 +456,7 @@ def test_refused_request(app, server):
 
 
 def test_refused_request_is_no_connection_error(app, server):
+    """A refused request is no connection error."""
     server.add('mail')
     server.refuse = (406, 'PRECONDITION_FAILED - inequivalent arg')
     with pytest.raises(TokeoDramatiqError) as e:

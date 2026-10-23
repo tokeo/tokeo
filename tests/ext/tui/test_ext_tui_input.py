@@ -41,6 +41,7 @@ def shell():
 
 
 def test_extension_registers_input_only():
+    """Only app.tui.input exists, app.tui.output names the missing extension."""
     with TuiInputTest() as app:
         assert isinstance(app.tui.input, TokeoTuiInput)
         with pytest.raises(TokeoTuiError, match='Enable the extension tokeo.ext.tui.output'):
@@ -48,6 +49,7 @@ def test_extension_registers_input_only():
 
 
 def test_lines_until_ctrl_d(shell):
+    """The shell hands each line to the command until Ctrl-D, into the history."""
     history = InMemoryHistory()
     assert shell(f'list\rtasks pause 1\r{CTRL_D}', history=history, completer={'list': None, 'tasks': {'pause': None}}) == [
         'list',
@@ -57,16 +59,17 @@ def test_lines_until_ctrl_d(shell):
 
 
 def test_history_from_a_list(shell):
-    # arrow up brings the first line of the list
+    """With a list as history arrow up brings its last line."""
     assert shell(f'\x1b[A\r{CTRL_D}', history=['exit', 'list']) == ['list']
 
 
 def test_failed_line_stays_until_ctrl_c(shell):
-    # False keeps the line, the next enter sends it again; Ctrl-C clears it
+    """A line the command rejects stays for the next enter until Ctrl-C."""
     assert shell(f'typo\r\r{CTRL_C}ok\r{CTRL_D}', command=lambda line: line != 'typo') == ['typo', 'typo', 'ok']
 
 
 def test_failing_command_is_logged_and_shell_goes_on(shell, monkeypatch):
+    """An exception of the command is logged as error, the shell goes on."""
     from cement.ext.ext_logging import LoggingLogHandler
 
     def command(line):
@@ -81,6 +84,8 @@ def test_failing_command_is_logged_and_shell_goes_on(shell, monkeypatch):
 
 
 def test_command_ends_shell_by_eof(shell):
+    """EOFError of the command ends the shell, later lines are not read."""
+
     def command(line):
         if line == 'exit':
             raise EOFError()
@@ -91,6 +96,8 @@ def test_command_ends_shell_by_eof(shell):
 
 @pytest.mark.parametrize('signum', [signal.SIGINT, signal.SIGTERM])
 def test_shutdown_signal_ends_shell(shell, signum):
+    """SIGINT or SIGTERM raised by the command ends the shell."""
+
     def command(line):
         raise CaughtSignal(signum, None)
 
@@ -98,6 +105,8 @@ def test_shutdown_signal_ends_shell(shell, signum):
 
 
 def test_other_signal_passes(shell):
+    """Another signal raised by the command passes out of the shell."""
+
     def command(line):
         raise CaughtSignal(signal.SIGUSR1, None)
 
@@ -106,7 +115,7 @@ def test_other_signal_passes(shell):
 
 
 def test_log_handlers_write_to_the_shell_meanwhile(shell):
-    # a handler set up on the console before the shell, as cement does
+    """A console log handler writes through the shell while it runs."""
     handler = logging.StreamHandler(sys.stderr)
     logger = logging.getLogger('tokeo_test_tui')
     logger.addHandler(handler)
@@ -121,6 +130,10 @@ def test_log_handlers_write_to_the_shell_meanwhile(shell):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_output_of_other_threads_appears_above_the_prompt():
+    """
+    The probe prints, logs and calls app.print from another thread while
+    its shell waits; each output stands on its own line above the prompt.
+    """
     probe = 'tests.ext.tui.tui_tests_input_probe'
     with Terminal([sys.executable, '-m', probe], rows=12, columns=80) as terminal:
         shown = terminal.wait_for(lambda lines: 'MARK-APP-PRINT' in ''.join(lines) and lines[-1] == 'Probe>')

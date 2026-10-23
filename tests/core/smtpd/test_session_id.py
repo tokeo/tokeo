@@ -53,6 +53,7 @@ def _session(port):
 
 
 def test_ctx_id_is_write_once():
+    """ctx.id is set once, a second assignment raises AttributeError."""
     ctx = SmtpdContext(id='abc123')
     assert ctx.id == 'abc123'
     with pytest.raises(AttributeError):
@@ -65,6 +66,7 @@ def test_ctx_id_is_write_once():
 
 
 def test_session_id_format_uniqueness_and_persistence():
+    """Each connection gets its own 16 hex id, kept across RSET."""
     events = IdCaptureEvents()
     _run(events, lambda port: (_session(port), _session(port)))
     connects = [sid for kind, sid in events.seen_ids if kind == 'connect']
@@ -78,6 +80,7 @@ def test_session_id_format_uniqueness_and_persistence():
 
 
 def test_session_id_bytes_is_keyword_only_not_a_service_setting():
+    """session_id_bytes sizes the id as keyword, the setting is ignored."""
     events = IdCaptureEvents()
     # the keyword sizes the id; the same key in settings must stay ignored
     _run(events, _session, settings={'session_id_bytes': 12}, session_id_bytes=4)

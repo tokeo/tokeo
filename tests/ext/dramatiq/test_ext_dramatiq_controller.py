@@ -64,6 +64,7 @@ def serve(tmp, monkeypatch):
 
 
 def test_serve_purges_locks(serve):
+    """serve purges the locks once and starts dramatiq."""
     calls = serve()
     assert calls['purge'] == 1
     assert len(calls['main']) == 1
@@ -71,14 +72,14 @@ def test_serve_purges_locks(serve):
 
 
 def test_serve_no_purge_keeps_locks(serve):
+    """serve --no-purge keeps the locks."""
     calls = serve('--no-purge')
     assert calls['purge'] == 0
     assert len(calls['main']) == 1
 
 
 def test_serve_no_purge_survives_watch_restart(serve):
-    # a restart by --watch re-executes sys.argv, so the restored argv must
-    # still carry --no-purge for the next start of the service
+    """The argv kept for a restart by --watch still holds --no-purge."""
     calls = serve('--no-purge', '--watch', __file__)
     assert calls['argv'] == ['tokeo', 'dramatiq', 'serve', '--no-purge', '--watch', __file__]
     assert calls['main'][0].watch is not None
@@ -88,6 +89,7 @@ def test_serve_no_purge_survives_watch_restart(serve):
 
 
 def test_serve_worker_options_from_config(serve):
+    """Without switches dramatiq gets the defaults, prefetch auto as 0."""
     calls = serve()
     args = calls['main'][0]
     # the defaults of the extension reach dramatiq
@@ -97,6 +99,7 @@ def test_serve_worker_options_from_config(serve):
 
 
 def test_serve_worker_switches_replace_config(serve):
+    """The switches win over the config for workers and prefetch."""
     config = dict(
         worker_processes=3,
         worker_threads=4,
@@ -123,12 +126,14 @@ def test_serve_worker_switches_replace_config(serve):
 
 
 def test_serve_fixed_config_values_without_switches(serve):
+    """Fixed config values reach dramatiq and its env."""
     calls = serve(config=dict(worker_processes=3, queue_prefetch=10, delay_queue_prefetch='20'))
     assert calls['main'][0].processes == 3
     assert (os.environ['dramatiq_queue_prefetch'], os.environ['dramatiq_delay_queue_prefetch']) == ('10', '20')
 
 
 def test_serve_auto_switches_reset_fixed_config(serve):
+    """auto as switch resets a fixed config, processes follow the cpus."""
     config = dict(worker_processes=3, queue_prefetch=10, delay_queue_prefetch=20)
     calls = serve('-p', 'auto', '--queue-prefetch', 'auto', '--delay-queue-prefetch', 'AUTO', config=config)
     # without --processes dramatiq takes its default, the cpus of the host
@@ -139,11 +144,13 @@ def test_serve_auto_switches_reset_fixed_config(serve):
 
 @pytest.mark.parametrize('value', ['auto', 0, '0'])
 def test_serve_auto_prefetch_in_config(serve, value):
+    """auto, 0 or "0" as prefetch in the config give 0."""
     serve(config=dict(queue_prefetch=value, delay_queue_prefetch=value))
     assert (os.environ['dramatiq_queue_prefetch'], os.environ['dramatiq_delay_queue_prefetch']) == ('0', '0')
 
 
 def test_serve_auto_processes_in_config(serve):
+    """worker_processes auto lets dramatiq take the cpus."""
     calls = serve(config=dict(worker_processes='auto'))
     assert '--processes' not in calls['dramatiq_argv']
     assert calls['main'][0].processes == dramatiq_cli.CPUS
@@ -164,7 +171,7 @@ def test_serve_auto_processes_in_config(serve):
     ids=lambda options: ' '.join(options),
 )
 def test_serve_invalid_switches(serve, options):
-    # switches are checked like the config, with the name of the switch
+    """An invalid switch raises the config error naming the switch."""
     switch = {'-p': '--processes', '-t': '--threads'}.get(options[0], options[0])
     with pytest.raises(TokeoDramatiqConfigError, match=f'Invalid switch {switch}: Value .* must be'):
         serve(*options)
@@ -183,6 +190,7 @@ def test_serve_invalid_switches(serve, options):
     ],
 )
 def test_serve_invalid_config(serve, key, value):
+    """An invalid config value raises before sys.argv changes."""
     with pytest.raises(TokeoDramatiqConfigError, match=f'Invalid dramatiq config {key}'):
         serve(config={key: value})
     # the error comes before sys.argv is changed and dramatiq is called
@@ -193,11 +201,13 @@ def test_serve_invalid_config(serve, key, value):
 
 
 def test_serve_starts_workers_by_forkserver(serve):
+    """serve sets the start method forkserver."""
     calls = serve()
     assert calls['start_methods'] == [('forkserver', True)]
 
 
 def test_serve_falls_back_to_spawn_without_forkserver(serve, monkeypatch):
+    """Without forkserver serve sets spawn."""
     monkeypatch.setattr('tokeo.ext.dramatiq.controller.multiprocessing.get_all_start_methods', lambda: ['spawn'])
     calls = serve()
     assert calls['start_methods'] == [('spawn', True)]
@@ -214,6 +224,7 @@ def test_serve_falls_back_to_spawn_without_forkserver(serve, monkeypatch):
     ids=['config', 'switch', 'forkserver_switch', 'last_wins'],
 )
 def test_serve_use_spawn(serve, options, config, method):
+    """use_spawn and the switches pick the start method, the last wins."""
     calls = serve(*options, config=config)
     assert calls['start_methods'] == [(method, True)]
     # tokeo sets the start method itself, dramatiq never gets the switch
@@ -224,6 +235,7 @@ def test_serve_use_spawn(serve, options, config, method):
 
 @pytest.mark.parametrize('value', ['yes', 1, None])
 def test_serve_invalid_use_spawn_config(serve, value):
+    """use_spawn other than a bool raises the config error."""
     with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config use_spawn'):
         serve(config=dict(use_spawn=value))
     assert sys.argv == ['tokeo']
@@ -247,6 +259,7 @@ DEBUG_ARGV = pytest.mark.filterwarnings(r'ignore:App\.Meta\.framework_logging:De
     ids=['default', 'debug', 'debug_skip_logging', 'skip_logging'],
 )
 def test_serve_verbose_follows_debug(serve, options, debug, verbose, skip_logging):
+    """dramatiq is verbose with --debug unless --skip-logging."""
     calls = serve(*options, debug=debug)
     args = calls['main'][0]
     assert (args.verbose, args.skip_logging) == (verbose, skip_logging)
@@ -256,12 +269,14 @@ def test_serve_verbose_follows_debug(serve, options, debug, verbose, skip_loggin
 
 
 def test_serve_consumes_all_queues_without_switch(serve):
+    """Without --queues dramatiq consumes all queues."""
     calls = serve()
     assert '--queues' not in calls['dramatiq_argv']
     assert not calls['main'][0].queues
 
 
 def test_serve_binds_queues(serve):
+    """--queues reaches dramatiq after broker and actors and survives a restart."""
     calls = serve('--queues', 'mail', 'orders_unparalleled')
     args = calls['main'][0]
     # --queues stays behind broker and actors, so dramatiq keeps both
@@ -273,6 +288,7 @@ def test_serve_binds_queues(serve):
 
 
 def test_serve_queues_needs_a_name(serve, capsys):
+    """--queues without a name exits with an error."""
     with pytest.raises(SystemExit):
         serve('--queues')
     assert '--queues' in capsys.readouterr().err
@@ -282,19 +298,21 @@ def test_serve_queues_needs_a_name(serve, capsys):
 
 
 def test_serve_poll_interval_default_keeps_env(serve):
+    """Without config serve leaves dramatiq_worker_timeout alone."""
     serve()
     # without config tokeo leaves the env of dramatiq alone
     assert 'dramatiq_worker_timeout' not in os.environ
 
 
 def test_serve_poll_interval_from_config(serve, monkeypatch):
-    # the config wins over an env set from outside, even an invalid one
+    """worker_poll_interval wins over the env, even over an invalid one."""
     monkeypatch.setenv('dramatiq_worker_timeout', '0')
     serve(config=dict(worker_poll_interval=250))
     assert os.environ['dramatiq_worker_timeout'] == '250'
 
 
 def test_serve_poll_interval_valid_env(serve, monkeypatch):
+    """A valid dramatiq_worker_timeout from outside is kept."""
     monkeypatch.setenv('dramatiq_worker_timeout', '500')
     calls = serve()
     assert calls['main']
@@ -303,6 +321,7 @@ def test_serve_poll_interval_valid_env(serve, monkeypatch):
 
 @pytest.mark.parametrize('value', ['0', '-5', '1s'])
 def test_serve_poll_interval_invalid_env(serve, monkeypatch, value):
+    """An invalid dramatiq_worker_timeout raises the config error."""
     monkeypatch.setenv('dramatiq_worker_timeout', value)
     with pytest.raises(TokeoDramatiqConfigError, match='Invalid env dramatiq_worker_timeout'):
         serve()
@@ -311,5 +330,6 @@ def test_serve_poll_interval_invalid_env(serve, monkeypatch, value):
 
 @pytest.mark.parametrize('value', [0, 'fast', True])
 def test_serve_poll_interval_invalid_config(serve, value):
+    """An invalid worker_poll_interval raises the config error."""
     with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config worker_poll_interval'):
         serve(config=dict(worker_poll_interval=value))

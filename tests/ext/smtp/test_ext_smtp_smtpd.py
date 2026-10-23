@@ -117,6 +117,7 @@ _CASES = [
 @pytest.mark.parametrize('mode, client', _MODES)
 @pytest.mark.parametrize('cert, verify, delivered', _CASES)
 def test_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
+    """STARTTLS and SMTPS deliver to the smtpd, unless the certificate fails."""
     verify = dict(verify)
     if verify.get('host_cert_ca') == 'file':
         verify['host_cert_ca'] = os.path.join(tmp.dir, 'ca.pem')
@@ -153,6 +154,7 @@ def test_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
     ],
 )
 def test_closes_connection_on_error(smtp, error):
+    """A failing login or recipient raises and still closes the connection."""
     with BackgroundSmtpd({'auth_mode': 'AUTH_OPTIONAL'}) as smtpd:
         with SmtpTest(host='127.0.0.1', port=smtpd.port, timeout=5, **smtp) as app:
             # the original error reaches the caller ...
@@ -169,6 +171,7 @@ def test_closes_connection_on_error(smtp, error):
 
 
 def test_qp_delivered_to_smtpd(tmp):
+    """A qp message with files, inline image and X-headers arrives intact."""
     pdf = os.path.join(tmp.dir, 'invoice.pdf')
     with open(pdf, 'wb') as f:
         f.write(b'%PDF-1.4 dummy invoice')

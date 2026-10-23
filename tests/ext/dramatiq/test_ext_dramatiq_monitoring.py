@@ -40,21 +40,25 @@ class DramatiqWithoutTuiTest(DramatiqTest):
 
 @pytest.mark.parametrize('value', [True, 'on', 'yes', 'True', 'ON'])
 def test_details_on(value):
+    """True, "on", "yes" in any case switch the details on."""
     assert _details(value, debug=False) is True
 
 
 @pytest.mark.parametrize('value', [False, None, 'off', 'no', 'null', 'False'])
 def test_details_off(value):
+    """False, None, "off", "no", "null" switch the details off."""
     assert _details(value, debug=True) is False
 
 
 @pytest.mark.parametrize('debug', [True, False])
 def test_details_follow_debug(debug):
+    """ "debug" switches the details on in debug mode only."""
     assert _details('debug', debug) is debug
 
 
 @pytest.mark.parametrize('value', ['maybe', 1])
 def test_details_invalid(value):
+    """Any other value raises the config error."""
     with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config monitoring_with_details: .* must be off, on or debug!'):
         _details(value, debug=False)
 
@@ -64,12 +68,14 @@ def _heartbeats(app):
 
 
 def test_monitoring_off_adds_no_heartbeat(tmp):
+    """Without monitoring there is no heartbeat, the interval stays 5."""
     with DramatiqMiddlewareTest(tmp) as app:
         assert _heartbeats(app) == []
         assert app.dramatiq.config('monitoring') is False and app.dramatiq.monitor.interval == 5
 
 
 def test_monitoring_adds_the_heartbeat(tmp):
+    """monitoring adds the heartbeat with exchange, interval and details."""
     with DramatiqMiddlewareTest(tmp, monitoring=True, monitoring_interval=7, monitoring_with_details='on') as app:
         (heartbeat,) = _heartbeats(app)
         assert (heartbeat.exchange, heartbeat.interval, heartbeat.details) == ('tokeo_test.dramatiq.monitoring', 7, True)
@@ -85,6 +91,7 @@ def test_monitoring_adds_the_heartbeat(tmp):
     ],
 )
 def test_monitoring_config_checked(tmp, config, error):
+    """Invalid monitoring settings raise the config error."""
     with pytest.raises(TokeoDramatiqConfigError, match=error):
         with DramatiqMiddlewareTest(tmp, **config):
             pass
@@ -127,6 +134,7 @@ def _join(broker):
 
 
 def test_heartbeat_counts_tasks(worker):
+    """The heartbeat counts done, failed and dead tasks, per actor too."""
     broker, w, heartbeat, sent, release, actors = worker()
     w.start()
     try:
@@ -149,6 +157,7 @@ def test_heartbeat_counts_tasks(worker):
 
 
 def test_heartbeat_describes_the_worker(worker):
+    """The heartbeat describes app and worker and is sent on stop too."""
     broker, w, heartbeat, sent, release, actors = worker()
     w.start()
     try:
@@ -165,6 +174,7 @@ def test_heartbeat_describes_the_worker(worker):
 
 @pytest.mark.parametrize('details', [False, True])
 def test_heartbeat_shows_running_tasks(worker, details):
+    """A running task shows actor, queue and runtime, args with details."""
     broker, w, heartbeat, sent, release, actors = worker(details=details)
     w.start()
     try:
@@ -186,6 +196,7 @@ def test_heartbeat_shows_running_tasks(worker, details):
 
 
 def test_heartbeat_details_show_error_texts(worker):
+    """With details the last error shows its text."""
     broker, w, heartbeat, sent, release, actors = worker(details=True)
     w.start()
     try:
@@ -198,6 +209,7 @@ def test_heartbeat_details_show_error_texts(worker):
 
 
 def test_heartbeat_details_are_cut():
+    """Details over 500 chars are cut by "..."."""
     assert monitoring._cut('x' * 600) == 'x' * 500 + '...'
 
 
@@ -227,6 +239,7 @@ class FakeConnection:
 
 
 def test_heartbeat_is_sent_without_mandatory_and_not_persistent(monkeypatch):
+    """Heartbeats go to a fanout exchange, transient, without mandatory."""
     monkeypatch.setattr(monitoring.pika, 'BlockingConnection', FakeConnection)
     heartbeat = TokeoDramatiqHeartbeat('probe.dramatiq.monitoring', 5, False, dict(label='probe', version=None))
     heartbeat._parameters = object()
@@ -241,6 +254,8 @@ def test_heartbeat_is_sent_without_mandatory_and_not_persistent(monkeypatch):
 
 
 def test_heartbeat_survives_a_lost_rabbitmq(monkeypatch):
+    """Without rabbitmq the heartbeat is dropped quietly."""
+
     def refused(parameters):
         raise pika.exceptions.AMQPConnectionError('refused')
 
@@ -252,6 +267,7 @@ def test_heartbeat_survives_a_lost_rabbitmq(monkeypatch):
 
 
 def test_heartbeat_without_broker_parameters_sends_nothing(monkeypatch):
+    """Without broker parameters the heartbeat connects nowhere."""
     monkeypatch.setattr(monitoring.pika, 'BlockingConnection', lambda parameters: pytest.fail('connected'))
     TokeoDramatiqHeartbeat('probe.dramatiq.monitoring', 5, False, {})._send(dict(a=1))
 
@@ -287,6 +303,7 @@ def monitor(tmp, monkeypatch):
 
 
 def test_monitor_states(monitor):
+    """A worker is late after 2 and gone after 3 of its intervals."""
     now = time.monotonic()
     beats = [(1, 1, 5, 'running'), (2, 12, 5, 'running'), (3, 16, 5, 'running'), (4, 3, 1, 'running'), (5, 2, 5, 'stopped')]
     for pid, seen, interval, state in beats:
@@ -298,6 +315,7 @@ def test_monitor_states(monitor):
 
 
 def test_monitor_drops_gone_and_stopped_workers(monitor):
+    """Gone and stopped workers stay for 10 more intervals."""
     now = time.monotonic()
     for pid, seen, state in [(1, 64, 'running'), (2, 66, 'running'), (3, 49, 'stopped'), (4, 51, 'stopped')]:
         monitor.receive(json.dumps(_beat(pid, state=state)), received=now - seen)
@@ -306,12 +324,14 @@ def test_monitor_drops_gone_and_stopped_workers(monitor):
 
 
 def test_monitor_ignores_other_messages(monitor):
+    """Messages that are no heartbeat are ignored."""
     for body in (b'not json', b'{}', json.dumps(dict(_beat(1), type='other')), b'[1]'):
         monitor.receive(body)
     assert monitor.workers() == []
 
 
 def test_monitor_snapshot_sums_running_workers(monitor):
+    """The snapshot sums the actors of live workers and the queues."""
     now = time.monotonic()
     since = dict(send_mail=dict(done=2, failed=1, max_runtime_ms=1400, last_error='LookupError'))
     monitor.receive(json.dumps(_beat(1, since=since)), received=now)
@@ -325,6 +345,8 @@ def test_monitor_snapshot_sums_running_workers(monitor):
 
 
 def test_monitor_without_rabbitmq(tmp, monkeypatch):
+    """Without rabbitmq the monitor raises the connection error."""
+
     def refused(parameters):
         raise pika.exceptions.AMQPConnectionError('refused')
 
@@ -338,6 +360,7 @@ def test_monitor_without_rabbitmq(tmp, monkeypatch):
 
 
 def test_duration():
+    """Durations show as "850 ms", "1.4 s", "3m 5s" or "1h 2m"."""
     assert [_duration(ms) for ms in (850, 1400, 185_000, 3_720_000)] == ['850 ms', '1.4 s', '3m 5s', '1h 2m']
 
 
@@ -359,6 +382,7 @@ def _snapshot(workers, monitoring=True, actors=None):
 
 
 def test_monitor_view(tmp):
+    """The view shows workers, running tasks, actors and the queue totals."""
     task = dict(message_id='m1', actor='send_mail', queue='mail', retries=1, started_at=0, runtime_ms=1200)
     running = [dict(task, args="(('[red]anna',), {})")]
     since = dict(send_mail=dict(done=2, failed=1, max_runtime_ms=1400, last_error='LookupError'))
@@ -389,6 +413,7 @@ def test_monitor_view(tmp):
 
 @pytest.mark.parametrize('monitoring, note', [(True, 'No worker heard of yet.'), (False, 'Monitoring is off in the config')])
 def test_monitor_view_without_workers(tmp, monitoring, note):
+    """Without workers the view says why, with monitoring on or off."""
     with DramatiqMiddlewareTest(tmp) as app:
         text = _view(app, _snapshot([], monitoring=monitoring))
     assert note in text and 'every' not in text
@@ -415,23 +440,27 @@ def command(tmp, monkeypatch):
 
 
 def test_command_json(command):
+    """dramatiq monitor --json prints one snapshot as json."""
     app, calls, _ = command('--json')
     assert json.loads(app.last_rendered[1])['workers'][0]['heartbeat']['worker']['pid'] == 4711
     assert calls == [0]
 
 
 def test_needs_the_tui_output_extension(tmp):
+    """Without tokeo.ext.tui.output the app names the missing extension."""
     with pytest.raises(TokeoError, match='The extension tokeo.ext.dramatiq needs tokeo.ext.tui.output, add it to the extensions'):
         with DramatiqWithoutTuiTest(tmp):
             pass
 
 
 def test_command_text(command, capsys):
+    """dramatiq monitor prints the view once."""
     command()
     assert 'w1:4711' in capsys.readouterr().out
 
 
 def test_command_follow(command):
+    """--follow --interval 2 listens 2 s between the views."""
     app, calls, follows = command('--follow', '--interval', '2')
     ((view, options),) = follows
     # listening for the interval fills the time between two displays
@@ -440,6 +469,7 @@ def test_command_follow(command):
 
 
 def test_command_follow_json(command):
+    """--follow --json prints one json line per interval, appended."""
     app, calls, follows = command('--follow', '--json')
     ((line, options),) = follows
     assert json.loads(line)['interval'] == 5 and '\n' not in line
@@ -447,12 +477,17 @@ def test_command_follow_json(command):
 
 
 def test_command_interval_checked(command):
+    """--interval 0 raises the config error."""
     with pytest.raises(TokeoDramatiqConfigError, match='Invalid switch --interval'):
         command('--follow', '--interval', '0')
 
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_command_follow_ends_on_ctrl_c_in_a_terminal(tmp):
+    """
+    The probe follows the monitor in a terminal; Ctrl-C ends it within
+    5 s with 0 and brings back the former screen.
+    """
     probe = 'tests.ext.dramatiq.lib.dramatiq_tests_monitor_probe'
     args = [sys.executable, '-m', probe, tmp.dir, 'dramatiq', 'monitor', '--follow', '--interval', '1']
     with Terminal(args, rows=24, columns=100, ctty=True) as terminal:

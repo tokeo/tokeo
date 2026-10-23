@@ -37,6 +37,7 @@ SETTINGS = {
 
 
 def test_thread_safety_with_multiple_connections():
+    """100 parallel deliveries never mix the ctx of their connections."""
     ev = ThreadSafetyEvents()
     mail = read_message('simple_mail.msg')
     count = 100

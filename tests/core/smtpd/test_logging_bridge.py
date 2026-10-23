@@ -58,8 +58,7 @@ class ThreadedLogging(SmtpdEvents):
 
 @pytest.mark.parametrize('handler_cls', [SyncLogging, AsyncLogging, ThreadedLogging])
 def test_logger_reaches_every_logging_event_form(handler_cls):
-    # smtpd.logger without a running loop: the bridge runs the coroutine to
-    # completion in place, whatever the declared form of on_logging_event
+    """Without a loop the logger reaches a def, async def or @threaded handler."""
     events = handler_cls()
     smtpd = SmtpdServer(events)
     smtpd.logger.warning('bridge me')
@@ -67,6 +66,7 @@ def test_logger_reaches_every_logging_event_form(handler_cls):
 
 
 def test_handler_log_is_bound_to_the_server_logger():
+    """The handler self.log is the logger of its server."""
     events = SyncLogging()
     smtpd = SmtpdServer(events)
     # the handler's self.log is the very server logger
@@ -76,15 +76,14 @@ def test_handler_log_is_bound_to_the_server_logger():
 
 
 def test_handler_log_is_none_before_binding():
-    # contract: self.log stays None until a server binds its logger at
-    # construction -- logging from an unbound handler fails loudly
+    """Before a server binds it self.log is None."""
     events = SyncLogging()
     assert events.log is None
 
 
 def test_self_log_from_sync_and_async_events_with_async_logging():
-    # live dialog: a sync and an async event both call self.log while
-    # on_logging_event itself is async -> scheduled on the loop, captured
+    """self.log of sync and async events reaches an async handler."""
+
     class Handler(AsyncLogging):
 
         def on_mail_from_event(self, ctx, mail_from_data):
@@ -116,8 +115,8 @@ def test_self_log_from_sync_and_async_events_with_async_logging():
 
 
 def test_self_log_from_threaded_event_reaches_loop_threadsafe():
-    # a @threaded event runs on a worker thread (no running loop there); the
-    # bridge must schedule thread-safe onto the server loop
+    """self.log of a @threaded event reaches the loop thread-safe."""
+
     class Handler(AsyncLogging):
 
         @threaded
@@ -145,8 +144,7 @@ def test_self_log_from_threaded_event_reaches_loop_threadsafe():
 
 
 def test_base_auth_deny_logs_via_bound_self_log():
-    # the base on_auth_event routes its deny log through self.log, so it works
-    # for every on_logging_event form; the 535 still raises
+    """The default auth deny logs by self.log and still raises 535."""
     from tokeo.core.smtpd.exc import Smtpd535Exception
     from tokeo.core.smtpd.context import SmtpdContext
     from tokeo.core.smtpd.events import SmtpdEvent

@@ -68,6 +68,7 @@ def live(tmp, rando):
 
 
 def test_state(live):
+    """state reports a missing queue, then 2 ready and 1 delayed message."""
     with live() as (app, name, actor):
         queues = app.dramatiq.queues
         # a missing queue is reported and not created by the state
@@ -82,6 +83,7 @@ def test_state(live):
 
 
 def test_dead_letters(live):
+    """A dead letter is peeked and requeued with its retries reset."""
     with live() as (app, name, actor):
         queues = app.dramatiq.queues
         actor.send(1)
@@ -101,6 +103,7 @@ def test_dead_letters(live):
 
 
 def test_purge_and_delete(live):
+    """delete needs force on a busy queue, purge empties it, delete removes it."""
     with live() as (app, name, actor):
         queues = app.dramatiq.queues
         actor.send(1)
@@ -113,6 +116,7 @@ def test_purge_and_delete(live):
 
 
 def test_recreate_with_priority(live):
+    """recreate sets x-max-priority, rabbitmq refuses other arguments."""
     with live(max_priority=5) as (app, name, actor):
         actor.send(1)
         (result,) = app.dramatiq.queues.recreate(name, force=True)
@@ -125,7 +129,7 @@ def test_recreate_with_priority(live):
 
 
 def test_reconnect_after_idle(live):
-    # a short heartbeat lets rabbitmq close the idle connection quickly
+    """After rabbitmq closed the idle connection, the next call reconnects."""
     with live(url=RABBITMQ_URL + ('&' if '?' in RABBITMQ_URL else '?') + 'heartbeat=1') as (app, name, actor):
         queues = app.dramatiq.queues
         queues.state(name)
@@ -136,6 +140,7 @@ def test_reconnect_after_idle(live):
 
 
 def test_monitor_hears_a_worker(tmp, rando):
+    """The monitor sees a worker running a task and then stopped with 1 done."""
     config = dict(monitoring=True, monitoring_interval=1, monitoring_with_details='on', rabbitmq=dict(url=RABBITMQ_URL))
     with DramatiqMiddlewareTest(tmp, **config) as app:
         name = f'tokeo_test_{rando}'
@@ -164,6 +169,7 @@ def test_monitor_hears_a_worker(tmp, rando):
 
 
 def test_unparalleled_runs_one_message_at_a_time(tmp, rando):
+    """An unparalleled queue runs its 4 messages one after another."""
     with DramatiqBrokerTest(tmp, dict(url=RABBITMQ_URL)) as app:
         name = f'tokeo_test_{rando}_unparalleled'
         runs = []

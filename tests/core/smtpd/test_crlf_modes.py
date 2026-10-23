@@ -37,6 +37,7 @@ NASTY = b'Subject: t\n' b'X: a\rb\r\n' b'\n' b'A\r\n' b'B\n' b'..C\r\n' b'D\r\r\
 
 
 def test_leave_preserves_wire_bytes():
+    """CRLF_LEAVE delivers every byte as received, de-dotted and chomped."""
     events = WireCapture()
     reply = run_wire(events, {'crlf_mode': 'CRLF_LEAVE'}, NASTY)
     assert reply == b'250'
@@ -47,6 +48,7 @@ def test_leave_preserves_wire_bytes():
 
 
 def test_ensure_normalizes_lines():
+    """CRLF_ENSURE ends every line with CRLF and drops stray CR and LF."""
     events = WireCapture()
     reply = run_wire(events, {'crlf_mode': 'CRLF_ENSURE'}, NASTY)
     assert reply == b'250'
@@ -55,6 +57,7 @@ def test_ensure_normalizes_lines():
 
 
 def test_strict_rejects_bare_lf():
+    """CRLF_STRICT answers a line with bare LF by 500."""
     events = WireCapture()
     reply = run_wire(events, {'crlf_mode': 'CRLF_STRICT'}, b'Subject: t\n')
     assert reply == b'500'

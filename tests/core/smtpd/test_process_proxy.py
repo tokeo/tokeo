@@ -45,6 +45,7 @@ def _session():
 
 
 def test_00_proxy_tcp4_valid():
+    """A TCP4 PROXY line fills source and dest ip and port."""
     session = _session()
     run_line(_SMTPD, session, 'PROXY TCP4 1.1.1.1 2.2.2.2 1111 2222')
     proxy = session.ctx.server.proxy
@@ -56,6 +57,7 @@ def test_00_proxy_tcp4_valid():
 
 
 def test_01_proxy_tcp6_valid():
+    """A TCP6 PROXY line is stored with normalized ips and ports."""
     session = _session()
     run_line(_SMTPD, session, 'PROXY TCP6 003::0003 4::4 000003333 4444')
     proxy = session.ctx.server.proxy
@@ -67,12 +69,14 @@ def test_01_proxy_tcp6_valid():
 
 
 def test_02_proxy_illegal_command():
+    """An illegal PROXY line raises the 421 abort."""
     session = _session()
     with pytest.raises(Smtpd421Exception):
         run_line(_SMTPD, session, 'PROXY ILLEGAL COMMAND')
 
 
 def test_03_proxy_multiple_proxy_abort():
+    """A second PROXY line raises the 421 abort."""
     session = _session()
     run_line(_SMTPD, session, 'PROXY TCP4 1.1.1.1 2.2.2.2 1111 2222')
     with pytest.raises(Smtpd421Exception):
@@ -80,6 +84,7 @@ def test_03_proxy_multiple_proxy_abort():
 
 
 def test_04_proxy_not_first_aborts():
+    """A first line other than PROXY raises the 421 abort."""
     session = _session()
     with pytest.raises(Smtpd421Exception):
         run_line(_SMTPD, session, 'EHLO SEQUENCE')

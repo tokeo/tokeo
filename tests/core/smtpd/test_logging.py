@@ -41,36 +41,42 @@ def _expect(events, severity, msg):
 
 
 def test_log_info():
+    """logger.info reaches on_logging_event with INFO and no ctx."""
     smtpd, events = _server()
     smtpd.logger.info('A simple info message.')
     _expect(events, Severity.INFO, 'A simple info message.')
 
 
 def test_log_warning():
+    """logger.warning reaches on_logging_event with WARNING and no ctx."""
     smtpd, events = _server()
     smtpd.logger.warning('A simple warning message.')
     _expect(events, Severity.WARNING, 'A simple warning message.')
 
 
 def test_log_error():
+    """logger.error reaches on_logging_event with ERROR and no ctx."""
     smtpd, events = _server()
     smtpd.logger.error('A simple error message.')
     _expect(events, Severity.ERROR, 'A simple error message.')
 
 
 def test_log_critical():
+    """logger.critical reaches on_logging_event with CRITICAL and no ctx."""
     smtpd, events = _server()
     smtpd.logger.critical('A simple critical message.')
     _expect(events, Severity.CRITICAL, 'A simple critical message.')
 
 
 def test_log_debug():
+    """logger.debug reaches on_logging_event with DEBUG and no ctx."""
     smtpd, events = _server()
     smtpd.logger.debug('A simple debug message.')
     _expect(events, Severity.DEBUG, 'A simple debug message.')
 
 
 def test_on_logging_event_with_context_and_err():
+    """on_logging_event passes ctx and err through."""
     _, events = _server()
     events.on_logging_event({'ctx': True}, Severity.CRITICAL, 'A simple critical message.', err={'err': 1})
     assert events.log_ctx['ctx'] is True
@@ -84,18 +90,17 @@ class SilentEvents(SmtpdEvents):
 
 
 def test_logging_dispatched_when_handler_overrides():
-    # LoggingEvents overrides on_logging_event -> a dispatch entry exists
+    """An overridden on_logging_event gets a dispatch entry."""
     assert SmtpdEvent.ON_LOGGING_EVENT in SmtpdServer(LoggingEvents()).emit_events
 
 
 def test_logging_not_dispatched_when_handler_does_not_override():
-    # the base on_logging_event is a no-op -> no dispatch entry
+    """The base no-op on_logging_event gets no dispatch entry."""
     assert SmtpdEvent.ON_LOGGING_EVENT not in SmtpdServer(SilentEvents()).emit_events
 
 
 def test_undispatched_logging_is_not_forwarded(monkeypatch):
-    # without a dispatch entry, the logger adapter short-circuits and never
-    # reaches the handler, so no message is built or forwarded
+    """Without a dispatch entry the logger forwards nothing."""
     seen = []
     monkeypatch.setattr(SmtpdEvents, 'on_logging_event', lambda *a, **k: seen.append(a), raising=True)
     smtpd = SmtpdServer(SilentEvents())

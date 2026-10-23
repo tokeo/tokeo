@@ -9,7 +9,7 @@ from tokeo.main import TokeoTest
 
 
 def test_print_and_inspect_write_to_the_current_stdout(monkeypatch):
-    # a stdout replaced later, e.g. by patch_stdout of prompt_toolkit, gets it
+    """print and inspect write to sys.stdout as it is at the time of the call."""
     with TokeoTest() as app:
         stdout = io.StringIO()
         monkeypatch.setattr(sys, 'stdout', stdout)

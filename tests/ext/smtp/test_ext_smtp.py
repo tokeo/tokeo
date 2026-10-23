@@ -13,8 +13,7 @@ from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, subjMsg, textM
 
 
 def test_qp_message(tmp):
-    # the message build needs no credentials and no network: embedded dummy
-    # settings and generated attachment files keep this half runnable anywhere
+    """In qp the umlauts of the body arrive as =C3=A4=C3=B6=C3=BC."""
     pdf = os.path.join(tmp.dir, 'invoice.pdf')
     with open(pdf, 'wb') as f:
         f.write(b'%PDF-1.4 dummy invoice')
@@ -57,8 +56,10 @@ def _parts(msg):
 
 @pytest.mark.parametrize('use_ssl', [False, True], ids=['smtp', 'smtp_ssl'])
 def test_connection_params(use_ssl):
-    # local_hostname and source_address come from the config only, an empty
-    # value is passed as None and the source port is chosen by the system
+    """
+    local_hostname and source_address come from the config only, an empty
+    value becomes None and the source port is left to the system.
+    """
     with mock.patch('smtplib.SMTP') as smtp, mock.patch('smtplib.SMTP_SSL') as smtp_ssl:
         with SmtpTest(ssl=use_ssl, timeout=7, local_hostname='mx.local', source_address='127.0.0.1') as app:
             app.mail.send('body', local_hostname='other.local', source_address='10.0.0.1')
@@ -77,6 +78,7 @@ def test_connection_params(use_ssl):
 
 
 def test_starttls_and_login():
+    """tls with host_cert_verify uses a verifying context, then logs in."""
     with mock.patch('smtplib.SMTP') as smtp:
         with SmtpTest(tls=True, auth=True, auth_identity='user', auth_password='secret', host_cert_verify=True) as app:
             app.mail.send('body')
@@ -92,6 +94,7 @@ def test_starttls_and_login():
 
 
 def test_host_cert_context(tmp):
+    """host_cert_ca takes PEM text or a file path, used strictly as given."""
     cert_pem, _ = make_cert('localhost')
     ca_file = os.path.join(tmp.dir, 'ca.pem')
     with open(ca_file, 'w') as f:
@@ -123,6 +126,7 @@ def test_host_cert_context(tmp):
     [(None, '1'), ('base64', '=?utf-8?b?MQ==?='), ('qp', '=?utf-8?q?1?=')],
 )
 def test_x_headers(header_encoding, encoded):
+    """x_ arguments become X- headers, encoded like the subject."""
     with SmtpTest(header_encoding=header_encoding) as app:
         params = app.mail._get_params(X_API_Key='1', x_my_header='2')
         msg = app.mail._make_message('body', **params)
@@ -137,6 +141,7 @@ def test_x_headers(header_encoding, encoded):
 
 
 def test_attachment_names(tmp):
+    """An attachment keeps a given name, else the name of its file."""
     pdf = os.path.join(tmp.dir, 'invoice.pdf')
     with open(pdf, 'wb') as f:
         f.write(b'%PDF-1.4 dummy')
@@ -151,6 +156,7 @@ def test_attachment_names(tmp):
 
 
 def test_inline_image(tmp):
+    """With html a cid file is an inline image, without html an attachment."""
     png = os.path.join(tmp.dir, 'logo.png')
     with open(png, 'wb') as f:
         f.write(PNG)
@@ -176,6 +182,7 @@ def test_inline_image(tmp):
 
 
 def test_inline_image_unsupported(tmp):
+    """An svg as inline image raises TypeError."""
     svg = os.path.join(tmp.dir, 'logo.svg')
     with open(svg, 'w') as f:
         f.write('<svg xmlns="http://www.w3.org/2000/svg"/>')
@@ -201,6 +208,7 @@ def test_inline_image_unsupported(tmp):
     ids=['text', 'html', 'alternative', 'mixed', 'mixed_related'],
 )
 def test_mime_structure(tmp, body, with_file, content_type):
+    """The body and files decide text, html, alternative or mixed."""
     pdf = os.path.join(tmp.dir, 'invoice.pdf')
     with open(pdf, 'wb') as f:
         f.write(b'%PDF-1.4 dummy')
@@ -219,6 +227,7 @@ def test_mime_structure(tmp, body, with_file, content_type):
 
 @pytest.mark.parametrize('body', [5, {'text': None}, (5, '')], ids=['int', 'dict_none', 'tuple_int'])
 def test_invalid_body(body):
+    """An int or a None part as body raises TypeError."""
     with SmtpTest() as app:
         with pytest.raises(TypeError):
             app.mail._make_message(body, **app.mail._get_params())
@@ -228,6 +237,7 @@ def test_invalid_body(body):
 
 
 def test_date_and_message_id():
+    """Date and Message-Id are set, a given value wins, both can be left out."""
     with SmtpTest(msgid_domain='example.com') as app:
         enforced = app.mail._make_message('body', **app.mail._get_params())
         given = app.mail._make_message(

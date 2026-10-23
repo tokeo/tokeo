@@ -70,6 +70,7 @@ def throttle_worker(directory, count, per_seconds, result_queue):
 
 
 def test_connections_of_threads_close_when_they_end(tmp, monkeypatch):
+    """The connection of each thread closes when the thread ends."""
     connections = Connections(monkeypatch)
     with DiskcacheTest(tmp.dir) as app:
         app.cache.set('key', 'value')
@@ -83,6 +84,7 @@ def test_connections_of_threads_close_when_they_end(tmp, monkeypatch):
 
 
 def test_connections_of_threads_close_after_temper_and_throttle(tmp, monkeypatch):
+    """Threads running temper and throttle leave no connection open."""
     connections = Connections(monkeypatch)
     with DiskcacheTest(tmp.dir) as app:
 
@@ -102,6 +104,7 @@ def test_connections_of_threads_close_after_temper_and_throttle(tmp, monkeypatch
 
 
 def test_connections_close_by_hand_and_reopen(tmp, monkeypatch):
+    """close() closes the connection, the next access opens a new one."""
     connections = Connections(monkeypatch)
     with DiskcacheTest(tmp.dir) as app:
         app.cache.set('key', 'value')
@@ -117,6 +120,7 @@ def test_connections_close_by_hand_and_reopen(tmp, monkeypatch):
 
 
 def test_connections_of_threads_close_after_transactions(tmp, monkeypatch):
+    """Threads with transactions leave no connection open."""
     connections = Connections(monkeypatch)
     with DiskcacheTest(tmp.dir) as app:
 
@@ -132,7 +136,7 @@ def test_connections_of_threads_close_after_transactions(tmp, monkeypatch):
 
 
 def test_connections_stay_open_when_released_in_another_thread():
-    # sqlite closes only in its own thread, so the release leaves it to sqlite
+    """A holder released in another thread leaves the connection open."""
     con = sqlite3.connect(':memory:', check_same_thread=False)
     holder = in_threads(lambda: _ThreadConnection(con), workers=1)[0]
     del holder
@@ -146,6 +150,7 @@ def test_connections_stay_open_when_released_in_another_thread():
 
 
 def test_locks_acquire_returns_true(tmp):
+    """acquire returns True and the lock is held until release."""
     with DiskcacheTest(tmp.dir) as app:
         assert app.cache.locks.acquire('acquire') is True
         assert app.cache.locks.locked('acquire') is True
@@ -161,6 +166,7 @@ def warnings_of(app, monkeypatch):
 
 
 def test_locks_lock_releases_its_own_lock(tmp, monkeypatch):
+    """lock() holds the lock in the block and frees it after, no warning."""
     with DiskcacheTest(tmp.dir) as app:
         logged = warnings_of(app, monkeypatch)
         with app.cache.locks.lock('own'):
@@ -170,6 +176,7 @@ def test_locks_lock_releases_its_own_lock(tmp, monkeypatch):
 
 
 def test_locks_lock_lost_by_purge_warns(tmp, monkeypatch):
+    """A lock purged in the block warns "... lost before release (missing)"."""
     with DiskcacheTest(tmp.dir) as app:
         logged = warnings_of(app, monkeypatch)
         with app.cache.locks.lock('lost'):
@@ -178,6 +185,7 @@ def test_locks_lock_lost_by_purge_warns(tmp, monkeypatch):
 
 
 def test_locks_lock_keeps_the_lock_of_another(tmp, monkeypatch):
+    """A lock taken by another after a purge stays held, with a warning."""
     with DiskcacheTest(tmp.dir) as app:
         logged = warnings_of(app, monkeypatch)
         with app.cache.locks.lock('other'):
@@ -189,6 +197,7 @@ def test_locks_lock_keeps_the_lock_of_another(tmp, monkeypatch):
 
 
 def test_locks_lock_keeps_the_lock_of_another_after_expire(tmp, monkeypatch):
+    """A lock taken by another after expire stays held, with a warning."""
     with DiskcacheTest(tmp.dir) as app:
         logged = warnings_of(app, monkeypatch)
         with app.cache.locks.lock('expire', expire=0.05):
@@ -199,6 +208,7 @@ def test_locks_lock_keeps_the_lock_of_another_after_expire(tmp, monkeypatch):
 
 
 def test_locks_lock_failing_acquire_keeps_the_lock_of_another(tmp, monkeypatch):
+    """An interrupted acquire leaves the lock of another held."""
     with DiskcacheTest(tmp.dir) as app:
         app.cache.locks.acquire('busy')
 
@@ -218,7 +228,7 @@ def test_locks_lock_failing_acquire_keeps_the_lock_of_another(tmp, monkeypatch):
 
 
 def test_temper_acquire_and_release(tmp):
-    # 1) a single call runs, returns its result and restores the slot
+    """A call runs, returns its result and gives its slot back."""
     with DiskcacheTest(tmp.dir) as app:
 
         @app.cache.locks.temper(count=1, name='single', verbose=False)
@@ -233,7 +243,7 @@ def test_temper_acquire_and_release(tmp):
 
 
 def test_temper_callback_when_no_slot(tmp):
-    # 2) when no slot is free the callback fires instead of the function
+    """Without a free slot the callback runs instead of the function."""
     with DiskcacheTest(tmp.dir) as app:
         runs = []
         entered = threading.Event()
@@ -264,7 +274,7 @@ def test_temper_callback_when_no_slot(tmp):
 
 
 def test_temper_releases_on_exception(tmp):
-    # 3) an exception inside the body still releases the slot (try/finally)
+    """An exception in the function still gives the slot back."""
     with DiskcacheTest(tmp.dir) as app:
 
         @app.cache.locks.temper(count=1, name='boom', verbose=False)
@@ -286,7 +296,7 @@ def test_temper_releases_on_exception(tmp):
 
 
 def test_temper_thread_concurrency_cap(tmp):
-    # 4) across many threads, never more than count run at the same time
+    """Of 8 threads with count 2 never more than 2 run at once."""
     count = 2
     workers = 8
     with DiskcacheTest(tmp.dir) as app:
@@ -315,7 +325,7 @@ def test_temper_thread_concurrency_cap(tmp):
 
 
 def test_temper_process_concurrency_cap(tmp):
-    # 5) across separate processes sharing the cache, the cap still holds
+    """Of 6 processes with count 2 never more than 2 run at once."""
     count = 2
     workers = 6
     ctx = spawn_context()
@@ -345,7 +355,7 @@ def test_temper_process_concurrency_cap(tmp):
 
 
 def test_throttle_allows_burst_up_to_count(tmp):
-    # 1) the first count calls pass, the next ones are rate limited
+    """With count 3 the first 3 of 5 calls run, 2 get the callback."""
     with DiskcacheTest(tmp.dir) as app:
 
         @app.cache.locks.throttle(
@@ -364,7 +374,7 @@ def test_throttle_allows_burst_up_to_count(tmp):
 
 
 def test_throttle_refills_over_time(tmp):
-    # 2) after enough time a fresh token becomes available again
+    """With 1 per 0.5 s a token is back after 0.7 s."""
     with DiskcacheTest(tmp.dir) as app:
 
         @app.cache.locks.throttle(
@@ -386,7 +396,7 @@ def test_throttle_refills_over_time(tmp):
 
 
 def test_throttle_blocking_delays(tmp):
-    # 3) without a callback extra calls block for about (extra / rate)
+    """Without callback 4 calls at 1 per second take at least 1.8 s."""
     with DiskcacheTest(tmp.dir) as app:
 
         # count=2, per_seconds=2 -> rate 1/s; 4 calls = 2 burst + 2 waits ~2s
@@ -402,7 +412,7 @@ def test_throttle_blocking_delays(tmp):
 
 
 def test_throttle_thread_rate_cap(tmp):
-    # 4) many threads at once -> only count run, the rest are limited
+    """Of 10 threads with count 3 exactly 3 run, 7 get the callback."""
     count = 3
     workers = 10
     with DiskcacheTest(tmp.dir) as app:
@@ -425,7 +435,7 @@ def test_throttle_thread_rate_cap(tmp):
 
 
 def test_throttle_process_rate_cap(tmp):
-    # 5) across separate processes sharing the cache, only count run
+    """Of 10 processes with count 3 exactly 3 run, 7 get the callback."""
     count = 3
     workers = 10
     # a large window keeps refill negligible during the (spawn) startup spread

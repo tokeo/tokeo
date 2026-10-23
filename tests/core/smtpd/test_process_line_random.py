@@ -29,6 +29,7 @@ def _session():
 
 
 def test_helo():
+    """HELO answers "250 OK" with the greeting and stores the name."""
     session = _session()
     result = run_line(_SMTPD, session, 'HELO Process line unit test')
     assert result == '250 OK Process line test - Greeting'
@@ -36,6 +37,7 @@ def test_helo():
 
 
 def test_helo_no_case_strip():
+    """HELO in any case works, the name is stored without blanks."""
     session = _session()
     helo_str = '  Process line unit test   '
     result = run_line(_SMTPD, session, f'hElO {helo_str}')
@@ -44,6 +46,7 @@ def test_helo_no_case_strip():
 
 
 def test_ehlo_no_case_strip():
+    """EHLO in any case lists 8BITMIME, SMTPUTF8, PIPELINING and AUTH."""
     session = _session()
     helo_str = '  Process line unit test   '
     result = run_line(_SMTPD, session, f'eHlO {helo_str}')

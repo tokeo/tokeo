@@ -16,6 +16,7 @@ def _smtpd():
 
 
 def test_reset_helo():
+    """A new connection expects HELO first."""
     session = SmtpdSession()
     _smtpd().process_reset_session(session, connection_initialize=True)
     assert session.cmd_sequence is CMD_HELO
@@ -30,7 +31,7 @@ def test_reset_helo():
     ],
 )
 def test_reset_initial_sequence(monkeypatch, settings, expected):
-    # a supported runtime is assumed, the version check has its own test
+    """With PROXY or TLS_IMMEDIATE the first step is PROXY or STARTTLS."""
     monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', (3, 14, 4, 'final', 0))
     session = SmtpdSession()
     SmtpdServer(CaptureSmtpdEvents(), settings=dict(settings, tls_cert_cn='localhost')).process_reset_session(
@@ -40,12 +41,14 @@ def test_reset_initial_sequence(monkeypatch, settings, expected):
 
 
 def test_reset_rset():
+    """A reset within a connection leaves the session in the RSET state."""
     session = SmtpdSession()
     _smtpd().process_reset_session(session, connection_initialize=False)
     assert session.cmd_sequence is CMD_RSET
 
 
 def test_session_status():
+    """A new session has the empty defaults of server, envelope and message."""
     session = SmtpdSession()
     _smtpd().process_reset_session(session, connection_initialize=True)
     assert isinstance(session.auth_challenge, dict)

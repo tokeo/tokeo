@@ -58,13 +58,14 @@ class _PinnedZone:
 
 
 def test_utc_now_is_aware_utc():
+    """utc_now returns a datetime with tzinfo UTC."""
     now = utc_now()
     assert isinstance(now, datetime)
     assert now.tzinfo == timezone.utc
 
 
 def test_utc_now_is_close_to_now():
-    # the call should land within a generous window of the real now
+    """utc_now is within 5 seconds of the real now."""
     delta = abs((utc_now() - datetime.now(timezone.utc)).total_seconds())
     assert delta < 5
 
@@ -74,84 +75,84 @@ def test_utc_now_is_close_to_now():
 
 
 def test_to_utc_aware_datetime_is_shifted():
-    # 14:00 at +02:00 is 12:00 UTC -- the instant is recomputed
+    """14:00 at +02:00 comes back as 12:00 UTC."""
     d = datetime(2026, 6, 23, 14, 0, tzinfo=PLUS_TWO)
     assert to_utc(d) == datetime(2026, 6, 23, 12, 0, tzinfo=timezone.utc)
 
 
 def test_to_utc_utc_datetime_is_unchanged():
+    """A datetime in UTC comes back equal to itself."""
     d = datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
     assert to_utc(d) == d
 
 
 def test_to_utc_date_is_lifted_to_midnight():
-    # a date has no time, so it becomes midnight UTC as a datetime
+    """A date comes back as the datetime of its midnight UTC."""
     result = to_utc(date(2026, 6, 23))
     assert result == datetime(2026, 6, 23, 0, 0, tzinfo=timezone.utc)
     assert isinstance(result, datetime)
 
 
 def test_to_utc_date_auto_type_stays_date():
-    # with auto_type a date input keeps its grain
+    """With auto_type a date comes back as the same date."""
     assert to_utc(date(2026, 6, 23), auto_type=True) == date(2026, 6, 23)
     assert type(to_utc(date(2026, 6, 23), auto_type=True)) is date
 
 
 def test_to_utc_aware_string_is_shifted():
-    # an offset in the string is honoured: 14:00 +02:00 -> 12:00 UTC,
-    # a fixed result independent of the machine's timezone
+    """ "14:00+02:00" comes back as 12:00 UTC on every machine."""
     assert to_utc('2026-06-23T14:00:00+02:00') == datetime(2026, 6, 23, 12, 0, tzinfo=timezone.utc)
 
 
 def test_to_utc_z_string_is_utc():
+    """A string ending in Z is read as UTC."""
     assert to_utc('2026-06-23 14:00:00.000Z') == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
 
 def test_to_utc_naive_date_string_is_utc_midnight():
-    # a date-only string carries no time or zone, so it is taken as midnight
-    # UTC directly -- no local shift, the same day on every machine
+    """A date-only string is midnight UTC, without local shift."""
     assert to_utc('2026-06-23') == datetime(2026, 6, 23, 0, 0, tzinfo=timezone.utc)
 
 
 def test_to_utc_string_auto_type_yields_date():
-    # a date-only string with auto_type yields a date, taken as utc midnight
-    # so the day is kept (no local shift)
+    """A date-only string with auto_type comes back as that date."""
     r = to_utc('2026-06-23', auto_type=True)
     assert type(r) is date
     assert r == date(2026, 6, 23)
 
 
 def test_to_utc_string_auto_type_timestring_stays_datetime():
+    """A timestring with auto_type comes back as a datetime."""
     r = to_utc('2026-06-23 14:00:00.000Z', auto_type=True)
     assert isinstance(r, datetime)
     assert r == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
 
 def test_to_utc_string_length_boundary():
-    # length 10 is the date boundary; a 10-char date stays a date, an
-    # 11-char input (shortest with a time) becomes a datetime
+    """10 chars with auto_type give a date, 11 chars a datetime."""
     assert type(to_utc('2026-06-23', auto_type=True)) is date
     assert isinstance(to_utc('20260623T12', auto_type=True), datetime)
 
 
 def test_to_utc_epoch_int_is_utc():
+    """The epoch 0 is 1970-01-01 00:00 UTC."""
     assert to_utc(0) == datetime(1970, 1, 1, 0, 0, tzinfo=timezone.utc)
 
 
 def test_to_utc_epoch_float_matches_fromtimestamp():
+    """A float epoch equals datetime.fromtimestamp in UTC."""
     ep = 1782744783.413
     assert to_utc(ep) == datetime.fromtimestamp(ep, timezone.utc)
 
 
 def test_to_utc_naive_timestring_shift_pinned_zone():
-    # a naive timestring is read as local time: midnight in Tokyo (+09:00)
-    # lands on the previous UTC day; pinning the zone makes the shift explicit
+    """A naive timestring is local time: midnight in Tokyo is 15:00 UTC before."""
     with _PinnedZone('Asia/Tokyo'):
         assert to_utc('2026-06-23T00:00:00') == datetime(2026, 6, 22, 15, 0, tzinfo=timezone.utc)
 
 
 def test_to_utc_bool_is_rejected():
-    # bool is an int subtype, but must not be read as an epoch
+    """True and False raise ValueError, they are no epoch."""
     with pytest.raises(ValueError):
         to_utc(True)
     with pytest.raises(ValueError):
@@ -159,12 +160,13 @@ def test_to_utc_bool_is_rejected():
 
 
 def test_to_utc_wrong_type_raises():
+    """None raises ValueError."""
     with pytest.raises(ValueError):
         to_utc(None)
 
 
 def test_to_utc_short_string_raises():
-    # a string under 8 chars is too short to be an ISO date
+    """A string under 8 chars raises ValueError."""
     with pytest.raises(ValueError):
         to_utc('2026')
 
@@ -174,60 +176,64 @@ def test_to_utc_short_string_raises():
 
 
 def test_as_utc_aware_datetime_is_relabelled_not_shifted():
-    # the offset is dropped, the wall clock kept -- 14:00 stays 14:00
+    """14:00 at +02:00 comes back as 14:00 UTC, the offset is dropped."""
     d = datetime(2026, 6, 23, 14, 0, tzinfo=PLUS_TWO)
     assert as_utc(d) == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
 
 def test_as_utc_naive_datetime_gets_utc_tzinfo():
+    """A naive datetime gets tzinfo UTC with the same wall clock."""
     d = datetime(2026, 6, 23, 14, 0)
     assert as_utc(d) == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
 
 def test_as_utc_aware_string_is_relabelled():
-    # the key fix: a string offset is dropped, not converted -- 14:00+02:00
-    # relabels to 14:00 UTC, consistent with the datetime branch
+    """ "14:00+02:00" comes back as 14:00 UTC, like a datetime."""
     assert as_utc('2026-06-23T14:00:00+02:00') == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
 
 def test_as_utc_string_and_datetime_are_consistent():
-    # same value as string and as datetime must give the same result
+    """The same value as string and as datetime gives the same result."""
     s = as_utc('2026-06-23T14:00:00+02:00')
     d = as_utc(datetime(2026, 6, 23, 14, 0, tzinfo=PLUS_TWO))
     assert s == d == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
 
 def test_as_utc_z_string():
+    """A string ending in Z is read as UTC."""
     assert as_utc('2026-06-23 14:00:00.000Z') == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
 
 def test_as_utc_date_is_lifted_to_midnight():
+    """A date comes back as the datetime of its midnight UTC."""
     assert as_utc(date(2026, 6, 23)) == datetime(2026, 6, 23, 0, 0, tzinfo=timezone.utc)
 
 
 def test_as_utc_date_auto_type_stays_date():
+    """With auto_type a date comes back as the same date."""
     assert as_utc(date(2026, 6, 23), auto_type=True) == date(2026, 6, 23)
 
 
 def test_as_utc_string_auto_type_keeps_the_day():
-    # because as_utc relabels (not shifts), a date-only string with
-    # auto_type keeps its day on every machine, unlike to_utc
+    """A date-only string with auto_type keeps its day in Tokyo too."""
     with _PinnedZone('Asia/Tokyo'):
         assert as_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
 
 
 def test_as_utc_epoch_is_utc():
-    # for an epoch, relabelling and converting coincide
+    """An epoch equals datetime.fromtimestamp in UTC."""
     ep = 1782744783
     assert as_utc(ep) == datetime.fromtimestamp(ep, timezone.utc)
 
 
 def test_as_utc_bool_is_rejected():
+    """True raises ValueError, it is no epoch."""
     with pytest.raises(ValueError):
         as_utc(True)
 
 
 def test_as_utc_wrong_type_raises():
+    """None raises ValueError."""
     with pytest.raises(ValueError):
         as_utc(None)
 
@@ -237,21 +243,21 @@ def test_as_utc_wrong_type_raises():
 
 
 def test_to_utc_vs_as_utc_datetime_offset():
-    # same input, opposite results on the wall clock
+    """For 14:00 at +02:00 to_utc gives hour 12, as_utc hour 14."""
     d = datetime(2026, 6, 23, 14, 0, tzinfo=PLUS_TWO)
     assert to_utc(d).hour == 12  # shifted
     assert as_utc(d).hour == 14  # relabelled
 
 
 def test_to_utc_vs_as_utc_string_offset():
+    """For "14:00+02:00" to_utc gives hour 12, as_utc hour 14."""
     s = '2026-06-23T14:00:00+02:00'
     assert to_utc(s).hour == 12  # shifted
     assert as_utc(s).hour == 14  # relabelled
 
 
 def test_to_utc_vs_as_utc_string_date_day_under_pinned_zone():
-    # for a date-only string to_utc no longer shifts the day: it now agrees
-    # with as_utc and keeps the day, on every machine
+    """For a date-only string both keep the day, also in Tokyo."""
     with _PinnedZone('Asia/Tokyo'):
         assert to_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
         assert as_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
@@ -262,25 +268,30 @@ def test_to_utc_vs_as_utc_string_date_day_under_pinned_zone():
 
 
 def test_to_utc_timestring_datetime_format():
+    """A UTC datetime formats as "2026-06-23 14:00:00.000Z"."""
     d = datetime(2026, 6, 23, 14, 0, 0, tzinfo=timezone.utc)
     assert to_utc_timestring(d) == '2026-06-23 14:00:00.000Z'
 
 
 def test_to_utc_timestring_datetime_with_offset_is_shifted():
+    """14:00 at +02:00 formats as "... 12:00:00.000Z"."""
     d = datetime(2026, 6, 23, 14, 0, 0, tzinfo=PLUS_TWO)
     assert to_utc_timestring(d) == '2026-06-23 12:00:00.000Z'
 
 
 def test_to_utc_timestring_date_uses_midnight():
+    """A date formats as its midnight, "... 00:00:00.000Z"."""
     assert to_utc_timestring(date(2026, 6, 23)) == '2026-06-23 00:00:00.000Z'
 
 
 def test_to_utc_timestring_milliseconds_kept():
+    """123000 microseconds format as ".123Z"."""
     d = datetime(2026, 6, 23, 14, 0, 0, 123000, tzinfo=timezone.utc)
     assert to_utc_timestring(d) == '2026-06-23 14:00:00.123Z'
 
 
 def test_to_utc_timestring_wrong_type_raises():
+    """An int raises ValueError."""
     with pytest.raises(ValueError):
         to_utc_timestring(42)
 
@@ -290,16 +301,18 @@ def test_to_utc_timestring_wrong_type_raises():
 
 
 def test_to_utc_datestring_datetime():
+    """A datetime formats as "2026-06-23"."""
     d = datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
     assert to_utc_datestring(d) == '2026-06-23'
 
 
 def test_to_utc_datestring_date():
+    """A date formats as "2026-06-23"."""
     assert to_utc_datestring(date(2026, 6, 23)) == '2026-06-23'
 
 
 def test_to_utc_datestring_offset_can_shift_the_day():
-    # 00:30 at +02:00 is 22:30 the previous day in UTC
+    """00:30 at +02:00 formats as the previous day in UTC."""
     d = datetime(2026, 6, 23, 0, 30, tzinfo=PLUS_TWO)
     assert to_utc_datestring(d) == '2026-06-22'
 
@@ -347,14 +360,13 @@ BAD = [
 
 @pytest.mark.parametrize('s', GOOD)
 def test_fromisoformat_compat_matches_builtin_on_valid(s):
-    # fromisoformat_compat is the extracted parser on every version; it must
-    # produce exactly what the builtin produces for a valid ISO string
+    """For a valid string the compat parser equals the builtin."""
     assert date_compat.fromisoformat_compat(s) == datetime.fromisoformat(s)
 
 
 @pytest.mark.parametrize('s', BAD)
 def test_fromisoformat_compat_matches_builtin_on_invalid(s):
-    # both must reject the same malformed inputs with a ValueError
+    """For a malformed string both raise ValueError."""
     with pytest.raises(ValueError):
         datetime.fromisoformat(s)
     with pytest.raises(ValueError):
@@ -362,6 +374,7 @@ def test_fromisoformat_compat_matches_builtin_on_invalid(s):
 
 
 def test_fromisoformat_compat_rejects_non_string():
+    """An int raises TypeError."""
     with pytest.raises(TypeError):
         date_compat.fromisoformat_compat(12345)
 
@@ -371,8 +384,7 @@ def test_fromisoformat_compat_rejects_non_string():
 
 
 def test_fromisoformat_matches_running_version():
-    # on 3.11+ the export is the builtin; on < 3.11 it is the extracted
-    # parser. either way it must parse the broad set the same way
+    """On 3.11+ the export is the builtin, below the compat parser."""
     if sys.version_info < (3, 11):
         assert date_compat.fromisoformat is date_compat.fromisoformat_compat
     else:
@@ -382,10 +394,10 @@ def test_fromisoformat_matches_running_version():
 
 
 def test_fromisoformat_export_parses_trailing_z():
-    # the whole point of the compat layer: Z parses on every version
+    """The export parses a trailing Z as UTC on every version."""
     assert date_compat.fromisoformat('2026-06-23T14:00:00Z') == datetime(2026, 6, 23, 14, 0, tzinfo=timezone.utc)
 
 
 def test_fromisoformat_star_import_surface():
-    # __all__ limits the public surface to the two parsers
+    """__all__ holds the two parsers only."""
     assert set(date_compat.__all__) == {'fromisoformat', 'fromisoformat_compat'}

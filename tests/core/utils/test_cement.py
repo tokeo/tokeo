@@ -76,18 +76,20 @@ def _run(argv, monkeypatch=None):
 
 
 def test_controllers_subcmdmeta_is_the_dispatched_command():
+    """Inside a command subcmdmeta is the meta of that command."""
     seen, _ = _run(['helpers', 'command'])
     assert seen['subcmd'].func_name == 'command'
     assert seen['subcmd'].parser_options['help'] == 'the help of command'
 
 
 def test_controllers_subcmdmeta_is_none_in_the_default():
+    """Inside the default of a controller subcmdmeta is None."""
     seen, _ = _run(['helpers'])
     assert seen['subcmd'] is None
 
 
 def test_controllers_defaultmeta_is_the_exposed_default():
-    # inside the command and inside the default itself
+    """defaultmeta is the exposed default, in a command and in the default."""
     for argv in (['helpers', 'command'], ['helpers']):
         seen, _ = _run(argv)
         assert seen['default'].func_name == 'standard'
@@ -95,11 +97,13 @@ def test_controllers_defaultmeta_is_the_exposed_default():
 
 
 def test_controllers_defaultmeta_is_none_without_exposed_default():
+    """Without an exposed default defaultmeta is None."""
     seen, _ = _run(['nodefault', 'command'])
     assert seen['default'] is None
 
 
 def test_controllers_log_info_help_logs_the_help(monkeypatch):
+    """log_info_help logs the help of the command on info."""
     _, logged = _run(['helpers', 'command'], monkeypatch)
     assert logged == ['the help of command']
 
@@ -108,6 +112,7 @@ def test_controllers_log_info_help_logs_the_help(monkeypatch):
 
 
 def test_extensions_required_names_the_missing_ones():
+    """required raises TokeoError naming every missing extension."""
     with CementTest() as app:
         extensions_required(app, 'tokeo.ext.probe', 'tokeo.ext.tui.output')
         with pytest.raises(TokeoError, match='needs tokeo.ext.tui.input and tokeo.ext.x, add them to the extensions of the app!'):

@@ -35,6 +35,7 @@ from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
 
 def test_resolve_events_handler_imports_and_rejects():
+    """A dotted path imports the handler, anything else raises TokeoSmtpdError."""
     from tokeo.ext.smtpd import TokeoSmtpdEvents
 
     assert _resolve_events_handler('tokeo.ext.smtpd.TokeoSmtpdEvents') is TokeoSmtpdEvents
@@ -48,6 +49,7 @@ def test_resolve_events_handler_imports_and_rejects():
 
 
 def test_events_handler_carries_the_app():
+    """TokeoSmtpdEvents keeps the app and the options."""
     from tokeo.ext.smtpd import TokeoSmtpdEvents
 
     events_handler = TokeoSmtpdEvents('app-sentinel', options={'answer': 42})
@@ -66,7 +68,7 @@ def _svc(name, pre_fork=0):
 
 
 def test_plan_single_service_stays_in_main_process():
-    # pre_fork <= 1 with one service: no fork, no shared limits
+    """One service with pre_fork up to 1 runs in the main process."""
     for pre_fork in (0, 1):
         plan = _plan([_svc('mx1', pre_fork)], has_global_limit=True)
         assert plan['inloop'] == [_svc('mx1', pre_fork)]
@@ -74,6 +76,7 @@ def test_plan_single_service_stays_in_main_process():
 
 
 def test_plan_single_service_prefork_main_is_worker_one():
+    """One service with pre_fork 3 runs in main plus 2 forks on one port."""
     plan = _plan([_svc('mx1', 3)], has_global_limit=True)
     assert plan['inloop'][0]['name'] == 'mx1'  # main process serves
     assert plan['forks'] == [(_svc('mx1', 3), 2)]  # plus N-1 workers
@@ -82,6 +85,7 @@ def test_plan_single_service_prefork_main_is_worker_one():
 
 
 def test_plan_multi_services_rules():
+    """Of several services only pre_fork 0 stays in main, all others fork."""
     services = [_svc('mx1', 5), _svc('mx2'), _svc('mx3', 1)]
     plan = _plan(services, has_global_limit=True)
     assert [svc['name'] for svc in plan['inloop']] == ['mx2']
@@ -97,6 +101,7 @@ def test_plan_multi_services_rules():
 
 
 def test_shared_limits_count_across_processes():
+    """SharedGlobalLimits counts admits from a forked process."""
     limits = SharedGlobalLimits(max_processings=5, max_connections=7)
     assert isinstance(limits, GlobalLimits)
     assert limits.max_processings == 5 and limits.max_connections == 7
@@ -120,6 +125,7 @@ def test_shared_limits_count_across_processes():
 
 
 def test_shared_limits_slot_wait_recheck_interval():
+    """slot_wait returns by its poll within 0.5 s without an event."""
     limits = SharedGlobalLimits(max_processings=1)
 
     async def measure():
@@ -135,6 +141,7 @@ def test_shared_limits_slot_wait_recheck_interval():
 
 
 def test_extension_loads_into_cement_app():
+    """The extension loads its services and builds a server for each."""
     config = dict(
         smtpd=dict(
             services=[
@@ -254,6 +261,7 @@ def _assert_port_free(port):
 
 
 def test_term_single_service_in_main_process(tmp_path):
+    """SIGTERM ends one service in main with 0, the port is free again."""
     port = _free_port()
     proc = _spawn(tmp_path, {'services': [_service('mx1', port)]}, names=None)
     try:
@@ -268,7 +276,7 @@ def test_term_single_service_in_main_process(tmp_path):
 
 
 def test_term_single_service_prefork_group(tmp_path):
-    # pre_fork 3 with one service: main process is worker #1 plus 2 forks
+    """SIGTERM ends main and its 2 forks with 0, the port is free again."""
     port = _free_port()
     proc = _spawn(tmp_path, {'services': [_service('mx1', port, pre_fork=3)]}, names=None)
     try:
@@ -286,8 +294,7 @@ def test_term_single_service_prefork_group(tmp_path):
 
 @pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the parent-death signal is Linux-only')
 def test_kill_master_takes_workers_down(tmp_path):
-    # a SIGKILL on the master cannot forward anything; the workers must end
-    # through the parent-death signal
+    """After SIGKILL of the master its workers end by the parent death signal."""
     port = _free_port()
     proc = _spawn(tmp_path, {'services': [_service('mx1', port, pre_fork=3)]}, names=None)
     try:
@@ -301,8 +308,7 @@ def test_kill_master_takes_workers_down(tmp_path):
 
 
 def test_term_mixed_services_with_shared_limits(tmp_path):
-    # mx1 as a 2-worker group, mx2 in the main loop, a global cap forces the
-    # shared limits path; one SIGTERM must end the whole invocation
+    """One SIGTERM ends forked and main services with shared limits."""
     port_a, port_b = _free_port(), _free_port()
     config = {
         'max_connections': 10,
@@ -333,8 +339,7 @@ def _broken_service(name):
 
 
 def test_failed_service_start_aborts_and_stops_started_ones(tmp_path):
-    # the second service cannot bind: the invocation must end with an error
-    # and release the already bound port of the first one
+    """A service that cannot bind ends the run with an error, ports free."""
     port_a = _free_port()
     proc = _spawn(tmp_path, {'services': [_service('mx1', port_a), _broken_service('mx2')]}, names=None)
     try:
@@ -346,8 +351,7 @@ def test_failed_service_start_aborts_and_stops_started_ones(tmp_path):
 
 
 def test_failed_start_terminates_forked_workers(tmp_path):
-    # a healthy 2-worker group plus a broken in-loop service: the abort must
-    # SIGTERM the forked workers instead of hanging in the reap
+    """A failed start in main also ends the forked workers."""
     port_a = _free_port()
     proc = _spawn(tmp_path, {'services': [_service('mx1', port_a, pre_fork=2), _broken_service('mx2')]}, names=None)
     try:

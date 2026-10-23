@@ -64,18 +64,18 @@ def _spawn(*args):
     [(0, False), (1, False), (2, True), (4, True), ('3', True), ('1', False)],
 )
 def test_is_prefork_matches_reference_threshold(count, expected):
-    # Ruby: pre_fork? is @pre_fork > 1
+    """pre_fork means more than one process, as in the reference."""
     assert is_prefork(count) is expected
 
 
 def test_set_pdeathsig_is_noop_off_linux(monkeypatch):
-    # must never raise and reports False when not on Linux
+    """Off Linux set_pdeathsig does nothing and returns False."""
     monkeypatch.setattr(sys, 'platform', 'darwin')
     assert set_pdeathsig(signal.SIGTERM) is False
 
 
 def test_run_prefork_single_process_runs_worker_in_place():
-    # count <= 1 -> no fork; worker runs in this very process, returns no pids
+    """With count 1 the worker runs in this process, no pid comes back."""
     calls = []
     result = run_prefork(lambda: calls.append(os.getpid()), count=1)
     assert result == []
@@ -89,9 +89,10 @@ def test_run_prefork_single_process_runs_worker_in_place():
 
 @requires_fork
 def test_supervise_workers_reaps_and_restores_handlers():
-    # workers that exit on their own -> supervise reaps them all and returns,
-    # without ever signalling; the probe asserts handler restore and reaping
-    # in-process, its exit code carries the verdict
+    """
+    The probe forks three workers that end on their own; supervise reaps
+    them and restores the signal handlers, the exit code 0 tells it.
+    """
     proc = _spawn('supervise')
     assert proc.wait(timeout=8) == 0
     assert wait_process_group_ended(proc.pid)
@@ -99,8 +100,10 @@ def test_supervise_workers_reaps_and_restores_handlers():
 
 @requires_fork
 def test_run_prefork_forks_supervises_and_reaps(tmp_path):
-    # a master subprocess runs the full run_prefork; SIGTERM to it must
-    # forward to every worker, reap them, and let the master exit cleanly
+    """
+    The probe runs run_prefork with three workers; a SIGTERM to the master
+    reaches every worker, the master exits 0 and the group ends.
+    """
     proc = _spawn('run_prefork', tmp_path, 3)
     try:
         assert wait_until(lambda: len(list(tmp_path.glob('pid_*'))) == 3, 3.0)
@@ -120,6 +123,7 @@ def test_run_prefork_forks_supervises_and_reaps(tmp_path):
 
 @requires_linux
 def test_set_pdeathsig_arms_parent_death_signal():
+    """set_pdeathsig arms SIGTERM as the parent death signal."""
     assert set_pdeathsig(signal.SIGTERM) is True
     try:
         assert _read_pdeathsig() == int(signal.SIGTERM)
@@ -129,6 +133,7 @@ def test_set_pdeathsig_arms_parent_death_signal():
 
 @requires_linux
 def test_set_pdeathsig_honours_requested_signal():
+    """set_pdeathsig arms the signal asked for, here SIGINT."""
     assert set_pdeathsig(signal.SIGINT) is True
     try:
         assert _read_pdeathsig() == int(signal.SIGINT)
@@ -138,8 +143,10 @@ def test_set_pdeathsig_honours_requested_signal():
 
 @requires_linux
 def test_worker_self_terminates_when_master_crashes(tmp_path):
-    # a hard master crash (SIGKILL) cannot forward anything; each worker must
-    # still stop itself through the armed parent-death signal
+    """
+    The master of two workers dies by SIGKILL; each worker stops itself by
+    the parent death signal and the group ends.
+    """
     proc = _spawn('run_prefork', tmp_path, 2)
     try:
         wait_until(lambda: len(list(tmp_path.glob('pid_*'))) == 2, 3.0)

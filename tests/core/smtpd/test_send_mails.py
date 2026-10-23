@@ -30,6 +30,7 @@ SETTINGS = {
 def test_simple_send_1_mail():
     # MidiSmtpServer sends this once by Net::SMTP and once by the Mail gem, two
     # client components; Python has smtplib only, so one test remains
+    """One mail by smtplib arrives byte-exact."""
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
     run_server_client(ev, SETTINGS, lambda port: send_mail(port, ENVELOPE_FROM, ENVELOPE_TO, mail))
@@ -37,6 +38,7 @@ def test_simple_send_1_mail():
 
 
 def test_net_smtp_simple_send_10_mails():
+    """Ten mails on one server arrive, the last byte-exact."""
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
 
@@ -49,6 +51,7 @@ def test_net_smtp_simple_send_10_mails():
 
 
 def test_net_smtp_auth_plain_and_simple_send_1_mail():
+    """AUTH PLAIN as administrator delivers, authorized as supervisor."""
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
     run_server_client(
@@ -63,6 +66,7 @@ def test_net_smtp_auth_plain_and_simple_send_1_mail():
 
 
 def test_net_smtp_auth_login_and_simple_send_1_mail():
+    """AUTH LOGIN as administrator delivers, authorized as supervisor."""
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
     run_server_client(
@@ -77,6 +81,7 @@ def test_net_smtp_auth_login_and_simple_send_1_mail():
 
 
 def test_net_smtp_auth_plain_fail():
+    """AUTH PLAIN with a wrong password raises SMTPAuthenticationError."""
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
     with pytest.raises(smtplib.SMTPAuthenticationError):
@@ -90,6 +95,7 @@ def test_net_smtp_auth_plain_fail():
 
 
 def test_simple_send_1_mail_starttls():
+    """STARTTLS and AUTH LOGIN deliver, authorized as supervisor."""
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
     run_server_client(

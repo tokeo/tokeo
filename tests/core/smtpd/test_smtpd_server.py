@@ -36,6 +36,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
 
 
 def test_full_delivery_and_events():
+    """A full dialog delivers the body byte-exact and fires every event."""
     ev = RecordingEvents()
     greeting, r = dialog(
         ev,
@@ -63,11 +64,13 @@ def test_full_delivery_and_events():
 
 
 def test_helo_gets_single_line_250():
+    """HELO answers one line of 250."""
     _, r = dialog(RecordingEvents(), {}, [b'HELO me\r\n'])
     assert r[0][0].startswith('250 ') and len(r[0]) == 1
 
 
 def test_ehlo_advertises_extensions_when_enabled():
+    """EHLO lists 8BITMIME, SMTPUTF8 and PIPELINING when enabled."""
     settings = {'internationalization_extensions': True, 'pipelining_extension': True}
     _, r = dialog(RecordingEvents(), settings, [b'EHLO me\r\n'])
     text = '\n'.join(r[0])
@@ -79,11 +82,13 @@ def test_ehlo_advertises_extensions_when_enabled():
 
 
 def test_null_sender_accepted():
+    """MAIL FROM:<> answers "250 OK"."""
     _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'MAIL FROM:<>\r\n'])
     assert r[1] == ['250 OK']
 
 
 def test_de_dot_stuffing_and_byte_exact_body():
+    """One leading dot per line is removed, the final CRLF chomped."""
     ev = RecordingEvents()
     dialog(
         ev,
@@ -101,6 +106,7 @@ def test_de_dot_stuffing_and_byte_exact_body():
 
 
 def test_multiple_transactions_with_rset():
+    """After RSET only the second transaction is delivered."""
     ev = RecordingEvents()
     _, r = dialog(
         ev,
@@ -122,6 +128,7 @@ def test_multiple_transactions_with_rset():
 
 
 def test_mail_from_rewrite_by_handler():
+    """A sender returned by on_mail_from_event replaces the given one."""
     ev = RecordingEvents()
     ev.rewrite_from = '<rewritten@x>'
     ev.messages.clear()
@@ -140,6 +147,7 @@ def test_mail_from_rewrite_by_handler():
 
 
 def test_noop_and_unknown_command():
+    """NOOP answers "250 OK", an unknown command 500."""
     _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'NOOP\r\n', b'FOOBAR\r\n'])
     assert r[1] == ['250 OK']
     assert r[2][0].startswith('500')
@@ -149,21 +157,25 @@ def test_noop_and_unknown_command():
 
 
 def test_sequence_rcpt_before_mail_is_503():
+    """RCPT before MAIL answers 503."""
     _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'RCPT TO:<x>\r\n'])
     assert r[1][0].startswith('503')
 
 
 def test_sequence_data_before_rcpt_is_503():
+    """DATA before RCPT answers 503."""
     _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'DATA\r\n'])
     assert r[2][0].startswith('503')
 
 
 def test_mail_before_helo_is_503():
+    """MAIL before HELO answers 503."""
     _, r = dialog(RecordingEvents(), {}, [b'MAIL FROM:<a@x>\r\n'])
     assert r[0][0].startswith('503')
 
 
 def test_handler_reject_maps_to_550():
+    """Smtpd550Exception of a handler answers 550."""
     ev = RecordingEvents()
     ev.reject_rcpt = {'deny'}
     _, r = dialog(ev, {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<deny@x>\r\n'])
@@ -171,6 +183,8 @@ def test_handler_reject_maps_to_550():
 
 
 def test_handler_reject_transient_450():
+    """Smtpd450Exception of a handler answers 450."""
+
     class E(RecordingEvents):
 
         def on_rcpt_to_event(self, ctx, rcpt_to):
@@ -181,6 +195,8 @@ def test_handler_reject_transient_450():
 
 
 def test_handler_bug_contained_as_500():
+    """Any other exception of a handler answers 500, the dialog goes on."""
+
     class E(RecordingEvents):
 
         def on_mail_from_event(self, ctx, mail_from):
@@ -194,6 +210,8 @@ def test_handler_bug_contained_as_500():
 
 
 def test_pipelining_rejected_when_disabled():
+    """Two commands in one segment answer 500 without PIPELINING."""
+
     async def go():
         server, port, task = await start_server(RecordingEvents(), {})
         try:
@@ -214,6 +232,8 @@ def test_pipelining_rejected_when_disabled():
 
 
 def test_pipelining_allowed_when_enabled():
+    """With PIPELINING two commands in one segment both answer 250."""
+
     async def go():
         server, port, task = await start_server(RecordingEvents(), {'pipelining_extension': True})
         try:
@@ -234,11 +254,13 @@ def test_pipelining_allowed_when_enabled():
 
 
 def test_crlf_strict_rejects_bare_lf():
+    """CRLF_STRICT answers a command with bare LF by 500."""
     _, r = dialog(RecordingEvents(), {'crlf_mode': 'CRLF_STRICT'}, [b'EHLO me\n'])
     assert r[0][0].startswith('500')
 
 
 def test_data_size_limit_552():
+    """A body over data_size answers 552."""
     ev = RecordingEvents()
     _, r = dialog(
         ev,
@@ -255,12 +277,14 @@ def test_data_size_limit_552():
 
 
 def test_buffer_overrun_421():
-    # the overrun raises to the outer handler which answers 421 and drops
+    """A line over io_buffer_max_size answers 421 and drops the connection."""
     _, r = dialog(RecordingEvents(), {'io_buffer_max_size': 100}, [b'EHLO ' + b'a' * 300 + b'\r\n'])
     assert r[0][0].startswith('421')
 
 
 def test_command_timeout_closes_connection():
+    """A silent client gets 421 after io_cmd_timeout."""
+
     async def go():
         server, port, task = await start_server(RecordingEvents(), {'io_cmd_timeout': 0.2})
         try:
@@ -278,8 +302,7 @@ def test_command_timeout_closes_connection():
 
 
 def test_read_line_skips_wait_for_when_line_buffered(monkeypatch):
-    # the timeout guards waiting on the wire; with a complete line already in
-    # the reader buffer, _read_line must take the direct path (no wait_for)
+    """A complete line in the buffer is read without wait_for."""
     from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
     async def go():
@@ -298,8 +321,7 @@ def test_read_line_skips_wait_for_when_line_buffered(monkeypatch):
 
 
 def test_read_line_times_out_on_partial_buffered_line():
-    # a partial line (no LF) is not "delivered": the wait_for path must apply
-    # and the io_cmd_timeout must fire exactly as before
+    """A partial line in the buffer still times out by io_cmd_timeout."""
     from tokeo.core.smtpd.exc import SmtpdIOTimeoutException
     from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
@@ -317,6 +339,7 @@ def test_read_line_times_out_on_partial_buffered_line():
 
 
 def test_body_and_smtputf8_params_stripped():
+    """BODY and SMTPUTF8 are stripped, the handler gets the address only."""
     ev = RecordingEvents()
     dialog(
         ev,
@@ -334,6 +357,7 @@ def test_body_and_smtputf8_params_stripped():
 
 
 def test_body_param_rejected_without_intl():
+    """BODY without internationalization_extensions answers 501."""
     _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x> BODY=8BITMIME\r\n'])
     assert r[1][0].startswith('501')
 
@@ -342,6 +366,8 @@ def test_body_param_rejected_without_intl():
 
 
 def test_max_connections_refuses_with_421():
+    """A connection over max_connections gets 421 instead of 220."""
+
     async def go():
         server, port, task = await start_server(RecordingEvents(), {'max_connections': 1, 'max_processings': 1})
         try:
@@ -361,6 +387,8 @@ def test_max_connections_refuses_with_421():
 
 
 def test_threaded_event_runs_off_loop():
+    """A @threaded data event runs in another thread than the loop."""
+
     class E(RecordingEvents):
 
         def on_connect_event(self, ctx):
@@ -391,6 +419,7 @@ def test_threaded_event_runs_off_loop():
 
 @pytest.mark.parametrize('mode', ['CRLF_ENSURE', 'CRLF_LEAVE', 'CRLF_STRICT'])
 def test_delivery_works_in_all_crlf_modes(mode):
+    """A plain message delivers in every crlf_mode."""
     ev = RecordingEvents()
     _, r = dialog(
         ev,
@@ -408,8 +437,7 @@ def test_delivery_works_in_all_crlf_modes(mode):
 
 
 def test_on_connect_fires_even_when_refused():
-    # contract: every accepted connection hits on_connect_event, even one
-    # that is then refused with 421 for exceeding max_connections
+    """on_connect_event fires also for a connection refused by 421."""
     ev = RecordingEvents()
 
     async def go():
@@ -433,8 +461,8 @@ def test_on_connect_fires_even_when_refused():
 
 
 def test_max_processings_waits_for_free_slot():
-    # a new client waits (before its 220 greeting) until processings drops
-    # below max_processings; with a single slot the second client is blocked
+    """With one slot a second client gets 220 only after the first quits."""
+
     async def go():
         server, port, task = await start_server(RecordingEvents(), {'max_processings': 1})
         try:
@@ -526,15 +554,17 @@ async def _dialog_raw(events, settings, steps, has_server_greeting=True):
 
 
 def test_proxy_disabled_is_unknown_command():
-    # without proxy_extension the PROXY line is just an unknown command
+    """Without proxy_extension a PROXY line answers 500."""
     _, r = dialog(RecordingEvents(), {}, [b'PROXY TCP4 1.2.3.4 5.6.7.8 111 222\r\n'])
     assert r[0][0].startswith('500')
 
 
 def test_unknown_command_counts_and_allows_abuse_abort():
-    # an unknown command raises Smtpd500 internally, so the serve
-    # loop counts it in ctx.server.exceptions -- which lets a handler abort an
-    # abusive peer. Two unknowns answer 500; the third sees exceptions >= 2 and 421.
+    """
+    Unknown commands count in ctx.server.exceptions: two answer 500, the
+    third lets the handler abort by 421.
+    """
+
     class AbuseGuard(RecordingEvents):
 
         def on_process_line_unknown_event(self, ctx, line):
@@ -548,6 +578,7 @@ def test_unknown_command_counts_and_allows_abuse_abort():
 
 
 def test_proxy_tcp4_fills_ctx_and_fires_event():
+    """A TCP4 header fires on_proxy_event and fills ctx.server.proxy."""
     ev = ProxyEvents()
 
     async def go():
@@ -572,6 +603,7 @@ def test_proxy_tcp4_fills_ctx_and_fires_event():
 
 
 def test_proxy_unknown_is_accepted():
+    """PROXY UNKNOWN is accepted without addresses."""
     ev = ProxyEvents()
 
     async def go():
@@ -589,6 +621,7 @@ def test_proxy_unknown_is_accepted():
 
 
 def test_proxy_event_can_rewrite():
+    """The data returned by on_proxy_event is stored instead."""
     ev = ProxyEvents()
     ev.proxy_rewrite = {'proto': 'TCP4', 'source_ip': '9.9.9.9'}
 
@@ -607,7 +640,8 @@ def test_proxy_event_can_rewrite():
 
 
 def test_proxy_not_first_aborts_421():
-    # with proxy_extension the PROXY header is mandatory as the first line
+    """With proxy_extension a first line other than PROXY gets 421."""
+
     async def go():
         return await _dialog_raw(
             ProxyEvents(),
@@ -622,6 +656,8 @@ def test_proxy_not_first_aborts_421():
 
 
 def test_proxy_illegal_command_aborts_421():
+    """An illegal PROXY line gets 421 and the connection closes."""
+
     async def go():
         return await _dialog_raw(
             ProxyEvents(),
@@ -636,7 +672,8 @@ def test_proxy_illegal_command_aborts_421():
 
 
 def test_proxy_bad_params_abort_421():
-    # TCP4 with an IPv6 address is an unsupported parameter -> 421 abort
+    """TCP4 with IPv6 addresses gets 421 and the connection closes."""
+
     async def go():
         return await _dialog_raw(
             ProxyEvents(),
@@ -651,6 +688,8 @@ def test_proxy_bad_params_abort_421():
 
 
 def test_proxy_twice_aborts_421():
+    """A second PROXY line gets 421 and the connection closes."""
+
     async def go():
         return await _dialog_raw(
             ProxyEvents(),
@@ -666,7 +705,8 @@ def test_proxy_twice_aborts_421():
 
 
 def test_proxy_header_timeout_aborts_421():
-    # the PROXY header has its own short timeout, io_cmd_timeout does not apply
+    """No PROXY header within io_proxy_cmd_timeout gets 421."""
+
     async def go():
         server, port, task = await start_server(
             ProxyEvents(), {'proxy_extension': True, 'io_proxy_cmd_timeout': 0.2, 'io_cmd_timeout': 30}
@@ -686,7 +726,8 @@ def test_proxy_header_timeout_aborts_421():
 
 
 def test_proxy_event_error_aborts_421():
-    # any failure on the PROXY header ends the connection, no other reply leaks
+    """An exception in on_proxy_event gets 421, no other reply."""
+
     class RejectingProxyEvents(ProxyEvents):
 
         def on_proxy_event(self, ctx, proxy_data):
@@ -709,6 +750,8 @@ def test_proxy_event_error_aborts_421():
 
 
 def test_stop_stops_accepting_new_connections():
+    """After stop a new connection is refused and stopped() is True."""
+
     async def go():
         srv, port = await start_smtpd(RecordingEvents(), settings={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
@@ -729,6 +772,8 @@ def test_stop_stops_accepting_new_connections():
 
 
 def test_shutdown_ends_active_dialog_after_current_command():
+    """After shutdown the next command still answers, then 221 follows."""
+
     async def go():
         srv, port = await start_smtpd(RecordingEvents(), settings={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
@@ -748,6 +793,8 @@ def test_shutdown_ends_active_dialog_after_current_command():
 
 
 def test_shutdown_refuses_ungreeted_connection():
+    """After shutdown a new connection gets 421 instead of 220."""
+
     async def go():
         srv, port = await start_smtpd(RecordingEvents(), settings={})
         # a scheduled shutdown greets a new connection with 421, not 220
@@ -763,6 +810,8 @@ def test_shutdown_refuses_ungreeted_connection():
 
 
 def test_graceful_stop_cancels_idle_connection():
+    """stop ends an idle connection, no session is left."""
+
     async def go():
         srv, port = await start_smtpd(RecordingEvents(), settings={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
@@ -780,6 +829,8 @@ def test_graceful_stop_cancels_idle_connection():
 
 
 def test_lifecycle_state_flags():
+    """stopped() and shutdown_requested() follow start, shutdown and stop."""
+
     async def go():
         srv = SmtpdServer(RecordingEvents(), settings={})
         before = srv.stopped()
@@ -807,16 +858,19 @@ def _b64(text):
 
 
 def test_auth_forbidden_by_default_is_500():
+    """By default AUTH answers 500."""
     _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'AUTH PLAIN ' + auth_plain('', 'u', 'p').encode() + b'\r\n'])
     assert r[1][0].startswith('500')
 
 
 def test_ehlo_advertises_auth_when_enabled():
+    """With AUTH_OPTIONAL EHLO lists "AUTH LOGIN PLAIN"."""
     _, r = dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n'])
     assert any('AUTH LOGIN PLAIN' in ln for ln in r[0])
 
 
 def test_auth_plain_inline_success_and_ctx():
+    """AUTH PLAIN inline answers 235, the authzid falls back to the user."""
     ev = AuthEvents()
     _, r = dialog(
         ev,
@@ -838,6 +892,7 @@ def test_auth_plain_inline_success_and_ctx():
 
 
 def test_auth_plain_wrong_credentials_535():
+    """AUTH PLAIN with a wrong password answers 535."""
     ev = AuthEvents()
     _, r = dialog(
         ev,
@@ -851,6 +906,7 @@ def test_auth_plain_wrong_credentials_535():
 
 
 def test_auth_plain_prompt_form():
+    """AUTH PLAIN without data prompts by "334 ", then answers 235."""
     ev = AuthEvents()
     _, r = dialog(
         ev,
@@ -867,6 +923,7 @@ def test_auth_plain_prompt_form():
 
 
 def test_auth_login_challenge_full():
+    """AUTH LOGIN asks for user and password in base64, then 235."""
     ev = AuthEvents()
     _, r = dialog(
         ev,
@@ -885,6 +942,7 @@ def test_auth_login_challenge_full():
 
 
 def test_auth_login_with_inline_user():
+    """AUTH LOGIN with the user inline asks for the password only."""
     ev = AuthEvents()
     _, r = dialog(
         ev,
@@ -900,7 +958,7 @@ def test_auth_login_with_inline_user():
 
 
 def test_auth_default_handler_denies_535():
-    # the SmtpdEvents base rejects every authentication
+    """The default handler denies every AUTH by 535."""
     _, r = dialog(
         RecordingEvents(),
         {'auth_mode': 'AUTH_OPTIONAL'},
@@ -913,6 +971,7 @@ def test_auth_default_handler_denies_535():
 
 
 def test_auth_garbage_base64_500_and_recovers():
+    """Invalid credentials answer 500, MAIL works after it."""
     ev = AuthEvents()
     _, r = dialog(
         ev,
@@ -929,6 +988,7 @@ def test_auth_garbage_base64_500_and_recovers():
 
 
 def test_auth_before_helo_503():
+    """AUTH before HELO answers 503."""
     _, r = dialog(
         AuthEvents(),
         {'auth_mode': 'AUTH_OPTIONAL'},
@@ -940,6 +1000,7 @@ def test_auth_before_helo_503():
 
 
 def test_auth_twice_503():
+    """A second AUTH answers 503."""
     ev = AuthEvents()
     _, r = dialog(
         ev,
@@ -955,11 +1016,13 @@ def test_auth_twice_503():
 
 
 def test_auth_cram_md5_rejected_500():
+    """AUTH CRAM-MD5 answers 500."""
     _, r = dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH CRAM-MD5\r\n'])
     assert r[1][0].startswith('500')
 
 
 def test_auth_required_gates_mail():
+    """With AUTH_REQUIRED MAIL answers 530 until AUTH succeeded."""
     ev = AuthEvents()
     _, r = dialog(
         ev,
@@ -977,6 +1040,7 @@ def test_auth_required_gates_mail():
 
 
 def test_auth_authzid_returned_by_handler():
+    """The id returned by on_auth_event becomes the authorization id."""
     ev = AuthEvents()
     ev.authz_return = 'boss'
     dialog(
@@ -1008,6 +1072,7 @@ class TlsEvents(RecordingEvents):
 
 
 def test_starttls_full_flow_delivers_over_tls():
+    """STARTTLS answers 220, EHLO then omits it and the mail is delivered."""
     ev = TlsEvents()
 
     async def go():
@@ -1041,16 +1106,20 @@ def test_starttls_full_flow_delivers_over_tls():
 
 
 def test_starttls_forbidden_is_500():
+    """By default STARTTLS answers 500."""
     _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'STARTTLS\r\n'])
     assert r[1][0].startswith('500')
 
 
 def test_starttls_before_helo_is_503():
+    """STARTTLS before HELO answers 503."""
     _, r = dialog(RecordingEvents(), TLS_SETTINGS, [b'STARTTLS\r\n'])
     assert r[0][0].startswith('503')
 
 
 def test_starttls_twice_already_encrypted_503():
+    """STARTTLS on an encrypted connection answers 503."""
+
     async def go():
         server, port, task = await start_server(RecordingEvents(), TLS_SETTINGS)
         try:
@@ -1071,6 +1140,8 @@ def test_starttls_twice_already_encrypted_503():
 
 
 def test_tls_required_gates_mail_until_starttls():
+    """With TLS_REQUIRED MAIL answers 530 until STARTTLS."""
+
     async def go():
         server, port, task = await start_server(RecordingEvents(), dict(TLS_SETTINGS, encrypt_mode='TLS_REQUIRED'))
         try:
@@ -1093,11 +1164,11 @@ def test_tls_required_gates_mail_until_starttls():
 
 
 def test_starttls_flushes_injected_plaintext():
-    # SECURITY: a command injected right after STARTTLS (before the handshake)
-    # must be discarded, not run over the encrypted channel. With pipelining on,
-    # the pipelining guard does not reject it, so only the flush protects here.
-    # Inject QUIT: if it leaked, the server would close; with the flush the
-    # connection stays alive and a fresh EHLO over TLS still succeeds.
+    """
+    A QUIT sent right behind STARTTLS in plaintext is discarded, also with
+    PIPELINING: the connection stays and EHLO over TLS answers 250.
+    """
+
     async def go():
         server, port, task = await start_server(RecordingEvents(), dict(TLS_SETTINGS, pipelining_extension=True))
         try:

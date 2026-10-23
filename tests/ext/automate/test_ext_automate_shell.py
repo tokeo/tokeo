@@ -41,18 +41,21 @@ def _lines(capsys):
 
 
 def test_needs_the_tui_extensions():
+    """Without the tui extensions the app names both missing ones."""
     with pytest.raises(TokeoError, match='The extension tokeo.ext.automate needs tokeo.ext.tui.input and tokeo.ext.tui.output, add them'):
         with AutomateWithoutTuiTest():
             pass
 
 
 def test_shell_switch_no_colors_removed():
+    """--no-colors is no switch of automate shell any more."""
     with AutomateTest(argv=['automate', 'shell', '--no-colors']) as app:
         with pytest.raises(SystemExit):
             app.run()
 
 
 def test_list_tasks(shell, capsys):
+    """list shows a table of the tasks with function and number of hosts."""
     capsys.readouterr()
     assert shell.command('list')
     lines = _lines(capsys)
@@ -63,6 +66,7 @@ def test_list_tasks(shell, capsys):
 
 
 def test_list_hosts_without_passwords(shell, capsys):
+    """hosts list shows the hosts without passwords, sudo or identity."""
     capsys.readouterr()
     shell.command('hosts list')
     text = capsys.readouterr().out
@@ -72,6 +76,7 @@ def test_list_hosts_without_passwords(shell, capsys):
 
 
 def test_list_hostgroups(shell, capsys):
+    """hostgroups list shows each group with its hosts."""
     capsys.readouterr()
     shell.command('hostgroups list')
     group1 = next(line for line in _lines(capsys) if line.startswith('group1'))
@@ -79,6 +84,7 @@ def test_list_hostgroups(shell, capsys):
 
 
 def test_list_connections_defaults_first(shell, capsys):
+    """connections list shows _defaults first, without passwords."""
     capsys.readouterr()
     shell.command('connections list')
     lines = _lines(capsys)
@@ -87,6 +93,7 @@ def test_list_connections_defaults_first(shell, capsys):
 
 
 def test_show_as_json(shell, capsys):
+    """show task2 prints the task as json."""
     capsys.readouterr()
     shell.command('show task2')
     text = capsys.readouterr().out
@@ -96,6 +103,7 @@ def test_show_as_json(shell, capsys):
 
 
 def test_show_unknown_task(shell, monkeypatch):
+    """show of an unknown task logs "Task nope not found!"."""
     from cement.ext.ext_logging import LoggingLogHandler
 
     errors = []
@@ -105,6 +113,7 @@ def test_show_unknown_task(shell, monkeypatch):
 
 
 def test_shell_shows_a_failing_command(shell, monkeypatch):
+    """A failing command is logged as "Shell command failed: ..."."""
     from cement.ext.ext_logging import LoggingLogHandler
 
     def run(*args, **kwargs):
@@ -121,6 +130,10 @@ def test_shell_shows_a_failing_command(shell, monkeypatch):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_shell_in_a_terminal():
+    """
+    The probe runs the automate shell; list shows the tasks, show nope
+    logs its error above the prompt and exit ends with 0.
+    """
     probe = 'tests.ext.automate.automate_tests_shell_probe'
     # each input waits for the output of the one before and the prompt below it
     steps = [(None, b'list\r'), ('function', b'show nope\r'), ('Task nope not found!', b'exit\r')]

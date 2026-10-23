@@ -50,6 +50,7 @@ def _ca_cert(name):
 
 
 def test_asyncio_event_loop_thread_is_daemon():
+    """The event loop thread is a daemon and stops on shutdown."""
     asyncio_middleware = TokeoAsyncIO()
     asyncio_middleware.before_worker_boot(None, None)
     try:
@@ -65,6 +66,7 @@ def test_asyncio_event_loop_thread_is_daemon():
 
 
 def test_register_uses_tokeo_asyncio(tmp):
+    """register adds TokeoAsyncIO to the broker."""
     with DramatiqTest(tmp, []):
         kinds = [type(m) for m in dramatiq.get_broker().middleware]
     assert TokeoAsyncIO in kinds
@@ -85,12 +87,13 @@ def test_register_uses_tokeo_asyncio(tmp):
     ids=['default', 'partial_block', 'off', 'on'],
 )
 def test_register_confirm_delivery(tmp, rabbitmq, confirm):
+    """confirm_delivery is on by default and follows the config."""
     with DramatiqBrokerTest(tmp, rabbitmq):
         assert dramatiq.get_broker().confirm_delivery is confirm
 
 
 def test_register_confirm_delivery_with_tls_parameters(tmp):
-    # amqps with a custom ca builds pika parameters instead of the url
+    """amqps with a ca builds pika parameters with ssl, confirm stays on."""
     rabbitmq = dict(url='amqps://localhost:5671/', tls_ca=os.path.join(tmp.dir, 'ca.pem'))
     with open(rabbitmq['tls_ca'], 'w') as f:
         f.write(_ca_cert('localhost'))
@@ -102,6 +105,7 @@ def test_register_confirm_delivery_with_tls_parameters(tmp):
 
 @pytest.mark.parametrize('value', ['yes', 1, None])
 def test_register_invalid_confirm_delivery(tmp, value):
+    """confirm_delivery other than a bool raises the config error."""
     with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config rabbitmq.confirm_delivery'):
         with DramatiqBrokerTest(tmp, dict(confirm_delivery=value)):
             pass
@@ -109,6 +113,7 @@ def test_register_invalid_confirm_delivery(tmp, value):
 
 @pytest.mark.parametrize('rabbitmq', [None, dict(url='amqp://localhost:5672/')], ids=['default', 'partial_block'])
 def test_register_queue_arguments_default(tmp, keep_dead_message_ttl, rabbitmq):
+    """Without config no priority and the ttl of dramatiq stay."""
     with DramatiqBrokerTest(tmp, rabbitmq):
         broker = dramatiq.get_broker()
         # without config the queues look as before: no priority, ttl of dramatiq
@@ -128,6 +133,7 @@ def test_register_queue_arguments_default(tmp, keep_dead_message_ttl, rabbitmq):
     ],
 )
 def test_unparalleled_queues_consume_one_message_at_a_time(tmp, monkeypatch, queue, prefetch, expected):
+    """An unparalleled queue prefetches 1, its delay queue as given."""
     consumed = []
     monkeypatch.setattr(
         dramatiq_rabbitmq.RabbitmqBroker, 'consume', lambda self, name, prefetch=1, timeout=5000: consumed.append(prefetch)
@@ -139,6 +145,7 @@ def test_unparalleled_queues_consume_one_message_at_a_time(tmp, monkeypatch, que
 
 @pytest.mark.usefixtures('keep_dead_message_ttl')
 def test_register_queue_arguments_from_config(tmp):
+    """max_priority and dead_message_ttl from the config reach the queues."""
     with DramatiqBrokerTest(tmp, dict(max_priority=10, dead_message_ttl='86400000')):
         broker = dramatiq.get_broker()
         assert broker.max_priority == 10
@@ -161,6 +168,7 @@ def test_register_queue_arguments_from_config(tmp):
     ],
 )
 def test_register_invalid_queue_arguments(tmp, keep_dead_message_ttl, key, value):
+    """Invalid queue arguments raise and leave the ttl as it was."""
     with pytest.raises(TokeoDramatiqConfigError, match=f'Invalid dramatiq config rabbitmq.{key}'):
         with DramatiqBrokerTest(tmp, {key: value}):
             pass
@@ -175,6 +183,7 @@ def middleware_of(kind):
 
 
 def test_register_middleware_defaults(tmp):
+    """The middleware keeps the defaults of dramatiq."""
     from dramatiq import middleware
 
     with DramatiqMiddlewareTest(tmp):
@@ -187,6 +196,7 @@ def test_register_middleware_defaults(tmp):
 
 
 def test_register_middleware_from_config(tmp):
+    """The config sets time limit, age, shutdown notice and retries."""
     from dramatiq import middleware
 
     config = dict(time_limit=5000, max_age='60000', notify_shutdown=True, max_retries=0, min_backoff=200, max_backoff=1000)
@@ -199,6 +209,7 @@ def test_register_middleware_from_config(tmp):
 
 
 def test_register_actor_options_stay_available(tmp):
+    """Actors may still set the options the config defaults."""
     with DramatiqMiddlewareTest(tmp, time_limit=5000):
         options = dramatiq.get_broker().actor_options
     # actors and messages still override the defaults of the config
@@ -221,6 +232,7 @@ def test_register_actor_options_stay_available(tmp):
     ],
 )
 def test_register_invalid_middleware_defaults(tmp, key, value):
+    """An invalid middleware value raises the config error."""
     with pytest.raises(TokeoDramatiqConfigError, match=f'Invalid dramatiq config {key}'):
         with DramatiqMiddlewareTest(tmp, **{key: value}):
             pass
@@ -230,6 +242,7 @@ def test_register_invalid_middleware_defaults(tmp, key, value):
 
 
 def test_register_dead_message_ttl_valid_env(tmp, keep_dead_message_ttl, monkeypatch):
+    """A valid dramatiq_dead_message_ttl env is accepted as it is."""
     monkeypatch.setenv('dramatiq_dead_message_ttl', '86400000')
     with DramatiqBrokerTest(tmp, None):
         # dramatiq read the env on import already, tokeo only checks it
@@ -239,6 +252,7 @@ def test_register_dead_message_ttl_valid_env(tmp, keep_dead_message_ttl, monkeyp
 @pytest.mark.usefixtures('keep_dead_message_ttl')
 @pytest.mark.parametrize('value', ['0', '-1', 'week'])
 def test_register_dead_message_ttl_invalid_env(tmp, monkeypatch, value):
+    """An invalid dramatiq_dead_message_ttl env raises the config error."""
     monkeypatch.setenv('dramatiq_dead_message_ttl', value)
     with pytest.raises(TokeoDramatiqConfigError, match='Invalid env dramatiq_dead_message_ttl'):
         with DramatiqBrokerTest(tmp, None):
@@ -247,7 +261,7 @@ def test_register_dead_message_ttl_invalid_env(tmp, monkeypatch, value):
 
 @pytest.mark.usefixtures('keep_dead_message_ttl')
 def test_register_dead_message_ttl_config_wins_over_env(tmp, monkeypatch):
-    # with the config value the env does not matter, even an invalid one
+    """The config wins over the env, even over an invalid one."""
     monkeypatch.setenv('dramatiq_dead_message_ttl', '0')
     with DramatiqBrokerTest(tmp, dict(dead_message_ttl=60000)):
         assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == 60000
@@ -257,6 +271,7 @@ def test_register_dead_message_ttl_config_wins_over_env(tmp, monkeypatch):
 
 
 def test_actor_alias_declares_tokeo_actor(tmp):
+    """app.dramatiq.actor makes a TokeoActor, an own actor_class stays."""
     from tokeo.ext.dramatiq import TokeoActor
 
     with DramatiqBrokerTest(tmp, None) as app:
@@ -271,6 +286,7 @@ def test_actor_alias_declares_tokeo_actor(tmp):
 
 
 def test_actor_send_and_run_unchanged(tmp, monkeypatch):
+    """send, send_with_options and the call of an actor work as before."""
     with DramatiqBrokerTest(tmp, None) as app:
         actor = app.dramatiq.actor(lambda value: value * 2, actor_name='double')
         sent = []
@@ -284,6 +300,7 @@ def test_actor_send_and_run_unchanged(tmp, monkeypatch):
 
 
 def test_actor_send_without_rabbitmq(tmp, monkeypatch):
+    """A send without rabbitmq raises the connection error naming the actor."""
     from dramatiq.errors import BrokerConnectionError, ConnectionClosed
     from tokeo.core.exc import TokeoError
     from tokeo.ext.dramatiq import TokeoDramatiqConnectionError
@@ -306,6 +323,7 @@ def test_actor_send_without_rabbitmq(tmp, monkeypatch):
 
 
 def test_pdoc_hooks_restore_the_tokeo_actor(tmp):
+    """The pdoc hooks swap the actor decorator and restore it after."""
     from tokeo.core.utils.pdoc import pdoc_replace_decorator
     from tokeo.ext.dramatiq import tokeo_actor, tokeo_dramatiq_pdoc_pre_render, tokeo_dramatiq_pdoc_post_render
 

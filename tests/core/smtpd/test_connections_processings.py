@@ -17,6 +17,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, start_smtpd
 
 
 def test_counters_are_zero_when_idle():
+    """A new server counts 0 connections and 0 processings."""
     srv = SmtpdServer(CaptureSmtpdEvents(), settings={})
     assert srv.connections == 0
     assert srv.has_connections() is False
@@ -25,6 +26,8 @@ def test_counters_are_zero_when_idle():
 
 
 def test_connections_counter_tracks_open_clients():
+    """connections rises with each open client and falls when they close."""
+
     async def scenario():
         srv, port = await start_smtpd(CaptureSmtpdEvents(), settings={})
         writers = []
@@ -65,6 +68,7 @@ class _RecordingEvents(CaptureSmtpdEvents):
 
 
 def test_processings_counter_tracks_message_processing():
+    """processings is at least 1 during the data event and 0 after."""
     events = _RecordingEvents()
 
     async def scenario():

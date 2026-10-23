@@ -69,6 +69,7 @@ def shared():
 
 
 def test_10_ehlo(shared):
+    """EHLO lists the extensions with AUTH and STARTTLS and stores the name."""
     result = shared.line('EHLO Process line unit test')
     assert result == (
         '250-Process line test - Greeting\r\n' '250-8BITMIME\r\n250-SMTPUTF8\r\n' '250-AUTH LOGIN PLAIN\r\n250-STARTTLS\r\n250 OK'
@@ -77,11 +78,13 @@ def test_10_ehlo(shared):
 
 
 def test_11_ehlo_bad_sequence(shared):
+    """A second EHLO raises 503."""
     with pytest.raises(Smtpd503Exception):
         shared.line('EHLO Process line unit test')
 
 
 def test_20_auth_login_simulate_fail(shared):
+    """AUTH LOGIN with a wrong password raises 535 and stays unauthenticated."""
     result = shared.line('AUTH LOGIN')
     assert result == '334 ' + base64.b64encode(b'Username:').decode()
     result = shared.line(base64.b64encode(b'administrator').decode())
@@ -98,6 +101,7 @@ def test_20_auth_login_simulate_fail(shared):
 
 
 def test_21_auth_plain_authenticate_supervisor(shared):
+    """AUTH PLAIN as administrator answers 235, authorized as supervisor."""
     result = shared.line('AUTH PLAIN')
     assert result == '334 '
     result = shared.line('AGFkbWluaXN0cmF0b3IAcGFzc3dvcmQ')
@@ -112,12 +116,14 @@ def test_21_auth_plain_authenticate_supervisor(shared):
 
 
 def test_30_mail_from(shared):
+    """MAIL FROM answers 250 and stores the sender."""
     result = shared.line('MAIL FROM: demo@local.local')
     assert result == '250 OK'
     assert shared.session.ctx.envelope.mail_from == 'demo@local.local'
 
 
 def test_40_rcpt_to(shared):
+    """Two RCPT TO answer 250 and store both recipients in order."""
     assert shared.line('RCPT TO: demo1@local.local') == '250 OK'
     assert shared.line('RCPT TO: demo2@local.local') == '250 OK'
     rcpts = shared.session.ctx.envelope.rcpt_tos
@@ -127,6 +133,7 @@ def test_40_rcpt_to(shared):
 
 
 def test_50_data(shared):
+    """DATA delivers 174 bytes with the injected headers, then resets."""
     assert shared.line('DATA').startswith('354 ')
     shared.line('From: <demo@local.local>')
     shared.line('To: <demo1@local.local>, <demo2@local.local>')
@@ -153,14 +160,17 @@ def test_50_data(shared):
 
 
 def test_90_noop(shared):
+    """NOOP answers "250 OK"."""
     assert shared.line('NOOP') == '250 OK'
 
 
 def test_91_rset(shared):
+    """RSET answers "250 OK" and sets the RSET state."""
     assert shared.line('RSET') == '250 OK'
     assert shared.session.cmd_sequence is CMD_RSET
 
 
 def test_99_quit(shared):
+    """QUIT answers empty and sets the QUIT state."""
     assert shared.line('QUIT') == ''
     assert shared.session.cmd_sequence is CMD_QUIT

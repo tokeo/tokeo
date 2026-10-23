@@ -22,19 +22,19 @@ from tests.ext.automate.automate_tests_helper import (
 
 
 def test_hosts_simple():
-    # the hosts are read and completed by their id and name
+    """The hosts are read and completed by their id and name."""
     with AutomateTest() as app:
         assert app.automate.hosts == defaults_automate_hosts(validate=True)
 
 
 def test_hostgroups_simple():
-    # the hostgroups are read and expanded to their hosts
+    """The hostgroups are read and expanded to their hosts."""
     with AutomateTest() as app:
         assert app.automate.hostgroups == defaults_automate_hostgroups(validate=True)
 
 
 def test_reserved_local_key():
-    # "local" is reserved, neither a host nor a hostgroup may use it as id
+    """ "local" as id of a host or a hostgroup raises TokeoAutomateError."""
     test_defaults = copy.deepcopy(defaults)
     test_defaults['automate']['hosts']['local'] = dict(host='local')
     test_defaults['automate']['hostgroups']['local'] = ('a', 'b')
@@ -46,14 +46,16 @@ def test_reserved_local_key():
 
 
 def test_connections_simple():
-    # the connections are read and completed by their defaults
+    """The connections are read and completed by their defaults."""
     with AutomateTest() as app:
         assert app.automate.connections == defaults_automate_connections(validate=True)
 
 
 def test_tasks_simple():
-    # the tasks are read and expanded; func and module are left out, the
-    # imported functions cannot be compared and are run by the next test
+    """
+    The tasks are read and expanded; func and module are left out, the
+    imported functions are run by the next test.
+    """
     with AutomateTest() as app:
         tasks = app.automate.tasks
         for name in ('task1', 'task2', 'task3'):
@@ -63,7 +65,7 @@ def test_tasks_simple():
 
 
 def test_tasks_task1_runs_locally(monkeypatch):
-    # task1 runs uname by invoke on the local host and returns its result
+    """task1 runs uname by invoke on the local host and exits with 0."""
     with AutomateTest() as app:
         task = app.automate.tasks['task1']
         connection = invoke.Context(config=invoke.Config(overrides={}))
@@ -79,7 +81,7 @@ def test_tasks_task1_runs_locally(monkeypatch):
 
 
 def test_tasks_local_default_resolves_without_local_host():
-    # without a hosts entry "local" the default of a task is the bare local host
+    """Without a host "local" a task runs on the bare local host."""
     test_defaults = init_defaults('automate')
     test_defaults['automate']['tasks'] = dict(
         _defaults=dict(module='tests.ext.automate.automate_tests_helper'),
@@ -90,7 +92,7 @@ def test_tasks_local_default_resolves_without_local_host():
 
 
 def test_tasks_local_default_resolves_with_local_host():
-    # a configured hosts entry "local" is taken for the default of a task
+    """A configured host "local" is taken for a task by default."""
     test_defaults = init_defaults('automate')
     test_defaults['automate']['hosts'] = dict(local=dict(shell='/bin/sh'))
     test_defaults['automate']['tasks'] = dict(
@@ -102,7 +104,7 @@ def test_tasks_local_default_resolves_with_local_host():
 
 
 def test_automate_result():
-    # the fields of a result are read like attributes, it is no dict
+    """A result is read by its fields like attributes, it is no dict."""
     with AutomateTest() as app:
         res = TokeoAutomateResult(
             'task1', 'con1', 'host1', result=dict(stdout='Out', stderr='Err', command='Cmd', exited=1, values=dict(a=1, b='2nd'))

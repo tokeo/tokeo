@@ -106,6 +106,7 @@ def _deliver(events, settings, tls_context):
 
 
 def test_self_signed_simple_certificate(certs):
+    """A self-signed certificate from files delivers to a verifying client."""
     ev = CaptureSmtpdEvents()
     settings = _tls_settings(certs['simple_cert'], certs['simple_key'])
     mail = _deliver(ev, settings, verifying_tls_context(certs['simple_cert']))
@@ -115,9 +116,7 @@ def test_self_signed_simple_certificate(certs):
 
 @pytest.mark.filterwarnings('ignore::DeprecationWarning')
 def test_legacy_tls_preset_still_delivers(certs):
-    # the opt-in LEGACY preset lowers the floor to TLS 1.0 and adds SHA1 CBC
-    # suites for old clients; a normal (modern) client must still deliver.
-    # Python warns that TLS 1.0 is deprecated -- that is the intended signal.
+    """The LEGACY preset, down to TLS 1.0, still delivers to a modern client."""
     ev = CaptureSmtpdEvents()
     settings = _tls_settings(certs['simple_cert'], certs['simple_key'])
     settings['tls_methods'] = TLS_METHODS_LEGACY
@@ -128,6 +127,7 @@ def test_legacy_tls_preset_still_delivers(certs):
 
 
 def test_self_signed_chain_certificate(certs):
+    """A certificate with its chain delivers to a client trusting the CA."""
     ev = CaptureSmtpdEvents()
     settings = _tls_settings(certs['chain_cert'], certs['chain_key'])
     mail = _deliver(ev, settings, verifying_tls_context(certs['ca']))
@@ -136,6 +136,7 @@ def test_self_signed_chain_certificate(certs):
 
 
 def test_self_signed_chain_and_key_certificate(certs):
+    """A chain file with the key in it delivers without a key file."""
     ev = CaptureSmtpdEvents()
     settings = _tls_settings(certs['chain_and_key'], None)
     mail = _deliver(ev, settings, verifying_tls_context(certs['ca']))
@@ -144,8 +145,7 @@ def test_self_signed_chain_and_key_certificate(certs):
 
 
 def test_memory_only_certificate():
-    # no cert path -> the server generates a self-signed cert in memory; the
-    # client accepts any certificate (VERIFY_NONE)
+    """Without a certificate the server makes one in memory and delivers."""
     ev = CaptureSmtpdEvents()
     settings = {
         'max_processings': 1,
@@ -163,8 +163,7 @@ def test_memory_only_certificate():
 
 
 def test_invalid_certificate_name(certs):
-    # the certificate name does not match 127.0.0.1 -> the verifying client
-    # rejects the handshake with an SSL error
+    """A certificate not naming 127.0.0.1 fails the handshake by SSLError."""
     ev = CaptureSmtpdEvents()
     settings = _tls_settings(certs['invalid_cert'], certs['invalid_key'])
     with pytest.raises(ssl.SSLError):
@@ -172,8 +171,7 @@ def test_invalid_certificate_name(certs):
 
 
 def test_in_memory_certificate_string(certs):
-    # Tokeo-only extension: the certificate and key are provided as PEM
-    # strings (tls_cert/tls_key) and loaded in memory (memfd), never via disk
+    """Certificate and key given as PEM strings deliver, read from memory."""
     ev = CaptureSmtpdEvents()
     with open(certs['simple_cert']) as handle:
         cert_pem = handle.read()
@@ -232,6 +230,7 @@ def _names(certificate):
 
 
 def test_tls_cert_names_derivation_rules():
+    """CN and SAN come from the config, else from the first usable host."""
     from tokeo.core.smtpd.server import _tls_cert_names
 
     # a configured cn wins unchanged
@@ -246,6 +245,7 @@ def test_tls_cert_names_derivation_rules():
 
 
 def test_self_signed_derives_names_from_hosts():
+    """Bound to 127.0.0.1 the certificate is localhost.local with the ip."""
     certificate = _peer_certificate({'encrypt_mode': 'TLS_OPTIONAL'}, hosts=['127.0.0.1'])
     cn, dns = _names(certificate)
     assert cn == 'localhost.local'
@@ -253,6 +253,7 @@ def test_self_signed_derives_names_from_hosts():
 
 
 def test_self_signed_uses_configured_names():
+    """tls_cert_cn and tls_cert_san become the CN and the SAN."""
     certificate = _peer_certificate(
         {
             'encrypt_mode': 'TLS_OPTIONAL',
@@ -269,8 +270,7 @@ def test_self_signed_uses_configured_names():
 
 
 def test_plain_smtpd_runs_without_cryptography():
-    # importing and building a server without tls must work when the
-    # cryptography package is absent (blocked in a fresh interpreter)
+    """Without cryptography a server without TLS still builds."""
     code = (
         'import sys\n'
         "sys.modules['cryptography'] = None\n"
@@ -284,6 +284,7 @@ def test_plain_smtpd_runs_without_cryptography():
 
 
 def test_self_signed_without_cryptography_raises(monkeypatch):
+    """Without cryptography a server needing a certificate raises."""
     from tokeo.core.smtpd.server import SmtpdServer
 
     monkeypatch.setitem(sys.modules, 'cryptography', None)

@@ -41,6 +41,7 @@ def _ehlo_auth_and_authcmd(settings):
 
 
 def test_when_auth_on_plain_hides_auth_but_offers_starttls():
+    """On plaintext AUTH is hidden and refused by 530, STARTTLS offered."""
     advertised, starttls, reply = _ehlo_auth_and_authcmd(
         {
             'auth_mode': 'AUTH_OPTIONAL',
@@ -53,6 +54,7 @@ def test_when_auth_on_plain_hides_auth_but_offers_starttls():
 
 
 def test_when_auth_after_starttls_offers_and_accepts_auth():
+    """After STARTTLS AUTH is offered and accepted by 235."""
     ev = AuthEvents()
     settings = dict(TLS_SETTINGS)
     settings.update({'encrypt_mode': 'TLS_WHEN_AUTH', 'auth_mode': 'AUTH_OPTIONAL'})
@@ -80,8 +82,7 @@ def test_when_auth_after_starttls_offers_and_accepts_auth():
 
 
 def test_tls_optional_keeps_reference_plaintext_auth():
-    # TLS_OPTIONAL stays pure reference behaviour: AUTH advertised and
-    # accepted on plaintext
+    """TLS_OPTIONAL offers and accepts AUTH on plaintext, as the reference."""
     advertised, _, reply = _ehlo_auth_and_authcmd(
         {
             'auth_mode': 'AUTH_OPTIONAL',
@@ -93,6 +94,7 @@ def test_tls_optional_keeps_reference_plaintext_auth():
 
 
 def test_tls_required_on_plain_refuses_auth():
+    """TLS_REQUIRED hides AUTH on plaintext and refuses it by 530."""
     advertised, _, reply = _ehlo_auth_and_authcmd(
         {
             'auth_mode': 'AUTH_OPTIONAL',
@@ -104,6 +106,7 @@ def test_tls_required_on_plain_refuses_auth():
 
 
 def test_tls_forbidden_offers_plain_auth():
+    """TLS_FORBIDDEN offers AUTH on plaintext and no STARTTLS."""
     advertised, starttls, reply = _ehlo_auth_and_authcmd(
         {
             'auth_mode': 'AUTH_OPTIONAL',
@@ -116,6 +119,7 @@ def test_tls_forbidden_offers_plain_auth():
 
 
 def test_parse_error_lists_the_new_mode():
+    """An unknown encrypt_mode raises ValueError listing TLS_WHEN_AUTH."""
     from tokeo.core.smtpd.server import SmtpdServer
 
     with pytest.raises(ValueError) as exc:

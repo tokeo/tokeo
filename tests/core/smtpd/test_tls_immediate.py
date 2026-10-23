@@ -58,6 +58,7 @@ async def _deliver(reader, writer):
 
 @needs_tls_immediate
 def test_delivers_over_tls():
+    """TLS from the first byte delivers, STARTTLS is no longer offered."""
     ev = ImmediateEvents()
 
     async def go():
@@ -85,6 +86,7 @@ def test_delivers_over_tls():
 
 @needs_tls_immediate
 def test_behind_proxy():
+    """TLS right after the PROXY header delivers and keeps the proxy data."""
     ev = ImmediateEvents()
 
     async def go():
@@ -122,6 +124,7 @@ def test_behind_proxy():
     ids=lambda value: '.'.join(map(str, value)) if isinstance(value, tuple) else str(value),
 )
 def test_required_python_version(monkeypatch, version, supported):
+    """Below 3.13.13 or 3.14.4 a TLS_IMMEDIATE server raises ValueError."""
     monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', version + ('final', 0))
     if supported:
         assert SmtpdServer(RecordingEvents(), settings=_SETTINGS).tls is not None

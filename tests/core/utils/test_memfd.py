@@ -18,12 +18,14 @@ from tokeo.core.utils.memfd import memory_paths, MemfdUnavailable
 
 
 def test_single_blob_is_readable():
+    """The path of one blob reads back its bytes."""
     with memory_paths(b'hello world') as (path,):
         with open(path, 'rb') as f:
             assert f.read() == b'hello world'
 
 
 def test_multiple_blobs_are_independent():
+    """Each blob gets its own path with its own bytes."""
     with memory_paths(b'first', b'second') as (a, b):
         assert a != b
         with open(a, 'rb') as f:
@@ -33,12 +35,14 @@ def test_multiple_blobs_are_independent():
 
 
 def test_str_is_encoded_utf8():
+    """A str blob reads back as its utf-8 bytes."""
     with memory_paths('grüße') as (path,):
         with open(path, 'rb') as f:
             assert f.read() == 'grüße'.encode('utf-8')
 
 
 def test_no_blobs_yields_empty():
+    """Without blobs memory_paths yields an empty tuple."""
     with memory_paths() as paths:
         assert paths == ()
 
@@ -74,6 +78,7 @@ def _self_signed_pem():
 
 
 def test_loads_ssl_cert_chain_from_memory():
+    """ssl loads a certificate and key from the paths in memory."""
     cert_pem, key_pem = _self_signed_pem()
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     with memory_paths(cert_pem, key_pem) as (cert_ref, key_ref):
@@ -82,7 +87,7 @@ def test_loads_ssl_cert_chain_from_memory():
 
 @pytest.mark.skipif(not os.path.isdir('/dev/fd'), reason='needs /dev/fd')
 def test_devfd_pipe_backing_when_no_memfd(monkeypatch):
-    # simulate macOS/BSD: no memfd_create, so the /dev/fd pipe path is taken
+    """Without memfd_create, as on macOS, the paths are /dev/fd pipes."""
     monkeypatch.delattr(os, 'memfd_create', raising=False)
     with memory_paths(b'over a pipe') as (path,):
         assert path.startswith('/dev/fd/')
@@ -91,7 +96,7 @@ def test_devfd_pipe_backing_when_no_memfd(monkeypatch):
 
 
 def test_raises_when_no_backing(monkeypatch):
-    # simulate a platform with neither memfd_create nor /dev/fd (e.g. Windows)
+    """Without memfd_create and /dev/fd, as on Windows, it raises."""
     monkeypatch.delattr(os, 'memfd_create', raising=False)
     monkeypatch.setattr(os.path, 'isdir', lambda p: False)
     with pytest.raises(MemfdUnavailable):

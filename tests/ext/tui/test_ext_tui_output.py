@@ -31,6 +31,7 @@ def output():
 
 
 def test_extension_registers_output_only():
+    """Only app.tui.output exists, app.tui.input names the missing extension."""
     with TuiOutputTest() as app:
         assert isinstance(app.tui.output, TokeoTuiOutput)
         with pytest.raises(TokeoTuiError, match='Enable the extension tokeo.ext.tui.input to use app.tui.input!'):
@@ -38,11 +39,13 @@ def test_extension_registers_output_only():
 
 
 def test_require_names_the_missing_package():
+    """require raises TokeoTuiError naming the missing package."""
     with pytest.raises(TokeoTuiError, match='The extension tokeo.ext.tui.output needs the package nope, add it'):
         require('tokeo_no_such_module', 'nope', 'tokeo.ext.tui.output')
 
 
 def test_table(output):
+    """A table shows its title and headers, None empty, numbers right aligned."""
     out, _ = output
     table = out.table(['queue', ('ready', 'right')], [['mail', 3], ['orders_unparalleled', None]], title='queues')
     lines = [line for line in out.render(table).splitlines() if line.strip()]
@@ -56,6 +59,7 @@ def test_table(output):
 
 
 def test_data_is_never_read_as_markup(output):
+    """Text in square brackets is printed as given, not as markup."""
     out, buffer = output
     out.print('[bold]args[/bold]', out.table(['args'], [["(('[red]x', 1), {})"]]))
     assert '[bold]args[/bold]' in buffer.getvalue()
@@ -63,6 +67,7 @@ def test_data_is_never_read_as_markup(output):
 
 
 def test_print_to_a_pipe_has_no_control_characters(output):
+    """Printing to a pipe writes no escape sequences."""
     out, buffer = output
     assert not out.is_terminal
     out.print(out.table(['a'], [[1]]))
@@ -70,6 +75,7 @@ def test_print_to_a_pipe_has_no_control_characters(output):
 
 
 def test_follow_appends_blocks_without_terminal(output):
+    """Without a terminal follow appends each block after an empty line."""
     out, buffer = output
     ticks = iter(range(1, 10))
     out.follow(lambda: [f'tick {next(ticks)}', 'done'], interval=0, count=2)
@@ -77,6 +83,7 @@ def test_follow_appends_blocks_without_terminal(output):
 
 
 def test_follow_repaints_in_a_terminal(output):
+    """In a terminal follow repaints on the alternate screen."""
     out, _ = output
     buffer = io.StringIO()
     out._console = Console(file=buffer, width=60, force_terminal=True)
@@ -89,6 +96,7 @@ def test_follow_repaints_in_a_terminal(output):
 
 
 def test_follow_appends_in_a_terminal_on_request(output):
+    """With repaint=False follow appends in a terminal too."""
     out, _ = output
     buffer = io.StringIO()
     out._console = Console(file=buffer, width=60, force_terminal=True)
@@ -98,6 +106,7 @@ def test_follow_appends_in_a_terminal_on_request(output):
 
 @pytest.mark.parametrize('stop', [KeyboardInterrupt(), CaughtSignal(signal.SIGINT, None), CaughtSignal(signal.SIGTERM, None)])
 def test_follow_ends_on_ctrl_c_and_shutdown_signals(output, stop):
+    """Ctrl-C, SIGINT and SIGTERM end follow quietly."""
     out, buffer = output
 
     def render():
@@ -108,6 +117,7 @@ def test_follow_ends_on_ctrl_c_and_shutdown_signals(output, stop):
 
 
 def test_follow_passes_other_signals(output):
+    """Another signal passes out of follow."""
     out, _ = output
 
     def render():
@@ -118,6 +128,7 @@ def test_follow_passes_other_signals(output):
 
 
 def test_text_is_styled_in_a_terminal_only(output):
+    """Text gets its style in a terminal only, brackets stay text."""
     out, buffer = output
     out.print(out.text('[x] missing', 'bold red'))
     assert buffer.getvalue() == '[x] missing\n'
@@ -128,6 +139,7 @@ def test_text_is_styled_in_a_terminal_only(output):
 
 
 def test_table_cuts_long_values_and_keeps_full_columns(output):
+    """Long values are cut by "…", a full column and short values stay whole."""
     out = TokeoTuiOutput(output[0].app, file=io.StringIO(), width=100)
     message_id = '3f2a9c1e-77b0-4c4e-9d1a-0c6a1e2b9f11'
     error = 'LookupError: user anna@example.com not found in the customer table'
@@ -141,6 +153,7 @@ def test_table_cuts_long_values_and_keeps_full_columns(output):
 
 
 def test_table_shrinks_further_in_a_narrow_terminal(output):
+    """In 40 columns the row fits, the full column stays, the rest is cut."""
     out, _ = output
     narrow = TokeoTuiOutput(out.app, file=io.StringIO(), width=40)
     rows = [['orders_unparalleled', 'take_order', 'unparalleled, no consumer']]
@@ -150,6 +163,7 @@ def test_table_shrinks_further_in_a_narrow_terminal(output):
 
 
 def test_json_indented_and_colored_in_a_terminal_only(output):
+    """json is indented, colored in a terminal only, objects as their str."""
     out, buffer = output
     data = dict(id='deploy', hosts=['web1', 'web2'], when=object)
     out.json(data)

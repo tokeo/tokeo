@@ -29,12 +29,14 @@ from tokeo.ext.dramatiq import (
     ],
 )
 def test_config_error(source, name, message):
+    """The config error names source, name, value and what was expected."""
     e = TokeoDramatiqConfigError(source, name, 'x', 'null or an integer >= 1')
     assert str(e) == message and e.args == (message,)
     assert (e.source, e.name, e.value, e.expected) == (source, name, 'x', 'null or an integer >= 1')
 
 
 def test_connection_error():
+    """The connection error names the address or the actor and the cause."""
     cause = ConnectionClosed('connection refused')
     e = TokeoDramatiqConnectionError('mq.example:5672', cause)
     assert str(e) == 'Cannot connect to rabbitmq at mq.example:5672 (ConnectionClosed: connection refused)!'
@@ -46,6 +48,7 @@ def test_connection_error():
 
 
 def test_refused_error():
+    """The refused error names the address and the cause."""
     cause = ValueError('NOT_FOUND')
     e = TokeoDramatiqRefusedError('mq.example:5672', cause)
     assert str(e) == 'Rabbitmq at mq.example:5672 refused the request (ValueError: NOT_FOUND)!'
@@ -53,6 +56,7 @@ def test_refused_error():
 
 
 def test_queue_error():
+    """The queue error names the queue and the reason."""
     e = TokeoDramatiqQueueError('mail', 'has no actor, its arguments are unknown')
     assert str(e) == 'Queue mail has no actor, its arguments are unknown!'
     assert (e.queue, e.reason) == ('mail', 'has no actor, its arguments are unknown')
@@ -68,12 +72,13 @@ def test_queue_error():
     ],
 )
 def test_errors_are_tokeo_errors(error):
-    # main catches them as tokeo errors, only a lost connection is a dramatiq one
+    """All are tokeo errors, only the connection error is ConnectionClosed."""
     assert isinstance(error, TokeoDramatiqError) and isinstance(error, TokeoError)
     assert isinstance(error, ConnectionClosed) == isinstance(error, TokeoDramatiqConnectionError)
 
 
 def test_old_import_path():
+    """The errors still import from tokeo.ext.dramatiq.base."""
     from tokeo.ext.dramatiq import base
 
     assert base.TokeoDramatiqError is TokeoDramatiqError
@@ -99,6 +104,7 @@ def _pickled(error):
 @pytest.mark.parametrize('index', range(4), ids=['config', 'connection', 'refused', 'queue'])
 @pytest.mark.parametrize('clone', [copy.copy, copy.deepcopy, _pickled], ids=['copy', 'deepcopy', 'pickle'])
 def test_errors_survive_copy_and_pickle(index, clone):
+    """copy, deepcopy and pickle keep type, args, fields and notes."""
     error = _errors()[index]
     error.add_note('a note')
     cloned = clone(error)
@@ -107,7 +113,7 @@ def test_errors_survive_copy_and_pickle(index, clone):
 
 
 def test_errors_survive_a_process_pool():
-    # a process pool pickles them on the way in and out
+    """The errors pass a process pool in and out with the same text."""
     errors = _errors()
     with multiprocessing.get_context('spawn').Pool(1) as pool:
         returned = pool.apply_async(copy.copy, (errors,)).get(timeout=60)

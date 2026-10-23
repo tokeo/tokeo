@@ -8,14 +8,14 @@ from tokeo.main import TokeoTest
 
 
 def test_tokeo():
-    # test tokeo without any subcommands or arguments
+    """The app without a command runs and exits with 0."""
     with TokeoTest() as app:
         app.run()
         assert app.exit_code == 0
 
 
 def test_tokeo_debug():
-    # test that debug mode is functional
+    """The app with --debug runs in debug mode."""
     argv = ['--debug']
     with TokeoTest(argv=argv) as app:
         app.run()

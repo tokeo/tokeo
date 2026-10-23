@@ -31,6 +31,7 @@ class GatedEvents(SmtpdEvents):
 
 
 def test_servers_share_the_global_wake_event():
+    """Servers with the same GlobalLimits share its slot_free event."""
     gl = GlobalLimits(max_processings=1)
     a = SmtpdServer(GatedEvents(), global_limits=gl)
     b = SmtpdServer(GatedEvents(), global_limits=gl)
@@ -42,8 +43,10 @@ def test_servers_share_the_global_wake_event():
 
 
 def test_release_on_service_a_wakes_waiter_on_service_b():
-    # one global processing slot; A occupies it (gated handler), B's client
-    # must wait -- and MUST proceed once A releases (before the fix B starved)
+    """
+    With one global slot held by service A, the client of B waits and
+    delivers once A releases the slot.
+    """
     events_a, events_b = GatedEvents(), GatedEvents()
     gl = GlobalLimits(max_processings=1)
 
@@ -87,9 +90,10 @@ class PollingLimits(GlobalLimits):
 
 
 def test_external_counter_release_is_seen_via_slot_wait_override():
-    # cross-process scenario: another process releases the global slot -- the
-    # counters change but nobody sets this loop's event; a limits class with a
-    # polling slot_wait (as the extension provides) must still admit the waiter
+    """
+    A slot freed by another process, without any event, still admits the
+    waiting client through the polling slot_wait.
+    """
     events = GatedEvents()
     events.gate.set()  # deliver immediately once admitted
     gl = PollingLimits(max_processings=1)

@@ -13,6 +13,6 @@ from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdE
 
 
 def test_io_waitreadable_sleep_is_exposed():
-    # API parity: the setting exists and is configurable, default 0.1
+    """io_waitreadable_sleep exists for API parity, default 0.1, settable."""
     assert SmtpdServer(CaptureSmtpdEvents()).io_waitreadable_sleep == DEFAULT_IO_WAITREADABLE_SLEEP
     assert SmtpdServer(CaptureSmtpdEvents(), settings={'io_waitreadable_sleep': 0.5}).io_waitreadable_sleep == 0.5

@@ -36,12 +36,14 @@ def started():
 
 
 def test_needs_the_tui_extensions():
+    """Without tokeo.ext.tui.output the app names the missing extension."""
     with pytest.raises(TokeoError, match='The extension tokeo.ext.scheduler needs tokeo.ext.tui.output, add it to the extensions'):
         with SchedulerWithoutTuiTest():
             pass
 
 
 def test_launch_without_shell_by_default(monkeypatch):
+    """launch starts without shell, with interactive=True the shell follows."""
     calls = []
     with SchedulerTest() as app:
         monkeypatch.setattr(app.scheduler, 'startup', lambda interactive, paused: calls.append(('startup', interactive, paused)))
@@ -53,6 +55,7 @@ def test_launch_without_shell_by_default(monkeypatch):
 
 @pytest.mark.parametrize('argv, expected', [([], (False, False)), (['--shell'], (True, False)), (['--shell', '--paused'], (True, True))])
 def test_launch_command(monkeypatch, argv, expected):
+    """scheduler launch hands --shell and --paused to launch."""
     calls = []
     with SchedulerTest(argv=['scheduler', 'launch', *argv]) as app:
         monkeypatch.setattr(app.scheduler, 'launch', lambda interactive, paused: calls.append((interactive, paused)))
@@ -62,12 +65,14 @@ def test_launch_command(monkeypatch, argv, expected):
 
 @pytest.mark.parametrize('switch', ['--background', '--no-colors'])
 def test_launch_switches_removed(switch):
+    """--background and --no-colors are no switches any more."""
     with SchedulerTest(argv=['scheduler', 'launch', switch]) as app:
         with pytest.raises(SystemExit):
             app.run()
 
 
 def test_list_table(started, capsys, monkeypatch):
+    """list shows the state of the scheduler and a table of the tasks."""
     monkeypatch.setenv('COLUMNS', '160')
     capsys.readouterr()
     assert started.scheduler.command('list')
@@ -81,6 +86,7 @@ def test_list_table(started, capsys, monkeypatch):
 
 
 def test_list_shows_paused_tasks_and_scheduler(started, capsys):
+    """list shows a paused task and a paused scheduler."""
     started.scheduler.command('tasks pause 1')
     started.scheduler.command('pause')
     capsys.readouterr()
@@ -90,6 +96,7 @@ def test_list_shows_paused_tasks_and_scheduler(started, capsys):
 
 
 def test_shell_runs_commands(started):
+    """The shell runs "tasks pause 1", the task has no next run time."""
     with create_pipe_input() as keyboard:
         keyboard.send_text('tasks pause 1\rexit\r')
         started.scheduler.shell(input=keyboard, output=DummyOutput())
@@ -97,7 +104,7 @@ def test_shell_runs_commands(started):
 
 
 def test_shell_keeps_a_wrong_command(started):
-    # an unknown command fails and stays, Ctrl-C clears it, Ctrl-D ends the shell
+    """An unknown command is tried once, Ctrl-C clears it."""
     calls = []
     original = started.scheduler.command
 
@@ -113,6 +120,7 @@ def test_shell_keeps_a_wrong_command(started):
 
 
 def test_shell_shows_a_failing_command(started, monkeypatch):
+    """A failing command is logged as "Shell command failed: ..."."""
     from cement.ext.ext_logging import LoggingLogHandler
 
     def pause():
@@ -129,6 +137,10 @@ def test_shell_shows_a_failing_command(started, monkeypatch):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
 def test_shell_shows_logs_of_tasks_above_the_prompt():
+    """
+    The probe runs the scheduler shell; "tasks fire 1" makes its task log,
+    the log line stands above the prompt and exit ends with 0.
+    """
     probe = 'tests.ext.scheduler.scheduler_tests_shell_probe'
     with Terminal([sys.executable, '-m', probe, 'scheduler', 'launch', '--shell'], rows=16, columns=100) as terminal:
         assert terminal.wait_for(lambda lines: lines[-1] == 'Scheduler>'), '\n'.join(terminal.screen.display)

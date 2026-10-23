@@ -29,6 +29,8 @@ async def _welcome(reader):
 
 
 def test_010_tcp_1_connect():
+    """One connection gets the welcome."""
+
     async def go():
         srv, port = await _start_limited()
         try:
@@ -43,6 +45,8 @@ def test_010_tcp_1_connect():
 
 
 def test_020_tcp_2_simultan_connects():
+    """A second connection waits for the slot, then gets the welcome."""
+
     async def go():
         srv, port = await _start_limited()
         try:
@@ -71,6 +75,8 @@ def test_020_tcp_2_simultan_connects():
 
 
 def test_030_tcp_3_simultan_connects_and_1_abort():
+    """A third connection gets the 421 abort and is closed."""
+
     async def go():
         srv, port = await _start_limited()
         try:

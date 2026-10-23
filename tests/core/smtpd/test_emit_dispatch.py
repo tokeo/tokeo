@@ -52,20 +52,21 @@ def _ctx():
 
 
 def test_event_names_map_covers_every_event_and_existing_methods():
-    # every enum member maps to a real method on the base class -- a typo in
-    # SMTPD_EVENT_NAMES (or a renamed event) must fail here
+    """Every SmtpdEvent maps to an existing method of SmtpdEvents."""
     assert set(SMTPD_EVENT_NAMES) == set(SmtpdEvent)
     for ev, name in SMTPD_EVENT_NAMES.items():
         assert callable(getattr(SmtpdEvents, name)), f'{ev}: {name}'
 
 
 def test_base_noops_have_no_entry():
+    """Without overrides only ON_AUTH_EVENT has a dispatch entry."""
     dispatch = SmtpdServer(BareEvents()).emit_events
     # only the behavioural base events stay dispatchable without an override
     assert set(dispatch) == {SmtpdEvent.ON_AUTH_EVENT}
 
 
 def test_overridden_events_get_entries_with_resolved_kind():
+    """Overrides get entries as sync, async or thread, bound to the handler."""
     srv = SmtpdServer(MixedEvents())
     dispatch = srv.emit_events
     assert dispatch[SmtpdEvent.ON_HELO_EVENT][0] == srv._EMIT_SYNC
@@ -78,8 +79,7 @@ def test_overridden_events_get_entries_with_resolved_kind():
 
 
 def test_auth_default_deny_stays_dispatchable():
-    # without an override, ON_AUTH_EVENT keeps its entry and default deny
-    # deny (535) still fires through _emit
+    """Without an override ON_AUTH_EVENT still denies by 535."""
     srv = SmtpdServer(BareEvents())
     assert SmtpdEvent.ON_AUTH_EVENT in srv.emit_events
 
@@ -91,6 +91,7 @@ def test_auth_default_deny_stays_dispatchable():
 
 
 def test_emit_returns_none_for_skipped_event():
+    """_emit of an event without entry returns None."""
     srv = SmtpdServer(BareEvents())
 
     async def call():
@@ -100,8 +101,8 @@ def test_emit_returns_none_for_skipped_event():
 
 
 def test_mail_flows_end_to_end_with_bare_handler():
-    # with no overrides every no-op event is skipped; the dialog must still
-    # accept and deliver a message exactly as before
+    """A handler without overrides still delivers a mail with 250."""
+
     async def scenario():
         srv, port = await start_smtpd(BareEvents(), settings={})
         loop = asyncio.get_event_loop()

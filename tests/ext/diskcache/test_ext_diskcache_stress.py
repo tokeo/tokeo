@@ -352,6 +352,12 @@ def stress(directory, monkeypatch, purge):
 
 @pytest.mark.parametrize('purge', [False, True], ids=['steady', 'purge'])
 def test_stress(tmp_path, monkeypatch, purge):
+    """
+    Threads in three processes run random operations on one cache, once
+    steady and once with purges in between. Both runs end without errors
+    or wrong values, with a sound database and no open connection; the
+    steady run also keeps every count, lock and limit.
+    """
     report, counter, warnings, integrity, connections = stress(str(tmp_path), monkeypatch, purge)
     # no failed operation, no wrong value, a healthy database, no open connection
     assert report['errors'] == []
