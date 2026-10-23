@@ -1,9 +1,11 @@
 """
-Tests for tokeo.ext.diskcache: the locks temper (concurrency limit) and
-throttle (rate limit), alone, across threads and across processes.
+Tests for tokeo.ext.diskcache: the connections of the threads, the locks
+temper (concurrency limit) and throttle (rate limit), alone, across threads
+and across processes.
 """
 
 import time
+import sqlite3
 import threading
 import multiprocessing as mp
 from queue import Empty
@@ -12,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
+from tokeo.ext.diskcache import _ThreadConnection
 
 # --------------------------------------------------------------------------------------
 # helpers
@@ -50,6 +53,38 @@ class DiskcacheTest(TokeoTest):
         config = init_defaults('diskcache')
         config['diskcache']['directory'] = directory
         super().__init__(config_defaults=config, **kw)
+
+
+class Connections:
+    """Records the sqlite connections diskcache opens and which got closed."""
+
+    def __init__(self, monkeypatch):
+        self.opened = []
+        connect = sqlite3.connect
+        connections = self
+
+        class Connection(sqlite3.Connection):
+
+            def __init__(self, *args, **kw):
+                super().__init__(*args, **kw)
+                self.closed = False
+                connections.opened.append(self)
+
+            def close(self):
+                self.closed = True
+                super().close()
+
+        monkeypatch.setattr('diskcache.core.sqlite3.connect', lambda *args, **kw: connect(*args, factory=Connection, **kw))
+
+    @property
+    def unclosed(self):
+        return [con for con in self.opened if not con.closed]
+
+
+def in_threads(func, workers=4):
+    # run func once in each of the workers threads of a pool, return the results
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return list(pool.map(lambda _: func(), range(workers)))
 
 
 def spawn_context():
@@ -125,6 +160,82 @@ def throttle_worker(directory, count, per_seconds, result_queue):
             result_queue.put(('ok', job()))
     except BaseException as err:  # noqa: B036
         result_queue.put(('error', repr(err)))
+
+
+# --------------------------------------------------------------------------------------
+# connections: each thread closes its own when it ends
+# --------------------------------------------------------------------------------------
+
+
+def test_connections_of_threads_close_when_they_end(tmp, monkeypatch):
+    connections = Connections(monkeypatch)
+    with DiskcacheTest(tmp.dir) as app:
+        app.cache.set('key', 'value')
+        thread = threading.Thread(target=app.cache.get, args=('key',))
+        thread.start()
+        thread.join()
+        assert in_threads(lambda: app.cache.get('key')) == ['value'] * 4
+        # only the connection of the app is still open
+        assert len(connections.unclosed) == 1
+    assert connections.unclosed == []
+
+
+def test_connections_of_threads_close_after_temper_and_throttle(tmp, monkeypatch):
+    connections = Connections(monkeypatch)
+    with DiskcacheTest(tmp.dir) as app:
+
+        @app.cache.locks.temper(count=4, name='threads', verbose=False)
+        def tempered():
+            return 'ran'
+
+        @app.cache.locks.throttle(count=4, per_seconds=3600, name='threads', verbose=False)
+        def throttled():
+            return 'ran'
+
+        assert in_threads(tempered) == ['ran'] * 4
+        assert in_threads(throttled) == ['ran'] * 4
+        # the app itself never accessed the cache after its setup
+        assert len(connections.opened) > 1
+        assert connections.unclosed == []
+
+
+def test_connections_close_by_hand_and_reopen(tmp, monkeypatch):
+    connections = Connections(monkeypatch)
+    with DiskcacheTest(tmp.dir) as app:
+        app.cache.set('key', 'value')
+        app.cache.close()
+        assert connections.unclosed == []
+        # a later access opens a new connection
+        assert app.cache.get('key') == 'value'
+        assert len(connections.unclosed) == 1
+        # also by hand inside a thread as diskcache describes it
+        assert in_threads(lambda: (app.cache.get('key'), app.cache.close())[0]) == ['value'] * 4
+        assert len(connections.unclosed) == 1
+    assert connections.unclosed == []
+
+
+def test_connections_of_threads_close_after_transactions(tmp, monkeypatch):
+    connections = Connections(monkeypatch)
+    with DiskcacheTest(tmp.dir) as app:
+
+        def transact():
+            with app.cache._cache.transact():
+                app.cache.set('key', 'value')
+                return app.cache.get('key')
+
+        assert in_threads(transact) == ['value'] * 4
+        assert app.cache.get('key') == 'value'
+        assert len(connections.unclosed) == 1
+    assert connections.unclosed == []
+
+
+def test_connections_stay_open_when_released_in_another_thread():
+    # sqlite closes only in its own thread, so the release leaves it to sqlite
+    con = sqlite3.connect(':memory:', check_same_thread=False)
+    holder = in_threads(lambda: _ThreadConnection(con), workers=1)[0]
+    del holder
+    assert con.execute('SELECT 1').fetchone() == (1,)
+    con.close()
 
 
 # --------------------------------------------------------------------------------------

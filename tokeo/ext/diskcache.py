@@ -42,6 +42,8 @@ suitable for web applications, microservices, and other distributed systems.
 """
 
 import sys
+import threading
+import weakref
 from os.path import basename
 from tokeo.ext.argparse import Controller
 from tokeo.core.exc import TokeoError
@@ -71,6 +73,49 @@ class TokeoDiskCacheLockError(TokeoError):
     """
 
     pass
+
+
+class _ThreadConnection:
+    """Holds the connection of one thread and closes it when the thread ends."""
+
+    __slots__ = ('con', 'ident')
+
+    def __init__(self, con):
+        self.con, self.ident = con, threading.get_ident()
+
+    def __del__(self):
+        # sqlite closes only in the own thread, else it closes on its release
+        if threading.get_ident() == self.ident:
+            self.con.close()
+
+
+class _ThreadConnections(threading.local):
+    """
+    The thread storage of the diskcache, a connection ends with its thread.
+
+    ### Notes
+
+    : diskcache keeps one sqlite connection per thread in ```Cache._local```
+        and closes only the one of the calling thread, so every thread would
+        have to call ```close``` itself; this storage closes the connection of
+        a thread when the thread ends
+
+    """
+
+    @property
+    def con(self):
+        try:
+            return self._holder.con
+        except AttributeError:
+            raise AttributeError('con') from None
+
+    @con.setter
+    def con(self, con):
+        self._holder = _ThreadConnection(con)
+
+    @con.deleter
+    def con(self):
+        del self._holder
 
 
 class TokeoDiskCacheLocksHandler:
@@ -674,6 +719,12 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
             directory=self._config('directory'),
             timeout=self._config('timeout'),
         )
+        # close the connection diskcache opened on setup before the storage changes
+        self._cache.close()
+        # every thread closes its own connection when it ends
+        self._cache._local = _ThreadConnections()
+        # the connection of this thread when the app is never closed
+        weakref.finalize(self, self._cache.close)
         # create a locks handler for cache
         self.locks = self.locks_handler(
             self._config('locks_tag'),
@@ -791,6 +842,21 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         retry = kw.get('retry', False)
         return self._cache.delete(key, retry=retry)
+
+    def close(self):
+        """
+        Close the connection of the calling thread to the cache.
+
+        ### Notes
+
+        : The app closes its own connection on close, the connection of
+            any other thread is closed when the thread ends; a later access
+            opens a new connection
+
+        """
+        self._cache.close()
+
+    # --------------------------------------------------------------------------------------
 
     def purge(self, **kw):
         """
@@ -1541,6 +1607,7 @@ def load(app):
     - Sets the default cache handler to TokeoDiskCacheCacheHandler
     - Registers the cache handler with the application
     - Registers the command-line controller for cache management
+    - Closes the connection of the app to the cache when the app closes
 
     ### Args
 
@@ -1551,6 +1618,20 @@ def load(app):
     app.handler.register(TokeoDiskCacheCacheHandler)
     app.handler.register(TokeoDiskCacheController)
     app.hook.register('tokeo_pdoc_render_decorator', tokeo_diskcache_pdoc_render_decorator)
+    app.hook.register('pre_close', tokeo_diskcache_pre_close)
+
+
+def tokeo_diskcache_pre_close(app):
+    """
+    Close the connection of the app to the cache when the app closes.
+
+    ### Args
+
+    - **app** (Application): The Cement application instance
+
+    """
+    if isinstance(getattr(app, 'cache', None), TokeoDiskCacheCacheHandler):
+        app.cache.close()
 
 
 def unpack_func_args(func, *args):
