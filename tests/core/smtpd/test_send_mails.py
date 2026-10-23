@@ -89,7 +89,7 @@ def test_net_smtp_auth_plain_fail():
         )
 
 
-def test_mikel_mail_simple_send_1_mail_starttls():
+def test_simple_send_1_mail_starttls():
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
     run_server_client(
