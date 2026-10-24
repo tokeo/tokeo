@@ -347,13 +347,16 @@ def test_term_mixed_services_with_shared_limits(tmp_path):
         proc.kill()
 
 
-def _broken_service(name):
+def _broken_service(name, pre_fork=0):
     """A service whose listener cannot bind (TEST-NET address)."""
-    return {
+    svc = {
         'name': name,
         'events_handler': 'tokeo.ext.smtpd.TokeoSmtpdEvents',
         'listeners': [{'host': '203.0.113.1', 'port': 2525}],
     }
+    if pre_fork:
+        svc['settings'] = {'pre_fork': pre_fork}
+    return svc
 
 
 def test_failed_service_start_aborts_and_stops_started_ones(tmp_path):
@@ -392,6 +395,21 @@ def test_broken_config_of_a_worker_stops_before_the_fork(tmp_path):
         log = proc.probe_log.read_text()
         assert "smtpd: service 'mx2': encrypt_mode must be one of" in log
         assert 'forked workers' not in log
+        _assert_port_free(port_a)
+    finally:
+        proc.kill()
+
+
+def test_failed_worker_stops_all_services(tmp_path):
+    """A worker that cannot bind logs why and ends all services, ports free."""
+    port_a = _free_port()
+    proc = _spawn(tmp_path, {'services': [_service('mx1', port_a), _broken_service('mx2', pre_fork=1)]}, names=None)
+    try:
+        assert _wait_exit(proc) != 0
+        assert wait_process_group_ended(proc.pid)
+        log = proc.probe_log.read_text()
+        assert "of service 'mx2' failed: could not bind" in log
+        assert "of service 'mx2' ended with 1, all services stopped" in log
         _assert_port_free(port_a)
     finally:
         proc.kill()

@@ -45,7 +45,10 @@ lists, process topology with pre-forked workers and machine-wide limits.
     twice fails at the port bind
 
 : Every selected service is built before a worker forks, so a broken config
-    ends the start with the name of the service and nothing is bound
+    ends the start with the name of the service and nothing is bound. A
+    worker that ends on its own, e.g. as it cannot bind its port, ends the
+    whole invocation with an error; a restart is left to the supervisor of
+    the system, e.g. systemd with ```Restart=on-failure```
 
 ### Example
 
@@ -357,17 +360,23 @@ class TokeoSmtpd(MetaMixin):
             reason = str(err).removeprefix('smtpd: ')
             raise TokeoSmtpdError(f"smtpd: service '{svc.get('name')}': {reason}") from err
 
-    async def _serve_async(self, services, global_limits, child_pids, reuse):
+    async def _serve_async(self, services, global_limits, workers, reuse):
         """
         Serve the given services in this process until a stop signal.
 
         Starts one server per service, waits for SIGINT/SIGTERM, forwards
         the stop to the child workers first and then drains the own servers
         (2 seconds for running dialogs). With an empty service list this is
-        the supervising master: it just waits for the signal.
+        the supervising master: it just waits for the signal. A worker that
+        ends on its own stops all services, the error names it.
+
+        ### Raises
+
+        - **TokeoSmtpdError**: When a worker ended before the stop signal
 
         """
         servers = []
+        ended = []
         try:
             for svc in services:
                 server = self._build_server(svc, global_limits)
@@ -380,8 +389,26 @@ class TokeoSmtpd(MetaMixin):
             loop = asyncio.get_running_loop()
             for sig in (signal.SIGINT, signal.SIGTERM):
                 loop.add_signal_handler(sig, stop.set)
+
+            def reap():
+                # a worker that ends before the stop signal ends all services
+                if stop.is_set():
+                    return
+                for pid, name in workers.items():
+                    try:
+                        done, status = os.waitpid(pid, os.WNOHANG)
+                    except ChildProcessError:
+                        continue
+                    if done:
+                        ended.append(f"worker {pid} of service '{name}' ended with {os.waitstatus_to_exitcode(status)}")
+                        stop.set()
+
+            if workers:
+                loop.add_signal_handler(signal.SIGCHLD, reap)
+                # a worker may have ended before the handler was set
+                reap()
             await stop.wait()
-            for pid in child_pids:
+            for pid in workers:
                 try:
                     os.kill(pid, signal.SIGTERM)
                 except ProcessLookupError:
@@ -390,10 +417,12 @@ class TokeoSmtpd(MetaMixin):
             # a failed start must not leave already started services bound
             for server in servers:
                 await server.stop(wait_seconds_before_close=2.0)
+        if ended:
+            raise TokeoSmtpdError(f'smtpd: {", ".join(ended)}, all services stopped')
 
     def _run_worker(self, svc, global_limits, reuse):
         """Run one forked worker serving exactly one service."""
-        asyncio.run(self._serve_async([svc], global_limits, [], reuse))
+        asyncio.run(self._serve_async([svc], global_limits, {}, reuse))
 
     def serve(self, names=None):
         """
@@ -426,7 +455,7 @@ class TokeoSmtpd(MetaMixin):
         # limits above are inherited by every worker
         if plan['forks'] and not sys.platform.startswith('linux'):
             self.app.log.warning('smtpd: no parent-death signal on this platform -- a crashed master leaves the workers running')
-        child_pids = []
+        workers = {}
         for svc, count in plan['forks']:
             for _ in range(count):
                 pid = os.fork()
@@ -441,11 +470,12 @@ class TokeoSmtpd(MetaMixin):
                     finally:
                         # a forked worker must never run the parent's code path
                         os._exit(status)
-                child_pids.append(pid)
+                workers[pid] = svc.get('name')
+        child_pids = list(workers)
         if child_pids:
             self.app.log.info(f'smtpd: forked workers {child_pids}')
         try:
-            asyncio.run(self._serve_async(plan['inloop'], global_limits, child_pids, plan['reuse']))
+            asyncio.run(self._serve_async(plan['inloop'], global_limits, workers, plan['reuse']))
         finally:
             # the normal stop already forwarded SIGTERM; after a failed start
             # the workers still run and need it here before the reap
