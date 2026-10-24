@@ -50,12 +50,11 @@ its helpers and probes move into ```lib/```; the test files stay on top.
 Test data lives in ```data/``` of its subject. The files in the root of
 ```tests/``` are the shared base.
 
-Every folder of ```tests/``` with Python files has an ```__init__.py``` with
-a one-line docstring naming its subject, e.g.
-```"""Tests of tokeo.ext.dramatiq."""```. pytest then imports a test file by
-its full path, e.g. ```tests.ext.dramatiq.test_live```, so a file name only
-has to be unique within its folder and repeats nothing the folder already
-says.
+Every folder of ```tests/``` with Python files has an empty
+```__init__.py```, only the one of ```tests/``` itself has content. pytest
+then imports a test file by its full path, e.g.
+```tests.ext.dramatiq.test_live```, so a file name only has to be unique
+within its folder and repeats nothing the folder already says.
 
 An example from the tests of tokeo:
 
