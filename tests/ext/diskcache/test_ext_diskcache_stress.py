@@ -3,7 +3,7 @@ Stress tests of tokeo.ext.diskcache: threads in three processes run random
 operations on one cache, once without and once with purges in between.
 
 They run only with STRESSTESTS=1, STRESS_SECONDS sets the duration of each
-run and STRESS_SEED repeats a run.
+run, more than 2.5 s, and STRESS_SEED repeats a run.
 """
 
 import os
@@ -315,6 +315,9 @@ def show(report, title):
 
 
 def stress(directory, monkeypatch, purge):
+    if SECONDS <= TAIL:
+        # a purge run keeps its last TAIL seconds free of purges
+        pytest.fail(f'STRESS_SECONDS={SECONDS} is too short, it must be above {TAIL}', pytrace=False)
     seed = SEED + purge
     print(f'\nSTRESS_SEED={SEED} purge={purge} seconds={SECONDS}')
     connections = Connections(monkeypatch)
