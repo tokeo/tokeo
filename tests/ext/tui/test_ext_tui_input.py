@@ -21,6 +21,8 @@ from tests.ext.tui.tui_tests_helper import TuiInputTest
 
 CTRL_C, CTRL_D = '\x03', '\x04'
 
+needs_pty = pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
+
 
 @pytest.fixture
 def shell():
@@ -129,7 +131,7 @@ def test_log_handlers_write_to_the_shell_meanwhile(shell):
     assert during is proxy and handler.stream is sys.stderr
 
 
-@pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
+@needs_pty
 def test_output_of_other_threads_appears_above_the_prompt():
     """
     The probe prints, logs and calls app.print from another thread while

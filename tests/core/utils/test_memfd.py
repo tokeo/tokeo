@@ -16,6 +16,8 @@ import pytest
 
 from tokeo.core.utils.memfd import memory_paths, MemfdUnavailable
 
+needs_devfd = pytest.mark.skipif(not os.path.isdir('/dev/fd'), reason='needs /dev/fd')
+
 
 def test_single_blob_is_readable():
     """The path of one blob reads back its bytes."""
@@ -85,7 +87,7 @@ def test_loads_ssl_cert_chain_from_memory():
         context.load_cert_chain(cert_ref, key_ref)  # must not raise
 
 
-@pytest.mark.skipif(not os.path.isdir('/dev/fd'), reason='needs /dev/fd')
+@needs_devfd
 def test_devfd_pipe_backing_when_no_memfd(monkeypatch):
     """Without memfd_create, as on macOS, the paths are /dev/fd pipes."""
     monkeypatch.delattr(os, 'memfd_create', raising=False)

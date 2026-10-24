@@ -18,6 +18,8 @@ from tests.ext.automate.automate_tests_helper import AutomateTest
 
 CTRL_C, CTRL_D = '\x03', '\x04'
 
+needs_pty = pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
+
 
 class AutomateWithoutTuiTest(AutomateTest):
 
@@ -128,7 +130,7 @@ def test_shell_shows_a_failing_command(shell, monkeypatch):
     assert errors == ['Shell command failed: cannot run']
 
 
-@pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
+@needs_pty
 def test_shell_in_a_terminal():
     """
     The probe runs the automate shell; list shows the tasks, show nope

@@ -16,6 +16,8 @@ from tests.ext.scheduler.scheduler_tests_helper import SchedulerTest
 
 CTRL_D = '\x04'
 
+needs_pty = pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
+
 
 class SchedulerWithoutTuiTest(SchedulerTest):
 
@@ -135,7 +137,7 @@ def test_shell_shows_a_failing_command(started, monkeypatch):
     assert errors == ['Shell command failed: cannot pause']
 
 
-@pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
+@needs_pty
 def test_shell_shows_logs_of_tasks_above_the_prompt():
     """
     The probe runs the scheduler shell; "tasks fire 1" makes its task log,

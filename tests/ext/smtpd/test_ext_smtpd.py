@@ -31,6 +31,8 @@ from tokeo.ext.smtpd import (
 from tests.utils import ROOT, wait_process_group_ended
 from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
+needs_pdeathsig = pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the parent-death signal is Linux-only')
+
 # --- unit: handler resolving -----------------------------------------------------
 
 
@@ -292,7 +294,7 @@ def test_term_single_service_prefork_group(tmp_path):
         proc.kill()
 
 
-@pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the parent-death signal is Linux-only')
+@needs_pdeathsig
 def test_kill_master_takes_workers_down(tmp_path):
     """After SIGKILL of the master its workers end by the parent death signal."""
     port = _free_port()

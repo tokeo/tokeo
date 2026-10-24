@@ -24,6 +24,8 @@ from tokeo.core.exc import TokeoError
 from tests.utils import Terminal, wait_until
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqMiddlewareTest
 
+needs_pty = pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
+
 
 class DramatiqWithoutTuiTest(DramatiqTest):
 
@@ -485,7 +487,7 @@ def test_command_interval_checked(command):
         command('--follow', '--interval', '0')
 
 
-@pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
+@needs_pty
 def test_command_follow_ends_on_ctrl_c_in_a_terminal(tmp):
     """
     The probe follows the monitor in a terminal; Ctrl-C ends it within
