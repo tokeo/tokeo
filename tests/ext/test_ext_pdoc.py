@@ -105,14 +105,14 @@ def log_lines(app, monkeypatch):
 # --------------------------------------------------------------------------------------
 
 
-def write(path, text):
+def _write(path, text):
     """Write `text` to `path`, creating parent directories."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding='utf-8')
     return path
 
 
-def has(lines, needle):
+def _has(lines, needle):
     """Did any captured log line contain `needle`?"""
     return any(needle in line for line in lines)
 
@@ -251,7 +251,7 @@ def test_collect_hash_colon_docs_survives_broken_source(app):
 def test_inject_hash_colon_docstrings_fills_pdoc_members(app, tmp_path, monkeypatch):
     """The "#:" texts become docstrings, a string literal wins."""
     pdoc_doc = pytest.importorskip('pdoc.doc')
-    write(tmp_path / 'hcmod.py', HASH_COLON_SOURCE)
+    _write(tmp_path / 'hcmod.py', HASH_COLON_SOURCE)
     monkeypatch.syspath_prepend(str(tmp_path))
 
     module = pdoc_doc.Module.from_name('hcmod')
@@ -354,29 +354,29 @@ def test_config_settings_returns_empty_for_a_non_mapping(app):
 # --------------------------------------------------------------------------------------
 
 
-def build_config_tree(root):
+def _build_config_tree(root):
     """A config dir covering every file kind appenv knows."""
-    write(root / 'base.yaml', 'smtp:\n  host: base\n')
-    write(root / 'base.d' / 'smtp.yaml', 'smtp:\n  port: 25\n')
-    write(root / 'production.yaml', 'smtp:\n  host: prod\n')
-    write(root / 'production.d' / 'smtp.yaml', 'smtp:\n  port: 587\n')
-    write(root / 'production.d' / 'creds.local.yaml', 'smtp:\n  user: u\n')
-    write(root / 'production.local.yaml', 'smtp:\n  password: SECRET\n')
+    _write(root / 'base.yaml', 'smtp:\n  host: base\n')
+    _write(root / 'base.d' / 'smtp.yaml', 'smtp:\n  port: 25\n')
+    _write(root / 'production.yaml', 'smtp:\n  host: prod\n')
+    _write(root / 'production.d' / 'smtp.yaml', 'smtp:\n  port: 587\n')
+    _write(root / 'production.d' / 'creds.local.yaml', 'smtp:\n  user: u\n')
+    _write(root / 'production.local.yaml', 'smtp:\n  password: SECRET\n')
     return root
 
 
-def collect_config_sections(app, tmp_path, monkeypatch):
+def _collect_config_sections(app, tmp_path, monkeypatch):
     """Run `_render_config_page` and return the section names it produced."""
     import types
 
-    config_dir = build_config_tree(tmp_path / 'config' / 'spiral')
+    config_dir = _build_config_tree(tmp_path / 'config' / 'spiral')
     monkeypatch.setattr(
         app,
         'env',
         types.SimpleNamespace(
             APP_CONFIG_DIR=str(config_dir),
             get_config_files=lambda app_env='base', app_config_file_suffix='.yaml': (
-                fake_appenv_files(config_dir, app_env, app_config_file_suffix)
+                _fake_appenv_files(config_dir, app_env, app_config_file_suffix)
             ),
         ),
         raising=False,
@@ -395,7 +395,7 @@ def collect_config_sections(app, tmp_path, monkeypatch):
     return list(seen)
 
 
-def fake_appenv_files(config_dir, app_env, suffix):
+def _fake_appenv_files(config_dir, app_env, suffix):
     """
     Reproduce appenv's resolver, including its ordering.
 
@@ -423,7 +423,7 @@ def test_config_page_follows_the_load_order(app, tmp_path, monkeypatch):
     """The page lists the config files in the order cement loads them."""
     # the order carries meaning: cement merges the files in this sequence and
     # the last one wins, so the page reads top to bottom as values are applied
-    sections = collect_config_sections(app, tmp_path, monkeypatch)
+    sections = _collect_config_sections(app, tmp_path, monkeypatch)
 
     assert sections == [
         'base',
@@ -439,9 +439,9 @@ def test_config_page_skips_base_local(app, tmp_path, monkeypatch):
     """base.local is not listed."""
     # appenv ignores `.local` for the base environment, so documenting one
     # would promise an override that never happens
-    write(tmp_path / 'config' / 'spiral' / 'base.local.yaml', 'smtp:\n  x: 1\n')
+    _write(tmp_path / 'config' / 'spiral' / 'base.local.yaml', 'smtp:\n  x: 1\n')
 
-    sections = collect_config_sections(app, tmp_path, monkeypatch)
+    sections = _collect_config_sections(app, tmp_path, monkeypatch)
 
     assert 'base.local' not in sections
 
@@ -455,9 +455,9 @@ def test_discover_walks_namespace_subpackages(app, tmp_path, monkeypatch):
     """A subpackage without __init__.py is found with its modules."""
     # `pkg.space` has no __init__.py; pkgutil-based walking would skip it
     # and everything below it
-    write(tmp_path / 'pkg' / '__init__.py', '"""pkg."""\n')
-    write(tmp_path / 'pkg' / 'plain.py', '"""plain."""\n')
-    write(tmp_path / 'pkg' / 'space' / 'deep.py', '"""deep."""\n')
+    _write(tmp_path / 'pkg' / '__init__.py', '"""pkg."""\n')
+    _write(tmp_path / 'pkg' / 'plain.py', '"""plain."""\n')
+    _write(tmp_path / 'pkg' / 'space' / 'deep.py', '"""deep."""\n')
     monkeypatch.syspath_prepend(str(tmp_path))
 
     found = app.pdoc._discover('pkg')
@@ -467,9 +467,9 @@ def test_discover_walks_namespace_subpackages(app, tmp_path, monkeypatch):
 
 def test_discover_honours_excludes(app, tmp_path, monkeypatch):
     """An excluded module is left out."""
-    write(tmp_path / 'expkg' / '__init__.py', '"""expkg."""\n')
-    write(tmp_path / 'expkg' / 'keep.py', '"""keep."""\n')
-    write(tmp_path / 'expkg' / 'drop.py', '"""drop."""\n')
+    _write(tmp_path / 'expkg' / '__init__.py', '"""expkg."""\n')
+    _write(tmp_path / 'expkg' / 'keep.py', '"""keep."""\n')
+    _write(tmp_path / 'expkg' / 'drop.py', '"""drop."""\n')
     monkeypatch.syspath_prepend(str(tmp_path))
 
     found = app.pdoc._discover('expkg', excludes=['expkg.drop'])
@@ -482,8 +482,8 @@ def test_discover_skips_template_placeholders(app, tmp_path, monkeypatch):
     """Directories named "{{ ... }}" are skipped."""
     # code-generation trees carry `{{ name }}` directories that are not
     # importable modules
-    write(tmp_path / 'tplpkg' / '__init__.py', '"""tplpkg."""\n')
-    write(tmp_path / 'tplpkg' / '{{ project }}' / 'x.py', 'x = 1\n')
+    _write(tmp_path / 'tplpkg' / '__init__.py', '"""tplpkg."""\n')
+    _write(tmp_path / 'tplpkg' / '{{ project }}' / 'x.py', 'x = 1\n')
     monkeypatch.syspath_prepend(str(tmp_path))
 
     found = app.pdoc._discover('tplpkg')
@@ -493,12 +493,12 @@ def test_discover_skips_template_placeholders(app, tmp_path, monkeypatch):
 
 def test_discover_honours_pdoc_overrides(app, tmp_path, monkeypatch):
     """A module set False in __pdoc__ is left out."""
-    write(
+    _write(
         tmp_path / 'ovpkg' / '__init__.py',
         '"""ovpkg."""\n\n__pdoc__ = {"hidden": False}\n',
     )
-    write(tmp_path / 'ovpkg' / 'hidden.py', '"""hidden."""\n')
-    write(tmp_path / 'ovpkg' / 'shown.py', '"""shown."""\n')
+    _write(tmp_path / 'ovpkg' / 'hidden.py', '"""hidden."""\n')
+    _write(tmp_path / 'ovpkg' / 'shown.py', '"""shown."""\n')
     monkeypatch.syspath_prepend(str(tmp_path))
 
     found = app.pdoc._discover('ovpkg')
@@ -512,7 +512,7 @@ def test_discover_honours_pdoc_overrides(app, tmp_path, monkeypatch):
 # --------------------------------------------------------------------------------------
 
 
-def stub_dirs(app, monkeypatch, dirs):
+def _stub_dirs(app, monkeypatch, dirs):
     """Pretend the documented modules resolve to `dirs`."""
     monkeypatch.setattr(app.pdoc, '_module_dirs', lambda: dirs)
     monkeypatch.setattr(app.pdoc, '_resolve_docstrings_dirs', lambda: [])
@@ -528,7 +528,7 @@ def test_watch_dirs_drops_directories_outside_the_project(app, tmp_path, monkeyp
     outside_dir = tmp_path / 'site-packages' / 'tokeo'
     outside_dir.mkdir(parents=True)
     monkeypatch.chdir(project)
-    stub_dirs(
+    _stub_dirs(
         app,
         monkeypatch,
         [
@@ -549,7 +549,7 @@ def test_watch_dirs_collapses_nested_directories(app, tmp_path, monkeypatch):
     project = tmp_path / 'project'
     (project / 'spiral' / 'core').mkdir(parents=True)
     monkeypatch.chdir(project)
-    stub_dirs(
+    _stub_dirs(
         app,
         monkeypatch,
         [
@@ -574,7 +574,7 @@ def test_watch_dirs_does_not_confuse_a_prefix_with_a_parent(
     sibling = tmp_path / 'proj2'
     sibling.mkdir()
     monkeypatch.chdir(project)
-    stub_dirs(app, monkeypatch, [str(project / 'app'), str(sibling)])
+    _stub_dirs(app, monkeypatch, [str(project / 'app'), str(sibling)])
 
     assert app.pdoc._watch_dirs()[0] == [str(project / 'app')]
 
@@ -582,7 +582,7 @@ def test_watch_dirs_does_not_confuse_a_prefix_with_a_parent(
 def test_watch_dirs_includes_the_docstrings_dirs(app, tmp_path, monkeypatch):
     """The directories of the docstrings are watched too."""
     # the decorator snippets are watched too, so editing one rebuilds. Cannot
-    # use stub_dirs() here: that helper pins _resolve_docstrings_dirs to []
+    # use _stub_dirs() here: that helper pins _resolve_docstrings_dirs to []
     project = tmp_path / 'project'
     (project / 'spiral').mkdir(parents=True)
     (project / 'snippets').mkdir()
@@ -615,7 +615,7 @@ def test_watch_dirs_includes_the_config_dir_when_appenv_is_loaded(
     (project / 'spiral').mkdir(parents=True)
     (project / 'config').mkdir()
     monkeypatch.chdir(project)
-    stub_dirs(app, monkeypatch, [str(project / 'spiral')])
+    _stub_dirs(app, monkeypatch, [str(project / 'spiral')])
     monkeypatch.setattr(
         app,
         'env',
@@ -643,8 +643,8 @@ def test_init_md_becomes_the_docstring_of_a_namespace_package(
     # would render the package page blank
     pdoc_doc = pytest.importorskip('pdoc.doc')
     package = tmp_path / 'nspkg'
-    write(package / '__init__.md', 'Intro from markdown.\n')
-    write(package / 'mod.py', '"""A module."""\n')
+    _write(package / '__init__.md', 'Intro from markdown.\n')
+    _write(package / 'mod.py', '"""A module."""\n')
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc_doc.Module.from_name.cache_clear()
 
@@ -660,8 +660,8 @@ def test_init_md_is_skipped_for_a_regular_package(app, tmp_path, monkeypatch):
     # whatever an __init__.md next to it says
     pdoc_doc = pytest.importorskip('pdoc.doc')
     package = tmp_path / 'realpkg'
-    write(package / '__init__.py', '"""The real docstring."""\n')
-    write(package / '__init__.md', 'Should be ignored.\n')
+    _write(package / '__init__.py', '"""The real docstring."""\n')
+    _write(package / '__init__.md', 'Should be ignored.\n')
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc_doc.Module.from_name.cache_clear()
 
@@ -677,8 +677,8 @@ def test_init_md_does_not_override_an_existing_docstring(app, tmp_path, monkeypa
     # already set (e.g. injected earlier in the chain) must survive
     pdoc_doc = pytest.importorskip('pdoc.doc')
     package = tmp_path / 'guardpkg'
-    write(package / '__init__.md', 'From markdown.\n')
-    write(package / 'mod.py', '"""A module."""\n')
+    _write(package / '__init__.md', 'From markdown.\n')
+    _write(package / 'mod.py', '"""A module."""\n')
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc_doc.Module.from_name.cache_clear()
 
@@ -778,7 +778,7 @@ class Beta:
 }
 
 
-def render_sidebar(tmp_path, monkeypatch, source, package_name='sample'):
+def _render_sidebar(tmp_path, monkeypatch, source, package_name='sample'):
     """
     Render one module through the real pipeline, return its sidebar HTML.
 
@@ -796,8 +796,8 @@ def render_sidebar(tmp_path, monkeypatch, source, package_name='sample'):
 
     package = tmp_path / package_name
     package.mkdir()
-    write(package / '__init__.py', '"""Sample."""\n')
-    write(package / 'main.py', source)
+    _write(package / '__init__.py', '"""Sample."""\n')
+    _write(package / 'main.py', source)
     monkeypatch.chdir(tmp_path)
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc.doc.Module.from_name.cache_clear()
@@ -859,7 +859,7 @@ class SidebarEntries(HTMLParser):
             self._div_depth = max(self._div_depth - 1, 0)
 
 
-def class_entries(sidebar):
+def _class_entries(sidebar):
     """Map each class name in the sidebar to how it was rendered."""
     parser = SidebarEntries()
     parser.feed(sidebar)
@@ -871,7 +871,7 @@ def test_sidebar_bare_classes_are_not_indented(tmp_path, monkeypatch):
     # with no chevron anywhere in the section there is nothing to line up
     # with, so padding would only push the names out of line with every
     # other sidebar section
-    entries = class_entries(render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['bare'], 'bare_a'))
+    entries = _class_entries(_render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['bare'], 'bare_a'))
 
     assert entries == {'Alpha': 'py-0.5', 'Beta': 'py-0.5'}
 
@@ -883,15 +883,15 @@ def test_sidebar_bare_classes_align_with_the_functions_section(
     """Classes without members carry no pl- padding."""
     # the visible symptom of a wrong padding: class names sitting further in
     # than the function names right below them
-    sidebar = render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['bare'], 'bare_b')
+    sidebar = _render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['bare'], 'bare_b')
 
-    assert 'pl-' not in class_entries(sidebar)['Alpha']
+    assert 'pl-' not in _class_entries(sidebar)['Alpha']
 
 
 def test_sidebar_expandable_classes_get_a_chevron(tmp_path, monkeypatch):
     """Classes with methods are expandable, each with a chevron."""
-    sidebar = render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['expandable'], 'exp_a')
-    entries = class_entries(sidebar)
+    sidebar = _render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['expandable'], 'exp_a')
+    entries = _class_entries(sidebar)
 
     assert entries == {'Alpha': 'expandable', 'Beta': 'expandable'}
     assert sidebar.count('tk-chev') == 2
@@ -899,7 +899,7 @@ def test_sidebar_expandable_classes_get_a_chevron(tmp_path, monkeypatch):
 
 def test_sidebar_expandable_classes_list_their_members(tmp_path, monkeypatch):
     """An expandable class lists links to its methods."""
-    sidebar = render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['expandable'], 'exp_b')
+    sidebar = _render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['expandable'], 'exp_b')
 
     assert 'href="#Alpha.start"' in sidebar
     assert 'href="#Alpha.stop"' in sidebar
@@ -910,7 +910,7 @@ def test_sidebar_mixed_classes_line_up_with_the_chevron(tmp_path, monkeypatch):
     """Next to an expandable class a plain one gets pl-3.5."""
     # here the padding is earned: the plain link has to start where the
     # expandable one's name starts, past its chevron
-    entries = class_entries(render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_a'))
+    entries = _class_entries(_render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_a'))
 
     assert entries['Beta'] == 'expandable'
     assert entries['Alpha'] == 'py-0.5 pl-3.5'
@@ -921,8 +921,8 @@ def test_sidebar_padding_matches_the_chevron_width(tmp_path, monkeypatch):
     # `tk-chev` is .4rem wide and the summary uses `gap-2` (.5rem), so the
     # name starts .9rem in; pl-3.5 is .875rem, the closest value the
     # pre-built tailwind.min.css actually ships
-    sidebar = render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_b')
-    padding = class_entries(sidebar)['Alpha']
+    sidebar = _render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_b')
+    padding = _class_entries(sidebar)['Alpha']
 
     assert padding.endswith('pl-3.5')
     assert 'gap-2' in sidebar  # the chevron gap the padding is derived from
@@ -932,7 +932,7 @@ def test_sidebar_padding_class_exists_in_the_stylesheet(tmp_path, monkeypatch):
     """pl-3.5 exists in the shipped tailwind.min.css."""
     # an arbitrary value like `pl-[0.9rem]` would need a tailwind rebuild and
     # would silently have no effect until someone runs it
-    render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_c')
+    _render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_c')
     stylesheet = (tmp_path / 'html' / 'assets' / 'tailwind.min.css').read_text()
 
     assert '.pl-3\\.5{' in stylesheet
@@ -945,7 +945,7 @@ def test_sidebar_padding_class_exists_in_the_stylesheet(tmp_path, monkeypatch):
 
 def test_serve_answers_and_stops_via_the_started_monitor(app, tmp_path, monkeypatch):
     """serve answers a request and stops by the monitor it started."""
-    write(tmp_path / 'html' / 'index.html', '<html>tokeo</html>\n')
+    _write(tmp_path / 'html' / 'index.html', '<html>tokeo</html>\n')
     seen = {}
 
     def monitor(httpd):
@@ -979,14 +979,14 @@ def test_serve_reports_a_missing_output_dir(tmp_path):
         booted.log.error = lambda msg, *a, **kw: lines.append(str(msg))
 
         assert booted.pdoc.serve() is None
-        assert has(lines, 'nothing to serve')
+        assert _has(lines, 'nothing to serve')
 
 
 def test_serve_raises_a_clean_error_when_the_port_is_taken(tmp_path):
     """A taken port raises TokeoPdocError naming the port."""
     import socket
 
-    write(tmp_path / 'html' / 'index.html', '<html>x</html>\n')
+    _write(tmp_path / 'html' / 'index.html', '<html>x</html>\n')
     blocker = socket.socket()
     blocker.bind(('127.0.0.1', 0))
     blocker.listen(1)
@@ -1125,7 +1125,7 @@ def test_set_show_config_without_argument_takes_the_config(app):
     assert app.pdoc._show_config == app.config.get('pdoc', 'show_config')
 
 
-def watch_output(app, monkeypatch, tmp_path, restarted=False):
+def _watch_output(app, monkeypatch, tmp_path, restarted=False):
     """Start a watch and return the lines it logged, by level."""
     pytest.importorskip('watchdog')
     project = tmp_path / 'project'
@@ -1133,7 +1133,7 @@ def watch_output(app, monkeypatch, tmp_path, restarted=False):
     monkeypatch.chdir(project)
     elsewhere = tmp_path / 'elsewhere'
     elsewhere.mkdir()
-    stub_dirs(app, monkeypatch, [str(project / 'spiral'), str(elsewhere)])
+    _stub_dirs(app, monkeypatch, [str(project / 'spiral'), str(elsewhere)])
 
     lines = {'info': [], 'debug': []}
     for level in lines:
@@ -1150,7 +1150,7 @@ def watch_output(app, monkeypatch, tmp_path, restarted=False):
 
 def test_watch_announces_itself_on_info(app, monkeypatch, tmp_path):
     """The watch logs one line on info."""
-    lines = watch_output(app, monkeypatch, tmp_path)
+    lines = _watch_output(app, monkeypatch, tmp_path)
 
     assert lines['info'] == ['pdoc watching for changes on project files']
 
@@ -1159,7 +1159,7 @@ def test_watch_puts_the_directory_detail_on_debug(app, monkeypatch, tmp_path):
     """The watched and skipped directories are logged on debug."""
     # the paths are noise on info level but the only way to tell why an edit
     # does nothing, so they belong on debug rather than nowhere
-    lines = watch_output(app, monkeypatch, tmp_path)
+    lines = _watch_output(app, monkeypatch, tmp_path)
 
     assert any(line.startswith('pdoc watching /') for line in lines['debug'])
     assert any('not watching' in line for line in lines['debug'])
@@ -1170,7 +1170,7 @@ def test_watch_stays_quiet_after_a_restart(app, monkeypatch, tmp_path):
     """After a restart the watch logs nothing."""
     # a restart replays the whole command, and repeating the startup output
     # would bury the one line that says what changed
-    lines = watch_output(app, monkeypatch, tmp_path, restarted=True)
+    lines = _watch_output(app, monkeypatch, tmp_path, restarted=True)
 
     assert lines['info'] == []
     assert lines['debug'] == []
@@ -1233,13 +1233,13 @@ def test_restart_flag_is_hidden_from_the_help(tmp_path, monkeypatch, capsys):
 # --------------------------------------------------------------------------------------
 
 
-def render_minimal(tmp_path, monkeypatch, package_name, clean):
+def _render_minimal(tmp_path, monkeypatch, package_name, clean):
     """Render a one-module package, so the clean step really runs."""
     import pdoc.doc
 
     package = tmp_path / package_name
     package.mkdir()
-    write(package / '__init__.py', '"""Sample."""\n')
+    _write(package / '__init__.py', '"""Sample."""\n')
     monkeypatch.chdir(tmp_path)
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc.doc.Module.from_name.cache_clear()
@@ -1255,10 +1255,10 @@ def test_render_logs_the_skipped_modules_with_their_reason(tmp_path, monkeypatch
     import pdoc.doc
 
     package = tmp_path / 'skippkg'
-    write(package / '__init__.py', '"""Sample."""\n')
-    write(package / 'optional_a.py', 'import not_installed_pkg\n')
-    write(package / 'optional_b.py', 'import not_installed_pkg.sub\n')
-    write(package / 'broken.py', 'raise RuntimeError("broken on import")\n')
+    _write(package / '__init__.py', '"""Sample."""\n')
+    _write(package / 'optional_a.py', 'import not_installed_pkg\n')
+    _write(package / 'optional_b.py', 'import not_installed_pkg.sub\n')
+    _write(package / 'broken.py', 'raise RuntimeError("broken on import")\n')
     monkeypatch.chdir(tmp_path)
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc.doc.Module.from_name.cache_clear()
@@ -1282,9 +1282,9 @@ def test_clean_wipes_the_output_dir(tmp_path, monkeypatch):
     """--clean removes old pages before the render."""
     # pages of modules that no longer exist would otherwise stay reachable
     stale = tmp_path / 'html' / 'stale.html'
-    write(stale, '<html>from an earlier render</html>\n')
+    _write(stale, '<html>from an earlier render</html>\n')
 
-    render_minimal(tmp_path, monkeypatch, 'cleanpkg', clean=True)
+    _render_minimal(tmp_path, monkeypatch, 'cleanpkg', clean=True)
 
     assert not stale.exists()
     assert (tmp_path / 'html' / 'index.html').exists()
@@ -1293,9 +1293,9 @@ def test_clean_wipes_the_output_dir(tmp_path, monkeypatch):
 def test_without_clean_the_output_dir_is_kept(tmp_path, monkeypatch):
     """Without --clean old pages stay."""
     stale = tmp_path / 'html' / 'stale.html'
-    write(stale, '<html>from an earlier render</html>\n')
+    _write(stale, '<html>from an earlier render</html>\n')
 
-    render_minimal(tmp_path, monkeypatch, 'keeppkg', clean=False)
+    _render_minimal(tmp_path, monkeypatch, 'keeppkg', clean=False)
 
     assert stale.exists()
     assert (tmp_path / 'html' / 'index.html').exists()
@@ -1393,7 +1393,7 @@ def test_render_logs_instead_of_raising_for_watch(app, log_lines, monkeypatch):
 
     app.pdoc.render(raise_on_error=False)
 
-    assert has(log_lines, 'render failed')
+    assert _has(log_lines, 'render failed')
 
 
 def test_module_source_dir_of_a_package(app, tmp_path, monkeypatch):
@@ -1401,7 +1401,7 @@ def test_module_source_dir_of_a_package(app, tmp_path, monkeypatch):
     import importlib
     import types
 
-    write(tmp_path / 'mdpkg' / '__init__.py', '"""mdpkg."""\n')
+    _write(tmp_path / 'mdpkg' / '__init__.py', '"""mdpkg."""\n')
     monkeypatch.syspath_prepend(str(tmp_path))
     module = types.SimpleNamespace(obj=importlib.import_module('mdpkg'))
 
@@ -1413,7 +1413,7 @@ def test_module_source_dir_of_a_package(app, tmp_path, monkeypatch):
 # --------------------------------------------------------------------------------------
 
 
-def run_cli(tmp_path, monkeypatch, argv):
+def _run_cli(tmp_path, monkeypatch, argv):
     """
     Run the real CLI and record what the handler was asked to do.
 
@@ -1512,14 +1512,14 @@ def test_no_config_switch_removes_config_from_the_summary(tmp_path, monkeypatch)
 
 def test_controller_renders_only_without_flags(tmp_path, monkeypatch):
     """pdoc render renders and raises on errors."""
-    assert run_cli(tmp_path, monkeypatch, ['pdoc', 'render']) == [
+    assert _run_cli(tmp_path, monkeypatch, ['pdoc', 'render']) == [
         ('render', True),
     ]
 
 
 def test_controller_serves_after_rendering(tmp_path, monkeypatch):
     """--serve renders, then serves without watch."""
-    assert run_cli(tmp_path, monkeypatch, ['pdoc', 'render', '--serve']) == [
+    assert _run_cli(tmp_path, monkeypatch, ['pdoc', 'render', '--serve']) == [
         ('render', True),
         ('serve', False),
     ]
@@ -1529,7 +1529,7 @@ def test_controller_ignores_watch_without_serve(tmp_path, monkeypatch):
     """--watch without --serve only renders."""
     # --watch only means something while serving; on its own the command
     # stays a plain render and keeps failing loudly
-    assert run_cli(tmp_path, monkeypatch, ['pdoc', 'render', '--watch']) == [
+    assert _run_cli(tmp_path, monkeypatch, ['pdoc', 'render', '--watch']) == [
         ('render', True),
     ]
 
@@ -1538,7 +1538,7 @@ def test_controller_watches_and_tolerates_a_failed_render(tmp_path, monkeypatch)
     """--serve --watch renders without raising, then serves with watch."""
     # a broken template must not end the watch session, the next save fixes it
     argv = ['pdoc', 'render', '--serve', '--watch']
-    assert run_cli(tmp_path, monkeypatch, argv) == [
+    assert _run_cli(tmp_path, monkeypatch, argv) == [
         ('render', False),
         ('serve', True),
     ]
@@ -1546,7 +1546,7 @@ def test_controller_watches_and_tolerates_a_failed_render(tmp_path, monkeypatch)
 
 def test_controller_serve_command_does_not_render(tmp_path, monkeypatch):
     """pdoc serve serves without a render."""
-    assert run_cli(tmp_path, monkeypatch, ['pdoc', 'serve']) == [('serve', None)]
+    assert _run_cli(tmp_path, monkeypatch, ['pdoc', 'serve']) == [('serve', None)]
 
 
 def test_controller_passes_positional_modules(tmp_path, monkeypatch):

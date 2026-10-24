@@ -26,7 +26,7 @@ from tests.ext.diskcache.diskcache_tests_helper import (
 # --------------------------------------------------------------------------------------
 
 
-def temper_worker(directory, count, hold, result_queue):
+def _temper_worker(directory, count, hold, result_queue):
     # each process opens its own app pointing at the same cache directory;
     # report a payload either way so the parent never waits forever
     try:
@@ -43,7 +43,7 @@ def temper_worker(directory, count, hold, result_queue):
         result_queue.put(('error', repr(err)))
 
 
-def throttle_worker(directory, count, per_seconds, result_queue):
+def _throttle_worker(directory, count, per_seconds, result_queue):
     # each process opens its own app pointing at the same cache directory;
     # report a payload either way so the parent never waits forever
     try:
@@ -158,7 +158,7 @@ def test_locks_acquire_returns_true(tmp):
         assert app.cache.locks.locked('acquire') is False
 
 
-def warnings_of(app, monkeypatch):
+def _warnings_of(app, monkeypatch):
     # collect the warnings the app logs
     logged = []
     monkeypatch.setattr(app.log, 'warning', lambda msg, **kw: logged.append(msg))
@@ -168,7 +168,7 @@ def warnings_of(app, monkeypatch):
 def test_locks_lock_releases_its_own_lock(tmp, monkeypatch):
     """lock() holds the lock in the block and frees it after, no warning."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = warnings_of(app, monkeypatch)
+        logged = _warnings_of(app, monkeypatch)
         with app.cache.locks.lock('own'):
             assert app.cache.locks.locked('own') is True
         assert app.cache.locks.locked('own') is False
@@ -178,7 +178,7 @@ def test_locks_lock_releases_its_own_lock(tmp, monkeypatch):
 def test_locks_lock_lost_by_purge_warns(tmp, monkeypatch):
     """A lock purged in the block warns "... lost before release (missing)"."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = warnings_of(app, monkeypatch)
+        logged = _warnings_of(app, monkeypatch)
         with app.cache.locks.lock('lost'):
             app.cache.locks.purge()
         assert logged == ['lock dc_lost was lost before release (missing)']
@@ -187,7 +187,7 @@ def test_locks_lock_lost_by_purge_warns(tmp, monkeypatch):
 def test_locks_lock_keeps_the_lock_of_another(tmp, monkeypatch):
     """A lock taken by another after a purge stays held, with a warning."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = warnings_of(app, monkeypatch)
+        logged = _warnings_of(app, monkeypatch)
         with app.cache.locks.lock('other'):
             app.cache.locks.purge()
             # another holder takes the lock after the purge
@@ -199,7 +199,7 @@ def test_locks_lock_keeps_the_lock_of_another(tmp, monkeypatch):
 def test_locks_lock_keeps_the_lock_of_another_after_expire(tmp, monkeypatch):
     """A lock taken by another after expire stays held, with a warning."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = warnings_of(app, monkeypatch)
+        logged = _warnings_of(app, monkeypatch)
         with app.cache.locks.lock('expire', expire=0.05):
             time.sleep(0.1)
             app.cache.locks.acquire('expire')
@@ -332,7 +332,7 @@ def test_temper_process_concurrency_cap(tmp):
     result_queue = ctx.Queue()
     # fmt: off
     procs = [
-        ctx.Process(target=temper_worker, args=(tmp.dir, count, 0.4, result_queue))
+        ctx.Process(target=_temper_worker, args=(tmp.dir, count, 0.4, result_queue))
         for _ in range(workers)
     ]
     # fmt: on
@@ -444,7 +444,7 @@ def test_throttle_process_rate_cap(tmp):
     result_queue = ctx.Queue()
     procs = [
         ctx.Process(
-            target=throttle_worker,
+            target=_throttle_worker,
             args=(tmp.dir, count, per_seconds, result_queue),
         )
         for _ in range(workers)

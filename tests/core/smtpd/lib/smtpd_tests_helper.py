@@ -28,7 +28,7 @@ from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents
 from tokeo.core.smtpd.exc import Smtpd550Exception
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 
 
 def run_line(smtpd, session, line, line_break=b'\r\n'):
@@ -138,7 +138,7 @@ def make_cert(common_name, san_ips=(), san_dns=(), issuer_cert=None, issuer_key=
 
 def read_message(name):
     """Read a message file and convert it to RFC CRLF line endings."""
-    with open(os.path.join(DATA_DIR, name), 'r') as handle:
+    with open(os.path.join(_DATA_DIR, name), 'r') as handle:
         return handle.read().replace('\r', '').replace('\n', '\r\n')
 
 

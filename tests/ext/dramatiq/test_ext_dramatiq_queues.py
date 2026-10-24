@@ -147,7 +147,7 @@ def app(tmp):
         yield app
 
 
-def dead_letter(actor='send_mail', queue='mail', args=('a@b.c',), **options):
+def _dead_letter(actor='send_mail', queue='mail', args=('a@b.c',), **options):
     return Message(queue_name=queue, actor_name=actor, args=args, kwargs={}, options=options).encode()
 
 
@@ -204,7 +204,7 @@ def test_state_of_queue_without_actor(app, server):
 def test_peek_dead_leaves_letters(app, server):
     """peek_dead shows actor, retries and error, args cut, letters stay."""
     long_args = ('x' * 600,)
-    server.add('mail.XQ', dead_letter(retries=3, traceback='Traceback\n  ...\nValueError: bad'), dead_letter(args=long_args))
+    server.add('mail.XQ', _dead_letter(retries=3, traceback='Traceback\n  ...\nValueError: bad'), _dead_letter(args=long_args))
     letters = app.dramatiq.queues.peek_dead('mail')
     assert (letters[0]['actor'], letters[0]['retries'], letters[0]['error']) == ('send_mail', 3, 'ValueError: bad')
     assert letters[0]['args'] == "(('a@b.c',), {})"
@@ -215,7 +215,7 @@ def test_peek_dead_leaves_letters(app, server):
 
 def test_peek_dead_limit_and_missing(app, server):
     """peek_dead stops at the limit and gives [] for a missing queue."""
-    server.add('mail.XQ', dead_letter(), dead_letter(), dead_letter())
+    server.add('mail.XQ', _dead_letter(), _dead_letter(), _dead_letter())
     assert len(app.dramatiq.queues.peek_dead('mail', limit=2)) == 2
     assert len(server.queues['mail.XQ']['messages']) == 3
     assert app.dramatiq.queues.peek_dead('orders_unparalleled') == []
@@ -224,7 +224,7 @@ def test_peek_dead_limit_and_missing(app, server):
 def test_requeue_dead_resets_retries(app, server):
     """requeue_dead moves letters back without retries, traceback and eta."""
     server.add('mail')
-    server.add('mail.XQ', dead_letter(queue='mail.DQ', retries=20, traceback='tb', eta=1, broker_priority=3), dead_letter())
+    server.add('mail.XQ', _dead_letter(queue='mail.DQ', retries=20, traceback='tb', eta=1, broker_priority=3), _dead_letter())
     assert app.dramatiq.queues.requeue_dead('mail', limit=1) == dict(name='mail', requeued=1)
     (body,) = server.queues['mail']['messages']
     message = Message.decode(body)
@@ -236,7 +236,7 @@ def test_requeue_dead_resets_retries(app, server):
 
 def test_requeue_dead_refuses_missing_queue(app, server):
     """requeue_dead to a missing queue raises and keeps the letters."""
-    server.add('mail.XQ', dead_letter())
+    server.add('mail.XQ', _dead_letter())
     with pytest.raises(TokeoDramatiqQueueError, match='Queue mail is missing') as e:
         app.dramatiq.queues.requeue_dead('mail')
     assert e.value.queue == 'mail'
@@ -246,7 +246,7 @@ def test_requeue_dead_refuses_missing_queue(app, server):
 def test_requeue_dead_keeps_letter_when_publish_fails(app, server):
     """A refused publish raises and puts the letter back at once."""
     server.add('mail')
-    server.add('mail.XQ', dead_letter())
+    server.add('mail.XQ', _dead_letter())
     server.refuse_publish = True
     with pytest.raises(TokeoDramatiqRefusedError, match='refused the request \\(UnroutableError'):
         app.dramatiq.queues.requeue_dead('mail')
@@ -370,7 +370,7 @@ def command(tmp, server, capsys, monkeypatch):
 def test_command_state_table(command, server):
     """dramatiq queues shows the state table and the dead letters of a queue."""
     server.add('mail', b'1', consumers=0)
-    server.add('mail.XQ', dead_letter())
+    server.add('mail.XQ', _dead_letter())
     lines = [line.strip() for line in command('mail', 'old', '--dead').splitlines() if line.strip()]
     assert lines[0] == 'queues'
     assert lines[1].split() == ['queue', 'ready', 'delayed', 'dead', 'consumers', 'flags']

@@ -185,7 +185,7 @@ def test_register_invalid_queue_arguments(tmp, keep_dead_message_ttl, key, value
 # --- middleware defaults -----------------------------------------------------
 
 
-def middleware_of(kind):
+def _middleware_of(kind):
     return [m for m in dramatiq.get_broker().middleware if isinstance(m, kind)][0]
 
 
@@ -195,10 +195,10 @@ def test_register_middleware_defaults(tmp):
 
     with DramatiqMiddlewareTest(tmp):
         # the defaults are the ones of dramatiq, so nothing changes for apps
-        assert middleware_of(middleware.TimeLimit).time_limit == 600_000
-        assert middleware_of(middleware.AgeLimit).max_age is None
-        assert middleware_of(middleware.ShutdownNotifications).notify_shutdown is False
-        retries = middleware_of(middleware.Retries)
+        assert _middleware_of(middleware.TimeLimit).time_limit == 600_000
+        assert _middleware_of(middleware.AgeLimit).max_age is None
+        assert _middleware_of(middleware.ShutdownNotifications).notify_shutdown is False
+        retries = _middleware_of(middleware.Retries)
         assert (retries.max_retries, retries.min_backoff, retries.max_backoff) == (20, 15_000, 604_800_000)
 
 
@@ -208,10 +208,10 @@ def test_register_middleware_from_config(tmp):
 
     config = dict(time_limit=5000, max_age='60000', notify_shutdown=True, max_retries=0, min_backoff=200, max_backoff=1000)
     with DramatiqMiddlewareTest(tmp, **config):
-        assert middleware_of(middleware.TimeLimit).time_limit == 5000
-        assert middleware_of(middleware.AgeLimit).max_age == 60000
-        assert middleware_of(middleware.ShutdownNotifications).notify_shutdown is True
-        retries = middleware_of(middleware.Retries)
+        assert _middleware_of(middleware.TimeLimit).time_limit == 5000
+        assert _middleware_of(middleware.AgeLimit).max_age == 60000
+        assert _middleware_of(middleware.ShutdownNotifications).notify_shutdown is True
+        retries = _middleware_of(middleware.Retries)
         assert (retries.max_retries, retries.min_backoff, retries.max_backoff) == (0, 200, 1000)
 
 

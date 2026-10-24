@@ -55,17 +55,17 @@ WEIGHTS = dict(
 )
 
 
-def payload(rnd):
+def _payload(rnd):
     # mostly small values, sometimes above 32 KiB so diskcache stores them in files
     size = rnd.choice((0, 10, 1000, 10000, 40000, 100000))
     return rnd.randbytes(size)
 
 
-def value_of(key, data):
+def _value_of(key, data):
     return (key, hashlib.sha256(data).hexdigest(), data)
 
 
-def wrong_value(key, value):
+def _wrong_value(key, value):
     # a value is right when it is missing or belongs to its key and is complete
     if value is None:
         return None
@@ -74,7 +74,7 @@ def wrong_value(key, value):
     return None
 
 
-def accounts(app):
+def _accounts(app):
     # read all accounts in a transaction, set them up again when one is missing
     keys = [f'acc:{n}' for n in range(ACCOUNTS)]
     values = [app.cache.get(key, retry=True) for key in keys]
@@ -138,19 +138,19 @@ class Participant:
 
     def op_get(self, rnd):
         key = f'd:{rnd.randrange(200)}'
-        self.wrong(wrong_value(key, self.app.cache.get(key, retry=rnd.random() < 0.5)))
+        self.wrong(_wrong_value(key, self.app.cache.get(key, retry=rnd.random() < 0.5)))
 
     def op_set(self, rnd):
         key = f'd:{rnd.randrange(200)}'
-        self.app.cache.set(key, value_of(key, payload(rnd)), tag='stress', retry=rnd.random() < 0.5)
+        self.app.cache.set(key, _value_of(key, _payload(rnd)), tag='stress', retry=rnd.random() < 0.5)
 
     def op_delete(self, rnd):
         self.app.cache.delete(f'd:{rnd.randrange(200)}', retry=rnd.random() < 0.5)
 
     def op_add(self, rnd):
         key = f'e:{rnd.randrange(50)}'
-        self.app.cache.add(key, value_of(key, payload(rnd)), expire=rnd.uniform(0.01, 0.5), retry=rnd.random() < 0.5)
-        self.wrong(wrong_value(key, self.app.cache.get(key, retry=rnd.random() < 0.5)))
+        self.app.cache.add(key, _value_of(key, _payload(rnd)), expire=rnd.uniform(0.01, 0.5), retry=rnd.random() < 0.5)
+        self.wrong(_wrong_value(key, self.app.cache.get(key, retry=rnd.random() < 0.5)))
 
     def op_touch(self, rnd):
         self.app.cache.touch(f'e:{rnd.randrange(50)}', expire=rnd.uniform(0.01, 0.5), retry=rnd.random() < 0.5)
@@ -164,7 +164,7 @@ class Participant:
 
     def op_transfer(self, rnd):
         with self.app.cache.transact(retry=True):
-            keys, values = accounts(self.app)
+            keys, values = _accounts(self.app)
             a, b = rnd.sample(range(ACCOUNTS), 2)
             amount = rnd.randint(0, values[a])
             self.app.cache.set(keys[a], values[a] - amount, retry=True)
@@ -172,7 +172,7 @@ class Participant:
 
     def op_audit(self, rnd):
         with self.app.cache.transact(retry=True):
-            _, values = accounts(self.app)
+            _, values = _accounts(self.app)
         if sum(values) != ACCOUNTS * BALANCE or min(values) < 0:
             self.wrong(f'accounts: {values}')
 
@@ -263,7 +263,7 @@ class Participant:
         return self.report
 
 
-def stress_worker(directory, index, seed, seconds, purge, result_queue):
+def _stress_worker(directory, index, seed, seconds, purge, result_queue):
     try:
         with DiskcacheTest(directory) as app:
             result_queue.put(('ok', Participant(app, index, seed, seconds, purge).run()))
@@ -271,7 +271,7 @@ def stress_worker(directory, index, seed, seconds, purge, result_queue):
         result_queue.put(('error', traceback.format_exc()))
 
 
-def merge(reports):
+def _merge(reports):
     merged = dict(errors=[], wrong=[], lost=[], ops=Counter(), counter=0, mutex=[], purges=[], workers=0)
     merged['tempers'] = {name: [] for name in TEMPERS}
     merged['throttles'] = {name: [] for name in THROTTLES}
@@ -287,7 +287,7 @@ def merge(reports):
     return merged
 
 
-def throttle_excess(times, count, per_seconds):
+def _throttle_excess(times, count, per_seconds):
     # the most runs any time window had above what the bucket allows
     times, rate, worst = sorted(times), count / per_seconds, 0
     for i, start in enumerate(times):
@@ -297,7 +297,7 @@ def throttle_excess(times, count, per_seconds):
     return worst
 
 
-def after(report, since):
+def _after(report, since):
     # the runs that started after a point in time
     tail = dict(report, mutex=[item for item in report['mutex'] if item[0] > since])
     tail['tempers'] = {name: [item for item in items if item[0] > since] for name, items in report['tempers'].items()}
@@ -305,16 +305,16 @@ def after(report, since):
     return tail
 
 
-def show(report, title):
+def _show(report, title):
     print(f'{title}: mutex runs={len(report["mutex"])} overlap={max_overlap(report["mutex"])}')
     for name, count in TEMPERS.items():
         print(f'{title}: {name} count={count} runs={len(report["tempers"][name])} overlap={max_overlap(report["tempers"][name])}')
     for name, (count, per_seconds, _) in THROTTLES.items():
         times = report['throttles'][name]
-        print(f'{title}: {name} runs={len(times)} excess={throttle_excess(times, count, per_seconds):.2f}')
+        print(f'{title}: {name} runs={len(times)} excess={_throttle_excess(times, count, per_seconds):.2f}')
 
 
-def stress(directory, monkeypatch, purge):
+def _stress(directory, monkeypatch, purge):
     if SECONDS <= TAIL:
         # a purge run keeps its last TAIL seconds free of purges
         pytest.fail(f'STRESS_SECONDS={SECONDS} is too short, it must be above {TAIL}', pytrace=False)
@@ -326,7 +326,7 @@ def stress(directory, monkeypatch, purge):
     with DiskcacheTest(directory) as app:
         app.cache.set('counter', 0)
         procs = [
-            ctx.Process(target=stress_worker, args=(directory, index, seed + index, SECONDS, purge, result_queue))
+            ctx.Process(target=_stress_worker, args=(directory, index, seed + index, SECONDS, purge, result_queue))
             for index in range(1, PROCESSES + 1)
         ]
         for proc in procs:
@@ -336,7 +336,7 @@ def stress(directory, monkeypatch, purge):
         stop_processes(procs)
         assert [payload for kind, payload in results if kind == 'error'] == []
         assert len(results) == PROCESSES
-        report = merge([own] + [payload for _, payload in results])
+        report = _merge([own] + [payload for _, payload in results])
         counter = app.cache.get('counter')
         warnings = app.cache.check()
         directory_db = os.path.join(directory, 'cache.db')
@@ -347,9 +347,9 @@ def stress(directory, monkeypatch, purge):
     print(f'workers={report["workers"]} ops={sum(report["ops"].values())} {dict(report["ops"])}')
     print(f'opened connections in the main process: {len(connections.opened)}')
     print(f'counter={counter} increments={report["counter"]} lost locks={len(report["lost"])}')
-    show(report, 'all')
+    _show(report, 'all')
     if purge:
-        show(after(report, max(report['purges'])), 'tail')
+        _show(_after(report, max(report['purges'])), 'tail')
     return report, counter, warnings, integrity, connections
 
 
@@ -361,7 +361,7 @@ def test_stress_runs_without_errors_or_wrong_values(tmp_path, monkeypatch, purge
     or wrong values, with a sound database and no open connection; the
     steady run also keeps every count, lock and limit.
     """
-    report, counter, warnings, integrity, connections = stress(str(tmp_path), monkeypatch, purge)
+    report, counter, warnings, integrity, connections = _stress(str(tmp_path), monkeypatch, purge)
     # no failed operation, no wrong value, a healthy database, no open connection
     assert report['errors'] == []
     assert report['wrong'] == []
@@ -381,4 +381,4 @@ def test_stress_runs_without_errors_or_wrong_values(tmp_path, monkeypatch, purge
     assert max_overlap(report['mutex']) == 1
     for name, (count, per_seconds, _) in THROTTLES.items():
         assert len(report['throttles'][name]) > 0
-        assert throttle_excess(report['throttles'][name], count, per_seconds) <= 0
+        assert _throttle_excess(report['throttles'][name], count, per_seconds) <= 0

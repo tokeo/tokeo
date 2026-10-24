@@ -48,7 +48,7 @@ def keep_global_broker(monkeypatch):
 
 
 @contextmanager
-def raw_channel():
+def _raw_channel():
     """A channel of its own, to put and check messages beside the app."""
     connection = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
     try:
@@ -95,14 +95,14 @@ def test_dead_letters(live):
         queues = app.dramatiq.queues
         actor.send(1)
         letter = Message(queue_name=name, actor_name=actor.actor_name, args=(7,), kwargs={}, options=dict(retries=3, traceback='E: x'))
-        with raw_channel() as channel:
+        with _raw_channel() as channel:
             channel.basic_publish(exchange='', routing_key=f'{name}.XQ', body=letter.encode())
         (peeked,) = queues.peek_dead(name)
         assert (peeked['message_id'], peeked['retries'], peeked['error']) == (letter.message_id, 3, 'E: x')
         assert queues.state(name)[0]['dead'] == 1
         assert queues.requeue_dead(name) == dict(name=name, requeued=1)
         assert (queues.state(name)[0]['ready'], queues.state(name)[0]['dead']) == (2, 0)
-        with raw_channel() as channel:
+        with _raw_channel() as channel:
             bodies = [channel.basic_get(name, auto_ack=True)[2] for _ in range(2)]
         requeued = [Message.decode(b) for b in bodies if Message.decode(b).message_id == letter.message_id][0]
         # the requeued message starts its retries again
@@ -129,7 +129,7 @@ def test_recreate_with_priority(live):
         (result,) = app.dramatiq.queues.recreate(name, force=True)
         assert result['arguments']['x-max-priority'] == 5
         # rabbitmq takes the same arguments again, but refuses other ones
-        with raw_channel() as channel:
+        with _raw_channel() as channel:
             channel.queue_declare(name, durable=True, arguments=result['arguments'])
             with pytest.raises(pika.exceptions.ChannelClosedByBroker, match='PRECONDITION_FAILED'):
                 channel.queue_declare(name, durable=True, arguments=dict(result['arguments'], **{'x-max-priority': 3}))

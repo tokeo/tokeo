@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
 
-DEFAULTS = init_defaults('smtp')
+_DEFAULTS = init_defaults('smtp')
 
 SUBJECT = 'Umlaute äöüß Kodiert'
 TEXT = 'Body Text plain message [äöü]'
@@ -35,7 +35,7 @@ class SmtpTest(TokeoTest):
         mail_handler = 'tokeo.smtp'
 
     def __init__(self, **smtp):
-        section = dict(DEFAULTS['smtp'])
+        section = dict(_DEFAULTS['smtp'])
         section.update(to=['to@example.com'], from_addr='from@example.com')
         section.update(smtp)
         super().__init__(config_defaults=dict(smtp=section))
