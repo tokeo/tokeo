@@ -227,6 +227,7 @@ def _probe_log(proc, lines=15):
     return ''.join(tail).strip() or '(no output)'
 
 
+# test rules exception: a wait loop of its own, it tells why the probe did not serve
 def _wait_banner(proc, port, timeout=8.0):
     """Readiness: the SMTP banner answers on the port."""
     deadline = time.time() + timeout

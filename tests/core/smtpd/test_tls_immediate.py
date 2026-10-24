@@ -39,7 +39,8 @@ class ImmediateEvents(RecordingEvents):
         self.proxy_at_mail = None
 
     async def on_connect_event(self, ctx):
-        # give the client time to put its ClientHello into the read buffer
+        # test rules exception: a fixed wait, nothing shows from outside when
+        # the ClientHello of the client is in the read buffer
         await asyncio.sleep(0.2)
 
     def on_mail_from_event(self, ctx, mail_from):
