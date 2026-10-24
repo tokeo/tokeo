@@ -22,7 +22,7 @@ from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqB
 
 @pytest.fixture
 def keep_dead_message_ttl(monkeypatch):
-    # register sets the dramatiq constant, restore it after the test
+    """Restores DEAD_MESSAGE_TTL of dramatiq after the test, register sets it."""
     monkeypatch.setattr(dramatiq_rabbitmq, 'DEAD_MESSAGE_TTL', dramatiq_rabbitmq.DEAD_MESSAGE_TTL)
     return dramatiq_rabbitmq.DEAD_MESSAGE_TTL
 

@@ -30,7 +30,7 @@ class AutomateWithoutTuiTest(AutomateTest):
 
 @pytest.fixture
 def shell(monkeypatch):
-    # the shell of an app with a wide output
+    """The shell of an app with a wide output."""
     monkeypatch.setenv('COLUMNS', '200')
     with AutomateTest() as app:
         yield TokeoAutomateShell(app)

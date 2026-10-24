@@ -214,6 +214,7 @@ class Klass:
 
 @pytest.fixture
 def hash_colon_docs(app):
+    """The #: docs collected from HASH_COLON_SOURCE."""
     return app.pdoc._collect_hash_colon_docs(HASH_COLON_SOURCE)
 
 
@@ -300,6 +301,7 @@ smtp:
 
 @pytest.fixture
 def base_settings(app):
+    """The settings extracted from BASE_YAML as config base."""
     import yaml
 
     return app.pdoc._config_settings('base', BASE_YAML.split('\n'), yaml.safe_load(BASE_YAML))
@@ -307,6 +309,7 @@ def base_settings(app):
 
 @pytest.fixture
 def local_settings(app):
+    """The settings extracted from LOCAL_YAML as config development.local."""
     import yaml
 
     return app.pdoc._config_settings('development.local', LOCAL_YAML.split('\n'), yaml.safe_load(LOCAL_YAML))

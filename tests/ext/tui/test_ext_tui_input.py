@@ -24,7 +24,8 @@ CTRL_C, CTRL_D = '\x03', '\x04'
 
 @pytest.fixture
 def shell():
-    # runs the shell of an app on the given keys, returns the entered lines
+    """Runs the shell of an app on the given keys, returns the entered lines."""
+
     def run(keys, command=None, **options):
         lines = []
 

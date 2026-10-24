@@ -124,6 +124,7 @@ class FakeConnection:
 
 @pytest.fixture
 def server(monkeypatch):
+    """A fake rabbitmq server the queues connect to."""
     fake = FakeServer()
     monkeypatch.setattr('tokeo.ext.dramatiq.queues.pika.BlockingConnection', lambda parameters: FakeConnection(fake))
     return fake
@@ -131,6 +132,7 @@ def server(monkeypatch):
 
 @pytest.fixture
 def app(tmp):
+    """An app with three actors on the queues mail and orders_unparalleled."""
     with DramatiqBrokerTest(tmp, None) as app:
         broker = app.dramatiq.broker
         for name, queue in (('send_mail', 'mail'), ('send_report', 'mail'), ('build_order', 'orders_unparalleled')):
@@ -345,6 +347,7 @@ def test_connection_is_kept_and_reopened(app, server):
 
 @pytest.fixture
 def command(tmp, server, capsys, monkeypatch):
+    """Runs the queues command against the fake server, returns its output."""
     # a wide output, so no table wraps
     monkeypatch.setenv('COLUMNS', '160')
 

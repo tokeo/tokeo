@@ -24,7 +24,7 @@ class TuiOutputTest(TokeoTest):
 
 @pytest.fixture
 def output():
-    # writes to a buffer of a fixed width instead of the terminal
+    """An output to a buffer of fixed width, not the terminal, and the buffer."""
     with TuiOutputTest() as app:
         buffer = io.StringIO()
         yield TokeoTuiOutput(app, file=buffer, width=60), buffer

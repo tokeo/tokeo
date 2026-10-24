@@ -64,7 +64,7 @@ class ProcessLineSession:
 
 @pytest.fixture(scope='module')
 def shared():
-    # created once, every test continues the dialog of the one before
+    """One session for the module, each test continues the dialog before."""
     return ProcessLineSession()
 
 

@@ -102,7 +102,8 @@ def test_monitoring_config_checked(tmp, config, error):
 
 @pytest.fixture
 def worker():
-    # a stub broker with the heartbeat middleware, the heartbeats are recorded
+    """Builds a stub broker with the heartbeat middleware and its heartbeats."""
+
     def build(details=False, interval=60):
         broker = StubBroker()
         heartbeat = TokeoDramatiqHeartbeat('probe.dramatiq.monitoring', interval, details, dict(label='probe', version='1.0'))
@@ -294,6 +295,7 @@ def _beat(pid, interval=5, state='running', running=(), since=None, details=Fals
 
 @pytest.fixture
 def monitor(tmp, monkeypatch):
+    """The monitor of an app, fed by receive and with a fixed queue state."""
     with DramatiqMiddlewareTest(tmp) as app:
         monitor = app.dramatiq.monitor
         # heartbeats come by receive, not by rabbitmq
@@ -421,7 +423,8 @@ def test_monitor_view_without_workers(tmp, monitoring, note):
 
 @pytest.fixture
 def command(tmp, monkeypatch):
-    # runs the monitor command on a fixed snapshot
+    """Runs the monitor command on a fixed snapshot."""
+
     def run(*options):
         with DramatiqMiddlewareTest(tmp, ['dramatiq', 'monitor', *options]) as app:
             calls = []
