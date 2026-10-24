@@ -28,14 +28,14 @@ from tokeo.ext.dramatiq import (
         ('switch', '--limit', "Invalid switch --limit: Value 'x' must be null or an integer >= 1!"),
     ],
 )
-def test_config_error(source, name, message):
+def test_config_error_names_source_value_and_expected(source, name, message):
     """The config error names source, name, value and what was expected."""
     e = TokeoDramatiqConfigError(source, name, 'x', 'null or an integer >= 1')
     assert str(e) == message and e.args == (message,)
     assert (e.source, e.name, e.value, e.expected) == (source, name, 'x', 'null or an integer >= 1')
 
 
-def test_connection_error():
+def test_connection_error_names_address_or_actor_and_cause():
     """The connection error names the address or the actor and the cause."""
     cause = ConnectionClosed('connection refused')
     e = TokeoDramatiqConnectionError('mq.example:5672', cause)
@@ -47,7 +47,7 @@ def test_connection_error():
     assert str(e) == 'Cannot send count_words to the broker (ConnectionClosed: connection refused)!'
 
 
-def test_refused_error():
+def test_refused_error_names_address_and_cause():
     """The refused error names the address and the cause."""
     cause = ValueError('NOT_FOUND')
     e = TokeoDramatiqRefusedError('mq.example:5672', cause)
@@ -55,7 +55,7 @@ def test_refused_error():
     assert (e.address, e.cause) == ('mq.example:5672', 'ValueError: NOT_FOUND')
 
 
-def test_queue_error():
+def test_queue_error_names_queue_and_reason():
     """The queue error names the queue and the reason."""
     e = TokeoDramatiqQueueError('mail', 'has no actor, its arguments are unknown')
     assert str(e) == 'Queue mail has no actor, its arguments are unknown!'

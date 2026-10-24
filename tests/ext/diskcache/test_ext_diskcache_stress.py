@@ -351,7 +351,7 @@ def stress(directory, monkeypatch, purge):
 
 
 @pytest.mark.parametrize('purge', [False, True], ids=['steady', 'purge'])
-def test_stress(tmp_path, monkeypatch, purge):
+def test_stress_runs_without_errors_or_wrong_values(tmp_path, monkeypatch, purge):
     """
     Threads in three processes run random operations on one cache, once
     steady and once with purges in between. Both runs end without errors

@@ -21,19 +21,19 @@ from tests.ext.automate.automate_tests_helper import (
 )
 
 
-def test_hosts_simple():
+def test_hosts_are_completed_by_id_and_name():
     """The hosts are read and completed by their id and name."""
     with AutomateTest() as app:
         assert app.automate.hosts == defaults_automate_hosts(validate=True)
 
 
-def test_hostgroups_simple():
+def test_hostgroups_are_expanded_to_their_hosts():
     """The hostgroups are read and expanded to their hosts."""
     with AutomateTest() as app:
         assert app.automate.hostgroups == defaults_automate_hostgroups(validate=True)
 
 
-def test_reserved_local_key():
+def test_local_as_id_of_a_host_or_hostgroup_raises():
     """ "local" as id of a host or a hostgroup raises TokeoAutomateError."""
     test_defaults = copy.deepcopy(defaults)
     test_defaults['automate']['hosts']['local'] = dict(host='local')
@@ -45,13 +45,13 @@ def test_reserved_local_key():
             app.automate.hostgroups
 
 
-def test_connections_simple():
+def test_connections_are_completed_by_their_defaults():
     """The connections are read and completed by their defaults."""
     with AutomateTest() as app:
         assert app.automate.connections == defaults_automate_connections(validate=True)
 
 
-def test_tasks_simple():
+def test_tasks_are_read_and_expanded():
     """
     The tasks are read and expanded; func and module are left out,
     test_tasks_task1_runs_locally runs one of the functions.
@@ -103,7 +103,7 @@ def test_tasks_local_default_resolves_with_local_host():
         assert app.automate.tasks['task1']['connection']['hosts'] == (dict(id='local', name='local', host='local', shell='/bin/sh'),)
 
 
-def test_automate_result():
+def test_result_is_read_by_attributes_not_as_dict():
     """A result is read by its fields like attributes, it is no dict."""
     with AutomateTest() as app:
         res = TokeoAutomateResult(
