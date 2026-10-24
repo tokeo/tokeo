@@ -1,5 +1,7 @@
 """
-Tests for tokeo.ext.tui.output and the shared parts of tokeo.ext.tui.
+Tests for tokeo.ext.tui.output and the shared parts of tokeo.ext.tui: tables,
+text and json for a terminal and a pipe, and follow with its repaint and its
+end by Ctrl-C or a signal.
 """
 
 import io

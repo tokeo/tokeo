@@ -1,7 +1,5 @@
 """
-Tests for the tokeo.ext.pdoc extension.
-
-The focus is on what this extension adds on top of pdoc, not on pdoc itself:
+Tests for tokeo.ext.pdoc, on what it adds on top of pdoc, not on pdoc itself:
 
 - `#:` variable comments, which pdoc3 understood and pdoc 16 does not
 - the yaml config page: comment extraction, per-setting slicing, `.local`

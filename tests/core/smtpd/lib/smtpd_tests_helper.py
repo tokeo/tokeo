@@ -1,14 +1,12 @@
 """
-Shared test helpers for the smtpd core-lib tests.
-
-Contains the events of the tests (```RecordingEvents```, ```AuthEvents```),
-the client dialog against a live server, the dialog-engine driver
-(```run_line```, which calls the async ```process_line``` synchronously) and
-the integration helpers: read an RFC message from the data folder, generate
-certificates with ```cryptography```, and send mail with Python's
-```smtplib``` (with optional STARTTLS and AUTH PLAIN/LOGIN), plus a runner
-that starts the async server, runs the blocking client(s) in a thread, and
-stops the server, and a delivery of raw wire bytes.
+Shared helpers of the tests of tokeo.core.smtpd: the events of the tests
+(```RecordingEvents```, ```AuthEvents```), the client dialog against a live
+server, the dialog-engine driver (```run_line```, which calls the async
+```process_line``` synchronously) and the integration helpers: read an RFC
+message from the data folder, generate certificates with ```cryptography```,
+and send mail with Python's ```smtplib``` (with optional STARTTLS and AUTH
+PLAIN/LOGIN), plus a runner that starts the async server, runs the blocking
+client(s) in a thread, and stops the server, and a delivery of raw wire bytes.
 """
 
 import os

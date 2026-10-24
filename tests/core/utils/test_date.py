@@ -1,14 +1,13 @@
 """
-Tests for tokeo.core.utils.date and tokeo.core.utils.date_compat.
-
-Two concerns are covered here. First, the date utility functions: to_utc and
-as_utc across all their input types (date, datetime, string, epoch) and their
-auto_type grain detection, the contrast between to_utc (which shifts by the
-offset) and as_utc (which relabels, keeping the wall clock time), and the
-timestring and datestring formatters. Second, the version compatibility of
-fromisoformat: that fromisoformat_compat (the extracted parser, available on
-every version) agrees with the builtin datetime.fromisoformat, so the parser
-used on Python < 3.11 is held to the same standard as the builtin on 3.11+.
+Tests for two concerns of tokeo.core.utils.date and date_compat. First, the
+date utility functions: to_utc and as_utc across all their input types (date,
+datetime, string, epoch) and their auto_type grain detection, the contrast
+between to_utc (which shifts by the offset) and as_utc (which relabels,
+keeping the wall clock time), and the timestring and datestring formatters.
+Second, the version compatibility of fromisoformat: that fromisoformat_compat
+(the extracted parser, available on every version) agrees with the builtin
+datetime.fromisoformat, so the parser used on Python < 3.11 is held to the
+same standard as the builtin on 3.11+.
 """
 
 import sys

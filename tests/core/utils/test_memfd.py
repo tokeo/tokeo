@@ -1,11 +1,9 @@
 """
-Tests for tokeo.core.utils.memfd.
-
-Cover the RAM-backed path primitive: a single blob yields a readable path, many
-blobs yield independent paths, str is encoded, and the real consumer works
-(ssl.SSLContext.load_cert_chain from PEM in memory). The platform branches are
-exercised too: forcing the /dev/fd pipe path (as on macOS) and raising when the
-platform offers neither backing (as on Windows).
+Tests for tokeo.core.utils.memfd, the RAM-backed paths: a single blob yields a
+readable path, many blobs yield independent paths, str is encoded, and the
+real consumer works (ssl.SSLContext.load_cert_chain from PEM in memory). The
+platform branches are exercised too: forcing the /dev/fd pipe path (as on
+macOS) and raising when the platform offers neither backing (as on Windows).
 """
 
 import os

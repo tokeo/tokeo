@@ -1,5 +1,7 @@
 """
-Shared parts of the tests of tokeo.ext.diskcache.
+Shared parts of the tests of tokeo.ext.diskcache: the test app on a fixed
+directory, the recorder of the sqlite connections and the tools for threads
+and processes.
 """
 
 import time

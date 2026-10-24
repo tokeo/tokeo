@@ -1,5 +1,6 @@
 """
-Shared parts of the tests of tokeo.ext.scheduler.
+Shared parts of the tests of tokeo.ext.scheduler: the test app with the
+scheduler and its tasks.
 """
 
 from cement.utils.misc import init_defaults

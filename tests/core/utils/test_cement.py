@@ -1,5 +1,7 @@
 """
-Tests for tokeo.core.utils.cement.
+Tests for tokeo.core.utils.cement: the controller helpers subcmdmeta,
+defaultmeta and log_info_help inside a command and in the default of a
+controller, and the check of the extensions an extension requires.
 """
 
 import pytest

@@ -1,8 +1,7 @@
 """
-Tests for tokeo.core.utils.base, the value helpers.
-
-```as_int_or_auto``` lets a config key or an argument take a number or
-```'auto'```. These pin the accepted forms, the lower bound and the errors.
+Tests for tokeo.core.utils.base: ```as_int_or_auto``` lets a config key or an
+argument take a number or ```'auto'```; the tests pin the accepted forms, the
+lower bound and the errors.
 """
 
 import pytest

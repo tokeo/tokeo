@@ -1,5 +1,6 @@
 """
-Shared parts of the tests of tokeo.ext.smtpd.
+Shared parts of the tests of tokeo.ext.smtpd: the test app with the smtpd
+extension.
 """
 
 from tokeo.main import TokeoTest

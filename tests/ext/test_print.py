@@ -1,5 +1,6 @@
 """
-Tests for tokeo.ext.print.
+Tests for tokeo.ext.print: app.print and app.inspect write to the stdout of
+the moment of the call.
 """
 
 import io

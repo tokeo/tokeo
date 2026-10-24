@@ -1,8 +1,8 @@
 """
-Tests for tokeo.ext.tui.input.
-
-The shell gets its keys from a pipe; one test runs a real app in a pseudo
-terminal and reads its screen by pyte, a terminal emulator.
+Tests for tokeo.ext.tui.input: the shell with its lines, history, signals and
+the output of other threads. The shell gets its keys from a pipe; one test
+runs a real app in a pseudo terminal and reads its screen by pyte, a terminal
+emulator.
 """
 
 import sys

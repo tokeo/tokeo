@@ -1,9 +1,7 @@
 """
-Tests for tokeo.ext.dramatiq.queues without a running broker.
-
-A small fake of pika keeps the queues in memory, so the tests check what the
-queue management reads, moves and changes, and how the queues command shows
-it.
+Tests for tokeo.ext.dramatiq.queues without a running broker: a small fake of
+pika keeps the queues in memory, so the tests check what the queue management
+reads, moves and changes, and how the queues command shows it.
 """
 
 import json

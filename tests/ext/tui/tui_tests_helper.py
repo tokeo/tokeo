@@ -1,5 +1,6 @@
 """
-Shared parts of the tests of tokeo.ext.tui.
+Shared parts of the tests of tokeo.ext.tui: the test app with the input of
+the shell.
 """
 
 from tokeo.main import TokeoTest

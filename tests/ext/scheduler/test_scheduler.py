@@ -1,8 +1,7 @@
 """
-Tests for tokeo.ext.scheduler.
-
-The shell gets its keys from a pipe; one test runs a real app in a pseudo
-terminal and reads its screen by pyte, a terminal emulator.
+Tests for tokeo.ext.scheduler: launch and its switches, the list of the tasks
+and the shell. The shell gets its keys from a pipe; one test runs a real app
+in a pseudo terminal and reads its screen by pyte, a terminal emulator.
 """
 
 import sys

@@ -1,8 +1,7 @@
 """
-Tests for tokeo.ext.dramatiq.controller without a running broker.
-
-The dramatiq cli is replaced by a recorder, so the tests check what the serve
-command hands over to dramatiq and what it does before the workers start.
+Tests for tokeo.ext.dramatiq.controller without a running broker: a recorder
+takes the place of the dramatiq cli, so the tests check what the serve command
+hands over to dramatiq and what it does before the workers start.
 """
 
 import os

@@ -1,8 +1,6 @@
 """
-Tests for tokeo.ext.dramatiq.base without a running broker.
-
-They check the broker, the middleware and the config values that register
-hands over to dramatiq.
+Tests for tokeo.ext.dramatiq.base without a running broker: the broker, the
+middleware and the config values that register hands over to dramatiq.
 """
 
 import os

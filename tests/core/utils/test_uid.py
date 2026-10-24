@@ -1,8 +1,7 @@
 """
-Tests for tokeo.core.utils.uid, the random-id helpers.
-
-```get_token_hex``` and ```get_uuid4``` hand out a random token, optionally
-prefixed. These pin the length, the prefix behaviour and the type check.
+Tests for tokeo.core.utils.uid: ```get_token_hex``` and ```get_uuid4``` hand
+out a random token, optionally prefixed; the tests pin the length, the prefix
+behaviour and the type check.
 """
 
 import pytest
