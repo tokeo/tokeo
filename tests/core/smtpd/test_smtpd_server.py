@@ -18,6 +18,7 @@ import pytest
 from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import threaded
 from tokeo.core.smtpd.exc import Smtpd550Exception, Smtpd450Exception, Smtpd421Exception
+from tests.utils import wait_until_async
 from tests.core.smtpd.lib.smtpd_tests_helper import (
     RecordingEvents,
     AuthEvents,
@@ -769,6 +770,43 @@ def test_stop_stops_accepting_new_connections():
     assert greeting[0].startswith('220')
     assert refused is True
     assert stopped is True
+
+
+def test_graceful_stop_lets_the_current_command_finish():
+    """A command in progress at a graceful stop still gets its reply."""
+
+    class SlowMailEvents(RecordingEvents):
+
+        def __init__(self, options=None):
+            super().__init__(options)
+            self.busy = False
+
+        async def on_mail_from_event(self, ctx, mail_from):
+            # still busy with MAIL when the stop begins
+            self.busy = True
+            await asyncio.sleep(0.3)
+            return super().on_mail_from_event(ctx, mail_from)
+
+    events = SlowMailEvents()
+
+    async def go():
+        srv, port = await start_smtpd(events, settings={})
+        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        await read_reply(reader)
+        await send_command(reader, writer, b'EHLO me\r\n')
+        writer.write(b'MAIL FROM:<a@x>\r\n')
+        await writer.drain()
+        assert await wait_until_async(lambda: events.busy)
+        stop = asyncio.create_task(srv.stop(wait_seconds_before_close=2.0))
+        mail = await asyncio.wait_for(read_reply(reader), timeout=3)
+        bye = await asyncio.wait_for(read_reply(reader), timeout=3)
+        await stop
+        writer.close()
+        return mail, bye
+
+    mail, bye = asyncio.run(go())
+    assert mail == ['250 OK']
+    assert bye[0].startswith('221')
 
 
 def test_shutdown_ends_active_dialog_after_current_command():

@@ -546,7 +546,10 @@ class SmtpdServer:
     async def _serve_forever(self):
         """Serve all bound listeners until cancelled."""
         try:
-            await asyncio.gather(*(s.serve_forever() for s in self._servers))
+            # the listeners serve since start_server; wait here and not in the
+            # serve_forever of asyncio, which on Python 3.13 closes every client
+            # connection as soon as stop() closes the listeners
+            await asyncio.get_running_loop().create_future()
         except asyncio.CancelledError:
             # cancelled by stop(); the listeners are already closed
             pass
