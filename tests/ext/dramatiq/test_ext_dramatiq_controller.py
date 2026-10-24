@@ -9,9 +9,16 @@ import os
 import sys
 
 import pytest
+from dramatiq import broker as dramatiq_broker
 from dramatiq import cli as dramatiq_cli
 from tokeo.ext.dramatiq import TokeoDramatiqConfigError
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest
+
+
+@pytest.fixture(autouse=True)
+def keep_global_broker(monkeypatch):
+    """The global broker of dramatiq, restored after the test, register sets it."""
+    monkeypatch.setattr(dramatiq_broker, 'global_broker', dramatiq_broker.global_broker)
 
 
 @pytest.fixture

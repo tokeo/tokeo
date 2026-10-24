@@ -14,10 +14,17 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from dramatiq import broker as dramatiq_broker
 from dramatiq.asyncio import get_event_loop_thread
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
 from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoAsyncIO
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqBrokerTest, DramatiqMiddlewareTest
+
+
+@pytest.fixture(autouse=True)
+def keep_global_broker(monkeypatch):
+    """The global broker of dramatiq, restored after the test, register sets it."""
+    monkeypatch.setattr(dramatiq_broker, 'global_broker', dramatiq_broker.global_broker)
 
 
 @pytest.fixture

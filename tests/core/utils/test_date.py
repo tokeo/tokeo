@@ -11,7 +11,6 @@ every version) agrees with the builtin datetime.fromisoformat, so the parser
 used on Python < 3.11 is held to the same standard as the builtin on 3.11+.
 """
 
-import os
 import sys
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -31,26 +30,15 @@ from tokeo.core.utils import date_compat
 PLUS_TWO = timezone(timedelta(hours=2))
 
 
-class _PinnedZone:
-    """Context manager that pins the local timezone via TZ + tzset."""
-
-    def __init__(self, tz_name):
-        self._tz_name = tz_name
-        self._old = None
-
-    def __enter__(self):
-        self._old = os.environ.get('TZ')
-        os.environ['TZ'] = self._tz_name
+@pytest.fixture
+def tokyo():
+    """The local time zone pinned to Asia/Tokyo for the test."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv('TZ', 'Asia/Tokyo')
         time.tzset()
-        return self
-
-    def __exit__(self, *exc):
-        if self._old is None:
-            os.environ.pop('TZ', None)
-        else:
-            os.environ['TZ'] = self._old
-        time.tzset()
-        return False
+        yield
+    # the zone of the environment again for the later tests
+    time.tzset()
 
 
 # --- utc_now ------------------------------------------------------------------
@@ -145,10 +133,9 @@ def test_to_utc_epoch_float_matches_fromtimestamp():
     assert to_utc(ep) == datetime.fromtimestamp(ep, timezone.utc)
 
 
-def test_to_utc_naive_timestring_shift_pinned_zone():
+def test_to_utc_naive_timestring_shift_pinned_zone(tokyo):
     """A naive timestring is local time: midnight in Tokyo is 15:00 UTC before."""
-    with _PinnedZone('Asia/Tokyo'):
-        assert to_utc('2026-06-23T00:00:00') == datetime(2026, 6, 22, 15, 0, tzinfo=timezone.utc)
+    assert to_utc('2026-06-23T00:00:00') == datetime(2026, 6, 22, 15, 0, tzinfo=timezone.utc)
 
 
 def test_to_utc_bool_is_rejected():
@@ -214,10 +201,9 @@ def test_as_utc_date_auto_type_stays_date():
     assert as_utc(date(2026, 6, 23), auto_type=True) == date(2026, 6, 23)
 
 
-def test_as_utc_string_auto_type_keeps_the_day():
+def test_as_utc_string_auto_type_keeps_the_day(tokyo):
     """A date-only string with auto_type keeps its day in Tokyo too."""
-    with _PinnedZone('Asia/Tokyo'):
-        assert as_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
+    assert as_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
 
 
 def test_as_utc_epoch_is_utc():
@@ -256,11 +242,10 @@ def test_to_utc_vs_as_utc_string_offset():
     assert as_utc(s).hour == 14  # relabelled
 
 
-def test_to_utc_vs_as_utc_string_date_day_under_pinned_zone():
+def test_to_utc_vs_as_utc_string_date_day_under_pinned_zone(tokyo):
     """For a date-only string both keep the day, also in Tokyo."""
-    with _PinnedZone('Asia/Tokyo'):
-        assert to_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
-        assert as_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
+    assert to_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
+    assert as_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
 
 
 # --- to_utc_timestring --------------------------------------------------------

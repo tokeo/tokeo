@@ -13,6 +13,7 @@ import threading
 import pika
 import pytest
 import dramatiq
+from dramatiq import broker as dramatiq_broker
 from dramatiq.brokers.stub import StubBroker
 from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoDramatiqConnectionError
 from tokeo.ext.dramatiq import monitoring
@@ -25,6 +26,12 @@ from tests.utils import Terminal, wait_until
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqMiddlewareTest
 
 needs_pty = pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')
+
+
+@pytest.fixture(autouse=True)
+def keep_global_broker(monkeypatch):
+    """The global broker of dramatiq, restored after the test, register sets it."""
+    monkeypatch.setattr(dramatiq_broker, 'global_broker', dramatiq_broker.global_broker)
 
 
 class DramatiqWithoutTuiTest(DramatiqTest):

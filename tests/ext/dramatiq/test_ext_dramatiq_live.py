@@ -14,6 +14,7 @@ from contextlib import contextmanager
 import pika
 import pytest
 import dramatiq
+from dramatiq import broker as dramatiq_broker
 from dramatiq.message import Message
 from tokeo.ext.dramatiq import TokeoDramatiqError
 from tests.utils import wait_until
@@ -38,6 +39,12 @@ needs_rabbitmq = pytest.mark.skipif(
 )
 
 pytestmark = needs_rabbitmq
+
+
+@pytest.fixture(autouse=True)
+def keep_global_broker(monkeypatch):
+    """The global broker of dramatiq, restored after the test, register sets it."""
+    monkeypatch.setattr(dramatiq_broker, 'global_broker', dramatiq_broker.global_broker)
 
 
 @contextmanager

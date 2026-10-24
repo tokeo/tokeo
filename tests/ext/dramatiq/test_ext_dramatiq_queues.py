@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import pika
 import pytest
 import dramatiq
+from dramatiq import broker as dramatiq_broker
 from dramatiq.message import Message
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
 from tokeo.ext.dramatiq import (
@@ -120,6 +121,12 @@ class FakeConnection:
 
     def close(self):
         self.is_closed = True
+
+
+@pytest.fixture(autouse=True)
+def keep_global_broker(monkeypatch):
+    """The global broker of dramatiq, restored after the test, register sets it."""
+    monkeypatch.setattr(dramatiq_broker, 'global_broker', dramatiq_broker.global_broker)
 
 
 @pytest.fixture
