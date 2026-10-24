@@ -151,6 +151,9 @@ CMD_AUTH_PLAIN_VALUES = CmdSequence.AUTH_PLAIN_VALUES
 CMD_AUTH_LOGIN_USER = CmdSequence.AUTH_LOGIN_USER
 CMD_AUTH_LOGIN_PASS = CmdSequence.AUTH_LOGIN_PASS
 
+# reply that ends a dialog on a shutdown of the service (RFC 5321 3.8)
+REPLY_421_FOR_SHUTDOWN = '421 Service shutting down and closing transmission channel'
+
 
 class SmtpdSession:
     """
@@ -853,7 +856,7 @@ class SmtpdServer:
                     if session.cmd_sequence is CMD_QUIT:
                         break
 
-                    # a graceful shutdown ends the dialog after the current command
+                    # a graceful shutdown ends the dialog
                     if self._shutdown:
                         break
 
@@ -946,7 +949,8 @@ class SmtpdServer:
                     if session.cmd_sequence is CMD_PROXY:
                         raise Smtpd421Exception(f'Abort connection while PROXY failed! ({output})')
 
-                output = '221 Service closing transmission channel'
+                # QUIT closes with 221, a shutdown with 421 (RFC 5321 3.8)
+                output = '221 Service closing transmission channel' if session.cmd_sequence is CMD_QUIT else REPLY_421_FOR_SHUTDOWN
                 writer.write(output.encode() + b'\r\n')
                 await writer.drain()
 

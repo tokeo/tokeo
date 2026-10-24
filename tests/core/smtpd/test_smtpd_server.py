@@ -806,18 +806,19 @@ def test_graceful_stop_lets_the_current_command_finish():
 
     mail, bye = asyncio.run(go())
     assert mail == ['250 OK']
-    assert bye[0].startswith('221')
+    # RFC 5321 3.8: a shutdown closes with 421
+    assert bye[0].startswith('421')
 
 
 def test_shutdown_ends_active_dialog_after_current_command():
-    """After shutdown the next command still answers, then 221 follows."""
+    """After shutdown the next command still answers, then 421 follows."""
 
     async def go():
         srv, port = await start_smtpd(RecordingEvents(), settings={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
         await send_command(reader, writer, b'EHLO me\r\n')
-        # request a graceful shutdown; the next command is answered, then 221
+        # request a graceful shutdown; the next command is answered, then 421
         srv.shutdown()
         noop = await send_command(reader, writer, b'NOOP\r\n')
         bye = await read_reply(reader)
@@ -827,7 +828,7 @@ def test_shutdown_ends_active_dialog_after_current_command():
 
     noop, bye = asyncio.run(go())
     assert noop[0] == '250 OK'
-    assert bye[0].startswith('221')
+    assert bye[0].startswith('421')
 
 
 def test_shutdown_refuses_ungreeted_connection():

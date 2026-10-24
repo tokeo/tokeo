@@ -536,6 +536,10 @@ A graceful ```stop``` stops accepting new connections, lets the connections
 already in progress finish (up to the drain window), and only then closes. This is
 what lets you restart or redeploy without dropping a message mid-delivery.
 
+A shutdown request ends the current dialog and replies by
+```421 Service shutting down and closing transmission channel```. The client's
+```QUIT``` command is replied by ```221``` instead.
+
 ## 13. Logging
 
 The server exposes a ```logger``` whose ```debug```/```info```/```warning```/
