@@ -130,13 +130,13 @@ def test_shared_limits_slot_wait_recheck_interval():
     """slot_wait returns by its poll within 0.5 s without an event."""
     limits = SharedGlobalLimits(max_processings=1)
 
-    async def measure():
+    async def go():
         limits.slot_free.clear()
         start = time.perf_counter()
         await limits.slot_wait()  # nobody sets the event
         return time.perf_counter() - start
 
-    assert asyncio.run(measure()) < 0.5  # returns via the poll
+    assert asyncio.run(go()) < 0.5  # returns via the poll
 
 
 # --- cement wiring ---------------------------------------------------------------

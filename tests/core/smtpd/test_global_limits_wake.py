@@ -50,7 +50,7 @@ def test_release_on_service_a_wakes_waiter_on_service_b():
     events_a, events_b = GatedEvents(), GatedEvents()
     gl = GlobalLimits(max_processings=1)
 
-    async def scenario():
+    async def go():
         srv_a, port_a = await start_smtpd(events_a, global_limits=gl)
         srv_b, port_b = await start_smtpd(events_b, global_limits=gl)
         loop = asyncio.get_event_loop()
@@ -74,7 +74,7 @@ def test_release_on_service_a_wakes_waiter_on_service_b():
             await srv_a.stop(wait_seconds_before_close=0.3)
             await srv_b.stop(wait_seconds_before_close=0.3)
 
-    asyncio.run(scenario())
+    asyncio.run(go())
 
 
 class PollingLimits(GlobalLimits):
@@ -98,7 +98,7 @@ def test_external_counter_release_is_seen_via_slot_wait_override():
     events.gate.set()  # deliver immediately once admitted
     gl = PollingLimits(max_processings=1)
 
-    async def scenario():
+    async def go():
         srv, port = await start_smtpd(events, global_limits=gl)
         loop = asyncio.get_event_loop()
         try:
@@ -113,4 +113,4 @@ def test_external_counter_release_is_seen_via_slot_wait_override():
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
-    asyncio.run(scenario())
+    asyncio.run(go())

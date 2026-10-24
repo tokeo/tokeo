@@ -94,7 +94,7 @@ def test_self_log_from_sync_and_async_events_with_async_logging():
 
     events = Handler()
 
-    async def scenario():
+    async def go():
         srv, port = await start_smtpd(events, settings={})
         loop = asyncio.get_event_loop()
         try:
@@ -108,7 +108,7 @@ def test_self_log_from_sync_and_async_events_with_async_logging():
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
-    asyncio.run(scenario())
+    asyncio.run(go())
     messages = [m for _, m in events.captured]
     assert 'mail_from (sync event)' in messages
     assert 'rcpt_to (async event)' in messages
@@ -126,7 +126,7 @@ def test_self_log_from_threaded_event_reaches_loop_threadsafe():
 
     events = Handler()
 
-    async def scenario():
+    async def go():
         srv, port = await start_smtpd(events, settings={})
         loop = asyncio.get_event_loop()
         try:
@@ -139,7 +139,7 @@ def test_self_log_from_threaded_event_reaches_loop_threadsafe():
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
-    asyncio.run(scenario())
+    asyncio.run(go())
     assert 'data (threaded event)' in [m for _, m in events.captured]
 
 
@@ -155,11 +155,11 @@ def test_base_auth_deny_logs_via_bound_self_log():
     ctx.server.remote_ip = '127.0.0.1'
     ctx.server.remote_port = '12345'
 
-    async def call():
+    async def go():
         with pytest.raises(Smtpd535Exception):
             await smtpd._emit(SmtpdEvent.ON_AUTH_EVENT, ctx, '', 'user', 'secret')
         # the scheduled deny log runs on the loop
         assert await wait_until_async(lambda: any('Deny access' in m for _, m in events.captured))
 
-    asyncio.run(call())
+    asyncio.run(go())
     assert any('Deny access' in m for _, m in events.captured)

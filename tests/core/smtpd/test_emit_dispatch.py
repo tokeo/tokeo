@@ -83,27 +83,27 @@ def test_auth_default_deny_stays_dispatchable():
     srv = SmtpdServer(BareEvents())
     assert SmtpdEvent.ON_AUTH_EVENT in srv.emit_events
 
-    async def call():
+    async def go():
         with pytest.raises(Smtpd535Exception):
             await srv._emit(SmtpdEvent.ON_AUTH_EVENT, _ctx(), '', 'user', 'secret')
 
-    asyncio.run(call())
+    asyncio.run(go())
 
 
 def test_emit_returns_none_for_skipped_event():
     """_emit of an event without entry returns None."""
     srv = SmtpdServer(BareEvents())
 
-    async def call():
+    async def go():
         assert await srv._emit(SmtpdEvent.ON_HELO_EVENT, _ctx(), 'x') is None
 
-    asyncio.run(call())
+    asyncio.run(go())
 
 
 def test_mail_flows_end_to_end_with_bare_handler():
     """A handler without overrides still delivers a mail with 250."""
 
-    async def scenario():
+    async def go():
         srv, port = await start_smtpd(BareEvents(), settings={})
         loop = asyncio.get_event_loop()
         try:
@@ -115,4 +115,4 @@ def test_mail_flows_end_to_end_with_bare_handler():
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
-    asyncio.run(scenario())
+    asyncio.run(go())

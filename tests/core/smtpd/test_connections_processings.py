@@ -28,7 +28,7 @@ def test_counters_are_zero_when_idle():
 def test_connections_counter_tracks_open_clients():
     """connections rises with each open client and falls when they close."""
 
-    async def scenario():
+    async def go():
         srv, port = await start_smtpd(CaptureSmtpdEvents(), settings={})
         writers = []
         try:
@@ -49,7 +49,7 @@ def test_connections_counter_tracks_open_clients():
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
-    asyncio.run(scenario())
+    asyncio.run(go())
 
 
 class _RecordingEvents(CaptureSmtpdEvents):
@@ -71,7 +71,7 @@ def test_processings_counter_tracks_message_processing():
     """processings is at least 1 during the data event and 0 after."""
     events = _RecordingEvents()
 
-    async def scenario():
+    async def go():
         srv, port = await start_smtpd(events, settings={})
         events.server_ref = srv
         loop = asyncio.get_event_loop()
@@ -90,4 +90,4 @@ def test_processings_counter_tracks_message_processing():
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
-    asyncio.run(scenario())
+    asyncio.run(go())
