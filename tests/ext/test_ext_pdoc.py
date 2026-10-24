@@ -38,7 +38,8 @@ from tokeo.ext.pdoc import (
 
 
 class PdocTest(TokeoTest):
-    """A TokeoTest app with the pdoc extension loaded.
+    """
+    A TokeoTest app with the pdoc extension loaded.
 
     Its pdoc section is pinned to a temp dir and a free port, `overrides`
     change single settings. `port=0` lets the kernel pick a free one, so
@@ -395,7 +396,8 @@ def collect_config_sections(app, tmp_path, monkeypatch):
 
 
 def fake_appenv_files(config_dir, app_env, suffix):
-    """Reproduce appenv's resolver, including its ordering.
+    """
+    Reproduce appenv's resolver, including its ordering.
 
     Env file, then `.d/*`, then the top-level `.local`, then `.d/*.local`.
     That is cement's load order, and the config page follows it so the
@@ -777,7 +779,8 @@ class Beta:
 
 
 def render_sidebar(tmp_path, monkeypatch, source, package_name='sample'):
-    """Render one module through the real pipeline, return its sidebar HTML.
+    """
+    Render one module through the real pipeline, return its sidebar HTML.
 
     Goes through `app.pdoc.render()` rather than calling Jinja directly, so
     template resolution, the custom globals and the asset copy are all part
@@ -810,7 +813,8 @@ def render_sidebar(tmp_path, monkeypatch, source, package_name='sample'):
 
 
 class SidebarEntries(HTMLParser):
-    """Read the sidebar's class entries with a real parser.
+    """
+    Read the sidebar's class entries with a real parser.
 
     A regex cannot do this: `<details>` nests its own `<div>` and carries
     several links, so any non-greedy pattern stops in the wrong place. This
@@ -1410,7 +1414,8 @@ def test_module_source_dir_of_a_package(app, tmp_path, monkeypatch):
 
 
 def run_cli(tmp_path, monkeypatch, argv):
-    """Run the real CLI and record what the handler was asked to do.
+    """
+    Run the real CLI and record what the handler was asked to do.
 
     Goes through cement's argument parsing, so the flag combinations are
     exercised exactly as a user types them. `render()` and `serve()` are

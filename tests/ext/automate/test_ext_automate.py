@@ -13,7 +13,7 @@ from tokeo.core.utils.base import hasprops, anyprop, getprop
 from tokeo.ext.automate import TokeoAutomateError, TokeoAutomateResult
 from tests.ext.automate.automate_tests_helper import (
     AutomateTest,
-    defaults,
+    DEFAULTS,
     defaults_automate_hosts,
     defaults_automate_hostgroups,
     defaults_automate_connections,
@@ -35,7 +35,7 @@ def test_hostgroups_are_expanded_to_their_hosts():
 
 def test_local_as_id_of_a_host_or_hostgroup_raises():
     """ "local" as id of a host or a hostgroup raises TokeoAutomateError."""
-    test_defaults = copy.deepcopy(defaults)
+    test_defaults = copy.deepcopy(DEFAULTS)
     test_defaults['automate']['hosts']['local'] = dict(host='local')
     test_defaults['automate']['hostgroups']['local'] = ('a', 'b')
     with AutomateTest(config_defaults=test_defaults) as app:

@@ -9,7 +9,7 @@ import base64
 from unittest import mock
 
 import pytest
-from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, subjMsg, textMsg, htmlImg
+from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, SUBJECT, TEXT, HTML_WITH_IMAGE
 
 
 def test_qp_message(tmp):
@@ -23,10 +23,10 @@ def test_qp_message(tmp):
 
     with SmtpTest(body_encoding='qp', from_addr='Tester <tester@example.com>', to='dev@example.com') as app:
         mail = app.mail
-        body = (textMsg, htmlImg)
+        body = (TEXT, HTML_WITH_IMAGE)
         get_params = mail._get_params(
             to=mail._config('to'),
-            subject=subjMsg,
+            subject=SUBJECT,
             files=[
                 ('Demo-Rechnung.pdf', pdf),
                 {'name': 'abcd1234.webp', 'path': webp, 'cid': 'abcd1234.webp'},

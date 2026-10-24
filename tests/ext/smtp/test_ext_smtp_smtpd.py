@@ -21,7 +21,7 @@ import pytest
 
 from tokeo.core.smtpd import SmtpdServer, SmtpdEvents, Smtpd535Exception, Smtpd550Exception, tls_immediate_supported
 from tests.utils import wait_until
-from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, subjMsg, textMsg, htmlImg
+from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, SUBJECT, TEXT, HTML_WITH_IMAGE
 
 needs_tls_immediate = pytest.mark.skipif(
     not tls_immediate_supported(),
@@ -183,8 +183,8 @@ def test_qp_delivered_to_smtpd(tmp):
         # quoted-printable is set for the config of this app only
         with SmtpTest(host='127.0.0.1', port=smtpd.port, timeout=5, body_encoding='qp') as app:
             sent = app.mail.send(
-                (textMsg, htmlImg),
-                subject=subjMsg,
+                (TEXT, HTML_WITH_IMAGE),
+                subject=SUBJECT,
                 files=[
                     ('Demo-Rechnung.pdf', pdf),
                     {'name': 'abcd1234.webp', 'path': webp, 'cid': 'abcd1234.webp'},
@@ -199,14 +199,14 @@ def test_qp_delivered_to_smtpd(tmp):
     msg = email.message_from_bytes(data)
     parts = {part.get_content_type(): part for part in msg.walk()}
 
-    assert str(make_header(decode_header(msg['Subject']))) == subjMsg
+    assert str(make_header(decode_header(msg['Subject']))) == SUBJECT
     assert msg['X-super'] == 'Toller Key'
     assert msg['X-binary'] == "(12, 'hallo', -1)"
     # the text arrives quoted-printable with the umlauts encoded as utf-8
     text = parts['text/plain']
     assert text['Content-Transfer-Encoding'] == 'quoted-printable'
     assert '=C3=A4=C3=B6=C3=BC' in text.get_payload()
-    assert text.get_payload(decode=True).decode('utf-8') == textMsg
+    assert text.get_payload(decode=True).decode('utf-8') == TEXT
     # the pdf is an attachment, the image is embedded into the related part
     assert parts['application/octet-stream'].get_filename() == 'Demo-Rechnung.pdf'
     image = [p for p in parts['multipart/related'].walk() if p.get_content_type() == 'image/webp'][0]

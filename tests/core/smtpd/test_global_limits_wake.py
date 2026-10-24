@@ -78,9 +78,11 @@ def test_release_on_service_a_wakes_waiter_on_service_b():
 
 
 class PollingLimits(GlobalLimits):
-    """The cross-process wait strategy the smtpd extension ships: counters may
+    """
+    The cross-process wait strategy the smtpd extension ships: counters may
     change from another process (no event reaches this loop), so re-check at a
-    short interval while throttled."""
+    short interval while throttled.
+    """
 
     async def slot_wait(self):
         try:

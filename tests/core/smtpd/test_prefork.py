@@ -30,8 +30,8 @@ from tests.utils import ROOT, wait_until, wait_process_group_ended
 LINUX = sys.platform.startswith('linux')
 HAS_FORK = hasattr(os, 'fork')
 
-requires_fork = pytest.mark.skipif(not HAS_FORK, reason='requires os.fork')
-requires_linux = pytest.mark.skipif(not LINUX, reason='PR_SET_PDEATHSIG is Linux-only')
+needs_fork = pytest.mark.skipif(not HAS_FORK, reason='requires os.fork')
+needs_pdeathsig = pytest.mark.skipif(not LINUX, reason='PR_SET_PDEATHSIG is Linux-only')
 
 
 def _read_pdeathsig():
@@ -87,7 +87,7 @@ def test_run_prefork_single_process_runs_worker_in_place():
 # --------------------------------------------------------------------------
 
 
-@requires_fork
+@needs_fork
 def test_supervise_workers_reaps_and_restores_handlers():
     """
     The probe forks three workers that end on their own; supervise reaps
@@ -98,7 +98,7 @@ def test_supervise_workers_reaps_and_restores_handlers():
     assert wait_process_group_ended(proc.pid)
 
 
-@requires_fork
+@needs_fork
 def test_run_prefork_forks_supervises_and_reaps(tmp_path):
     """
     The probe runs run_prefork with three workers; a SIGTERM to the master
@@ -121,7 +121,7 @@ def test_run_prefork_forks_supervises_and_reaps(tmp_path):
 # --------------------------------------------------------------------------
 
 
-@requires_linux
+@needs_pdeathsig
 def test_set_pdeathsig_arms_parent_death_signal():
     """set_pdeathsig arms SIGTERM as the parent death signal."""
     assert set_pdeathsig(signal.SIGTERM) is True
@@ -131,7 +131,7 @@ def test_set_pdeathsig_arms_parent_death_signal():
         ctypes.CDLL(None).prctl(1, 0, 0, 0, 0)  # clear again for the runner
 
 
-@requires_linux
+@needs_pdeathsig
 def test_set_pdeathsig_honours_requested_signal():
     """set_pdeathsig arms the signal asked for, here SIGINT."""
     assert set_pdeathsig(signal.SIGINT) is True
@@ -141,7 +141,7 @@ def test_set_pdeathsig_honours_requested_signal():
         ctypes.CDLL(None).prctl(1, 0, 0, 0, 0)
 
 
-@requires_linux
+@needs_pdeathsig
 def test_worker_self_terminates_when_master_crashes(tmp_path):
     """
     The master of two workers dies by SIGKILL; each worker stops itself by

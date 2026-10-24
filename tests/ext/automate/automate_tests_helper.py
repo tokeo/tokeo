@@ -396,15 +396,15 @@ def defaults_automate_tasks(validate=False):
     return d
 
 
-defaults = init_defaults('automate')
-defaults['automate']['hosts'] = defaults_automate_hosts()
-defaults['automate']['hostgroups'] = defaults_automate_hostgroups()
-defaults['automate']['connections'] = defaults_automate_connections()
-defaults['automate']['tasks'] = defaults_automate_tasks()
+DEFAULTS = init_defaults('automate')
+DEFAULTS['automate']['hosts'] = defaults_automate_hosts()
+DEFAULTS['automate']['hostgroups'] = defaults_automate_hostgroups()
+DEFAULTS['automate']['connections'] = defaults_automate_connections()
+DEFAULTS['automate']['tasks'] = defaults_automate_tasks()
 
 
 class AutomateTest(TokeoTest):
-    """A test app with automate, by default with the config of defaults."""
+    """A test app with automate, by default with the config of DEFAULTS."""
 
     class Meta:
         extensions = [
@@ -415,5 +415,5 @@ class AutomateTest(TokeoTest):
         ]
 
     def __init__(self, **kw):
-        kw.setdefault('config_defaults', defaults)
+        kw.setdefault('config_defaults', DEFAULTS)
         super().__init__(**kw)
