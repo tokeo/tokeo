@@ -1,5 +1,38 @@
 """
 The fixtures for all tests of the app.
+
+pytest loads this file before any test. It keeps the temporary files of a run
+in ```tmp/tests/``` of the project and gives every test the fixtures ```tmp```
+and ```rando```; a test takes a fixture by naming it as argument.
+
+### Usage
+
+```python
+def test_report_is_written(tmp):
+    # tmp.dir is an empty directory, tmp.file an empty file next to it
+    path = os.path.join(tmp.dir, 'report.txt')
+    with open(path, 'w') as f:
+        f.write('done')
+    assert os.listdir(tmp.dir) == ['report.txt']
+
+
+def test_lock_of_its_own(rando):
+    # a name on a shared server, a parallel run takes another one
+    name = f'test_lock_{rando}'
+    ...
+```
+
+### Notes
+
+- Every test gets its own ```tmp``` and ```rando```, nothing is shared
+- ```tmp``` gives paths as str for code and test apps that want them,
+    ```tmp_path``` of pytest gives a ```pathlib.Path```
+- pytest empties ```tmp/tests/``` at the start of the next run, so a test
+    cleans nothing up and its files stay for a look until then
+- ```pytest --basetemp=<dir>``` puts the temporary files there instead
+- A fixture goes into this file only if every test may need it, the
+    fixtures of a subject stay in its test files
+
 """
 
 import os
