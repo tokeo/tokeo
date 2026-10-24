@@ -1,5 +1,5 @@
 """
-Tests for the random-id helpers.
+Tests for tokeo.core.utils.uid, the random-id helpers.
 
 ```get_token_hex``` and ```get_uuid4``` hand out a random token, optionally
 prefixed. These pin the length, the prefix behaviour and the type check.
@@ -38,8 +38,8 @@ def test_token_hex_rejects_non_str_prefix():
 
 
 def test_token_hex_is_random():
-    # two draws must differ (collision at 32 bit is ~2.3e-10)
     """Two tokens of 4 bytes differ."""
+    # two draws must differ (collision at 32 bit is ~2.3e-10)
     assert get_token_hex(4) != get_token_hex(4)
 
 

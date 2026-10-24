@@ -16,7 +16,7 @@ from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest
 
 @pytest.fixture
 def serve(tmp, monkeypatch):
-    """Run the serve command with a recording cli and purge."""
+    """Runs the serve command with a recording cli and purge."""
     # serve rewrites sys.argv and the env, monkeypatch restores both
     monkeypatch.setattr(sys, 'argv', ['tokeo'])
     for name in ('dramatiq_restart_delay', 'dramatiq_queue_prefetch', 'dramatiq_delay_queue_prefetch', 'dramatiq_worker_timeout'):

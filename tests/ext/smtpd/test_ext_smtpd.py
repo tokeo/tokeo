@@ -1,5 +1,5 @@
 """
-Tests for the smtpd extension: settings mapping, topology planning, shared
+Tests for tokeo.ext.smtpd: settings mapping, topology planning, shared
 limits across processes and the termination guarantees with real processes.
 
 The termination guarantees are process properties (exit code, port release,

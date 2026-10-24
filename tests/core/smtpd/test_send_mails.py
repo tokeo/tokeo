@@ -28,9 +28,9 @@ SETTINGS = {
 
 
 def test_simple_send_1_mail():
+    """One mail by smtplib arrives byte-exact."""
     # MidiSmtpServer sends this once by Net::SMTP and once by the Mail gem, two
     # client components; Python has smtplib only, so one test remains
-    """One mail by smtplib arrives byte-exact."""
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
     run_server_client(ev, SETTINGS, lambda port: send_mail(port, ENVELOPE_FROM, ENVELOPE_TO, mail))

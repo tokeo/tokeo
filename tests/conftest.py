@@ -18,10 +18,11 @@ def pytest_configure(config):
 
 @pytest.fixture(scope="function")
 def tmp(tmp_path):
-    # inside tmp_path, pytest keeps it until the next run
+    """A cement fs.Tmp inside tmp_path, kept until the next run."""
     yield fs.Tmp(dir=str(tmp_path))
 
 
 @pytest.fixture(scope="function")
 def rando(request):
+    """A random string of 12 characters."""
     yield _rando()[:12]

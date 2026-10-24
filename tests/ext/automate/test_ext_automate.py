@@ -53,8 +53,8 @@ def test_connections_simple():
 
 def test_tasks_simple():
     """
-    The tasks are read and expanded; func and module are left out, the
-    imported functions are run by the next test.
+    The tasks are read and expanded; func and module are left out,
+    test_tasks_task1_runs_locally runs one of the functions.
     """
     with AutomateTest() as app:
         tasks = app.automate.tasks

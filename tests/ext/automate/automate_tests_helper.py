@@ -22,7 +22,6 @@ def task3(app, connection, url=''):
 
 
 def defaults_automate_hosts(validate=False):
-    # define config defaults
     d = dict(
         host1=dict(
             host='ip_address1',
@@ -44,7 +43,7 @@ def defaults_automate_hosts(validate=False):
             host='ip_address3',
         ),
     )
-    # fullfill the dict in case for validation purpose
+    # the values the extension adds
     if validate:
         d['host1']['id'] = 'host1'
         d['host1']['name'] = 'host1'
@@ -58,13 +57,12 @@ def defaults_automate_hosts(validate=False):
             match='password:',
             tail=100,
         )
-    # return the dict
     return d
 
 
 def defaults_automate_hostgroups(validate=False):
     if not validate:
-        # define config defaults
+        # the config as given
         d = dict(
             group1=tuple(
                 (
@@ -93,7 +91,7 @@ def defaults_automate_hostgroups(validate=False):
             ),
         )
     else:
-        # fullfill the dict in case for validation purpose
+        # the hosts the extension puts in place of the names
         hosts = defaults_automate_hosts(validate=True)
         d = dict(
             group1=tuple(
@@ -132,12 +130,10 @@ def defaults_automate_hostgroups(validate=False):
                 )
             ),
         )
-    # return the dict
     return d
 
 
 def defaults_automate_connections(validate=False):
-    # define base
     b = dict(
         port=22,
         user='user_connect_base',
@@ -150,9 +146,7 @@ def defaults_automate_connections(validate=False):
         forward_agent=False,
         known_hosts=None,
     )
-    # define connections
     c = dict(
-        # additional defined connections
         con1=dict(
             name='A sample connection',
             hosts=tuple(
@@ -180,12 +174,10 @@ def defaults_automate_connections(validate=False):
             identity='identity',
         ),
     )
-    # define config defaults
     if not validate:
         # the extension reads base values from the _defaults key of the section
         d = dict(_defaults=b, **c)
     else:
-        # add _defaults
         b['id'] = '_defaults'
         b['name'] = '_defaults'
         # meta-only fields the user section does not set
@@ -199,7 +191,6 @@ def defaults_automate_connections(validate=False):
             tail=100,
         )
         c['_defaults'] = b
-        # add same fullfiller
         c['con1']['id'] = 'con1'
         c['con2']['id'] = 'con2'
         c['con1']['sudo'] = dict(
@@ -210,13 +201,12 @@ def defaults_automate_connections(validate=False):
         )
         # the connections property returns the composed mapping itself
         d = c
-    # return the dict
     return d
 
 
 def defaults_automate_tasks(validate=False):
     if not validate:
-        # define config defaults
+        # the config as given
         d = dict(
             _defaults=dict(
                 module='tests.ext.automate.automate_tests_helper',
@@ -247,7 +237,7 @@ def defaults_automate_tasks(validate=False):
             ),
         )
     else:
-        # define expanded validate dict
+        # the tasks as the extension expands them
         d = dict(
             task1=dict(
                 id='task1',
@@ -403,11 +393,9 @@ def defaults_automate_tasks(validate=False):
                 ),
             ),
         )
-    # return the dict
     return d
 
 
-# setup a default config
 defaults = init_defaults('automate')
 defaults['automate']['hosts'] = defaults_automate_hosts()
 defaults['automate']['hostgroups'] = defaults_automate_hostgroups()

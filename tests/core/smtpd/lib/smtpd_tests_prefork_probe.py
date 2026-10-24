@@ -15,6 +15,8 @@ their SIGTERM arrives (forwarded by the master, or delivered by the
 parent-death signal after a master crash).
 """
 
+# test rules exception: a probe of the core library, it runs without a test app
+
 import os
 import signal
 import sys

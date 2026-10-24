@@ -431,7 +431,9 @@ assert wait_process_group_ended(proc.pid)        # the master and all its worker
 ```wait_until``` and ```wait_until_async``` wait 5 seconds unless a timeout
 is given and return the last value of the check, so the ```assert``` shows
 what failed. ```time.sleep``` stays for a test that holds a state on
-purpose, e.g. a job keeping its slot while others try.
+purpose, e.g. a job keeping its slot while others try, and for a test
+where time itself is the subject, e.g. a lock that expires or a rate
+limit that refills.
 
 ## Async code
 
