@@ -435,7 +435,8 @@ class TokeoSmtpd(MetaMixin):
                     status = 0
                     try:
                         self._run_worker(svc, global_limits, plan['reuse'])
-                    except Exception:
+                    except Exception as err:
+                        self.app.log.error(f"smtpd: worker {os.getpid()} of service '{svc.get('name')}' failed: {err}")
                         status = 1
                     finally:
                         # a forked worker must never run the parent's code path
