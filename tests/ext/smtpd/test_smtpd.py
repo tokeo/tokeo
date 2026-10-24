@@ -170,6 +170,21 @@ def test_extension_loads_into_cement_app():
         assert server.session_id_bytes == 8
 
 
+@pytest.mark.parametrize(
+    'svc, reason',
+    [
+        (dict(events_handler='tokeo.ext.smtpd.TokeoSmtpdEvents', settings=dict(encrypt_mode='TLS_NOPE')), 'encrypt_mode must be one of'),
+        (dict(events_handler='NoDots'), 'events_handler needs a dotted path'),
+    ],
+    ids=['encrypt_mode', 'events_handler'],
+)
+def test_build_server_names_the_service(svc, reason):
+    """A service that cannot be built raises TokeoSmtpdError naming it."""
+    with SmtpdTest() as app:
+        with pytest.raises(TokeoSmtpdError, match=f"^smtpd: service 'mx-x': {reason}"):
+            app.smtpd._build_server(dict(svc, name='mx-x', listeners=[]), None)
+
+
 # --- process tests: real termination behaviour ----------------------------------
 
 
@@ -360,6 +375,23 @@ def test_failed_start_terminates_forked_workers(tmp_path):
     try:
         assert _wait_exit(proc) != 0
         assert wait_process_group_ended(proc.pid)
+        _assert_port_free(port_a)
+    finally:
+        proc.kill()
+
+
+def test_broken_config_of_a_worker_stops_before_the_fork(tmp_path):
+    """A worker service with a broken config ends the start before any fork."""
+    port_a, port_b = _free_port(), _free_port()
+    broken = _service('mx2', port_b, pre_fork=1)
+    broken['settings']['encrypt_mode'] = 'TLS_NOPE'
+    proc = _spawn(tmp_path, {'services': [_service('mx1', port_a), broken]}, names=None)
+    try:
+        assert _wait_exit(proc) != 0
+        assert wait_process_group_ended(proc.pid)
+        log = proc.probe_log.read_text()
+        assert "smtpd: service 'mx2': encrypt_mode must be one of" in log
+        assert 'forked workers' not in log
         _assert_port_free(port_a)
     finally:
         proc.kill()

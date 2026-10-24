@@ -44,6 +44,9 @@ lists, process topology with pre-forked workers and machine-wide limits.
     per service, e.g. ```tokeo smtpd serve mx1```. Starting the same service
     twice fails at the port bind
 
+: Every selected service is built before a worker forks, so a broken config
+    ends the start with the name of the service and nothing is bound
+
 ### Example
 
 ```python
@@ -327,20 +330,32 @@ class TokeoSmtpd(MetaMixin):
         return listeners
 
     def _build_server(self, svc, global_limits):
-        """Build the ```SmtpdServer``` for one service config."""
-        events_handler = _resolve_events_handler(svc.get('events_handler'))(self.app, options=svc.get('options'))
-        # hand the listener hosts to the server so a self-signed certificate
-        # derives its CN and SAN from them
-        hosts = list(dict.fromkeys(lst.get('host') for lst in svc.get('listeners') or [] if lst.get('host')))
-        return SmtpdServer(
-            events_handler,
-            settings=svc.get('settings'),
-            options=svc.get('options'),
-            global_limits=global_limits,
-            debug=self.app.debug,
-            hosts=hosts or None,
-            session_id_bytes=self._config('session_id_bytes'),
-        )
+        """
+        Build the ```SmtpdServer``` for one service config.
+
+        ### Raises
+
+        - **TokeoSmtpdError**: On any error of the service config, naming
+            the service
+
+        """
+        try:
+            events_handler = _resolve_events_handler(svc.get('events_handler'))(self.app, options=svc.get('options'))
+            # hand the listener hosts to the server so a self-signed certificate
+            # derives its CN and SAN from them
+            hosts = list(dict.fromkeys(lst.get('host') for lst in svc.get('listeners') or [] if lst.get('host')))
+            return SmtpdServer(
+                events_handler,
+                settings=svc.get('settings'),
+                options=svc.get('options'),
+                global_limits=global_limits,
+                debug=self.app.debug,
+                hosts=hosts or None,
+                session_id_bytes=self._config('session_id_bytes'),
+            )
+        except Exception as err:
+            reason = str(err).removeprefix('smtpd: ')
+            raise TokeoSmtpdError(f"smtpd: service '{svc.get('name')}': {reason}") from err
 
     async def _serve_async(self, services, global_limits, child_pids, reuse):
         """
@@ -403,6 +418,10 @@ class TokeoSmtpd(MetaMixin):
             global_limits = GlobalLimits(max_processings, max_connections)
         else:
             global_limits = None
+        # build every service once before the fork: a broken config ends the
+        # run here, before a worker starts or a port is bound
+        for svc in services:
+            self._build_server(svc, global_limits)
         # fork the worker groups BEFORE any event loop exists; the shared
         # limits above are inherited by every worker
         if plan['forks'] and not sys.platform.startswith('linux'):
