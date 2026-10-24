@@ -1,5 +1,5 @@
 """
-A tokeo app with a tui shell, run by test_ext_tui_input in a pseudo terminal.
+A tokeo app with a tui shell, run by test_input in a pseudo terminal.
 
 Half a second after the start another thread prints, logs and calls
 app.print, the shell ends on the line exit.

@@ -1,5 +1,5 @@
 """
-A tokeo app with the scheduler shell, run by test_ext_scheduler in a pseudo
+A tokeo app with the scheduler shell, run by test_scheduler in a pseudo
 terminal.
 
 Its task ping logs by app.log; the shell fires it by ```tasks fire 1```.

@@ -50,9 +50,12 @@ its helpers and probes move into ```lib/```; the test files stay on top.
 Test data lives in ```data/``` of its subject. The files in the root of
 ```tests/``` are the shared base.
 
-Only ```tests/``` itself has an ```__init__.py```, the folders below have
-none. pytest imports a test file by its file name alone, so every test file
-name is unique in all of ```tests/```.
+Every folder of ```tests/``` with Python files has an ```__init__.py``` with
+a one-line docstring naming its subject, e.g.
+```"""Tests of tokeo.ext.dramatiq."""```. pytest then imports a test file by
+its full path, e.g. ```tests.ext.dramatiq.test_live```, so a file name only
+has to be unique within its folder and repeats nothing the folder already
+says.
 
 An example from the tests of tokeo:
 
@@ -61,16 +64,20 @@ tests/
   conftest.py  utils.py  bootstrap.py  test_init.py   # shared base
   app/test_tokeo_app.py
   core/utils/test_date.py
-  ext/test_ext_print.py               # a subject with one file stays flat
+  ext/test_print.py                   # a subject with one file stays flat
   ext/tui/                            # a subject with more files has a folder
+    __init__.py
     tui_tests_helper.py
     tui_tests_input_probe.py
-    test_ext_tui_input.py
-    test_ext_tui_output.py
+    test_input.py
+    test_output.py
   ext/dramatiq/                       # more than 6 files: helpers and probes in lib/
+    __init__.py
+    lib/__init__.py
     lib/dramatiq_tests_helper.py
     lib/dramatiq_tests_monitor_probe.py
-    test_ext_dramatiq_base.py
+    test_base.py
+    test_live.py
     ...
   core/smtpd/data/simple_mail.msg     # test data of a subject in data/
 ```
@@ -81,21 +88,24 @@ tests/
 |---|---|
 | a module of the core, ```tokeo/core/utils/date.py``` | ```tests/core/utils/test_date.py``` |
 | a package of the core, ```tokeo/core/smtpd/``` | ```tests/core/smtpd/test_<topic>.py```, e.g. ```test_spool.py``` |
-| an extension, ```tokeo/ext/print.py``` | ```tests/ext/test_ext_print.py``` |
-| an extension with several test files, ```tokeo/ext/tui/``` | ```tests/ext/tui/test_ext_tui_<part>.py```, e.g. ```test_ext_tui_input.py``` |
+| an extension, ```tokeo/ext/print.py``` | ```tests/ext/test_print.py``` |
+| an extension with several test files, ```tokeo/ext/tui/``` | ```tests/ext/tui/test_<part>.py```, e.g. ```test_input.py``` |
 | the app itself, ```tokeo/main.py``` and its controllers | ```tests/app/test_tokeo_app.py``` |
 
-- A test file of the core is named ```test_<module>.py```, inside the folder
-  of a core package ```test_<topic>.py```
-- A test file of an extension is named ```test_ext_<extension>.py```, a
-  part of it ```test_ext_<extension>_<part>.py```, e.g.
-  ```test_ext_diskcache_stress.py```
+- A test file is named after what it tests, without what its folder
+  already says: ```test_<module>.py``` for a module, e.g.
+  ```tests/ext/test_print.py```, ```test_<topic>.py``` or
+  ```test_<part>.py``` in the folder of a subject, e.g.
+  ```tests/core/smtpd/test_spool.py```, ```tests/ext/dramatiq/test_live.py```
+- The main file of a subject folder is named after the subject, e.g.
+  ```tests/ext/automate/test_automate.py```, its parts after themselves,
+  e.g. ```test_shell.py```, ```test_stress.py```
 - A new test goes into the file of its subject, below the tests of the same
   function; a new file only for a part of its own, e.g. the stress tests or
   the tests against a live server
 - When a flat subject gets a second file, both move into a new folder named
-  after the subject, e.g. ```tests/ext/test_ext_print.py``` becomes
-  ```tests/ext/print/test_ext_print.py```
+  after the subject, with an ```__init__.py```, e.g.
+  ```tests/ext/test_print.py``` becomes ```tests/ext/print/test_print.py```
 
 ## Shared base
 
@@ -147,7 +157,7 @@ from tests.ext.tui.tui_tests_helper import TuiInputTest         # own subject
 
 # never from another subject, a conftest.py or a test file, never by a bare name
 from tests.core.smtpd.lib.smtpd_tests_helper import make_cert   # wrong
-from test_ext_diskcache import DiskcacheTest                    # wrong
+from tests.ext.diskcache.test_diskcache import _warnings_of     # wrong
 from tui_tests_helper import TuiInputTest                       # wrong
 ```
 

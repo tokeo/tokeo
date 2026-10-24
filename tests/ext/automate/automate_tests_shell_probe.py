@@ -1,6 +1,5 @@
 """
-A tokeo app with the automate shell, run by test_ext_automate_shell in a
-pseudo terminal.
+A tokeo app with the automate shell, run by test_shell in a pseudo terminal.
 """
 
 import sys

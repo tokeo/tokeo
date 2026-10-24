@@ -1,7 +1,7 @@
 """
 Runs one real Tokeo test app serving smtpd, for the process tests.
 
-Started as its own process by test_ext_smtpd.py: the termination guarantees
+Started as its own process by test_smtpd.py: the termination guarantees
 under test (exit code, port release, worker cleanup, SIGKILL behaviour) are
 process properties and can only be observed from outside. Inside, a regular
 ``TokeoTest`` Cement app loads the extension and blocks in ``serve`` until a
