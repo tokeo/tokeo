@@ -149,12 +149,11 @@ def test_worker_self_terminates_when_master_crashes(tmp_path):
     """
     proc = _spawn('run_prefork', tmp_path, 2)
     try:
-        wait_until(lambda: len(list(tmp_path.glob('pid_*'))) == 2, 3.0)
+        assert wait_until(lambda: len(list(tmp_path.glob('pid_*'))) == 2, 3.0)
         proc.kill()
         proc.wait(timeout=8)
-        wait_until(lambda: len(list(tmp_path.glob('stopped_*'))) == 2, 3.0)
         # every worker observed the parent death and the group is gone
-        assert len(list(tmp_path.glob('stopped_*'))) == 2
+        assert wait_until(lambda: len(list(tmp_path.glob('stopped_*'))) == 2, 3.0)
         assert wait_process_group_ended(proc.pid)
     finally:
         proc.kill()

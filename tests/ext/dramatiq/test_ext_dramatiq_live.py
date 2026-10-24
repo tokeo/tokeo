@@ -156,7 +156,7 @@ def test_monitor_hears_a_worker(tmp, rando):
         try:
             worker.start()
             actor.send(2)
-            wait_until(lambda: mine(0.5) and mine(0)[0]['heartbeat']['running'], 15)
+            assert wait_until(lambda: mine(0.5) and mine(0)[0]['heartbeat']['running'], 15)
             (running,) = mine(0)
             worker.stop()
             (stopped,) = mine(1)
@@ -186,7 +186,7 @@ def test_unparalleled_runs_one_message_at_a_time(tmp, rando):
             worker.start()
             for value in range(4):
                 actor.send(value)
-            wait_until(lambda: len(runs) >= 4, 20)
+            assert wait_until(lambda: len(runs) >= 4, 20)
         finally:
             worker.stop()
             app.dramatiq.queues.delete(name, force=True)

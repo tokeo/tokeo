@@ -182,7 +182,7 @@ def test_heartbeat_shows_running_tasks(worker, details):
     w.start()
     try:
         actors['waits'].send('anna@example.com')
-        wait_until(lambda: heartbeat.heartbeat()['running'], 5)
+        assert wait_until(lambda: heartbeat.heartbeat()['running'], 5)
         (task,) = heartbeat.heartbeat()['running']
         release.set()
         _join(broker)
