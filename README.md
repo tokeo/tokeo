@@ -158,14 +158,17 @@ your_app grpc-client count-words --url https://github.com
 ### Schedule Recurring Tasks
 
 ```bash
-# Run the scheduler with interactive shell
+# Run the scheduler in the background, the default
 your_app scheduler launch
+
+# Run the scheduler with the interactive shell in the foreground
+your_app scheduler launch --shell
 
 # Within the scheduler shell, list and manage tasks
 Scheduler> list
-Scheduler> tasks pause 1 2 3  # Pause task with ID 1, 2, 3
+Scheduler> tasks pause 1 2 3  # Pause tasks with ID 1, 2, 3
 Scheduler> tasks resume 1  # Resume task with ID 1
-Scheduler> tasks fire 1  # Resume task with ID 1
+Scheduler> tasks fire 1  # Run task with ID 1 now, regardless of its schedule
 ```
 
 ### Automate Operations

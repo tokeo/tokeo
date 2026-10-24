@@ -1159,9 +1159,9 @@ class TokeoSchedulerController(Controller):
         """
         Start the scheduler service.
 
-        Without --shell the scheduler runs in the foreground until it is
-        stopped; with --shell it runs in the background of the interactive
-        shell.
+        Without --shell the scheduler runs in the background until it is
+        stopped, the default; with --shell the interactive shell runs in the
+        foreground.
 
         """
         self.app.scheduler.launch(interactive=self.app.pargs.shell, paused=self.app.pargs.paused)
