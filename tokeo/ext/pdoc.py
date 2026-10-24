@@ -1147,11 +1147,11 @@ class TokeoPdoc(Handler):
         import markdown as pymd
 
         extensions = ['admonition', 'fenced_code', 'tables', 'attr_list', 'smarty']
-        # SmartyPants: turn `--` into an en-dash and `...` into an ellipsis,
-        # matching the prior output; leave quotes straight
+        # SmartyPants: turn `...` into an ellipsis; keep `--` as written, it
+        # is mostly a switch like --watch, and leave quotes straight
         extension_configs = {
             'smarty': {
-                'smart_dashes': True,
+                'smart_dashes': False,
                 'smart_ellipses': True,
                 'smart_quotes': False,
                 'smart_angled_quotes': False,

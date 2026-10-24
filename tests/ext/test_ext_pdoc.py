@@ -939,6 +939,24 @@ def test_sidebar_padding_class_exists_in_the_stylesheet(tmp_path, monkeypatch):
 
 
 # --------------------------------------------------------------------------------------
+# markdown of the docstrings
+# --------------------------------------------------------------------------------------
+
+
+def test_markdown_keeps_switches_and_makes_ellipses(app, monkeypatch):
+    """--watch and --serve stay as written, ... becomes an ellipsis."""
+    import pdoc.render
+
+    # the filter is replaced in the env of pdoc, the later tests get it back
+    monkeypatch.setitem(pdoc.render.env.filters, 'to_html', pdoc.render.env.filters['to_html'])
+    app.pdoc._install_markdown_filter()
+
+    html = pdoc.render.env.filters['to_html']('--watch without --serve only renders...')
+
+    assert '--watch without --serve only renders&hellip;' in html
+
+
+# --------------------------------------------------------------------------------------
 # serve
 # --------------------------------------------------------------------------------------
 
