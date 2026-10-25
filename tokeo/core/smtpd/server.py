@@ -627,9 +627,8 @@ class SmtpdServer:
 
         - **wait_seconds_before_close** (float): How long to let active
             connections finish before forcing them down
-        - **gracefully** (bool): When True, set the shutdown flag and let each
-            active dialog end after its current command; when False, drop
-            connections immediately
+        - **gracefully** (bool): When True, let each active dialog end after
+            its current command; when False, drop connections immediately
 
         ### Notes
 
@@ -640,9 +639,9 @@ class SmtpdServer:
         """
         # always stop accepting new connections first
         self.close()
+        # signal every active dialog to end
+        self._shutdown = True
         if gracefully:
-            # signal every active dialog to end after its current command
-            self._shutdown = True
             # wait for active sessions to finish, up to the time budget
             loop = asyncio.get_running_loop()
             deadline = loop.time() + max(0.0, wait_seconds_before_close)
@@ -959,6 +958,16 @@ class SmtpdServer:
                     await self._emit(
                         SmtpdEvent.ON_LOGGING_EVENT, session.ctx, Severity.DEBUG, 'Connection lost due abort by client! (EOFError)', e
                     )
+
+            except asyncio.CancelledError:
+                # a stop drops the connection, after a last attempt to send 421
+                # (RFC 5321 3.8)
+                if self._shutdown:
+                    try:
+                        writer.write(REPLY_421_FOR_SHUTDOWN.encode() + b'\r\n')
+                    except (OSError, RuntimeError):
+                        pass
+                raise
 
             except SmtpdStopServiceException:
                 # service shutdown: propagate after the disconnect event

@@ -831,6 +831,58 @@ def test_shutdown_ends_active_dialog_after_current_command():
     assert bye[0].startswith('421')
 
 
+def test_forced_stop_sends_421_before_the_drop():
+    """A dialog still busy after the drain window gets 421 before the drop."""
+
+    class SlowEvents(RecordingEvents):
+
+        def __init__(self, options=None):
+            super().__init__(options)
+            self.busy = False
+
+        async def on_message_data_event(self, ctx):
+            # busy far beyond the drain window of the stop below
+            self.busy = True
+            await asyncio.sleep(10)
+
+    events = SlowEvents()
+
+    async def go():
+        srv, port = await start_smtpd(events, settings={})
+        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        await read_reply(reader)
+        for cmd in (b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n'):
+            await send_command(reader, writer, cmd)
+        writer.write(b'body\r\n.\r\n')
+        await writer.drain()
+        assert await wait_until_async(lambda: events.busy)
+        stop = asyncio.create_task(srv.stop(wait_seconds_before_close=0.3))
+        reply = await asyncio.wait_for(read_reply(reader), timeout=3)
+        await stop
+        writer.close()
+        return reply
+
+    reply = asyncio.run(go())
+    assert reply[0].startswith('421')
+
+
+def test_stop_not_gracefully_sends_421_at_once():
+    """A stop that is not graceful drops a waiting dialog at once with 421."""
+
+    async def go():
+        srv, port = await start_smtpd(RecordingEvents(), settings={})
+        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        await read_reply(reader)
+        await send_command(reader, writer, b'EHLO me\r\n')
+        await srv.stop(gracefully=False)
+        reply = await asyncio.wait_for(read_reply(reader), timeout=2)
+        writer.close()
+        return reply
+
+    reply = asyncio.run(go())
+    assert reply[0].startswith('421')
+
+
 def test_shutdown_refuses_ungreeted_connection():
     """After shutdown a new connection gets 421 instead of 220."""
 
