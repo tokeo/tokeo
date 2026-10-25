@@ -1266,6 +1266,18 @@ def test_auth_without_returned_authzid_535(mechanism, authz_return):
     assert ev.ctx_auth == ('', '', '')
 
 
+@pytest.mark.parametrize('authz_return', [' user', 'user ', '  '])
+def test_auth_not_stripped_authzid_is_a_handler_fault(authz_return):
+    """A returned authorization id with surrounding whitespace answers 500."""
+    ev = AuthEvents()
+    ev.authz_return = authz_return
+    auth = b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n'
+    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', auth, b'MAIL FROM:<a@x>\r\n'])
+    assert r[1][0].startswith('500')
+    assert r[2][0] == '250 OK'
+    assert ev.ctx_auth == ('', '', '')
+
+
 # --- STARTTLS --------------------
 
 

@@ -1510,6 +1510,8 @@ class SmtpdServer:
             # only a returned authorization id grants the access
             if not (isinstance(return_value, str) and return_value):
                 raise Smtpd535Exception
+            if return_value != return_value.strip():
+                raise ValueError(f'on_auth_event must return a stripped authorization id, not {return_value!r}')
             # save authentication information to ctx
             ctx = session.ctx
             ctx.server.authorization_id = return_value
@@ -1569,6 +1571,8 @@ class SmtpdServer:
             # only a returned authorization id grants the access
             if not (isinstance(return_value, str) and return_value):
                 raise Smtpd535Exception
+            if return_value != return_value.strip():
+                raise ValueError(f'on_auth_event must return a stripped authorization id, not {return_value!r}')
             # save authentication information to ctx
             ctx = session.ctx
             ctx.server.authorization_id = return_value

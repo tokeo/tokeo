@@ -249,6 +249,8 @@ class SmtpdEvents:
         : The credential check and its source (vault, DB, LDAP) live entirely in
             the handler; only a returned non-empty string grants the access and
             is used as the authorization id, any other result is denied by 535
+        : The returned string must be stripped, leading or trailing whitespace
+            is a fault of the handler and raises a ValueError (reply 500)
         : Return the authorization_id sent by the client only after checking
             that the authentication_id may act as it
 

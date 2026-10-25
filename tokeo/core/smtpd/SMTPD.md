@@ -225,6 +225,8 @@ raw ```data``` body), which is handy for logging or enqueuing a job.
 You decide who may authenticate in ```on_auth_event```. Return the
 ```authorization_id``` as a non-empty string to grant access; raise
 ```Smtpd535Exception``` to deny. Any other result is denied by 535 as well.
+The string must be stripped, leading or trailing whitespace is a fault of
+the handler and raises a ```ValueError``` (reply 500).
 A client may send an ```authorization_id``` to act as another identity
 (AUTH PLAIN); return it only after you checked that the
 ```authentication_id``` may act as it:
