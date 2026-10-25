@@ -48,6 +48,7 @@ from .exc import (
     Smtpd500CrLfSequenceException,
     Smtpd501Exception,
     Smtpd503Exception,
+    Smtpd504Exception,
     Smtpd530Exception,
     Smtpd552Exception,
     Smtpd451Exception,
@@ -1260,8 +1261,8 @@ class SmtpdServer:
                 # optional SMTPS service should be provided
 
                 else:
-                    # unknown auth method
-                    raise Smtpd500Exception
+                    # unsupported auth mechanism (RFC 4954 section 4)
+                    raise Smtpd504Exception
 
             elif re.match(r'^NOOP\s*$', line, re.IGNORECASE):
                 # NOOP

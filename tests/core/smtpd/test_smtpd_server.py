@@ -1172,10 +1172,11 @@ def test_auth_twice_503():
     assert r[2][0].startswith('503')
 
 
-def test_auth_cram_md5_rejected_500():
-    """AUTH CRAM-MD5 answers 500."""
-    _, r = dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH CRAM-MD5\r\n'])
-    assert r[1][0].startswith('500')
+@pytest.mark.parametrize('mechanism', [b'CRAM-MD5', b'DIGEST-MD5', b'XPLAINX'])
+def test_auth_unsupported_mechanism_504(mechanism):
+    """AUTH with a mechanism the server does not support answers 504."""
+    _, r = dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH ' + mechanism + b'\r\n'])
+    assert r[1][0].startswith('504')
 
 
 def test_auth_required_gates_mail():
