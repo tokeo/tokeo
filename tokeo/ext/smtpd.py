@@ -23,7 +23,7 @@ lists, process topology with pre-forked workers and machine-wide limits.
 : Process topology of one invocation: a service without ```pre_fork``` runs
     in the main process loop; ```pre_fork: N``` (N >= 1) gives the service N
     dedicated worker processes -- note that ```pre_fork: 1``` here means "an
-    own process", while the plain server library only forks for values > 1.
+    own process".
     With only pre-forked services the main process just supervises. A single
     service is optimized: ```pre_fork <= 1``` runs directly in the main
     process without forking, ```pre_fork: N > 1``` runs the main process as
@@ -72,6 +72,7 @@ tokeo smtpd serve mx1 mx3
 import os
 import sys
 import time
+import ctypes
 import signal
 import asyncio
 import importlib
@@ -81,7 +82,6 @@ from cement.core.meta import MetaMixin
 from cement import ex
 from tokeo.core.exc import TokeoError
 from tokeo.core.smtpd import SmtpdServer, GlobalLimits, SmtpdEvents
-from tokeo.core.smtpd.prefork import set_pdeathsig
 from tokeo.ext.argparse import Controller
 
 
@@ -180,6 +180,43 @@ def _plan(services, has_global_limit):
                 plan['reuse'].add(svc.get('name'))
     plan['shared'] = has_global_limit and bool(plan['forks'])
     return plan
+
+
+#: ``prctl`` option number for the parent-death signal (Linux ``<sys/prctl.h>``)
+_PR_SET_PDEATHSIG = 1
+
+
+def _set_pdeathsig(sig=signal.SIGTERM):
+    """
+    Arm the parent-death signal for the calling process (Linux only).
+
+    ### Notes
+
+    - On Linux, asks the kernel (```prctl(PR_SET_PDEATHSIG, sig)```) to send
+        ```sig``` to this process when its parent dies, so an orphaned worker
+        does not linger if the master crashes without forwarding a stop
+    - A no-op on non-Linux platforms and best-effort on error; the master's
+        explicit signalling stays the primary shutdown path
+    - ```ctypes.CDLL(None)``` resolves ```prctl``` from the C library already
+        loaded into the running process, so no library filename is hardcoded
+        (```libc.so``` is often a linker script and will not ```dlopen```)
+
+    ### Args
+
+    - **sig** (int): Signal to receive on parent death (default ```SIGTERM```)
+
+    ### Returns
+
+    - **bool**: True if the signal was armed, False on non-Linux or on error
+
+    """
+    if not sys.platform.startswith('linux'):
+        return False
+    try:
+        ctypes.CDLL(None, use_errno=True).prctl(_PR_SET_PDEATHSIG, sig, 0, 0, 0)
+        return True
+    except (OSError, AttributeError, ValueError):
+        return False
 
 
 def _pre_fork(svc):
@@ -461,7 +498,7 @@ class TokeoSmtpd(MetaMixin):
             for _ in range(count):
                 pid = os.fork()
                 if pid == 0:
-                    set_pdeathsig(signal.SIGTERM)
+                    _set_pdeathsig(signal.SIGTERM)
                     # the master died between fork and prctl, so the parent
                     # death signal can never fire -- end at once
                     if os.getppid() != master_pid:
