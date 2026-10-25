@@ -1263,6 +1263,34 @@ def test_starttls_full_flow_delivers_over_tls():
     assert ev.encrypted_at_mail
 
 
+def test_starttls_discards_a_plaintext_auth():
+    """STARTTLS drops an AUTH of the plaintext channel, AUTH works again."""
+    ev = AuthEvents()
+    plain = b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n'
+
+    async def go():
+        server, port, task = await start_server(ev, {**TLS_SETTINGS, 'auth_mode': 'AUTH_OPTIONAL'})
+        try:
+            reader, writer = await asyncio.open_connection('127.0.0.1', port)
+            await read_reply(reader)
+            await send_command(reader, writer, b'EHLO me\r\n')
+            first = await send_command(reader, writer, plain)
+            await send_command(reader, writer, b'STARTTLS\r\n')
+            await writer.start_tls(insecure_tls_context())
+            await send_command(reader, writer, b'EHLO secure\r\n')
+            second = await send_command(reader, writer, plain)
+            writer.close()
+            return first, second
+        finally:
+            await stop_server(server, task)
+
+    first, second = asyncio.run(go())
+    assert first == ['235 OK']
+    # without the reset the second AUTH would answer 503
+    assert second == ['235 OK']
+    assert len(ev.auth_calls) == 2
+
+
 def test_starttls_forbidden_is_500():
     """By default STARTTLS answers 500."""
     _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'STARTTLS\r\n'])

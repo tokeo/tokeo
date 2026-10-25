@@ -71,6 +71,12 @@ class ServerCtx:
     #: When STARTTLS completed (UTC); empty/None while plain
     encrypted: object = ''
 
+    def reset_auth(self):
+        """Drop the AUTH state, as after the start of a new TLS channel."""
+        self.authorization_id = ''
+        self.authentication_id = ''
+        self.authenticated = ''
+
 
 @dataclass
 class EnvelopeCtx:

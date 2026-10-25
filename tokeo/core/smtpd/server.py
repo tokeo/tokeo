@@ -876,9 +876,10 @@ class SmtpdServer:
                             del buffered[:]
                         await writer.start_tls(self.tls.context, ssl_handshake_timeout=self.io_cmd_timeout)
                         ctx.server.encrypted = utc_now()
-                        # client must re-HELO; HELO state dropped (RFC 3207)
+                        # client must re-HELO; HELO and AUTH dropped (RFC 3207 4.2)
                         session.cmd_sequence = CMD_HELO
                         ctx.server.helo = ''
+                        ctx.server.reset_auth()
                         # immediate TLS greets only now, on the encrypted channel
                         if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
                             # send the server greeting next
