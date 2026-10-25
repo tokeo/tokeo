@@ -1103,12 +1103,34 @@ def test_auth_garbage_base64_500_and_recovers():
         [
             b'EHLO me\r\n',
             b'AUTH PLAIN\r\n',
-            b'*\r\n',  # abort: not valid credentials -> 500
+            b'!!!not-base64!!!\r\n',  # not valid credentials -> 500
             b'MAIL FROM:<a@x>\r\n',  # sequence was reset to RSET, MAIL works
         ],
     )
     assert r[2][0].startswith('500')
     assert r[3][0] == '250 OK'
+
+
+@pytest.mark.parametrize(
+    'steps',
+    [
+        [b'AUTH PLAIN\r\n'],
+        [b'AUTH LOGIN\r\n'],
+        [b'AUTH LOGIN\r\n', _b64('user').encode() + b'\r\n'],
+    ],
+    ids=['plain', 'login-user', 'login-password'],
+)
+def test_auth_cancel_answers_501_and_recovers(steps):
+    """A single "*" cancels the AUTH exchange with 501, the dialog goes on."""
+    ev = AuthEvents()
+    _, r = dialog(
+        ev,
+        {'auth_mode': 'AUTH_OPTIONAL'},
+        [b'EHLO me\r\n', *steps, b'*\r\n', b'MAIL FROM:<a@x>\r\n'],
+    )
+    assert r[-2][0].startswith('501')
+    assert r[-1][0] == '250 OK'
+    assert ev.auth_calls == []
 
 
 def test_auth_plain_inline_with_plus_and_slash():

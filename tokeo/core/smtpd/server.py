@@ -1088,6 +1088,12 @@ class SmtpdServer:
         """
         ctx = session.ctx
 
+        # the client cancels a running AUTH exchange (RFC 4954 section 4)
+        if line == b'*' and session.cmd_sequence in (CMD_AUTH_PLAIN_VALUES, CMD_AUTH_LOGIN_USER, CMD_AUTH_LOGIN_PASS):
+            session.cmd_sequence = CMD_RSET
+            session.auth_challenge = {}
+            raise Smtpd501Exception
+
         if session.cmd_sequence is CMD_AUTH_PLAIN_VALUES:
             # handle authentication
             return await self.process_auth_plain(session, line.decode('utf-8', 'surrogateescape'))
