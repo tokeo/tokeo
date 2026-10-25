@@ -17,7 +17,7 @@ import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import threaded
-from tokeo.core.smtpd.exc import Smtpd550Exception, Smtpd450Exception, Smtpd421Exception
+from tokeo.core.smtpd.exc import Smtpd550Exception, Smtpd450Exception, Smtpd421Exception, Smtpd555Exception
 from tests.utils import wait_until_async
 from tests.core.smtpd.lib.smtpd_tests_helper import (
     RecordingEvents,
@@ -193,6 +193,19 @@ def test_handler_reject_transient_450():
 
     _, r = dialog(E(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n'])
     assert r[2][0].startswith('450')
+
+
+def test_handler_reject_parameter_555():
+    """Smtpd555Exception of a handler answers 555 for a parameter it refuses."""
+
+    class E(RecordingEvents):
+
+        def on_mail_from_event(self, ctx, mail_from):
+            if 'SIZE=' in mail_from:
+                raise Smtpd555Exception
+
+    _, r = dialog(E(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x> SIZE=1000\r\n'])
+    assert r[1] == ['555 MAIL FROM/RCPT TO parameters not recognized or not implemented']
 
 
 def test_handler_bug_contained_as_500():

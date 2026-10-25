@@ -46,6 +46,7 @@ from .exc import (
     Smtpd552Exception,
     Smtpd553Exception,
     Smtpd554Exception,
+    Smtpd555Exception,
     Tls454Exception,
     Tls530Exception,
 )
@@ -104,6 +105,7 @@ __all__ = [
     'Smtpd552Exception',
     'Smtpd553Exception',
     'Smtpd554Exception',
+    'Smtpd555Exception',
     'Tls454Exception',
     'Tls530Exception',
     'SmtpdContext',

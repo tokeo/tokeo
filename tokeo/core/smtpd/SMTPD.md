@@ -255,6 +255,7 @@ line. The available classes (all importable from ```tokeo.core.smtpd```):
 <tr><td>Smtpd530Exception</td><td>530 authentication required</td><td>gate before MAIL</td></tr>
 <tr><td>Smtpd535Exception</td><td>535 authentication failed</td><td>deny AUTH</td></tr>
 <tr><td>Smtpd550Exception<br>Smtpd552Exception<br>Smtpd553Exception<br>Smtpd554Exception</td><td>5xx permanent</td><td>reject recipient / message</td></tr>
+<tr><td>Smtpd555Exception</td><td>555 parameters not recognized or not implemented</td><td>reject MAIL / RCPT parameters</td></tr>
 <tr><td>Tls454Exception<br>Tls530Exception</td><td>TLS-related</td><td>STARTTLS problems / TLS required</td></tr>
 </tbody>
 </table>
@@ -264,6 +265,11 @@ The full set is present (```Smtpd432```, ```Smtpd454```, ```Smtpd521```,
 The internal signals (```SmtpdIOTimeoutException```,
 ```SmtpdIOBufferOverrunException```) mark a line that timed out or overran
 ```io_buffer_max_size```; the server answers both with ```421```.
+
+The replies of the server lean towards broad compatibility: where a client bends
+the standard, the server keeps the more tolerant reply, e.g. ```501``` for an
+unannounced ```BODY``` or ```SMTPUTF8``` parameter, and leaves a stricter one
+like ```Smtpd555Exception``` to the handler.
 
 ### Which replies are valid per command
 

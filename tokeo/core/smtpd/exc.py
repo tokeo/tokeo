@@ -268,6 +268,13 @@ class Smtpd554Exception(SmtpdException):
     smtp_text = 'Transaction failed'
 
 
+class Smtpd555Exception(SmtpdException):
+    """555 MAIL FROM/RCPT TO parameters not recognized or not implemented."""
+
+    smtp_code = 555
+    smtp_text = 'MAIL FROM/RCPT TO parameters not recognized or not implemented'
+
+
 class Tls454Exception(SmtpdException):
     """454 TLS not available."""
 
