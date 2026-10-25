@@ -1111,6 +1111,17 @@ def test_auth_garbage_base64_500_and_recovers():
     assert r[3][0] == '250 OK'
 
 
+def test_auth_plain_inline_with_plus_and_slash():
+    """An initial response whose base64 holds "+" and "/" is accepted."""
+    ev = AuthEvents()
+    # the authzid '>>>???' encodes to 'Pj4+Pz8/' at the start of the base64
+    response = auth_plain('>>>???', 'user', 'secret')
+    assert '+' in response and '/' in response
+    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN ' + response.encode() + b'\r\n'])
+    assert r[1][0] == '235 OK'
+    assert ev.auth_calls == [('>>>???', 'user', 'secret')]
+
+
 def test_auth_before_helo_503():
     """AUTH before HELO answers 503."""
     _, r = dialog(

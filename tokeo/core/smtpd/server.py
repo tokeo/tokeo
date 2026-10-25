@@ -1214,7 +1214,7 @@ class SmtpdServer:
                 # return with new service ready message
                 return '220 Ready to start TLS'
 
-            elif re.match(r'^AUTH(\s+)((LOGIN|PLAIN)(\s+[A-Z0-9=]+)?|CRAM-MD5)\s*$', line, re.IGNORECASE):
+            elif re.match(r'^AUTH\s+\S+(\s+\S+)?\s*$', line, re.IGNORECASE):
                 # AUTH
                 if self.auth_mode is AuthMode.AUTH_FORBIDDEN:
                     raise Smtpd500Exception
@@ -1228,16 +1228,16 @@ class SmtpdServer:
                 auth_data = re.sub(r'^AUTH\ ', '', line, flags=re.IGNORECASE).strip()
                 auth_data = re.sub(r'\s+', ' ', auth_data).split(' ')
                 # handle auth command
-                if re.search(r'PLAIN', auth_data[0], re.IGNORECASE):
+                if auth_data[0].upper() == 'PLAIN':
                     if len(auth_data) == 1:
                         session.cmd_sequence = CMD_AUTH_PLAIN_VALUES
                         # response code include post ending with a space
                         return '334 '
                     else:
                         # handle authentication with given auth_id and password
-                        return await self.process_auth_plain(session, auth_data[1] if len(auth_data) == 2 else '')
+                        return await self.process_auth_plain(session, auth_data[1])
 
-                elif re.search(r'LOGIN', auth_data[0], re.IGNORECASE):
+                elif auth_data[0].upper() == 'LOGIN':
                     if len(auth_data) == 1:
                         # reset auth_challenge
                         session.auth_challenge = {}
@@ -1245,12 +1245,9 @@ class SmtpdServer:
                         # response code with request for Username
                         return '334 ' + base64.b64encode(b'Username:').decode()
 
-                    elif len(auth_data) == 2:
+                    else:
                         # handle next sequence
                         return self.process_auth_login_user(session, auth_data[1])
-
-                    else:
-                        raise Smtpd500Exception
 
                 # CRAM-MD5 is not supported in case of also unencrypted data
                 # delivery; instead of supporting password encryption only, an
