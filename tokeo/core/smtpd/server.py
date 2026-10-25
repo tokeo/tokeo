@@ -40,8 +40,6 @@ from .events import SmtpdEvents, SmtpdEvent, SMTPD_EVENT_NAMES
 
 from .exc import (
     SmtpdException,
-    SmtpdSignal,
-    SmtpdStopServiceException,
     SmtpdIOTimeoutException,
     SmtpdIOBufferOverrunException,
     Smtpd421Exception,
@@ -646,9 +644,9 @@ class SmtpdServer:
 
         ### Notes
 
-        : Stop accepting first, then either drain within
-            the time budget or force the remaining sessions down with
-            ```SmtpdStopConnectionException```
+        : Stop accepting first, then either drain within the time budget
+            or force the remaining sessions down by cancelling their tasks,
+            each after a last attempt to send 421
 
         """
         # always stop accepting new connections first
@@ -704,7 +702,7 @@ class SmtpdServer:
         session = SmtpdSession()
         try:
             await self.serve_client(session, reader, writer)
-        except (SmtpdStopServiceException, asyncio.CancelledError):
+        except asyncio.CancelledError:
             # service shutdown / forced drop: end this connection
             pass
         finally:
@@ -939,10 +937,6 @@ class SmtpdServer:
                         # re-raise to exit the loop and drop the connection
                         raise
 
-                    # internal control-flow signals pass to the outer handler
-                    except SmtpdSignal:
-                        raise
-
                     except SmtpdException as e:
                         ctx.server.exceptions += 1
                         ctx.server.errors.append(e)
@@ -981,10 +975,6 @@ class SmtpdServer:
                         writer.write(REPLY_421_FOR_SHUTDOWN.encode() + b'\r\n')
                     except (OSError, RuntimeError):
                         pass
-                raise
-
-            except SmtpdStopServiceException:
-                # service shutdown: propagate after the disconnect event
                 raise
 
             # any other error drops the connection with a 421

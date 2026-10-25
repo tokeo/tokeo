@@ -261,9 +261,9 @@ line. The available classes (all importable from ```tokeo.core.smtpd```):
 
 The full set is present (```Smtpd432```, ```Smtpd454```, ```Smtpd521```,
 ```Smtpd534```, ```Smtpd538```, and the pipelining/CRLF ```Smtpd500``` variants).
-A handful of Python control exceptions (```SmtpdStopConnectionException```,
-```SmtpdStopServiceException```, ```SmtpdIOTimeoutException```,
-```SmtpdIOBufferOverrunException```) round out the internal signalling.
+The internal signals (```SmtpdIOTimeoutException```,
+```SmtpdIOBufferOverrunException```) mark a line that timed out or overran
+```io_buffer_max_size```; the server answers both with ```421```.
 
 ### Which replies are valid per command
 

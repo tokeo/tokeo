@@ -5,14 +5,15 @@ This module defines the exception model of the SMTPD extension. It mirrors the
 ported exception hierarchy, so a handler raises the very same names like
 (```Smtpd550Exception```, ```Smtpd421Exception```, ...) it did in MidiSmtpServer.
 The server is the single place that catches these and translates them into
-aiosmtpd responses; the handler logic never returns raw SMTP codes.
+SMTP replies; the handler logic never returns raw SMTP codes.
 
 ### Features
 
 - Extension-level errors (```SmtpdError```, ```SmtpdContractError```) for
     config, wiring, and contract violations, rooted in ```TokeoError```
-- Internal control-flow signals (```SmtpdStopConnectionException``` and
-    friends) that carry no SMTP code (internal control flow)
+- Internal signals of the dialog (```SmtpdIOTimeoutException```,
+    ```SmtpdIOBufferOverrunException```) that carry no SMTP code; the server
+    answers them with 421
 - SMTP dialog exceptions (```SmtpdException``` and the numeric subclasses)
     that carry a fixed code and text; ```smtp_response``` renders the wire form
 - Faithful codes and default texts copied verbatim
@@ -53,43 +54,16 @@ class SmtpdContractError(SmtpdError):
     pass
 
 
-# --- internal control-flow signals (no SMTP code) ---
+# --- internal signals of the dialog (no SMTP code) ---
 
 
-class SmtpdSignal(Exception):
-    """
-    Base for internal control-flow signals without an SMTP return code.
-
-    ### Notes
-
-    : Internal RuntimeError-style signals; they steer the server
-        (stop a connection or the service, abort a slow or oversized line) and
-        are not translated into a client response like ```SmtpdException```
-
-    """
-
-    pass
-
-
-class SmtpdStopConnectionException(SmtpdSignal):
-    """Signal to actively close the current client connection."""
-
-    pass
-
-
-class SmtpdStopServiceException(SmtpdSignal):
-    """Signal to stop the service without a fatal error message."""
-
-    pass
-
-
-class SmtpdIOTimeoutException(SmtpdSignal):
+class SmtpdIOTimeoutException(Exception):
     """Signal that a complete data line did not arrive within the given timeout."""
 
     pass
 
 
-class SmtpdIOBufferOverrunException(SmtpdSignal):
+class SmtpdIOBufferOverrunException(Exception):
     """Signal that a data line exceeded io_buffer_max_size before its LF."""
 
     pass
