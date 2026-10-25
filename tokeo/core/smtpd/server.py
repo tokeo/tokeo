@@ -50,6 +50,7 @@ from .exc import (
     Smtpd503Exception,
     Smtpd504Exception,
     Smtpd530Exception,
+    Smtpd535Exception,
     Smtpd552Exception,
     Smtpd451Exception,
     Tls454Exception,
@@ -1506,12 +1507,12 @@ class SmtpdServer:
                 raise Smtpd500Exception
             # call event function to test credentials
             return_value = await self._emit(SmtpdEvent.ON_AUTH_EVENT, session.ctx, auth_values[0], auth_values[1], auth_values[2])
-            if return_value:
-                # overwrite data with returned value as authorization id
-                auth_values[0] = return_value
+            # only a returned authorization id grants the access
+            if not (isinstance(return_value, str) and return_value):
+                raise Smtpd535Exception
             # save authentication information to ctx
             ctx = session.ctx
-            ctx.server.authorization_id = auth_values[1] if str(auth_values[0]) == '' else auth_values[0]
+            ctx.server.authorization_id = return_value
             ctx.server.authentication_id = auth_values[1]
             ctx.server.authenticated = utc_now()
             # response code
@@ -1565,12 +1566,12 @@ class SmtpdServer:
             ]
             # check for valid credentials
             return_value = await self._emit(SmtpdEvent.ON_AUTH_EVENT, session.ctx, auth_values[0], auth_values[1], auth_values[2])
-            if return_value:
-                # overwrite data with returned value as authorization id
-                auth_values[0] = return_value
+            # only a returned authorization id grants the access
+            if not (isinstance(return_value, str) and return_value):
+                raise Smtpd535Exception
             # save authentication information to ctx
             ctx = session.ctx
-            ctx.server.authorization_id = auth_values[1] if str(auth_values[0]) == '' else auth_values[0]
+            ctx.server.authorization_id = return_value
             ctx.server.authentication_id = auth_values[1]
             ctx.server.authenticated = utc_now()
             # response code

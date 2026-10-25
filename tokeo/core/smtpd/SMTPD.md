@@ -222,9 +222,12 @@ raw ```data``` body), which is handy for logging or enqueuing a job.
 ```'AUTH_OPTIONAL'``` (offer it) or ```'AUTH_REQUIRED'``` (require it before
 ```MAIL```); the default is ```'AUTH_FORBIDDEN'``` (not offered).
 
-You decide who may authenticate in ```on_auth_event```. Return an
-```authorization_id``` (any truthy identifier) to grant access; raise
-```Smtpd535Exception``` to deny:
+You decide who may authenticate in ```on_auth_event```. Return the
+```authorization_id``` as a non-empty string to grant access; raise
+```Smtpd535Exception``` to deny. Any other result is denied by 535 as well.
+A client may send an ```authorization_id``` to act as another identity
+(AUTH PLAIN); return it only after you checked that the
+```authentication_id``` may act as it:
 
 ```python
 class MailHandler(SmtpdEvents):

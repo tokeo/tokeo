@@ -1028,7 +1028,7 @@ def test_ehlo_advertises_auth_when_enabled():
 
 
 def test_auth_plain_inline_success_and_ctx():
-    """AUTH PLAIN inline answers 235, the authzid falls back to the user."""
+    """AUTH PLAIN inline answers 235, the ctx carries the auth info."""
     ev = AuthEvents()
     _, r = dialog(
         ev,
@@ -1045,7 +1045,7 @@ def test_auth_plain_inline_success_and_ctx():
     assert ev.auth_calls == [('', 'user', 'secret')]
     authenticated, authentication_id, authorization_id = ev.ctx_auth
     assert authenticated and authentication_id == 'user'
-    # empty authzid falls back to the authentication id
+    # the authorization id is the one returned by the handler
     assert authorization_id == 'user'
 
 
@@ -1246,6 +1246,24 @@ def test_auth_authzid_returned_by_handler():
     )
     # the handler's return value becomes the authorization id
     assert ev.ctx_auth[2] == 'boss'
+
+
+@pytest.mark.parametrize('authz_return', [None, '', True, 1])
+@pytest.mark.parametrize('mechanism', ['plain', 'login'])
+def test_auth_without_returned_authzid_535(mechanism, authz_return):
+    """A handler result other than a non-empty string denies by 535."""
+    ev = AuthEvents()
+    ev.authz_return = authz_return
+    if mechanism == 'plain':
+        # the authzid of the client is never taken over on its own
+        auth = [b'AUTH PLAIN ' + auth_plain('boss', 'user', 'secret').encode() + b'\r\n']
+    else:
+        auth = [b'AUTH LOGIN ' + _b64('user').encode() + b'\r\n', _b64('secret').encode() + b'\r\n']
+    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', *auth, b'MAIL FROM:<a@x>\r\n'])
+    assert r[-2][0].startswith('535')
+    # not authenticated, MAIL still possible with AUTH_OPTIONAL
+    assert r[-1][0] == '250 OK'
+    assert ev.ctx_auth == ('', '', '')
 
 
 # --- STARTTLS --------------------

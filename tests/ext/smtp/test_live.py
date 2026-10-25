@@ -44,6 +44,7 @@ class RecordingEvents(SmtpdEvents):
     def on_auth_event(self, ctx, authorization_id, authentication_id, authentication):
         if (authentication_id, authentication) != ('user', 'secret'):
             raise Smtpd535Exception
+        return authentication_id
 
     def on_rcpt_to_event(self, ctx, rcpt_to):
         if 'reject@' in rcpt_to:

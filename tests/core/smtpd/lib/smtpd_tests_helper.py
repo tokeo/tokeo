@@ -349,12 +349,12 @@ def dialog(events, settings, commands):
 
 
 class AuthEvents(RecordingEvents):
-    """Accepts one fixed credential pair; optionally returns an authz id."""
+    """Accepts one fixed credential pair and returns its authz id."""
 
     def __init__(self, options=None):
         super().__init__(options)
         self.auth_calls = []
-        self.authz_return = None
+        self.authz_return = 'user'
         self.ctx_auth = None
 
     def on_auth_event(self, ctx, authorization_id, authentication_id, authentication):

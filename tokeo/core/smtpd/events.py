@@ -239,7 +239,7 @@ class SmtpdEvents:
 
     def on_auth_event(self, ctx, authorization_id, authentication_id, authentication):
         """
-        Called on AUTH; return an authorization id or raise to reject.
+        Called on AUTH; return the authorization id or raise to reject.
 
         ### Notes
 
@@ -247,7 +247,10 @@ class SmtpdEvents:
             your own user management -- otherwise all authentications are
             blocked per default (deny with ```Smtpd535Exception```)
         : The credential check and its source (vault, DB, LDAP) live entirely in
-            the handler; a returned value is used as the authorization id
+            the handler; only a returned non-empty string grants the access and
+            is used as the authorization id, any other result is denied by 535
+        : Return the authorization_id sent by the client only after checking
+            that the authentication_id may act as it
 
         """
         self.log.debug(
