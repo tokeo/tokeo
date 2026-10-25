@@ -15,6 +15,7 @@ from tokeo.core.smtpd.server import (
     DEFAULT_SMTPD_PORT,
     DEFAULT_IO_WAITREADABLE_SLEEP,
     DEFAULT_IO_CMD_TIMEOUT,
+    DEFAULT_IO_PROXY_CMD_TIMEOUT,
     DEFAULT_IO_BUFFER_CHUNK_SIZE,
     DEFAULT_IO_BUFFER_MAX_SIZE,
 )
@@ -85,6 +86,19 @@ def test_defaults_io_waitreadable_sleep():
 def test_defaults_io_cmd_timeout():
     """io_cmd_timeout defaults to 30 seconds."""
     assert _smtpd().io_cmd_timeout == DEFAULT_IO_CMD_TIMEOUT
+
+
+def test_defaults_io_proxy_cmd_timeout():
+    """io_proxy_cmd_timeout defaults to 5 seconds."""
+    assert _smtpd().io_proxy_cmd_timeout == DEFAULT_IO_PROXY_CMD_TIMEOUT
+
+
+@pytest.mark.parametrize('name', ['io_cmd_timeout', 'io_proxy_cmd_timeout'])
+@pytest.mark.parametrize('value', [0, 0.5, -1, None, True, '30'])
+def test_io_timeouts_below_one_second_are_rejected(name, value):
+    """An io timeout below 1 second, null or not a number stops the server setup."""
+    with pytest.raises(ValueError, match=name):
+        _smtpd(settings={name: value})
 
 
 def test_defaults_io_buffer_chunk_size():

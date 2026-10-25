@@ -451,10 +451,10 @@ The constructor keeps the original option names. Key ones:
 <tr><td>internationalization_extensions</td><td>False</td><td>advertise 8BITMIME and SMTPUTF8</td></tr>
 <tr><td>spool</td><td>None</td><td>path and file name prefix for the spool temp files (section 11)</td></tr>
 <tr><td>do_dns_reverse_lookup</td><td>True</td><td>resolve the remote host name</td></tr>
-<tr><td>io_cmd_timeout</td><td>30</td><td>seconds to await a complete command line</td></tr>
+<tr><td>io_cmd_timeout</td><td>30</td><td>seconds to await a complete command line, at least 1. When not set the default of DEFAULT_IO_CMD_TIMEOUT is used</td></tr>
 <tr><td>io_buffer_max_size</td><td>1 MiB</td><td>maximum line length before rejection</td></tr>
 <tr><td>proxy_extension</td><td>False</td><td>accept the PROXY protocol</td></tr>
-<tr><td>io_proxy_cmd_timeout</td><td>5</td><td>seconds to await the PROXY header line</td></tr>
+<tr><td>io_proxy_cmd_timeout</td><td>5</td><td>seconds to await the PROXY header line, at least 1. When not set the default of DEFAULT_IO_PROXY_CMD_TIMEOUT is used</td></tr>
 </tbody>
 </table>
 

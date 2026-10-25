@@ -436,6 +436,10 @@ class SmtpdServer:
         # validation
         if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not tls_immediate_supported():
             raise ValueError('Immediate TLS (encrypt_mode TLS_IMMEDIATE) requires Python 3.13.13+ or 3.14.4+!')
+        if not (type(self.io_cmd_timeout) in (int, float) and self.io_cmd_timeout >= 1):
+            raise ValueError('Timeout for a command line (io_cmd_timeout) must be at least 1 second!')
+        if not (type(self.io_proxy_cmd_timeout) in (int, float) and self.io_proxy_cmd_timeout >= 1):
+            raise ValueError('Timeout for the PROXY header (io_proxy_cmd_timeout) must be at least 1 second!')
         if not (isinstance(self.max_processings, int) and self.max_processings > 0):
             raise ValueError('Number of simultaneous processings (max_processings) must be a positive integer!')
         if self.max_connections is not None:
@@ -877,7 +881,7 @@ class SmtpdServer:
                         buffered = getattr(reader, '_buffer', None)
                         if buffered and self.encrypt_mode is not EncryptMode.TLS_IMMEDIATE:
                             del buffered[:]
-                        await writer.start_tls(self.tls.context, ssl_handshake_timeout=self.io_cmd_timeout or None)
+                        await writer.start_tls(self.tls.context, ssl_handshake_timeout=self.io_cmd_timeout)
                         ctx.server.encrypted = utc_now()
                         # client must re-HELO; HELO state dropped (RFC 3207)
                         session.cmd_sequence = CMD_HELO
@@ -1016,8 +1020,7 @@ class SmtpdServer:
         ### Args
 
         - **reader** (StreamReader): The connection input stream
-        - **io_timeout** (int|float|None): Seconds to wait for a complete line
-            (None or 0 waits without a timeout)
+        - **io_timeout** (int|float): Seconds to wait for a complete line
 
         ### Raises
 
@@ -1052,7 +1055,7 @@ class SmtpdServer:
         # a server that was never started has no shutdown signal yet
         waits = {read} if self._asyncio_shutdown_signal is None else {read, self._asyncio_shutdown_signal}
         try:
-            done, _ = await asyncio.wait(waits, timeout=io_timeout or None, return_when=asyncio.FIRST_COMPLETED)
+            done, _ = await asyncio.wait(waits, timeout=io_timeout, return_when=asyncio.FIRST_COMPLETED)
         finally:
             # no read outlives the wait, also not on a forced cancel
             if not read.done():

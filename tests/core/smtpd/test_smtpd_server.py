@@ -287,12 +287,12 @@ def test_command_timeout_closes_connection():
     """A silent client gets 421 after io_cmd_timeout."""
 
     async def go():
-        server, port, task = await start_server(RecordingEvents(), {'io_cmd_timeout': 0.2})
+        server, port, task = await start_server(RecordingEvents(), {'io_cmd_timeout': 1})
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
             # send nothing; the server must time out and answer 421
-            reply = await asyncio.wait_for(read_reply(reader), timeout=2)
+            reply = await asyncio.wait_for(read_reply(reader), timeout=3)
             writer.close()
             return reply
         finally:
@@ -302,8 +302,8 @@ def test_command_timeout_closes_connection():
     assert reply[0].startswith('421')
 
 
-def test_read_line_skips_wait_for_when_line_buffered(monkeypatch):
-    """A complete line in the buffer is read without wait_for."""
+def test_read_line_takes_a_buffered_line_without_waiting(monkeypatch):
+    """A complete line in the buffer is read without asyncio.wait."""
     from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
     async def go():
@@ -312,9 +312,9 @@ def test_read_line_skips_wait_for_when_line_buffered(monkeypatch):
         reader.feed_data(b'HELO x\r\nMAIL FROM:<a@b>\r\n')
 
         def boom(*args, **kwargs):
-            raise AssertionError('wait_for must not be used when a line is buffered')
+            raise AssertionError('asyncio.wait must not be used when a line is buffered')
 
-        monkeypatch.setattr(asyncio, 'wait_for', boom)
+        monkeypatch.setattr(asyncio, 'wait', boom)
         assert await srv._read_line(reader, srv.io_cmd_timeout) == b'HELO x\r\n'
         assert await srv._read_line(reader, srv.io_cmd_timeout) == b'MAIL FROM:<a@b>\r\n'
 
@@ -322,16 +322,17 @@ def test_read_line_skips_wait_for_when_line_buffered(monkeypatch):
 
 
 def test_read_line_times_out_on_partial_buffered_line():
-    """A partial line in the buffer still times out by io_cmd_timeout."""
+    """A partial line in the buffer still times out."""
     from tokeo.core.smtpd.exc import SmtpdIOTimeoutException
     from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
     async def go():
-        srv = SmtpdServer(CaptureSmtpdEvents(), settings={'io_cmd_timeout': 0.1})
+        srv = SmtpdServer(CaptureSmtpdEvents())
         reader = asyncio.StreamReader()
         reader.feed_data(b'incomplete without newline')
+        # a short timeout of the read itself, the config allows 1 second at least
         with pytest.raises(SmtpdIOTimeoutException):
-            await srv._read_line(reader, srv.io_cmd_timeout)
+            await srv._read_line(reader, 0.1)
 
     asyncio.run(go())
 
@@ -709,12 +710,10 @@ def test_proxy_header_timeout_aborts_421():
     """No PROXY header within io_proxy_cmd_timeout gets 421."""
 
     async def go():
-        server, port, task = await start_server(
-            ProxyEvents(), {'proxy_extension': True, 'io_proxy_cmd_timeout': 0.2, 'io_cmd_timeout': 30}
-        )
+        server, port, task = await start_server(ProxyEvents(), {'proxy_extension': True, 'io_proxy_cmd_timeout': 1, 'io_cmd_timeout': 30})
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            reply = await asyncio.wait_for(read_reply(reader), timeout=2)
+            reply = await asyncio.wait_for(read_reply(reader), timeout=3)
             closed = await asyncio.wait_for(reader.read(1), timeout=1) == b''
             writer.close()
             return reply, closed
