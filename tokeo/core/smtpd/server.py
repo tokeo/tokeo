@@ -53,6 +53,7 @@ from .exc import (
     Smtpd535Exception,
     Smtpd552Exception,
     Smtpd451Exception,
+    Smtpd454Exception,
     Tls454Exception,
     Tls530Exception,
 )
@@ -1506,12 +1507,18 @@ class SmtpdServer:
             if len(auth_values) != 3:
                 raise Smtpd500Exception
             # call event function to test credentials
-            return_value = await self._emit(SmtpdEvent.ON_AUTH_EVENT, session.ctx, auth_values[0], auth_values[1], auth_values[2])
+            try:
+                return_value = await self._emit(SmtpdEvent.ON_AUTH_EVENT, session.ctx, auth_values[0], auth_values[1], auth_values[2])
+            except SmtpdException:
+                raise
+            # any other handler fault is a temporary failure (RFC 4954 section 6)
+            except Exception as e:  # noqa: B902
+                raise Smtpd454Exception(f'{e} ({type(e).__name__})')
             # only a returned authorization id grants the access
             if not (isinstance(return_value, str) and return_value):
                 raise Smtpd535Exception
             if return_value != return_value.strip():
-                raise ValueError(f'on_auth_event must return a stripped authorization id, not {return_value!r}')
+                raise Smtpd454Exception(f'on_auth_event must return a stripped authorization id, not {return_value!r}')
             # save authentication information to ctx
             ctx = session.ctx
             ctx.server.authorization_id = return_value
@@ -1567,12 +1574,18 @@ class SmtpdServer:
                 self._decode64(encoded_auth_response),
             ]
             # check for valid credentials
-            return_value = await self._emit(SmtpdEvent.ON_AUTH_EVENT, session.ctx, auth_values[0], auth_values[1], auth_values[2])
+            try:
+                return_value = await self._emit(SmtpdEvent.ON_AUTH_EVENT, session.ctx, auth_values[0], auth_values[1], auth_values[2])
+            except SmtpdException:
+                raise
+            # any other handler fault is a temporary failure (RFC 4954 section 6)
+            except Exception as e:  # noqa: B902
+                raise Smtpd454Exception(f'{e} ({type(e).__name__})')
             # only a returned authorization id grants the access
             if not (isinstance(return_value, str) and return_value):
                 raise Smtpd535Exception
             if return_value != return_value.strip():
-                raise ValueError(f'on_auth_event must return a stripped authorization id, not {return_value!r}')
+                raise Smtpd454Exception(f'on_auth_event must return a stripped authorization id, not {return_value!r}')
             # save authentication information to ctx
             ctx = session.ctx
             ctx.server.authorization_id = return_value

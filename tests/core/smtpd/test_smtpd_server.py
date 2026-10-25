@@ -1268,14 +1268,36 @@ def test_auth_without_returned_authzid_535(mechanism, authz_return):
 
 @pytest.mark.parametrize('authz_return', [' user', 'user ', '  '])
 def test_auth_not_stripped_authzid_is_a_handler_fault(authz_return):
-    """A returned authorization id with surrounding whitespace answers 500."""
+    """A returned authorization id with surrounding whitespace answers 454."""
     ev = AuthEvents()
     ev.authz_return = authz_return
     auth = b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n'
     _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', auth, b'MAIL FROM:<a@x>\r\n'])
-    assert r[1][0].startswith('500')
+    assert r[1][0].startswith('454')
     assert r[2][0] == '250 OK'
     assert ev.ctx_auth == ('', '', '')
+
+
+@pytest.mark.parametrize('mechanism', ['plain', 'login'])
+def test_auth_handler_crash_454(mechanism):
+    """An unexpected exception of on_auth_event answers 454, AUTH may follow."""
+
+    class E(AuthEvents):
+
+        def on_auth_event(self, ctx, authorization_id, authentication_id, authentication):
+            if not self.auth_calls:
+                self.auth_calls.append('down')
+                raise ConnectionError('user database down')
+            return super().on_auth_event(ctx, authorization_id, authentication_id, authentication)
+
+    if mechanism == 'plain':
+        auth = [b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n']
+    else:
+        auth = [b'AUTH LOGIN ' + _b64('user').encode() + b'\r\n', _b64('secret').encode() + b'\r\n']
+    ev = E()
+    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', *auth, *auth])
+    assert r[len(auth)][0] == '454 Temporary authentication failure'
+    assert r[-1][0] == '235 OK'
 
 
 # --- STARTTLS --------------------

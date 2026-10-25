@@ -250,7 +250,8 @@ class SmtpdEvents:
             the handler; only a returned non-empty string grants the access and
             is used as the authorization id, any other result is denied by 535
         : The returned string must be stripped, leading or trailing whitespace
-            is a fault of the handler and raises a ValueError (reply 500)
+            is a fault of the handler and answered by 454 like any exception
+            other than an SmtpdException
         : Return the authorization_id sent by the client only after checking
             that the authentication_id may act as it
 
