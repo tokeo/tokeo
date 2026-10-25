@@ -573,5 +573,6 @@ forces or Tokeo adds: the events may be ```async def``` (or ```@threaded```)
 instead of Ruby threads; a certificate may be supplied as an in-memory PEM string
 (```tls_cert```/```tls_key```); with ```proxy_extension``` the PROXY header is
 mandatory as the first line and answered by the greeting (section 9); and the
-polling-only ```io_waitreadable_sleep``` knob has no effect because
-```asyncio``` is event-driven (it is accepted for parity).
+options that only steered the polling read of the original
+(```io_waitreadable_sleep```, ```io_buffer_chunk_size```) are left out because
+```asyncio``` is event-driven.

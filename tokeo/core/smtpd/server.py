@@ -58,12 +58,9 @@ from .exc import (
 # default constants
 DEFAULT_SMTPD_HOST = '127.0.0.1'
 DEFAULT_SMTPD_PORT = 2525
-DEFAULT_SMTPD_PRE_FORK = 0
 DEFAULT_SMTPD_MAX_PROCESSINGS = 4
-DEFAULT_IO_WAITREADABLE_SLEEP = 0.1
 DEFAULT_IO_CMD_TIMEOUT = 30
 DEFAULT_IO_PROXY_CMD_TIMEOUT = 5
-DEFAULT_IO_BUFFER_CHUNK_SIZE = 4 * 1024
 DEFAULT_IO_BUFFER_MAX_SIZE = 1 * 1024 * 1024
 
 
@@ -402,11 +399,8 @@ class SmtpdServer:
         self.ports = _parse_ports(kwargs.get('ports') if kwargs.get('ports') is not None else settings.get('ports', DEFAULT_SMTPD_PORT))
         self.hosts = _parse_hosts(kwargs.get('hosts') if kwargs.get('hosts') is not None else settings.get('hosts', DEFAULT_SMTPD_HOST))
         self._addresses = _build_addresses(self.ports, self.hosts)
-        self.pre_fork = settings.get('pre_fork', DEFAULT_SMTPD_PRE_FORK)
         # dialog options
-        self.io_waitreadable_sleep = settings.get('io_waitreadable_sleep', DEFAULT_IO_WAITREADABLE_SLEEP)
         self.io_cmd_timeout = settings.get('io_cmd_timeout', DEFAULT_IO_CMD_TIMEOUT)
-        self.io_buffer_chunk_size = settings.get('io_buffer_chunk_size', DEFAULT_IO_BUFFER_CHUNK_SIZE)
         self.io_buffer_max_size = settings.get('io_buffer_max_size', DEFAULT_IO_BUFFER_MAX_SIZE)
         self.crlf_mode = _parse_mode(CrlfMode, settings.get('crlf_mode'), 'CRLF_ENSURE', 'crlf_mode')
         self.pipelining_extension = bool(settings.get('pipelining_extension', False))

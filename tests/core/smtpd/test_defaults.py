@@ -13,10 +13,8 @@ from tokeo.core.smtpd.server import (
     EncryptMode,
     DEFAULT_SMTPD_HOST,
     DEFAULT_SMTPD_PORT,
-    DEFAULT_IO_WAITREADABLE_SLEEP,
     DEFAULT_IO_CMD_TIMEOUT,
     DEFAULT_IO_PROXY_CMD_TIMEOUT,
-    DEFAULT_IO_BUFFER_CHUNK_SIZE,
     DEFAULT_IO_BUFFER_MAX_SIZE,
 )
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
@@ -78,11 +76,6 @@ def test_defaults_crlf_mode():
     assert _smtpd().crlf_mode is CrlfMode.CRLF_ENSURE
 
 
-def test_defaults_io_waitreadable_sleep():
-    """io_waitreadable_sleep defaults to 0.1."""
-    assert _smtpd().io_waitreadable_sleep == DEFAULT_IO_WAITREADABLE_SLEEP
-
-
 def test_defaults_io_cmd_timeout():
     """io_cmd_timeout defaults to 30 seconds."""
     assert _smtpd().io_cmd_timeout == DEFAULT_IO_CMD_TIMEOUT
@@ -99,11 +92,6 @@ def test_io_timeouts_below_one_second_are_rejected(name, value):
     """An io timeout below 1 second, null or not a number stops the server setup."""
     with pytest.raises(ValueError, match=name):
         _smtpd(settings={name: value})
-
-
-def test_defaults_io_buffer_chunk_size():
-    """io_buffer_chunk_size defaults to 4 KiB."""
-    assert _smtpd().io_buffer_chunk_size == DEFAULT_IO_BUFFER_CHUNK_SIZE
 
 
 def test_defaults_io_buffer_max_size():
