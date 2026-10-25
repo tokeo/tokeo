@@ -455,12 +455,17 @@ class TokeoSmtpd(MetaMixin):
         # limits above are inherited by every worker
         if plan['forks'] and not sys.platform.startswith('linux'):
             self.app.log.warning('smtpd: no parent-death signal on this platform -- a crashed master leaves the workers running')
+        master_pid = os.getpid()
         workers = {}
         for svc, count in plan['forks']:
             for _ in range(count):
                 pid = os.fork()
                 if pid == 0:
                     set_pdeathsig(signal.SIGTERM)
+                    # the master died between fork and prctl, so the parent
+                    # death signal can never fire -- end at once
+                    if os.getppid() != master_pid:
+                        os._exit(0)
                     status = 0
                     try:
                         self._run_worker(svc, global_limits, plan['reuse'])
