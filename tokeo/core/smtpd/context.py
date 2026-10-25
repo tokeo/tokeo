@@ -71,6 +71,11 @@ class ServerCtx:
     #: When STARTTLS completed (UTC); empty/None while plain
     encrypted: object = ''
 
+    def reset_on_starttls(self):
+        """Drop the HELO and the AUTH state the client gave before TLS."""
+        self.helo = ''
+        self.reset_auth()
+
     def reset_auth(self):
         """Drop the AUTH state, as after the start of a new TLS channel."""
         self.authorization_id = ''
@@ -278,6 +283,16 @@ class SmtpdContext:
         if name == 'id' and getattr(self, 'id', ''):
             raise AttributeError('SmtpdContext.id is read-only')
         super().__setattr__(name, value)
+
+    def reset_on_starttls(self):
+        """Drop all the client told since the greeting (RFC 3207 4.2)."""
+        self.server.reset_on_starttls()
+        self.reset_on_mail_from()
+
+    def reset_on_mail_from(self):
+        """Start a new transaction, nothing of a former MAIL remains."""
+        self.envelope = EnvelopeCtx()
+        self.message = MessageCtx()
 
     def finalize(self):
         """Finish interrupted per-message resources (the spooler)."""

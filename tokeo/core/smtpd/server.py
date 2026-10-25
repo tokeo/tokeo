@@ -876,10 +876,10 @@ class SmtpdServer:
                             del buffered[:]
                         await writer.start_tls(self.tls.context, ssl_handshake_timeout=self.io_cmd_timeout)
                         ctx.server.encrypted = utc_now()
-                        # client must re-HELO; HELO and AUTH dropped (RFC 3207 4.2)
+                        # client must re-HELO; HELO, AUTH and the transaction are
+                        # dropped (RFC 3207 4.2)
                         session.cmd_sequence = CMD_HELO
-                        ctx.server.helo = ''
-                        ctx.server.reset_auth()
+                        ctx.reset_on_starttls()
                         # immediate TLS greets only now, on the encrypted channel
                         if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
                             # send the server greeting next
@@ -1291,6 +1291,8 @@ class SmtpdServer:
                     raise Tls530Exception
                 if self.auth_mode is AuthMode.AUTH_REQUIRED and not ctx.server.authenticated:
                     raise Smtpd530Exception
+                # a new transaction, nothing of a rejected MAIL remains
+                ctx.reset_on_mail_from()
                 cmd_data = re.sub(r'^MAIL FROM:', '', line, flags=re.IGNORECASE).strip()
                 if re.search(r'\sBODY=7BIT(\s|$)', cmd_data, re.IGNORECASE):
                     if not self.internationalization_extensions:

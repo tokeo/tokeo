@@ -377,6 +377,40 @@ def test_body_param_rejected_without_intl():
     assert r[1][0].startswith('501')
 
 
+def test_rejected_mail_leaves_no_envelope_behind():
+    """BODY and SMTPUTF8 of a rejected MAIL do not reach the next transaction."""
+
+    class E(RecordingEvents):
+
+        def __init__(self, options=None):
+            super().__init__(options)
+            self.encodings = []
+
+        def on_mail_from_event(self, ctx, mail_from):
+            self.encodings.append((mail_from, ctx.envelope.encoding_body, ctx.envelope.encoding_utf8))
+            if 'bad' in mail_from:
+                raise Smtpd550Exception
+
+        def on_message_data_event(self, ctx):
+            self.encodings.append(('data', ctx.envelope.encoding_body, ctx.envelope.encoding_utf8))
+
+    ev = E()
+    _, r = dialog(
+        ev,
+        {'internationalization_extensions': True},
+        [
+            b'EHLO me\r\n',
+            b'MAIL FROM:<bad@x> BODY=7BIT SMTPUTF8\r\n',
+            b'MAIL FROM:<good@x>\r\n',
+            b'RCPT TO:<b@y>\r\n',
+            b'DATA\r\n',
+            b'x\r\n.\r\n',
+        ],
+    )
+    assert r[1][0].startswith('550')
+    assert ev.encodings == [('<bad@x>', '7bit', 'utf8'), ('<good@x>', '', ''), ('data', '', '')]
+
+
 # --- limits ------------------------------------------------------------------
 
 
