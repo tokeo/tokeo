@@ -810,25 +810,46 @@ def test_graceful_stop_lets_the_current_command_finish():
     assert bye[0].startswith('421')
 
 
-def test_shutdown_ends_active_dialog_after_current_command():
-    """After shutdown the next command still answers, then 421 follows."""
+def test_shutdown_ends_a_waiting_dialog_at_once_with_421():
+    """A dialog waiting for its next command gets 421 at once on shutdown."""
 
     async def go():
         srv, port = await start_smtpd(RecordingEvents(), settings={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
         await send_command(reader, writer, b'EHLO me\r\n')
-        # request a graceful shutdown; the next command is answered, then 421
+        # the client sends nothing more, the shutdown must not wait for it
         srv.shutdown()
-        noop = await send_command(reader, writer, b'NOOP\r\n')
-        bye = await read_reply(reader)
+        reply = await asyncio.wait_for(read_reply(reader), timeout=2)
+        closed = await asyncio.wait_for(reader.read(1), timeout=2) == b''
         writer.close()
         await srv.stop(wait_seconds_before_close=0.2)
-        return noop, bye
+        return reply, closed
 
-    noop, bye = asyncio.run(go())
-    assert noop[0] == '250 OK'
-    assert bye[0].startswith('421')
+    reply, closed = asyncio.run(go())
+    assert reply[0].startswith('421')
+    assert closed is True
+
+
+def test_graceful_stop_ends_early_when_all_dialogs_ended():
+    """A graceful stop with only waiting dialogs returns before its drain window."""
+
+    async def go():
+        srv, port = await start_smtpd(RecordingEvents(), settings={})
+        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        await read_reply(reader)
+        await send_command(reader, writer, b'EHLO me\r\n')
+        loop = asyncio.get_running_loop()
+        t0 = loop.time()
+        await srv.stop(wait_seconds_before_close=5)
+        took = loop.time() - t0
+        reply = await asyncio.wait_for(read_reply(reader), timeout=2)
+        writer.close()
+        return took, reply
+
+    took, reply = asyncio.run(go())
+    assert took < 2
+    assert reply[0].startswith('421')
 
 
 def test_forced_stop_sends_421_before_the_drop():

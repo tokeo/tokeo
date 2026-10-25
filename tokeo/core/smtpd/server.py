@@ -481,6 +481,7 @@ class SmtpdServer:
         self._shutdown = False
         self._stopped = True
         self._sessions = set()
+        self._asyncio_shutdown_signal = None
         self._serve_task = None
 
     @property
@@ -534,6 +535,7 @@ class SmtpdServer:
         self._shutdown = False
         self._stopped = False
         self._asyncio_running_loop = asyncio.get_running_loop()
+        self._asyncio_shutdown_signal = self._asyncio_running_loop.create_future()
         if listeners is None:
             listeners = self._default_listeners()
         for lst in listeners:
@@ -592,6 +594,14 @@ class SmtpdServer:
     def shutdown(self):
         """Schedule a graceful shutdown."""
         self._shutdown = True
+        # signal to the dialogs that wait for input, from any thread
+        if self._asyncio_running_loop is not None and not self._asyncio_running_loop.is_closed():
+            self._asyncio_running_loop.call_soon_threadsafe(self._shutdown_signal)
+
+    def _shutdown_signal(self):
+        """Send the shutdown signal once."""
+        if self._asyncio_shutdown_signal is not None and not self._asyncio_shutdown_signal.done():
+            self._asyncio_shutdown_signal.set_result(b'')
 
     def shutdown_requested(self):
         """True once a shutdown was scheduled."""
@@ -640,7 +650,7 @@ class SmtpdServer:
         # always stop accepting new connections first
         self.close()
         # signal every active dialog to end
-        self._shutdown = True
+        self.shutdown()
         if gracefully:
             # wait for active sessions to finish, up to the time budget
             loop = asyncio.get_running_loop()
@@ -883,7 +893,7 @@ class SmtpdServer:
                         reader, self.io_proxy_cmd_timeout if session.cmd_sequence is CMD_PROXY else self.io_cmd_timeout
                     )
                     if raw == b'':
-                        # connection closed by the remote peer
+                        # connection closed by the remote peer or by a shutdown
                         break
 
                     try:
@@ -1017,14 +1027,13 @@ class SmtpdServer:
 
         """
         try:
-            # the timeout guards *waiting on the wire*: when a complete line is
-            # already buffered, readuntil returns without waiting, so the costly
-            # wait_for wrapper (timer + context per call) is skipped -- in
-            # pipelined/DATA bulk traffic that is nearly every line
-            if io_timeout and not self._buffered_line_lf(reader):
-                raw = await asyncio.wait_for(reader.readuntil(b'\n'), io_timeout)
-            else:
+            # the timeout and the shutdown guard *waiting on the wire*: when a
+            # complete line is already buffered, readuntil returns without
+            # waiting -- in pipelined/DATA bulk traffic that is nearly every line
+            if self._buffered_line_lf(reader):
                 raw = await reader.readuntil(b'\n')
+            else:
+                raw = await self._wait_line(reader, io_timeout)
         except asyncio.TimeoutError:
             raise SmtpdIOTimeoutException
         except asyncio.LimitOverrunError:
@@ -1034,6 +1043,26 @@ class SmtpdServer:
         if self.io_buffer_max_size and len(raw) > int(self.io_buffer_max_size):
             raise SmtpdIOBufferOverrunException
         return raw
+
+    async def _wait_line(self, reader, io_timeout):
+        """Wait for the next line, b'' once a shutdown ends the wait."""
+        if self._shutdown:
+            return b''
+        read = asyncio.ensure_future(reader.readuntil(b'\n'))
+        # a server that was never started has no shutdown signal yet
+        waits = {read} if self._asyncio_shutdown_signal is None else {read, self._asyncio_shutdown_signal}
+        try:
+            done, _ = await asyncio.wait(waits, timeout=io_timeout or None, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            # no read outlives the wait, also not on a forced cancel
+            if not read.done():
+                read.cancel()
+        if read in done:
+            # a line that arrived together with the shutdown is still served
+            return read.result()
+        if self._shutdown:
+            return b''
+        raise asyncio.TimeoutError
 
     @staticmethod
     def _buffered_line_lf(reader):
