@@ -47,6 +47,7 @@ class MailHandler(SmtpdEvents):
         # only accept mail addressed to our domain, reject the rest
         if not rcpt_to.strip('<>').endswith('@example.com'):
             raise Smtpd550Exception             # client sees "550 ..."
+        return True                             # accept the address as sent
 
     def on_message_data_event(self, ctx):
         # the complete message has arrived; do something with it
@@ -144,10 +145,13 @@ as a single method. The full set, in the order they can occur:
 
 Two conventions matter:
 
-- **Return value.** Where an event returns a value (for example
-  ```on_mail_from_event```), returning a string replaces the address the server
-  stores; returning ```None``` keeps the parsed value. Most handlers return
-  nothing.
+- **Return value.** ```on_mail_from_event``` and ```on_rcpt_to_event``` decide
+  by their result: ```True``` accepts the address as sent, a stripped string
+  accepts it as the replaced address (also ```''```), ```None``` or ```False```
+  refuses it by ```550```. Any other result, a string with surrounding
+  whitespace or an exception other than an ```Smtpd*Exception``` is a fault of
+  the handler and answered by ```451```. Not overriding the event accepts every
+  address.
 - **Raising decides the reply.** Raise one of the ```Smtpd*Exception``` classes
   (section 7) to reject a step; the exception carries the SMTP status line the
   client receives.
@@ -306,9 +310,10 @@ announced by ```EHLO``` on the channel, all on ```MAIL FROM```:
 ```internationalization_extensions```, and ```AUTH=``` while AUTH is offered.
 Keywords and values are not case sensitive.
 
-- an unknown or not announced parameter is answered by ```555```
+- an unknown or not announced parameter, and any parameter of ```RCPT TO```,
+  is answered by ```555```
 - a malformed parameter, a wrong value, an invalid xtext or a parameter given
-  twice is answered by ```501```
+  twice on ```MAIL FROM``` is answered by ```501```
 
 ### Which replies are valid per command
 

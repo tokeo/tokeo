@@ -263,12 +263,28 @@ class SmtpdEvents:
         raise Smtpd535Exception
 
     def on_mail_from_event(self, ctx, mail_from_data):
-        """Called on MAIL FROM; a returned value replaces the sender if given."""
-        pass
+        """
+        Called on MAIL FROM with the address as sent; return True to accept it.
+
+        ### Notes
+
+        : None or False refuses the address by 550, True accepts it as sent and
+            a stripped string accepts it as the replaced address; any other
+            result or exception other than an SmtpdException answers 451
+
+        """
+        return True
 
     def on_rcpt_to_event(self, ctx, rcpt_to_data):
-        """Called on each RCPT TO; raise ```Smtpd550Exception``` to reject."""
-        pass
+        """
+        Called on each RCPT TO with the address as sent; return True to accept it.
+
+        ### Notes
+
+        : The results are the same as for ```on_mail_from_event```
+
+        """
+        return True
 
     # --- message data (streamed) ---
 

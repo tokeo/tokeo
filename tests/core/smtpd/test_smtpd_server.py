@@ -209,16 +209,73 @@ def test_handler_reject_parameter_555():
     assert r[1] == ['555 MAIL FROM/RCPT TO parameters not recognized or not implemented']
 
 
-def test_handler_bug_contained_as_500():
-    """Any other exception of a handler answers 500, the dialog goes on."""
+@pytest.mark.parametrize('event', ['mail', 'rcpt'])
+def test_handler_bug_contained_as_451(event):
+    """Any other exception of a MAIL/RCPT handler answers 451, the dialog lasts."""
 
     class E(RecordingEvents):
 
         def on_mail_from_event(self, ctx, mail_from):
+            if event == 'mail':
+                raise RuntimeError('boom')
+            return True
+
+        def on_rcpt_to_event(self, ctx, rcpt_to):
             raise RuntimeError('boom')
 
-    _, r = dialog(E(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n'])
-    assert r[1][0].startswith('500')
+    _, r = dialog(E(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'NOOP\r\n'])
+    assert r[1 if event == 'mail' else 2][0].startswith('451')
+    assert r[3] == ['250 OK']
+
+
+@pytest.mark.parametrize(
+    'result, reply, address',
+    [
+        # None or False refuses
+        (None, '550', None),
+        (False, '550', None),
+        # True keeps the address as sent
+        (True, '250', '<a@x>'),
+        # a stripped string replaces it, also the empty one
+        ('<b@x>', '250', '<b@x>'),
+        ('', '250', ''),
+        # anything else is a fault of the handler
+        (' <b@x>', '451', None),
+        ('<b@x> ', '451', None),
+        (1, '451', None),
+        (b'<b@x>', '451', None),
+    ],
+)
+@pytest.mark.parametrize('event', ['mail', 'rcpt'])
+def test_mail_rcpt_event_results(event, result, reply, address):
+    """The result of a MAIL/RCPT handler refuses, keeps or replaces the address."""
+
+    class E(RecordingEvents):
+
+        def __init__(self, options=None):
+            super().__init__(options)
+            self.seen = []
+
+        def on_mail_from_event(self, ctx, mail_from):
+            return result if event == 'mail' else True
+
+        def on_rcpt_to_event(self, ctx, rcpt_to):
+            # a probe recipient shows what the server stored before
+            self.seen.append((ctx.envelope.mail_from, list(ctx.envelope.rcpt_tos)))
+            return True if rcpt_to == '<probe@y>' else result
+
+    if event == 'mail':
+        commands = [b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<probe@y>\r\n']
+    else:
+        commands = [b'MAIL FROM:<m@x>\r\n', b'RCPT TO:<a@x>\r\n', b'RCPT TO:<probe@y>\r\n']
+    ev = E()
+    _, r = dialog(ev, {}, [b'EHLO me\r\n', *commands])
+    assert r[-2][0].startswith(reply)
+    if event == 'mail':
+        # a refused MAIL leaves no transaction for the probe
+        assert ev.seen == ([(address, [])] if address is not None else [])
+    else:
+        assert ev.seen[-1] == ('<m@x>', [address] if address is not None else [])
 
 
 # --- security we own ---------------------------------------------------------
@@ -431,6 +488,7 @@ def test_mail_from_hands_the_address_as_sent(command, address):
 
         def on_mail_from_event(self, ctx, mail_from):
             self.mail = (mail_from, ctx.envelope.encoding_body, ctx.envelope.encoding_utf8)
+            return True
 
     ev = E()
     _, r = dialog(ev, {'internationalization_extensions': True}, [b'EHLO me\r\n', command + b'\r\n'])
@@ -452,6 +510,7 @@ def test_rejected_mail_leaves_no_envelope_behind():
             self.encodings.append((mail_from, ctx.envelope.encoding_body, ctx.envelope.encoding_utf8))
             if 'bad' in mail_from:
                 raise Smtpd550Exception
+            return True
 
         def on_message_data_event(self, ctx):
             self.encodings.append(('data', ctx.envelope.encoding_body, ctx.envelope.encoding_utf8))

@@ -255,7 +255,7 @@ class RecordingEvents(SmtpdEvents):
         self.fired = []
         self.messages = []
         self.reject_rcpt = set()
-        self.rewrite_from = None
+        self.rewrite_from = True
 
     def on_connect_event(self, ctx):
         self.fired.append('connect')
@@ -274,6 +274,7 @@ class RecordingEvents(SmtpdEvents):
         self.fired.append('rcpt')
         if any(s in rcpt_to for s in self.reject_rcpt):
             raise Smtpd550Exception
+        return True
 
     def on_message_data_start_event(self, ctx):
         self.fired.append('start')

@@ -49,6 +49,7 @@ class RecordingEvents(SmtpdEvents):
     def on_rcpt_to_event(self, ctx, rcpt_to):
         if 'reject@' in rcpt_to:
             raise Smtpd550Exception
+        return True
 
     def on_message_data_event(self, ctx):
         self.messages.append((bytes(ctx.message.data), bool(ctx.server.encrypted)))

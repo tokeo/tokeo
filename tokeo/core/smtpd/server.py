@@ -51,6 +51,7 @@ from .exc import (
     Smtpd504Exception,
     Smtpd530Exception,
     Smtpd535Exception,
+    Smtpd550Exception,
     Smtpd552Exception,
     Smtpd555Exception,
     Smtpd451Exception,
@@ -1342,9 +1343,20 @@ class SmtpdServer:
                         # unknown or not announced here (RFC 5321 4.1.1.11)
                         raise Smtpd555Exception
                 if SmtpdEvent.ON_MAIL_FROM_EVENT in self.emit_events:
-                    return_value = await self._emit(SmtpdEvent.ON_MAIL_FROM_EVENT, ctx, cmd_data)
-                    if return_value:
+                    try:
+                        return_value = await self._emit(SmtpdEvent.ON_MAIL_FROM_EVENT, ctx, cmd_data)
+                    except SmtpdException:
+                        raise
+                    # any other handler fault is a local error
+                    except Exception as e:  # noqa: B902
+                        raise Smtpd451Exception(f'{e} ({type(e).__name__})')
+                    # None/False refuses, True keeps, a stripped string replaces
+                    if return_value is None or return_value is False:
+                        raise Smtpd550Exception
+                    if isinstance(return_value, str) and return_value == return_value.strip():
                         cmd_data = return_value
+                    elif return_value is not True:
+                        raise Smtpd451Exception(f'on_mail_from_event must not return {return_value!r}')
                 ctx.envelope.mail_from = cmd_data
                 session.cmd_sequence = CMD_MAIL
                 return '250 OK'
@@ -1363,9 +1375,20 @@ class SmtpdServer:
                 if params:
                     raise Smtpd555Exception
                 if SmtpdEvent.ON_RCPT_TO_EVENT in self.emit_events:
-                    return_value = await self._emit(SmtpdEvent.ON_RCPT_TO_EVENT, ctx, cmd_data)
-                    if return_value:
+                    try:
+                        return_value = await self._emit(SmtpdEvent.ON_RCPT_TO_EVENT, ctx, cmd_data)
+                    except SmtpdException:
+                        raise
+                    # any other handler fault is a local error
+                    except Exception as e:  # noqa: B902
+                        raise Smtpd451Exception(f'{e} ({type(e).__name__})')
+                    # None/False refuses, True keeps, a stripped string replaces
+                    if return_value is None or return_value is False:
+                        raise Smtpd550Exception
+                    if isinstance(return_value, str) and return_value == return_value.strip():
                         cmd_data = return_value
+                    elif return_value is not True:
+                        raise Smtpd451Exception(f'on_rcpt_to_event must not return {return_value!r}')
                 ctx.envelope.rcpt_tos.append(cmd_data)
                 session.cmd_sequence = CMD_RCPT
                 return '250 OK'

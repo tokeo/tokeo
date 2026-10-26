@@ -88,9 +88,11 @@ def test_self_log_from_sync_and_async_events_with_async_logging():
 
         def on_mail_from_event(self, ctx, mail_from_data):
             self.log.info('mail_from (sync event)')
+            return True
 
         async def on_rcpt_to_event(self, ctx, rcpt_to_data):
             self.log.info('rcpt_to (async event)')
+            return True
 
     events = Handler()
 
