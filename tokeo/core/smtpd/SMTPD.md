@@ -252,7 +252,8 @@ server removes the parameter from the sender and decodes it (xtext) into
 value only when the client is logged in with an ```authorization_id``` listed
 in ```trusted_relay_auth_ids```, then ```ctx.envelope.auth_for_id``` carries
 the submitter stripped of surrounding whitespace. In all other cases, also for
-```AUTH=<>``` or an invalid xtext, ```auth_for_id``` stays ```''```.
+```AUTH=<>```, ```auth_for_id``` stays ```''```. An invalid xtext is answered
+by ```501```.
 
 Both sides of this trust are checked automatically to be stripped: the entries
 of ```trusted_relay_auth_ids``` when the server starts (else a
@@ -260,8 +261,9 @@ of ```trusted_relay_auth_ids``` when the server starts (else a
 ```on_auth_event``` (else ```454```, see above). So an id only matches as
 written, without hidden whitespace.
 
-While ```auth_mode``` is ```'AUTH_FORBIDDEN'``` the parameter stays in the
-sender like any other unknown parameter.
+While AUTH is not offered on the channel (```'AUTH_FORBIDDEN'```, or before
+```STARTTLS``` with ```'TLS_WHEN_AUTH'```/```'TLS_REQUIRED'```) the parameter is
+not announced and answered by ```555``` (section 7).
 
 ## 7. Responses and exceptions
 
@@ -293,9 +295,20 @@ The internal signals (```SmtpdIOTimeoutException```,
 ```io_buffer_max_size```; the server answers both with ```421```.
 
 The replies of the server lean towards broad compatibility: where a client bends
-the standard, the server keeps the more tolerant reply, e.g. ```501``` for an
-unannounced ```BODY``` or ```SMTPUTF8``` parameter, and leaves a stricter one
-like ```Smtpd555Exception``` to the handler.
+the standard in a harmless way, the server tolerates it, e.g. an address without
+angle brackets or a space after the colon of ```MAIL FROM:```/```RCPT TO:```.
+
+```MAIL FROM``` and ```RCPT TO``` hand only the address to the event, as sent:
+```<a@x>``` or ```a@x```, and ```<>``` or an empty address for the null sender.
+Their parameters are checked strictly (RFC 5321 4.1.2). Valid are only those
+announced by ```EHLO``` on the channel, all on ```MAIL FROM```:
+```BODY=7BIT```/```BODY=8BITMIME``` and ```SMTPUTF8``` with
+```internationalization_extensions```, and ```AUTH=``` while AUTH is offered.
+Keywords and values are not case sensitive.
+
+- an unknown or not announced parameter is answered by ```555```
+- a malformed parameter, a wrong value, an invalid xtext or a parameter given
+  twice is answered by ```501```
 
 ### Which replies are valid per command
 

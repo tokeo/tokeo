@@ -201,10 +201,11 @@ def test_handler_reject_parameter_555():
     class E(RecordingEvents):
 
         def on_mail_from_event(self, ctx, mail_from):
-            if 'SIZE=' in mail_from:
+            if ctx.envelope.encoding_utf8:
                 raise Smtpd555Exception
 
-    _, r = dialog(E(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x> SIZE=1000\r\n'])
+    settings = {'internationalization_extensions': True}
+    _, r = dialog(E(), settings, [b'EHLO me\r\n', b'MAIL FROM:<a@x> SMTPUTF8\r\n'])
     assert r[1] == ['555 MAIL FROM/RCPT TO parameters not recognized or not implemented']
 
 
@@ -372,9 +373,70 @@ def test_body_and_smtputf8_params_stripped():
 
 
 def test_body_param_rejected_without_intl():
-    """BODY without internationalization_extensions answers 501."""
+    """BODY is not announced without internationalization_extensions: 555."""
     _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x> BODY=8BITMIME\r\n'])
-    assert r[1][0].startswith('501')
+    assert r[1][0].startswith('555')
+
+
+@pytest.mark.parametrize(
+    'settings, command, reply',
+    [
+        # unknown or not announced: 555
+        ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> SIZE=1000', '555'),
+        ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> PARAM="a', '555'),
+        ({}, b'MAIL FROM:<a@x> SMTPUTF8', '555'),
+        ({}, b'MAIL FROM:<a@x> AUTH=<>', '555'),
+        ({**TLS_SETTINGS, 'encrypt_mode': 'TLS_WHEN_AUTH', 'auth_mode': 'AUTH_OPTIONAL'}, b'MAIL FROM:<a@x> AUTH=<>', '555'),
+        ({}, b'RCPT TO:<b@y> NOTIFY=NEVER', '555'),
+        # malformed, wrong value or twice: 501
+        ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> BODY=FOO', '501'),
+        ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> BODY', '501'),
+        ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> SMTPUTF8=1', '501'),
+        ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> BODY=7BIT body=8bitmime', '501'),
+        ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> SIZE=', '501'),
+        ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> SIZE=1=2', '501'),
+        ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> -SIZE=1', '501'),
+        ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> Leer"', '501'),
+        ({'auth_mode': 'AUTH_OPTIONAL'}, b'MAIL FROM:<a@x> AUTH', '501'),
+        ({'auth_mode': 'AUTH_OPTIONAL'}, b'MAIL FROM:<a@x> AUTH=a+Zb@x', '501'),
+        ({'auth_mode': 'AUTH_OPTIONAL'}, b'MAIL FROM:<a@x> AUTH=a=b@x', '501'),
+        ({}, b'RCPT TO:<b@y> Leer"', '555'),
+    ],
+)
+def test_mail_rcpt_parameters_are_checked_strictly(settings, command, reply):
+    """Only announced parameters in valid form are accepted at MAIL and RCPT."""
+    ev = RecordingEvents()
+    commands = [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n'] if command.startswith(b'RCPT') else [b'EHLO me\r\n']
+    _, r = dialog(ev, settings, commands + [command + b'\r\n'])
+    assert r[-1][0].startswith(reply)
+    # a refused MAIL does not reach the handler
+    assert ev.fired.count('mail') == (1 if command.startswith(b'RCPT') else 0)
+
+
+@pytest.mark.parametrize(
+    'command, address',
+    [
+        (b'MAIL FROM:<a@x>', '<a@x>'),
+        (b'MAIL FROM: <a@x>', '<a@x>'),
+        (b'MAIL FROM:a@x', 'a@x'),
+        (b'MAIL FROM:<>', '<>'),
+        (b'MAIL FROM:', ''),
+        (b'MAIL FROM:<a@x>  body=8bitmime   smtputf8', '<a@x>'),
+    ],
+)
+def test_mail_from_hands_the_address_as_sent(command, address):
+    """The handler gets the address as sent, without the parameters."""
+
+    class E(RecordingEvents):
+
+        def on_mail_from_event(self, ctx, mail_from):
+            self.mail = (mail_from, ctx.envelope.encoding_body, ctx.envelope.encoding_utf8)
+
+    ev = E()
+    _, r = dialog(ev, {'internationalization_extensions': True}, [b'EHLO me\r\n', command + b'\r\n'])
+    assert r[1] == ['250 OK']
+    params = b'8bitmime' in command
+    assert ev.mail == (address, '8bitmime' if params else '', 'utf8' if params else '')
 
 
 def test_rejected_mail_leaves_no_envelope_behind():
@@ -1338,9 +1400,6 @@ def _auth_for(trusted, login, mails):
         (['user'], True, b'AUTH=+20<>+20', '', ' <> '),
         # unknown submitter, also from a trusted relay
         (['user'], True, b'AUTH=<>', '', '<>'),
-        (['user'], True, b'AUTH=', '', ''),
-        # an invalid xtext stays undecoded and is not trusted
-        (['user'], True, b'AUTH=a+Zb@example.com', '', 'a+Zb@example.com'),
         # logged in, but not as a trusted relay
         ([], True, b'AUTH=bob@example.com', '', 'bob@example.com'),
         (['relay'], True, b'AUTH=bob@example.com', '', 'bob@example.com'),
@@ -1358,14 +1417,6 @@ def test_mail_from_auth_parameter_ends_with_the_transaction():
     """A next MAIL without AUTH= starts with empty auth_for_id fields."""
     mails = _auth_for(['user'], True, [b'<a@x> AUTH=s@example.com', b'<b@x>'])
     assert mails == [('<a@x>', 's@example.com', 's@example.com'), ('<b@x>', '', '')]
-
-
-def test_mail_from_auth_parameter_stays_while_auth_forbidden():
-    """While AUTH is not offered, AUTH= stays in the sender."""
-    ev = AuthForEvents()
-    _, r = dialog(ev, {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x> AUTH=<>\r\n'])
-    assert r[1][0] == '250 OK'
-    assert ev.mails == [('<a@x> AUTH=<>', '', '')]
 
 
 # --- STARTTLS --------------------

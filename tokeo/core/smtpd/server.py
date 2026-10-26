@@ -52,6 +52,7 @@ from .exc import (
     Smtpd530Exception,
     Smtpd535Exception,
     Smtpd552Exception,
+    Smtpd555Exception,
     Smtpd451Exception,
     Smtpd454Exception,
     Tls454Exception,
@@ -1302,43 +1303,44 @@ class SmtpdServer:
                 # a new transaction, nothing of a rejected MAIL remains
                 ctx.reset_on_mail_from()
                 cmd_data = re.sub(r'^MAIL FROM:', '', line, flags=re.IGNORECASE).strip()
-                if re.search(r'\sBODY=7BIT(\s|$)', cmd_data, re.IGNORECASE):
-                    if not self.internationalization_extensions:
+                # separate the address as sent from its parameters (RFC 5321 4.1.2)
+                cmd_data, params = re.match(r'(<[^>]*>|\S*)\s*(.*)$', cmd_data).groups()
+                keywords = []
+                for param in params.split():
+                    match = re.match(r'([A-Za-z0-9][A-Za-z0-9-]*)(?:=([\x21-\x3c\x3e-\x7e]+))?$', param)
+                    # a malformed or a repeated parameter
+                    if not match or match.group(1).upper() in keywords:
                         raise Smtpd501Exception
-                    ctx.envelope.encoding_body = '7bit'
-                elif re.search(r'\sBODY=8BITMIME(\s|$)', cmd_data, re.IGNORECASE):
-                    if not self.internationalization_extensions:
-                        raise Smtpd501Exception
-                    ctx.envelope.encoding_body = '8bitmime'
-                elif re.search(r'\sBODY=.*$', cmd_data, re.IGNORECASE):
-                    raise Smtpd501Exception
-                if re.search(r'\sSMTPUTF8(\s|$)', cmd_data, re.IGNORECASE):
-                    if not self.internationalization_extensions:
-                        raise Smtpd501Exception
-                    ctx.envelope.encoding_utf8 = 'utf8'
-                if self.internationalization_extensions:
-                    cmd_data = re.sub(r'\sBODY=(7BIT|8BITMIME)', '', cmd_data, flags=re.IGNORECASE)
-                    cmd_data = re.sub(r'\sSMTPUTF8', '', cmd_data, flags=re.IGNORECASE).strip()
-                if self.auth_mode is not AuthMode.AUTH_FORBIDDEN:
-                    # AUTH parameter of the original submitter (RFC 4954 section 5)
-                    match = re.search(r'\sAUTH=(\S*)', cmd_data, re.IGNORECASE)
-                    if match:
-                        cmd_data = cmd_data.replace(match.group(0), '', 1).strip()
-                        auth_for_id_raw = match.group(1)
-                        # decode the xtext ("+" with two hex digits is one char),
-                        # an invalid xtext stays undecoded
-                        xtext_valid = re.search(r'\+(?![0-9A-Fa-f]{2})', auth_for_id_raw) is None
-                        if xtext_valid:
-                            auth_for_id_raw = re.sub(r'\+([0-9A-Fa-f]{2})', lambda m: chr(int(m.group(1), 16)), auth_for_id_raw)
+                    keyword, value = match.group(1).upper(), match.group(2)
+                    keywords.append(keyword)
+                    # only the parameters announced by EHLO here are valid
+                    if keyword == 'BODY' and self.internationalization_extensions:
+                        # 8BITMIME (RFC 1652)
+                        if value is None or value.upper() not in ('7BIT', '8BITMIME'):
+                            raise Smtpd501Exception
+                        ctx.envelope.encoding_body = value.lower()
+                    elif keyword == 'SMTPUTF8' and self.internationalization_extensions:
+                        # SMTPUTF8 (RFC 6531)
+                        if value is not None:
+                            raise Smtpd501Exception
+                        ctx.envelope.encoding_utf8 = 'utf8'
+                    elif keyword == 'AUTH' and self._auth_available(ctx):
+                        # AUTH= of the original submitter (RFC 4954 section 5)
+                        if value is None or not re.match(r'([\x21-\x2a\x2c-\x3c\x3e-\x7e]|\+[0-9A-Fa-f]{2})+$', value):
+                            raise Smtpd501Exception
+                        # decode the xtext ("+" with two hex digits is one char)
+                        auth_for_id_raw = re.sub(r'\+([0-9A-Fa-f]{2})', lambda m: chr(int(m.group(1), 16)), value)
                         ctx.envelope.auth_for_id_raw = auth_for_id_raw
                         # only a trusted relay may name the submitter
                         if (
-                            xtext_valid
-                            and auth_for_id_raw.strip() not in ('', '<>')
+                            auth_for_id_raw.strip() not in ('', '<>')
                             and ctx.server.authorization_id.strip() != ''
                             and ctx.server.authorization_id in self.trusted_relay_auth_ids
                         ):
                             ctx.envelope.auth_for_id = auth_for_id_raw.strip()
+                    else:
+                        # unknown or not announced here (RFC 5321 4.1.1.11)
+                        raise Smtpd555Exception
                 if SmtpdEvent.ON_MAIL_FROM_EVENT in self.emit_events:
                     return_value = await self._emit(SmtpdEvent.ON_MAIL_FROM_EVENT, ctx, cmd_data)
                     if return_value:
@@ -1356,6 +1358,10 @@ class SmtpdServer:
                 if self.auth_mode is AuthMode.AUTH_REQUIRED and not ctx.server.authenticated:
                     raise Smtpd530Exception
                 cmd_data = re.sub(r'^RCPT TO:', '', line, flags=re.IGNORECASE).strip()
+                # separate the address as sent, no parameter of RCPT TO is announced
+                cmd_data, params = re.match(r'(<[^>]*>|\S*)\s*(.*)$', cmd_data).groups()
+                if params:
+                    raise Smtpd555Exception
                 if SmtpdEvent.ON_RCPT_TO_EVENT in self.emit_events:
                     return_value = await self._emit(SmtpdEvent.ON_RCPT_TO_EVENT, ctx, cmd_data)
                     if return_value:
