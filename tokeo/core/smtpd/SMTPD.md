@@ -496,6 +496,7 @@ The constructor keeps the original option names. Key ones:
 <tr><td>max_processings</td><td>4</td><td>connections processed simultaneously</td></tr>
 <tr><td>max_connections</td><td>None</td><td>concurrent connections accepted (None = unlimited)</td></tr>
 <tr><td>auth_mode</td><td>'AUTH_FORBIDDEN'</td><td>AUTH_OPTIONAL / AUTH_REQUIRED</td></tr>
+<tr><td>logger_severity</td><td>'WARNING'</td><td>level of the own stderr logger: DEBUG / INFO / WARNING / ERROR / CRITICAL, not with an own logger (section 13)</td></tr>
 <tr><td>trusted_relay_auth_ids</td><td>[]</td><td>authorization ids (stripped, non-empty) of relays trusted to name the submitter by AUTH= (section 6)</td></tr>
 <tr><td>encrypt_mode</td><td>'TLS_FORBIDDEN'</td><td>TLS_OPTIONAL / TLS_WHEN_AUTH / TLS_REQUIRED / TLS_IMMEDIATE</td></tr>
 <tr><td>pipelining_extension</td><td>False</td><td>advertise PIPELINING</td></tr>
@@ -596,8 +597,19 @@ dropped.
 
 The server exposes a ```logger``` whose ```debug```/```info```/```warning```/
 ```error```/```critical``` calls are forwarded to your handler's
-```on_logging_event(ctx, severity, msg, err=None)```. Override that one event to
-route every server and handler log line wherever you want:
+```on_logging_event(ctx, severity, msg, err=None)```; a handler logs by
+```self.log```.
+
+Without an override the default ```on_logging_event``` writes every line by its
+severity to the server logger: the ```logger``` given to ```SmtpdServer``` (the
+Tokeo extension passes ```app.log```), else an own logger on stderr, e.g.
+```2026-10-26 12:00:00: [WARNING] msg```, with the level ```logger_severity```
+(default ```'WARNING'```, ```'DEBUG'``` shows the whole dialog). A given logger
+keeps its own level, so ```logger_severity``` must not be set with it. A
+```CRITICAL``` line with an error is followed by its traceback.
+
+Override that one event to route every server and handler log line wherever you
+want, ```super().on_logging_event(...)``` writes to the server logger as well:
 
 ```python
 from tokeo.core.smtpd import SmtpdEvents, Severity

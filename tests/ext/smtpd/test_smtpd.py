@@ -168,6 +168,8 @@ def test_extension_loads_into_cement_app():
         assert server.hosts == ['127.0.0.1']
         # the global smtpd config sizes the session id for every service
         assert server.session_id_bytes == 8
+        # the default on_logging_event writes to the application log
+        assert server.events_handler._logger_protected is app.log
 
 
 @pytest.mark.parametrize(

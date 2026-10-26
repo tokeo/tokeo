@@ -59,10 +59,10 @@ def test_event_names_map_covers_every_event_and_existing_methods():
 
 
 def test_base_noops_have_no_entry():
-    """Without overrides only ON_AUTH_EVENT has a dispatch entry."""
+    """Without overrides only ON_AUTH_EVENT and ON_LOGGING_EVENT have an entry."""
     dispatch = SmtpdServer(BareEvents()).emit_events
     # only the behavioural base events stay dispatchable without an override
-    assert set(dispatch) == {SmtpdEvent.ON_AUTH_EVENT}
+    assert set(dispatch) == {SmtpdEvent.ON_AUTH_EVENT, SmtpdEvent.ON_LOGGING_EVENT}
 
 
 def test_overridden_events_get_entries_with_resolved_kind():

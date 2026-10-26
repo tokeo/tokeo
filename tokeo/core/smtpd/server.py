@@ -22,6 +22,7 @@ answer 500 only while ```encrypt_mode```/```auth_mode``` are FORBIDDEN.
 
 import re
 import base64
+import logging
 import secrets
 import asyncio
 import inspect
@@ -373,10 +374,13 @@ class SmtpdServer:
     - **settings** (dict): The service settings
     - **options** (dict, optional): The service ```options``` block for the ctx
     - **global_limits** (GlobalLimits, optional): Shared caps across services
+    - **logger** (optional): Target of the default ```on_logging_event```, any
+        logger with ```debug```/```info```/```warning```/```error```/```critical```;
+        when not given an own stderr logger with ```logger_severity``` is used
 
     """
 
-    def __init__(self, events_handler, settings=None, *, options=None, global_limits=None, debug=False, **kwargs):
+    def __init__(self, events_handler, settings=None, *, options=None, global_limits=None, logger=None, debug=False, **kwargs):
         # accept both the Tokeo settings-dict and the keyword style;
         # keyword args merge into settings, which takes precedence
         settings = dict(settings or {})
@@ -394,6 +398,22 @@ class SmtpdServer:
         self._pending_log_tasks = set()
         #: The serving loop, captured at start() for thread-safe log scheduling
         self._asyncio_running_loop = None
+        # target of the default on_logging_event: the given logger, else an own
+        # stderr logger; set on mounting, a value set on the handler is replaced
+        logger_severity = settings.get('logger_severity')
+        if logger_severity is not None and logger_severity not in Severity.__members__:
+            raise ValueError(f'Severity of the server logger (logger_severity) must be one of {", ".join(Severity.__members__)}!')
+        if logger is not None and logger_severity is not None:
+            raise ValueError('Severity of the server logger (logger_severity) must not be set with an own logger!')
+        if isinstance(logger, ForwardingLogger):
+            raise ValueError('The server logger (logger) must not be the log input of a handler!')
+        if logger is None:
+            logger = logging.Logger('smtpd')
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('%(asctime)s: [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+            logger.addHandler(handler)
+            logger.setLevel(Severity[logger_severity or 'WARNING'].value)
+        events_handler._logger_protected = logger
         #: The exposed logger; forwards to the handler's on_logging_event
         self.logger = ForwardingLogger(self._log_bridge)
         events_handler.log = self.logger
@@ -1732,7 +1752,7 @@ class SmtpdServer:
             if method is None:
                 continue
             overridden = getattr(type(events_handler), name, None) is not getattr(SmtpdEvents, name, None)
-            if not overridden and ev != SmtpdEvent.ON_AUTH_EVENT:
+            if not overridden and ev not in (SmtpdEvent.ON_AUTH_EVENT, SmtpdEvent.ON_LOGGING_EVENT):
                 continue
             if inspect.iscoroutinefunction(method):
                 kind = self._EMIT_ASYNC

@@ -389,6 +389,7 @@ class TokeoSmtpd(MetaMixin):
                 settings=svc.get('settings'),
                 options=svc.get('options'),
                 global_limits=global_limits,
+                logger=self.app.log,
                 debug=self.app.debug,
                 hosts=hosts or None,
                 session_id_bytes=self._config('session_id_bytes'),

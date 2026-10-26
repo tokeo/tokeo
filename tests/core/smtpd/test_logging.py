@@ -3,8 +3,14 @@ Ported from the reference suite's test/specs/logging_test.rb.
 
 Checks the exposed ```logger``` (ForwardingLogger) routes every level to the
 handler's on_logging_event with the matching Severity and a nil context, and
-that on_logging_event passes context and error through.
+that on_logging_event passes context and error through. The default
+on_logging_event writes to the server logger: the given one or an own stderr
+logger with logger_severity.
 """
+
+import re
+
+import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents, SmtpdEvent
@@ -85,8 +91,8 @@ def test_on_logging_event_with_context_and_err():
     assert events.log_err['err'] == 1
 
 
-class SilentEvents(SmtpdEvents):
-    """A handler that does not override on_logging_event (logging inactive)."""
+class DefaultEvents(SmtpdEvents):
+    """A handler that does not override on_logging_event."""
 
 
 def test_logging_dispatched_when_handler_overrides():
@@ -94,17 +100,98 @@ def test_logging_dispatched_when_handler_overrides():
     assert SmtpdEvent.ON_LOGGING_EVENT in SmtpdServer(LoggingEvents()).emit_events
 
 
-def test_logging_not_dispatched_when_handler_does_not_override():
-    """The base no-op on_logging_event gets no dispatch entry."""
-    assert SmtpdEvent.ON_LOGGING_EVENT not in SmtpdServer(SilentEvents()).emit_events
+def test_logging_dispatched_when_handler_does_not_override():
+    """The default on_logging_event gets a dispatch entry too."""
+    assert SmtpdEvent.ON_LOGGING_EVENT in SmtpdServer(DefaultEvents()).emit_events
 
 
-def test_undispatched_logging_is_not_forwarded(monkeypatch):
-    """Without a dispatch entry the logger forwards nothing."""
-    seen = []
-    monkeypatch.setattr(SmtpdEvents, 'on_logging_event', lambda *a, **k: seen.append(a), raising=True)
-    smtpd = SmtpdServer(SilentEvents())
-    assert SmtpdEvent.ON_LOGGING_EVENT not in smtpd.emit_events
-    smtpd.logger.debug('should be dropped')
-    smtpd._log_bridge(None, Severity.DEBUG, 'also dropped')
-    assert seen == []
+class Recorder:
+    """A logger that records the calls per method."""
+
+    def __init__(self):
+        self.lines = []
+
+    def __getattr__(self, level):
+        return lambda msg: self.lines.append((level, msg))
+
+
+def test_default_writes_from_warning_to_an_own_stderr_logger(capsys):
+    """Without a logger the default writes from WARNING on, formatted, to stderr."""
+    server = SmtpdServer(SmtpdEvents())
+    server.logger.info('quiet')
+    server.logger.warning('hello')
+    out, err = capsys.readouterr()
+    assert out == ''
+    assert re.match(r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: \[WARNING\] hello\n$', err)
+
+
+def test_logger_severity_sets_the_level_of_the_own_logger(capsys):
+    """logger_severity DEBUG lets the own logger write the whole dialog."""
+    server = SmtpdServer(SmtpdEvents(), {'logger_severity': 'DEBUG'})
+    server.logger.debug('dialog')
+    assert '[DEBUG] dialog' in capsys.readouterr().err
+
+
+def test_logger_severity_is_refused_with_an_own_logger():
+    """A given logger keeps its level, logger_severity must not be set with it."""
+    with pytest.raises(ValueError, match='must not be set with an own logger'):
+        SmtpdServer(SmtpdEvents(), {'logger_severity': 'DEBUG'}, logger=Recorder())
+
+
+@pytest.mark.parametrize('value', ['debug', 'WARN', 10, ''])
+def test_logger_severity_is_validated(value):
+    """logger_severity accepts only the Severity names."""
+    with pytest.raises(ValueError, match='logger_severity'):
+        SmtpdServer(SmtpdEvents(), {'logger_severity': value})
+
+
+def test_given_logger_is_the_target_and_replaces_a_preset_one():
+    """A given logger receives the lines, a value set on the handler is replaced."""
+    events = SmtpdEvents()
+    events._logger_protected = Recorder()
+    target = Recorder()
+    server = SmtpdServer(events, logger=target)
+    server.logger.error('boom')
+    assert target.lines == [('error', 'boom')]
+    assert events._logger_protected is target
+
+
+def test_forwarding_logger_is_refused_as_target():
+    """The log input of a handler must not be the target (endless loop)."""
+    with pytest.raises(ValueError, match='logger'):
+        SmtpdServer(SmtpdEvents(), logger=SmtpdServer(SmtpdEvents()).logger)
+
+
+def test_override_reaches_the_server_logger_by_super():
+    """An override that calls super writes to the server logger as well."""
+
+    class Own(SmtpdEvents):
+
+        def __init__(self):
+            super().__init__()
+            self.seen = []
+
+        def on_logging_event(self, ctx, severity, msg, err=None):
+            self.seen.append(msg)
+            super().on_logging_event(ctx, severity, msg, err)
+
+    target = Recorder()
+    events = Own()
+    SmtpdServer(events, logger=target).logger.info('both\r\n')
+    assert events.seen == ['both\r\n']
+    # the line break is chomped like by Ruby
+    assert target.lines == [('info', 'both')]
+
+
+def test_critical_with_error_is_followed_by_its_traceback():
+    """A CRITICAL line with an error writes the traceback lines after it."""
+    target = Recorder()
+    events = SmtpdEvents()
+    SmtpdServer(events, logger=target)
+    try:
+        raise RuntimeError('broken')
+    except RuntimeError as err:
+        events.on_logging_event(None, Severity.CRITICAL, 'fatal', err)
+    assert target.lines[0] == ('critical', 'fatal')
+    assert target.lines[1] == ('critical', 'Traceback (most recent call last):')
+    assert target.lines[-1] == ('critical', 'RuntimeError: broken')

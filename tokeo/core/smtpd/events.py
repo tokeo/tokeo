@@ -33,9 +33,11 @@ dispatches to these methods and turns any raised SMTP exception into a response.
 """
 
 import inspect
+import traceback
 from enum import Enum, auto
 
 from .exc import SmtpdContractError, Smtpd535Exception
+from .logger import Severity
 
 
 class SmtpdEvent(Enum):
@@ -163,8 +165,11 @@ class SmtpdEvents:
         #: The service ```options``` dict (business parameters), never evaluated
         #: by the extension
         self.options = options or {}
-        #: Handler logger will be set when handler is connected to server
+        #: Log input bound by the server, self.log.debug(...) and the other
+        #: levels go to on_logging_event
         self.log = None
+        #: Target of the default on_logging_event, bound by the server
+        self._logger_protected = None
 
     @staticmethod
     def authenticated(ctx):
@@ -345,5 +350,16 @@ class SmtpdEvents:
         pass
 
     def on_logging_event(self, ctx, severity, msg, err=None):
-        """Called for logging events; severity is a ```Severity``` enum member."""
-        pass
+        """
+        Called for logging events; severity is a ```Severity``` enum member.
+
+        ### Notes
+
+        : The default writes by severity to the logger of the server, a
+            CRITICAL error is followed by its traceback
+
+        """
+        getattr(self._logger_protected, severity.name.lower())(msg.rstrip('\r\n'))
+        if severity is Severity.CRITICAL and err is not None:
+            for line in ''.join(traceback.format_exception(err)).splitlines():
+                self._logger_protected.critical(line)
