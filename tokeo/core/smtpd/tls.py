@@ -253,6 +253,7 @@ class TlsTransport:
             .sign(key, hashes.SHA256())
         )
         cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
+        self._log(Severity.DEBUG, f'SSL: generated test certificate\n{cert_pem.decode()}')
         key_pem = key.private_bytes(
             serialization.Encoding.PEM,
             serialization.PrivateFormat.TraditionalOpenSSL,

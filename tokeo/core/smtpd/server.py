@@ -566,13 +566,19 @@ class SmtpdServer:
         if listeners is None:
             listeners = self._default_listeners()
         for lst in listeners:
+            host, port = lst.get('host', '127.0.0.1'), int(lst.get('port', 2525))
+            self.logger.info(f'Starting service on {f"[{host}]" if ":" in host else host}:{port or "(auto)"}')
             server = await asyncio.start_server(
                 self._on_connection,
-                host=lst.get('host', '127.0.0.1'),
-                port=int(lst.get('port', 2525)),
+                host=host,
+                port=port,
                 limit=int(self.io_buffer_max_size),
                 reuse_port=bool(lst.get('reuse_port', False)),
             )
+            # a name may bind several addresses, port 0 gets its port only now
+            for sock in server.sockets:
+                ip, bound = sock.getsockname()[:2]
+                self.logger.info(f'Service listening on {f"[{ip}]" if ":" in ip else ip}:{bound}')
             self._servers.append(server)
 
     async def _serve_forever(self):
@@ -730,6 +736,9 @@ class SmtpdServer:
         except asyncio.CancelledError:
             # service shutdown / forced drop: end this connection
             pass
+        # a fault outside the dialog, e.g. of on_disconnect_event
+        except Exception as e:  # noqa: B902
+            await self._emit(SmtpdEvent.ON_LOGGING_EVENT, None, Severity.CRITICAL, f'{e} ({type(e).__name__})', e)
         finally:
             self._sessions.discard(task)
             # drop from connections and processings; wake the next waiter
@@ -952,9 +961,14 @@ class SmtpdServer:
 
                         # log the received command line (never the DATA payload);
                         # the DATA check first: it skips the membership test and
-                        # the repr()/f-string for every body line
+                        # the decoding for every body line
                         if session.cmd_sequence is not CMD_DATA and SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
-                            await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, f'<<< {line!r}')
+                            await self._emit(
+                                SmtpdEvent.ON_LOGGING_EVENT,
+                                ctx,
+                                Severity.DEBUG,
+                                '<<< ' + line.decode('utf-8', 'backslashreplace').replace('\r', '[\\r]'),
+                            )
 
                         output = await self.process_line(session, line, line_break)
 
@@ -1019,15 +1033,18 @@ class SmtpdServer:
                         await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, "Can't send 421 abort code! (IOError)", e2)
 
         finally:
-            # event for cleanup at end of communication
-            if SmtpdEvent.ON_DISCONNECT_EVENT in self.emit_events:
-                await self._emit(SmtpdEvent.ON_DISCONNECT_EVENT, session.ctx)
             try:
-                writer.close()
-            except OSError:
-                pass
-            # finalize the session at least here, drop maybe interrupted parts
-            self.process_reset_session(session)
+                # event for cleanup at end of communication
+                if SmtpdEvent.ON_DISCONNECT_EVENT in self.emit_events:
+                    await self._emit(SmtpdEvent.ON_DISCONNECT_EVENT, session.ctx)
+            finally:
+                # also when on_disconnect_event failed
+                try:
+                    writer.close()
+                except OSError:
+                    pass
+                # finalize the session at least here, drop maybe interrupted parts
+                self.process_reset_session(session)
 
     async def _read_line(self, reader, io_timeout):
         """
@@ -1752,7 +1769,13 @@ class SmtpdServer:
             if method is None:
                 continue
             overridden = getattr(type(events_handler), name, None) is not getattr(SmtpdEvents, name, None)
-            if not overridden and ev not in (SmtpdEvent.ON_AUTH_EVENT, SmtpdEvent.ON_LOGGING_EVENT):
+            # the defaults of these events carry behaviour and run without override
+            if not overridden and ev not in (
+                SmtpdEvent.ON_AUTH_EVENT,
+                SmtpdEvent.ON_LOGGING_EVENT,
+                SmtpdEvent.ON_CONNECT_EVENT,
+                SmtpdEvent.ON_DISCONNECT_EVENT,
+            ):
                 continue
             if inspect.iscoroutinefunction(method):
                 kind = self._EMIT_ASYNC

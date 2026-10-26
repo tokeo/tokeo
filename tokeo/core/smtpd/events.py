@@ -206,12 +206,32 @@ class SmtpdEvents:
     # --- connection lifecycle ---
 
     def on_connect_event(self, ctx):
-        """Called on a new connection; raise ```Smtpd421Exception``` to refuse."""
-        pass
+        """
+        Called on a new connection; raise ```Smtpd421Exception``` to refuse it.
+
+        ### Notes
+
+        : The default logs the connection, an override without super() does not
+
+        """
+        self.log.debug(
+            f'Client connect from {ctx.server.remote_ip}:{ctx.server.remote_port} to {ctx.server.local_ip}:{ctx.server.local_port}',
+            ctx=ctx,
+        )
 
     def on_disconnect_event(self, ctx):
-        """Called when the connection ends."""
-        pass
+        """
+        Called when the connection ends.
+
+        ### Notes
+
+        : The default logs the disconnection, an override without super() does not
+
+        """
+        self.log.debug(
+            f'Client disconnect from {ctx.server.remote_ip}:{ctx.server.remote_port} on {ctx.server.local_ip}:{ctx.server.local_port}',
+            ctx=ctx,
+        )
 
     def on_proxy_event(self, ctx, proxy_data):
         """
@@ -261,9 +281,11 @@ class SmtpdEvents:
             that the authentication_id may act as it
 
         """
+        # the password stays out of the log
         self.log.debug(
             f'Deny access from {ctx.server.remote_ip}:{ctx.server.remote_port} '
-            f'for {authentication_id}' + ('' if authorization_id == '' else f'/{authorization_id}') + f' with {authentication}',
+            f'for {authentication_id}' + ('' if authorization_id == '' else f'/{authorization_id}'),
+            ctx=ctx,
         )
         raise Smtpd535Exception
 

@@ -5,16 +5,21 @@ Checks the exposed ```logger``` (ForwardingLogger) routes every level to the
 handler's on_logging_event with the matching Severity and a nil context, and
 that on_logging_event passes context and error through. The default
 on_logging_event writes to the server logger: the given one or an own stderr
-logger with logger_severity.
+logger with logger_severity. The log lines of the server and the default events
+follow the reference: connect, disconnect, auth denial, start, command lines and
+faults outside the dialog.
 """
 
 import re
+import asyncio
 
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer
+from tokeo.core.smtpd.tls import TlsTransport
 from tokeo.core.smtpd.events import SmtpdEvents, SmtpdEvent
 from tokeo.core.smtpd.logger import Severity
+from tests.core.smtpd.lib.smtpd_tests_helper import dialog, auth_plain
 
 
 class LoggingEvents(SmtpdEvents):
@@ -195,3 +200,116 @@ def test_critical_with_error_is_followed_by_its_traceback():
     assert target.lines[0] == ('critical', 'fatal')
     assert target.lines[1] == ('critical', 'Traceback (most recent call last):')
     assert target.lines[-1] == ('critical', 'RuntimeError: broken')
+
+
+class LinesEvents(SmtpdEvents):
+    """Collects every log line with its ctx, the other events keep their default."""
+
+    def __init__(self, options=None):
+        super().__init__(options)
+        self.lines = []
+
+    def on_logging_event(self, ctx, severity, msg, err=None):
+        self.lines.append((ctx, severity, msg, err))
+
+    def messages(self):
+        return [msg for _, _, msg, _ in self.lines]
+
+
+def test_forwarding_logger_passes_a_ctx():
+    """self.log.<level>(msg, ctx=ctx) hands the ctx to on_logging_event."""
+    events = LoggingEvents()
+    SmtpdServer(events).logger.info('with ctx', ctx='CTX')
+    assert (events.log_ctx, events.log_severity, events.log_msg) == ('CTX', Severity.INFO, 'with ctx')
+
+
+def test_default_connect_and_disconnect_are_logged_with_ctx():
+    """The default connect and disconnect events log their line with the ctx."""
+    events = LinesEvents()
+    dialog(events, {}, [b'QUIT\r\n'])
+    connect = [line for line in events.lines if line[2].startswith('Client connect from 127.0.0.1:')]
+    disconnect = [line for line in events.lines if line[2].startswith('Client disconnect from 127.0.0.1:')]
+    assert len(connect) == len(disconnect) == 1
+    assert connect[0][0] is not None and connect[0][0] is disconnect[0][0]
+
+
+def test_connect_override_without_super_logs_no_line():
+    """An on_connect_event override without super() drops the default line."""
+
+    class Own(LinesEvents):
+
+        def on_connect_event(self, ctx):
+            pass
+
+    events = Own()
+    dialog(events, {}, [b'QUIT\r\n'])
+    assert not any(msg.startswith('Client connect') for msg in events.messages())
+    assert any(msg.startswith('Client disconnect') for msg in events.messages())
+
+
+def test_default_auth_deny_logs_without_the_password():
+    """The default on_auth_event logs the denial without the password."""
+    events = LinesEvents()
+    dialog(events, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO a\r\n', b'AUTH PLAIN ' + auth_plain('', 'user', 'pa55word').encode() + b'\r\n'])
+    deny = [msg for msg in events.messages() if msg.startswith('Deny access from')]
+    assert deny and deny[0].endswith('for user')
+    assert not any('pa55word' in msg for msg in events.messages())
+
+
+@pytest.mark.parametrize(
+    'crlf_mode, line, logged',
+    [
+        ('CRLF_ENSURE', b'NOOP \xc3\xa4\r\n', '<<< NOOP ä'),
+        ('CRLF_LEAVE', b'NOOP a\rb\r\n', '<<< NOOP a[\\r]b'),
+        ('CRLF_ENSURE', b'NOOP \xff\r\n', '<<< NOOP \\xff'),
+    ],
+)
+def test_command_lines_are_logged_as_text(crlf_mode, line, logged):
+    """A command line is logged as text, a CR as [\\r] and bad bytes escaped."""
+    events = LinesEvents()
+    dialog(events, {'crlf_mode': crlf_mode}, [b'EHLO a\r\n', line])
+    assert logged in events.messages()
+
+
+@pytest.mark.parametrize('host, shown, bound', [('127.0.0.1', '127.0.0.1', '127.0.0.1'), ('::1', '[::1]', '[::1]')])
+def test_start_logs_every_listener_and_its_bound_address(host, shown, bound):
+    """start() logs the listener as given and each bound address, both at INFO."""
+    events = LinesEvents()
+
+    async def go():
+        server = SmtpdServer(events)
+        await server.start([{'host': host, 'port': 0}])
+        port = server._servers[0].sockets[0].getsockname()[1]
+        await server.stop(wait_seconds_before_close=0)
+        return port
+
+    try:
+        port = asyncio.run(go())
+    except OSError:
+        pytest.skip(f'{host} is not available here')
+    assert (None, Severity.INFO, f'Starting service on {shown}:(auto)', None) in events.lines
+    assert (None, Severity.INFO, f'Service listening on {bound}:{port}', None) in events.lines
+
+
+def test_disconnect_fault_is_logged_critical_and_closes_the_connection():
+    """A fault of on_disconnect_event is logged CRITICAL, the connection closes."""
+
+    class Broken(LinesEvents):
+
+        def on_disconnect_event(self, ctx):
+            raise RuntimeError('cleanup failed')
+
+    events = Broken()
+    dialog(events, {}, [b'QUIT\r\n'])
+    critical = [line for line in events.lines if line[1] is Severity.CRITICAL]
+    assert critical[0][2] == 'cleanup failed (RuntimeError)'
+    assert isinstance(critical[0][3], RuntimeError)
+
+
+def test_generated_test_certificate_is_logged_as_pem():
+    """The self-signed test certificate is logged at DEBUG as PEM."""
+    lines = []
+    TlsTransport(cert_cn='localhost', logger=lambda severity, msg: lines.append((severity, msg)))
+    pem = [msg for severity, msg in lines if msg.startswith('SSL: generated test certificate\n')]
+    assert pem and '-----BEGIN CERTIFICATE-----' in pem[0]
+    assert all(severity is Severity.DEBUG for severity, _ in lines)

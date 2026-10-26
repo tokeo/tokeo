@@ -35,8 +35,8 @@ class ForwardingLogger:
 
     The ```ForwardingLogger```: ```debug```/```info```/```warning```/
     ```error```/```critical``` push the message to the given
-    ```on_logging_event``` callable with the matching ```Severity``` and a nil
-    context.
+    ```on_logging_event``` callable with the matching ```Severity``` and the
+    given context, nil when not given.
 
     ### Args
 
@@ -47,22 +47,22 @@ class ForwardingLogger:
     def __init__(self, on_logging_event):
         self._on_logging_event = on_logging_event
 
-    def info(self, msg):
-        """Log msg at INFO severity."""
-        self._on_logging_event(None, Severity.INFO, msg)
+    def info(self, msg, ctx=None):
+        """Log msg at INFO severity, optionally for a ctx."""
+        self._on_logging_event(ctx, Severity.INFO, msg)
 
-    def warning(self, msg):
-        """Log msg at WARNING severity."""
-        self._on_logging_event(None, Severity.WARNING, msg)
+    def warning(self, msg, ctx=None):
+        """Log msg at WARNING severity, optionally for a ctx."""
+        self._on_logging_event(ctx, Severity.WARNING, msg)
 
-    def error(self, msg):
-        """Log msg at ERROR severity."""
-        self._on_logging_event(None, Severity.ERROR, msg)
+    def error(self, msg, ctx=None):
+        """Log msg at ERROR severity, optionally for a ctx."""
+        self._on_logging_event(ctx, Severity.ERROR, msg)
 
-    def critical(self, msg):
-        """Log msg at CRITICAL severity."""
-        self._on_logging_event(None, Severity.CRITICAL, msg)
+    def critical(self, msg, ctx=None):
+        """Log msg at CRITICAL severity, optionally for a ctx."""
+        self._on_logging_event(ctx, Severity.CRITICAL, msg)
 
-    def debug(self, msg):
-        """Log msg at DEBUG severity."""
-        self._on_logging_event(None, Severity.DEBUG, msg)
+    def debug(self, msg, ctx=None):
+        """Log msg at DEBUG severity, optionally for a ctx."""
+        self._on_logging_event(ctx, Severity.DEBUG, msg)
