@@ -930,8 +930,10 @@ class SmtpdServer:
                         reader, self.io_proxy_cmd_timeout if session.cmd_sequence is CMD_PROXY else self.io_cmd_timeout
                     )
                     if raw == b'':
-                        # connection closed by the remote peer or by a shutdown
-                        break
+                        # a shutdown ends by 421, a closed peer gets no reply
+                        if self._shutdown:
+                            break
+                        raise EOFError
 
                     try:
                         # pipelining extension or violation
@@ -946,10 +948,11 @@ class SmtpdServer:
                         if self.crlf_mode is CrlfMode.CRLF_ENSURE:
                             line = raw.replace(b'\r', b'').replace(b'\n', b'')
                         elif self.crlf_mode is CrlfMode.CRLF_LEAVE:
-                            line_break = raw[-2:] if raw.endswith(b'\r\n') else (raw[-1:] if raw.endswith(b'\n') else b'')
+                            # use the input line break, a line always ends by LF
+                            line_break = b'\r\n' if raw.endswith(b'\r\n') else b'\n'
                             if session.cmd_sequence is CMD_DATA:
-                                ctx.message.crlf = line_break or b'\r\n'
-                            line = raw[: len(raw) - len(line_break)] if line_break else raw
+                                ctx.message.crlf = line_break
+                            line = raw.removesuffix(line_break)
                         elif self.crlf_mode is CrlfMode.CRLF_STRICT:
                             if not raw.endswith(b'\r\n'):
                                 raise Smtpd500CrLfSequenceException
@@ -1001,7 +1004,8 @@ class SmtpdServer:
                 writer.write(output.encode() + b'\r\n')
                 await writer.drain()
 
-            except (asyncio.IncompleteReadError, ConnectionError) as e:
+            # the peer closed the connection, also within a line
+            except (EOFError, ConnectionError) as e:
                 if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
                     await self._emit(
                         SmtpdEvent.ON_LOGGING_EVENT, session.ctx, Severity.DEBUG, 'Connection lost due abort by client! (EOFError)', e
@@ -1061,6 +1065,11 @@ class SmtpdServer:
         - **SmtpdIOBufferOverrunException**: Buffer above io_buffer_max_size;
             both bubble to the outer handler which answers 421
 
+        ### Returns
+
+        - **bytes**: The line, always ending by LF; b'' when the peer closed,
+            also within a line, or a shutdown ended the wait
+
         """
         try:
             # the timeout and the shutdown guard *waiting on the wire*: when a
@@ -1074,8 +1083,9 @@ class SmtpdServer:
             raise SmtpdIOTimeoutException
         except asyncio.LimitOverrunError:
             raise SmtpdIOBufferOverrunException
-        except asyncio.IncompleteReadError as err:
-            return bytes(err.partial or b'')
+        except asyncio.IncompleteReadError:
+            # the peer closed, a rest without LF is dropped
+            return b''
         if self.io_buffer_max_size and len(raw) > int(self.io_buffer_max_size):
             raise SmtpdIOBufferOverrunException
         return raw
