@@ -426,6 +426,7 @@ class SmtpdServer:
             self.do_dns_reverse_lookup = True
         self.encrypt_mode = _parse_mode(EncryptMode, settings.get('encrypt_mode'), 'TLS_FORBIDDEN', 'encrypt_mode')
         self.auth_mode = _parse_mode(AuthMode, settings.get('auth_mode'), 'AUTH_FORBIDDEN', 'auth_mode')
+        self.trusted_relay_auth_ids = settings.get('trusted_relay_auth_ids', [])
         self.max_processings = settings.get('max_processings', DEFAULT_SMTPD_MAX_PROCESSINGS)
         self.max_connections = settings.get('max_connections', None)
         # validation
@@ -435,6 +436,11 @@ class SmtpdServer:
             raise ValueError('Timeout for a command line (io_cmd_timeout) must be at least 1 second!')
         if not (type(self.io_proxy_cmd_timeout) in (int, float) and self.io_proxy_cmd_timeout >= 1):
             raise ValueError('Timeout for the PROXY header (io_proxy_cmd_timeout) must be at least 1 second!')
+        if not (
+            isinstance(self.trusted_relay_auth_ids, list)
+            and all(isinstance(i, str) and i != '' and i == i.strip() for i in self.trusted_relay_auth_ids)
+        ):
+            raise ValueError('Trusted relays (trusted_relay_auth_ids) must be a list of stripped non-empty authorization ids!')
         if not (isinstance(self.max_processings, int) and self.max_processings > 0):
             raise ValueError('Number of simultaneous processings (max_processings) must be a positive integer!')
         if self.max_connections is not None:
@@ -1313,6 +1319,26 @@ class SmtpdServer:
                 if self.internationalization_extensions:
                     cmd_data = re.sub(r'\sBODY=(7BIT|8BITMIME)', '', cmd_data, flags=re.IGNORECASE)
                     cmd_data = re.sub(r'\sSMTPUTF8', '', cmd_data, flags=re.IGNORECASE).strip()
+                if self.auth_mode is not AuthMode.AUTH_FORBIDDEN:
+                    # AUTH parameter of the original submitter (RFC 4954 section 5)
+                    match = re.search(r'\sAUTH=(\S*)', cmd_data, re.IGNORECASE)
+                    if match:
+                        cmd_data = cmd_data.replace(match.group(0), '', 1).strip()
+                        auth_for_id_raw = match.group(1)
+                        # decode the xtext ("+" with two hex digits is one char),
+                        # an invalid xtext stays undecoded
+                        xtext_valid = re.search(r'\+(?![0-9A-Fa-f]{2})', auth_for_id_raw) is None
+                        if xtext_valid:
+                            auth_for_id_raw = re.sub(r'\+([0-9A-Fa-f]{2})', lambda m: chr(int(m.group(1), 16)), auth_for_id_raw)
+                        ctx.envelope.auth_for_id_raw = auth_for_id_raw
+                        # only a trusted relay may name the submitter
+                        if (
+                            xtext_valid
+                            and auth_for_id_raw.strip() not in ('', '<>')
+                            and ctx.server.authorization_id.strip() != ''
+                            and ctx.server.authorization_id in self.trusted_relay_auth_ids
+                        ):
+                            ctx.envelope.auth_for_id = auth_for_id_raw.strip()
                 if SmtpdEvent.ON_MAIL_FROM_EVENT in self.emit_events:
                     return_value = await self._emit(SmtpdEvent.ON_MAIL_FROM_EVENT, ctx, cmd_data)
                     if return_value:

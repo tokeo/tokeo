@@ -109,6 +109,18 @@ def test_defaults_auth_mode():
     assert _smtpd().auth_mode is AuthMode.AUTH_FORBIDDEN
 
 
+def test_defaults_trusted_relay_auth_ids():
+    """trusted_relay_auth_ids defaults to an empty list."""
+    assert _smtpd().trusted_relay_auth_ids == []
+
+
+@pytest.mark.parametrize('value', [None, 'relay', ('relay',), ['relay', 1], ['relay', ''], [' relay'], ['relay '], ['  ']])
+def test_trusted_relay_auth_ids_not_a_list_of_ids_is_rejected(value):
+    """trusted_relay_auth_ids accepts only a list of stripped non-empty ids."""
+    with pytest.raises(ValueError, match='trusted_relay_auth_ids'):
+        _smtpd(settings={'trusted_relay_auth_ids': value})
+
+
 def test_defaults_encrypt_mode():
     """encrypt_mode defaults to TLS_FORBIDDEN."""
     assert _smtpd().encrypt_mode is EncryptMode.TLS_FORBIDDEN

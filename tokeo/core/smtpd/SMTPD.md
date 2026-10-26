@@ -198,8 +198,9 @@ which carries the whole state of the conversation. It has three parts:
 session.
 
 **```ctx.envelope```** — the current transaction:
-```mail_from``` (the sender), ```rcpt_tos``` (the list of recipients) and
-```encoding_body```.
+```mail_from``` (the sender), ```rcpt_tos``` (the list of recipients),
+```encoding_body```, ```encoding_utf8```, ```auth_for_id``` and
+```auth_for_id_raw``` (section 6).
 
 **```ctx.message```** — the message being received:
 ```data``` (a ```bytearray``` of the raw message), ```bytesize```,
@@ -242,6 +243,25 @@ class MailHandler(SmtpdEvents):
 ```
 
 By default (no override) ```on_auth_event``` denies every attempt.
+
+A relay may name the original submitter of a message by the ```AUTH```
+parameter of ```MAIL FROM``` (RFC 4954), e.g. Alice submits to relay A, which
+logs in at your server and sends ```MAIL FROM:<alice@a> AUTH=alice@a```. The
+server removes the parameter from the sender and decodes it (xtext) into
+```ctx.envelope.auth_for_id_raw```, kept as sent for logging. It trusts the
+value only when the client is logged in with an ```authorization_id``` listed
+in ```trusted_relay_auth_ids```, then ```ctx.envelope.auth_for_id``` carries
+the submitter stripped of surrounding whitespace. In all other cases, also for
+```AUTH=<>``` or an invalid xtext, ```auth_for_id``` stays ```''```.
+
+Both sides of this trust are checked automatically to be stripped: the entries
+of ```trusted_relay_auth_ids``` when the server starts (else a
+```ValueError```) and the ```authorization_id``` returned by
+```on_auth_event``` (else ```454```, see above). So an id only matches as
+written, without hidden whitespace.
+
+While ```auth_mode``` is ```'AUTH_FORBIDDEN'``` the parameter stays in the
+sender like any other unknown parameter.
 
 ## 7. Responses and exceptions
 
@@ -458,6 +478,7 @@ The constructor keeps the original option names. Key ones:
 <tr><td>max_processings</td><td>4</td><td>connections processed simultaneously</td></tr>
 <tr><td>max_connections</td><td>None</td><td>concurrent connections accepted (None = unlimited)</td></tr>
 <tr><td>auth_mode</td><td>'AUTH_FORBIDDEN'</td><td>AUTH_OPTIONAL / AUTH_REQUIRED</td></tr>
+<tr><td>trusted_relay_auth_ids</td><td>[]</td><td>authorization ids (stripped, non-empty) of relays trusted to name the submitter by AUTH= (section 6)</td></tr>
 <tr><td>encrypt_mode</td><td>'TLS_FORBIDDEN'</td><td>TLS_OPTIONAL / TLS_WHEN_AUTH / TLS_REQUIRED / TLS_IMMEDIATE</td></tr>
 <tr><td>pipelining_extension</td><td>False</td><td>advertise PIPELINING</td></tr>
 <tr><td>internationalization_extensions</td><td>False</td><td>advertise 8BITMIME and SMTPUTF8</td></tr>

@@ -104,6 +104,10 @@ class EnvelopeCtx:
     encoding_body: str = ''
     #: encoding_utf8: 'utf8' when SMTPUTF8 was used, else ''
     encoding_utf8: str = ''
+    #: AUTH= of MAIL FROM when sent by a trusted relay, else ''
+    auth_for_id: str = ''
+    #: AUTH= of MAIL FROM as sent by the client (xtext decoded), for logging
+    auth_for_id_raw: str = ''
 
 
 class MessageSpooler:

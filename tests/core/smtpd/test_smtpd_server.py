@@ -1300,6 +1300,74 @@ def test_auth_handler_crash_454(mechanism):
     assert r[-1][0] == '235 OK'
 
 
+class AuthForEvents(AuthEvents):
+    """Records the sender and the AUTH parameter of every MAIL."""
+
+    def __init__(self, options=None):
+        super().__init__(options)
+        self.mails = []
+
+    def on_mail_from_event(self, ctx, mail_from):
+        self.mails.append((mail_from, ctx.envelope.auth_for_id, ctx.envelope.auth_for_id_raw))
+        return super().on_mail_from_event(ctx, mail_from)
+
+
+def _auth_for(trusted, login, mails):
+    """Runs the MAILs, logged in as "user" or not, and returns them recorded."""
+    ev = AuthForEvents()
+    auth = [b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n'] if login else []
+    settings = {'auth_mode': 'AUTH_OPTIONAL', 'trusted_relay_auth_ids': trusted}
+    commands = [b'EHLO me\r\n', *auth]
+    for mail in mails:
+        commands += [b'MAIL FROM:' + mail + b'\r\n', b'RSET\r\n']
+    _, r = dialog(ev, settings, commands)
+    # every MAIL and RSET is accepted
+    assert [line[0] for line in r].count('250 OK') == 2 * len(mails)
+    return ev.mails
+
+
+@pytest.mark.parametrize(
+    'trusted, login, param, auth_for_id, auth_for_id_raw',
+    [
+        # trusted relay: the decoded xtext names the submitter
+        (['user'], True, b'AUTH=e+3Dmc2@example.com', 'e=mc2@example.com', 'e=mc2@example.com'),
+        (['user'], True, b'auth=e+3dmc2@example.com', 'e=mc2@example.com', 'e=mc2@example.com'),
+        # surrounding whitespace of the decoded xtext is stripped
+        (['user'], True, b'AUTH=+20alice@x+20', 'alice@x', ' alice@x '),
+        (['user'], True, b'AUTH=+20+20', '', '  '),
+        (['user'], True, b'AUTH=+20<>+20', '', ' <> '),
+        # unknown submitter, also from a trusted relay
+        (['user'], True, b'AUTH=<>', '', '<>'),
+        (['user'], True, b'AUTH=', '', ''),
+        # an invalid xtext stays undecoded and is not trusted
+        (['user'], True, b'AUTH=a+Zb@example.com', '', 'a+Zb@example.com'),
+        # logged in, but not as a trusted relay
+        ([], True, b'AUTH=bob@example.com', '', 'bob@example.com'),
+        (['relay'], True, b'AUTH=bob@example.com', '', 'bob@example.com'),
+        # not logged in
+        (['user'], False, b'AUTH=bob@example.com', '', 'bob@example.com'),
+    ],
+)
+def test_mail_from_auth_parameter(trusted, login, param, auth_for_id, auth_for_id_raw):
+    """AUTH= leaves the sender, auth_for_id carries it only from a trusted relay."""
+    mails = _auth_for(trusted, login, [b'<a@x> ' + param])
+    assert mails == [('<a@x>', auth_for_id, auth_for_id_raw)]
+
+
+def test_mail_from_auth_parameter_ends_with_the_transaction():
+    """A next MAIL without AUTH= starts with empty auth_for_id fields."""
+    mails = _auth_for(['user'], True, [b'<a@x> AUTH=s@example.com', b'<b@x>'])
+    assert mails == [('<a@x>', 's@example.com', 's@example.com'), ('<b@x>', '', '')]
+
+
+def test_mail_from_auth_parameter_stays_while_auth_forbidden():
+    """While AUTH is not offered, AUTH= stays in the sender."""
+    ev = AuthForEvents()
+    _, r = dialog(ev, {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x> AUTH=<>\r\n'])
+    assert r[1][0] == '250 OK'
+    assert ev.mails == [('<a@x> AUTH=<>', '', '')]
+
+
 # --- STARTTLS --------------------
 
 
