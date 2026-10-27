@@ -380,8 +380,9 @@ def test_empty_body_message_matches_ram_mode(tmp_path):
 
 
 def test_crlf_leave_spool_file_is_byte_true(tmp_path):
-    """CRLF_LEAVE keeps bare LF in the file, only the last one is chomped."""
-    wire = b'Subject: t\n\nzeile-a\nzeile-b\n'
+    """CRLF_LEAVE keeps bare LF in the file, only the final CRLF is chomped."""
+    # the last line ends by CRLF, only <CRLF>.<CRLF> ends DATA
+    wire = b'Subject: t\n\nzeile-a\nzeile-b\r\n'
     ram = Capture()
     assert run_wire(ram, {'crlf_mode': 'CRLF_LEAVE'}, wire) == b'250'
     spool = Capture()

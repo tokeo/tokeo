@@ -331,21 +331,113 @@ def test_crlf_strict_rejects_bare_lf():
     assert r[0][0].startswith('500')
 
 
+DATA_ENVELOPE = [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n']
+
+
 def test_data_size_limit_552():
-    """A body over data_size answers 552."""
+    """A body over data_size answers 552 after the end of DATA, then goes on."""
     ev = RecordingEvents()
     _, r = dialog(
         ev,
         {'data_size': 50},
-        [
-            b'EHLO me\r\n',
-            b'MAIL FROM:<a@x>\r\n',
-            b'RCPT TO:<b@y>\r\n',
-            b'DATA\r\n',
-            b'X' * 200 + b'\r\n',
-        ],
+        DATA_ENVELOPE + [b'X' * 200 + b'\r\nMAIL FROM:<c@x>\r\n.\r\n', b'MAIL FROM:<d@x>\r\n'],
     )
     assert r[4][0].startswith('552')
+    # the rest of the message was discarded, no delivery, no command of it ran
+    assert ev.messages == []
+    # the session is reset like by RSET, only the next MAIL FROM ran
+    assert r[5] == ['250 OK']
+    assert ev.fired.count('mail') == 2
+
+
+class FaultInData(RecordingEvents):
+    """Raises the given error on the first received data line."""
+
+    def __init__(self, error):
+        super().__init__()
+        self.error = error
+        self.lines = []
+        self.errors = None
+
+    def on_message_data_receiving_event(self, ctx):
+        super().on_message_data_receiving_event(ctx)
+        if self.fired.count('recv') == 1:
+            raise self.error
+
+    def on_logging_event(self, ctx, severity, msg, err=None):
+        self.lines.append((severity, msg))
+
+    def on_disconnect_event(self, ctx):
+        super().on_disconnect_event(ctx)
+        self.errors = list(ctx.server.errors)
+
+
+@pytest.mark.parametrize(
+    'error, code, kind',
+    [(Smtpd550Exception(), '550', 'Smtpd550Exception'), (RuntimeError('broken'), '451', 'RuntimeError')],
+)
+def test_fault_in_data_is_answered_once_after_the_end(error, code, kind):
+    """A fault of the receiving event answers once after the end of DATA."""
+    ev = FaultInData(error)
+    _, r = dialog(ev, {}, DATA_ENVELOPE + [b'Subject: t\r\n\r\nA\r\nB\r\n.\r\n', b'NOOP\r\n'])
+    assert r[4][0].startswith(code)
+    # no more receiving events after the fault, no delivery
+    assert ev.fired.count('recv') == 1
+    assert ev.messages == []
+    assert r[5] == ['250 OK']
+    # the fault is logged when it occurs with the real error, then at the end
+    errors = [msg for severity, msg in ev.lines if severity.name == 'ERROR']
+    assert errors[0] == f'Error within DATA, further DATA is ignored up to its end: {error} ({kind})'
+    assert len(errors) == 2
+    # one recorded error, a foreign error is the cause of the 451
+    assert len(ev.errors) == 1
+    assert ev.errors[0] is error or ev.errors[0].__cause__ is error
+
+
+def test_no_start_event_after_a_fault_before_the_first_line():
+    """A bare LF in the first DATA line keeps the start event silent."""
+    ev = RecordingEvents()
+    _, r = dialog(ev, {'crlf_data_mode': 'CRLF_DATA_STRICT'}, DATA_ENVELOPE + [b'A\nB\r\n.\r\n'])
+    assert r[4][0].startswith('554')
+    assert 'start' not in ev.fired
+
+
+def test_a_failing_start_event_runs_once():
+    """A fault of on_message_data_start_event does not run it again per line."""
+
+    class StartFails(RecordingEvents):
+
+        def on_message_data_start_event(self, ctx):
+            super().on_message_data_start_event(ctx)
+            raise Smtpd550Exception
+
+    ev = StartFails()
+    _, r = dialog(ev, {}, DATA_ENVELOPE + [b'A\r\nB\r\nC\r\n.\r\n'])
+    assert r[4][0].startswith('550')
+    assert ev.fired.count('start') == 1
+
+
+def test_spool_with_empty_first_line_starts_once_and_keeps_data_size(tmp_path):
+    """Spooling with an empty first DATA line starts once, data_size holds."""
+    ev = RecordingEvents()
+    settings = {'spool': str(tmp_path) + '/', 'data_size': 100}
+    _, r = dialog(ev, settings, DATA_ENVELOPE + [b'\r\n' + b'X' * 60 + b'\r\n' + b'Y' * 60 + b'\r\n.\r\n'])
+    assert r[4][0].startswith('552')
+    assert ev.fired.count('start') == 1
+
+
+def test_only_the_first_fault_in_data_counts():
+    """Several bare LF in DATA count as one fault of the connection."""
+    seen = []
+
+    class Count(RecordingEvents):
+
+        def on_disconnect_event(self, ctx):
+            seen.append(ctx.server.exceptions)
+
+    _, r = dialog(Count(), {'crlf_data_mode': 'CRLF_DATA_STRICT'}, DATA_ENVELOPE + [b'A\nB\nC\nD\r\n.\r\n'])
+    assert r[4][0].startswith('554')
+    assert seen == [1]
 
 
 def test_buffer_overrun_421():

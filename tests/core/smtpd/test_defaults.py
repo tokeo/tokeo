@@ -9,6 +9,7 @@ import pytest
 from tokeo.core.smtpd.server import (
     SmtpdServer,
     CrlfMode,
+    CrlfDataMode,
     AuthMode,
     EncryptMode,
     DEFAULT_SMTPD_HOST,
@@ -74,6 +75,28 @@ def test_defaults_max_connections():
 def test_defaults_crlf_mode():
     """crlf_mode defaults to CRLF_ENSURE."""
     assert _smtpd().crlf_mode is CrlfMode.CRLF_ENSURE
+
+
+def test_defaults_crlf_data_mode():
+    """crlf_data_mode defaults to CRLF_DATA_MODERATE, with CRLF_STRICT to STRICT."""
+    assert _smtpd().crlf_data_mode is CrlfDataMode.CRLF_DATA_MODERATE
+    assert _smtpd(settings={'crlf_mode': 'CRLF_LEAVE'}).crlf_data_mode is CrlfDataMode.CRLF_DATA_MODERATE
+    assert _smtpd(settings={'crlf_mode': 'CRLF_STRICT'}).crlf_data_mode is CrlfDataMode.CRLF_DATA_STRICT
+
+
+@pytest.mark.parametrize('value', ['CRLF_DATA_MODERATE', 'CRLF_DATA_UNSAFE'])
+def test_crlf_strict_allows_only_the_strict_data_modes(value):
+    """CRLF_STRICT with a not strict crlf_data_mode is rejected."""
+    with pytest.raises(ValueError, match='crlf_data_mode'):
+        _smtpd(settings={'crlf_mode': 'CRLF_STRICT', 'crlf_data_mode': value})
+    smtpd = _smtpd(settings={'crlf_mode': 'CRLF_STRICT', 'crlf_data_mode': 'CRLF_DATA_STRICT_CLOSE'})
+    assert smtpd.crlf_data_mode is CrlfDataMode.CRLF_DATA_STRICT_CLOSE
+
+
+def test_unknown_crlf_data_mode_is_rejected():
+    """An unknown crlf_data_mode names the allowed values."""
+    with pytest.raises(ValueError, match='crlf_data_mode must be one of'):
+        _smtpd(settings={'crlf_data_mode': 'CRLF_DATA_LAX'})
 
 
 def test_defaults_io_cmd_timeout():

@@ -162,6 +162,15 @@ Two conventions matter:
     the hot path. Keep it fast and do not decorate it with ```@threaded```; the
     library rejects that at import time.
 
+    A fault within DATA (raised by ```on_message_data_start_event```,
+    ```on_message_data_headers_event``` or ```on_message_data_receiving_event```,
+    or a message over ```data_size```) is answered once after the end of DATA;
+    the server discards the rest of the message without further events
+    (RFC 1870). Any other error than an ```Smtpd*Exception``` answers 451,
+    the original error is its ```__cause__```. The fault is logged as ERROR
+    when it occurs (```Error within DATA, further DATA is ignored up to its
+    end: ...```); at the end it is counted once and logged with its reply.
+
 ### Slow work: ```@threaded```
 
 If an event does something slow (a database call, a network request), decorate it
@@ -281,6 +290,7 @@ line. The available classes (all importable from ```tokeo.core.smtpd```):
 </thead>
 <tbody>
 <tr><td>Smtpd421Exception</td><td>421 service not available</td><td>refuse / abort the connection</td></tr>
+<tr><td>Smtpd521Exception</td><td>521 does not accept mail</td><td>refuse the client for good, e.g. in on_connect_event; closes the connection, within DATA after its end</td></tr>
 <tr><td>Smtpd450Exception<br>Smtpd451Exception<br>Smtpd452Exception</td><td>4xx temporary</td><td>greylisting, transient failure</td></tr>
 <tr><td>Smtpd500Exception<br>Smtpd501Exception<br>Smtpd502Exception</td><td>syntax / not implemented</td><td>bad or unsupported command</td></tr>
 <tr><td>Smtpd503Exception</td><td>503 bad sequence</td><td>command out of order</td></tr>
@@ -292,8 +302,8 @@ line. The available classes (all importable from ```tokeo.core.smtpd```):
 </tbody>
 </table>
 
-The full set is present (```Smtpd432```, ```Smtpd454```, ```Smtpd521```,
-```Smtpd534```, ```Smtpd538```, and the pipelining/CRLF ```Smtpd500``` variants).
+The full set is present (```Smtpd432```, ```Smtpd454```, ```Smtpd534```,
+```Smtpd538```, and the pipelining/CRLF ```Smtpd500``` variants).
 The internal signals (```SmtpdIOTimeoutException```,
 ```SmtpdIOBufferOverrunException```) mark a line that timed out or overran
 ```io_buffer_max_size```; the server answers both with ```421```.
@@ -499,6 +509,9 @@ The constructor keeps the original option names. Key ones:
 <tr><td>logger_severity</td><td>'WARNING'</td><td>level of the own stderr logger: DEBUG / INFO / WARNING / ERROR / CRITICAL, not with an own logger (section 13)</td></tr>
 <tr><td>trusted_relay_auth_ids</td><td>[]</td><td>authorization ids (stripped, non-empty) of relays trusted to name the submitter by AUTH= (section 6)</td></tr>
 <tr><td>encrypt_mode</td><td>'TLS_FORBIDDEN'</td><td>TLS_OPTIONAL / TLS_WHEN_AUTH / TLS_REQUIRED / TLS_IMMEDIATE</td></tr>
+<tr><td>crlf_mode</td><td>'CRLF_ENSURE'</td><td>line breaks of all lines: CRLF_ENSURE ends each line with CRLF and drops a bare CR or LF, CRLF_LEAVE keeps the line break as received, CRLF_STRICT rejects a line without CRLF by 500</td></tr>
+<tr><td>data_size</td><td>None</td><td>maximum message size in bytes, a larger message is answered by 552 after the end of DATA (None = unlimited)</td></tr>
+<tr><td>crlf_data_mode</td><td>'CRLF_DATA_MODERATE', with CRLF_STRICT 'CRLF_DATA_STRICT'</td><td>line breaks in DATA against SMTP smuggling, only &lt;CRLF&gt;.&lt;CRLF&gt; ends DATA: CRLF_DATA_MODERATE keeps a bare CR or LF as data, CRLF_DATA_STRICT answers it by 554 after the end of DATA, CRLF_DATA_STRICT_CLOSE by 521 and closes the connection; CRLF_DATA_UNSAFE ends DATA on any dot line and logs a warning on start; CRLF_STRICT allows only the strict modes</td></tr>
 <tr><td>pipelining_extension</td><td>False</td><td>advertise PIPELINING</td></tr>
 <tr><td>internationalization_extensions</td><td>False</td><td>advertise 8BITMIME and SMTPUTF8</td></tr>
 <tr><td>spool</td><td>None</td><td>path and file name prefix for the spool temp files (section 11)</td></tr>
@@ -519,6 +532,50 @@ listeners:
 await server.start([{'host': '127.0.0.1', 'port': 2525},
                     {'host': '::1', 'port': 2526}])
 ```
+
+### Line breaks in DATA and SMTP smuggling
+
+SMTP ends a message only by ```<CRLF>.<CRLF>``` (RFC 5321 4.1.1.4). Many
+servers also end it by a dot line with a bare LF or CR, for example
+```<LF>.<LF>```. When two servers on the way of a message disagree on the end,
+a sender can hide a second message inside the first one (SMTP smuggling).
+
+An example: a sender submits one message to its provider, the body contains:
+
+```
+Hi!<LF>
+.<LF>
+MAIL FROM:<ceo@bank.example><CR><LF>
+RCPT TO:<victim@example.org><CR><LF>
+DATA<CR><LF>
+From: ceo@bank.example<CR><LF>
+Subject: urgent transfer<CR><LF>
+<CR><LF>
+Please pay now.<CR><LF>
+<CR><LF>.<CR><LF>
+```
+
+The provider ends the message only at the final ```<CRLF>.<CRLF>``` and
+relays it as one message. A receiving server that ends DATA already at
+```<LF>.<LF>``` reads the rest as new commands and accepts a second message
+from ```ceo@bank.example```. It arrives from the IP addresses of the provider
+and can pass SPF for any domain the provider hosts.
+
+```crlf_data_mode``` decides how the server handles such lines:
+
+- ```CRLF_DATA_MODERATE``` (default) ends DATA only at ```<CRLF>.<CRLF>```; a
+  false dot line and the lines after it stay part of the message, so the
+  example arrives as one message with its text
+- ```CRLF_DATA_STRICT``` rejects the message: the server reads to the real
+  end, discards the message and answers once by 554
+- ```CRLF_DATA_STRICT_CLOSE``` answers by 521 and closes the connection
+  (RFC 5321 7.8), for a client that sends bare line breaks only to attack
+- ```CRLF_DATA_UNSAFE``` ends DATA at every dot line like before and is open
+  to SMTP smuggling; the server logs a warning on start
+
+A client that ends its message by ```<LF>.<LF>``` gets no end of DATA with the
+safe modes and runs into ```io_cmd_timeout```. With ```crlf_mode```
+```CRLF_STRICT``` only the strict modes are allowed.
 
 ### Sharing limits across services
 

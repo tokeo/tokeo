@@ -5,16 +5,19 @@ Tests for the crlf_mode handling on the raw wire.
 protocol-mandated de-dot-stuffing and the final chomp apply), ``CRLF_ENSURE``
 normalizes every line to CRLF and strips stray CR/LF octets, ``CRLF_STRICT``
 rejects lines that do not end with CRLF. A rest without LF that the client
-leaves at its close is dropped in every mode. smtplib normalizes line endings on
-send, so these tests speak to the socket directly.
+leaves at its close is dropped in every mode. ``crlf_data_mode`` decides on bare
+CR and LF in DATA: only ``<CRLF>.<CRLF>`` ends DATA, except with
+``CRLF_DATA_UNSAFE`` (SMTP smuggling). smtplib normalizes line endings on send,
+so these tests speak to the socket directly.
 """
 
 import asyncio
 
 import pytest
 
+from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents
-from tests.core.smtpd.lib.smtpd_tests_helper import RecordingEvents, run_wire, start_server, stop_server, read_reply, send_command
+from tests.core.smtpd.lib.smtpd_tests_helper import RecordingEvents, dialog, run_wire, start_server, stop_server, read_reply, send_command
 
 
 class WireCapture(SmtpdEvents):
@@ -62,13 +65,101 @@ def test_ensure_normalizes_lines():
 
 
 def test_strict_rejects_bare_lf():
-    """CRLF_STRICT answers a line with bare LF by 500."""
+    """CRLF_STRICT answers a message with bare LF by 554 after the end of DATA."""
     events = WireCapture()
-    reply = run_wire(events, {'crlf_mode': 'CRLF_STRICT'}, b'Subject: t\n')
-    assert reply == b'500'
-    # the offending line was rejected and never reached the message (the
-    # session stays in DATA mode, so the closing dot completes empty)
-    assert not events.data
+    reply = run_wire(events, {'crlf_mode': 'CRLF_STRICT'}, b'Subject: t\nA\r\n')
+    assert reply == b'554'
+    # the message was discarded, no on_message_data_event
+    assert events.data is None
+
+
+#: the SMTP smuggling variants of a false end of DATA
+FALSE_ENDS = [b'\n.\n', b'\n.\r\n', b'\r\n.\n', b'\r\n\r.\r\n', b'\r\n.\r\r\n']
+#: a second message hidden behind a false end of DATA
+SMUGGLED = b'MAIL FROM:<evil@x>\r\nRCPT TO:<z@y>\r\nDATA\r\nsmuggled\r\n'
+
+
+@pytest.mark.parametrize('crlf_mode', ['CRLF_ENSURE', 'CRLF_LEAVE'])
+@pytest.mark.parametrize('end', FALSE_ENDS)
+def test_moderate_keeps_a_false_end_as_data(crlf_mode, end):
+    """With CRLF_DATA_MODERATE a dot line with a bare CR or LF does not end DATA."""
+    events = RecordingEvents()
+    reply = run_wire(events, {'crlf_mode': crlf_mode}, b'Subject: t\r\n\r\nA' + end + SMUGGLED)
+    assert reply == b'250'
+    # one message, the smuggled commands stay part of its data
+    assert len(events.messages) == 1
+    assert b'MAIL FROM:<evil@x>' in events.messages[0][0]
+    assert events.fired.count('mail') == 1
+
+
+@pytest.mark.parametrize('crlf_mode', ['CRLF_ENSURE', 'CRLF_LEAVE', 'CRLF_STRICT'])
+@pytest.mark.parametrize('end', FALSE_ENDS)
+def test_strict_rejects_a_false_end_once(crlf_mode, end):
+    """With CRLF_DATA_STRICT a false end answers 554 once after the real end."""
+    events = RecordingEvents()
+    settings = {'crlf_mode': crlf_mode, 'crlf_data_mode': 'CRLF_DATA_STRICT'}
+    reply = run_wire(events, settings, b'Subject: t\r\n\r\nA' + end + SMUGGLED)
+    assert reply == b'554'
+    # nothing delivered, the smuggled commands did not run
+    assert events.messages == []
+    assert events.fired.count('mail') == 1
+
+
+@pytest.mark.parametrize('end', FALSE_ENDS)
+def test_unsafe_ends_data_at_a_false_end(end):
+    """With CRLF_DATA_UNSAFE every dot line ends DATA like before."""
+    events = RecordingEvents()
+    settings = {'crlf_data_mode': 'CRLF_DATA_UNSAFE'}
+    _, r = dialog(events, settings, ENVELOPE + [b'Subject: t\r\n\r\nA' + end])
+    assert r[4][0].startswith('250')
+    assert len(events.messages) == 1
+
+
+def test_strict_close_answers_521_and_closes():
+    """CRLF_DATA_STRICT_CLOSE answers a bare LF by 521 after the end and closes."""
+    events = RecordingEvents()
+
+    async def go():
+        server, port, task = await start_server(events, {'crlf_data_mode': 'CRLF_DATA_STRICT_CLOSE'})
+        try:
+            reader, writer = await asyncio.open_connection('127.0.0.1', port)
+            await read_reply(reader)
+            for command in ENVELOPE:
+                await send_command(reader, writer, command)
+            # the bare LF gets no reply before the end of DATA
+            writer.write(b'Subject: t\r\n\r\nA\n')
+            await writer.drain()
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(reader.read(1), 0.5)
+            # the NOOP after the end must not run
+            writer.write(b'B\r\n.\r\nNOOP\r\n')
+            await writer.drain()
+            after = await asyncio.wait_for(reader.read(), 5)
+            writer.close()
+            # give the server the time to reach on_disconnect_event
+            await asyncio.sleep(0.1)
+            return after
+        finally:
+            await stop_server(server, task)
+
+    after = asyncio.run(go())
+    # one 521, no 250 for the NOOP, no 221 or 421 on the close
+    assert after == b'521 Service does not accept mail\r\n'
+    assert events.messages == []
+    assert 'disconnect' in events.fired
+
+
+def test_unsafe_logs_a_warning_on_start():
+    """start() with CRLF_DATA_UNSAFE logs a warning about SMTP smuggling."""
+    events = ClosingEvents()
+
+    async def go():
+        server = SmtpdServer(events, {'crlf_data_mode': 'CRLF_DATA_UNSAFE'})
+        await server.start([{'host': '127.0.0.1', 'port': 0}])
+        await server.stop(wait_seconds_before_close=0)
+
+    asyncio.run(go())
+    assert 'Line breaks in DATA (crlf_data_mode) CRLF_DATA_UNSAFE allow SMTP smuggling!' in events.lines
 
 
 class ClosingEvents(RecordingEvents):

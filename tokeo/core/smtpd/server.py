@@ -50,10 +50,12 @@ from .exc import (
     Smtpd501Exception,
     Smtpd503Exception,
     Smtpd504Exception,
+    Smtpd521Exception,
     Smtpd530Exception,
     Smtpd535Exception,
     Smtpd550Exception,
     Smtpd552Exception,
+    Smtpd554Exception,
     Smtpd555Exception,
     Smtpd451Exception,
     Smtpd454Exception,
@@ -101,6 +103,15 @@ class CrlfMode(Enum):
     CRLF_ENSURE = auto()
     CRLF_STRICT = auto()
     CRLF_LEAVE = auto()
+
+
+class CrlfDataMode(Enum):
+    """The crlf_data_mode symbols (member names match the config values)."""
+
+    CRLF_DATA_UNSAFE = auto()
+    CRLF_DATA_MODERATE = auto()
+    CRLF_DATA_STRICT = auto()
+    CRLF_DATA_STRICT_CLOSE = auto()
 
 
 class AuthMode(Enum):
@@ -169,7 +180,7 @@ class SmtpdSession:
 
     """
 
-    __slots__ = ('cmd_sequence', 'ctx', 'auth_challenge', 'processing')
+    __slots__ = ('cmd_sequence', 'ctx', 'auth_challenge', 'processing', 'data_error')
 
     def __init__(self):
         #: Current position in the SMTP command sequence (```CmdSequence```)
@@ -180,6 +191,8 @@ class SmtpdSession:
         self.auth_challenge = {}
         #: True while this connection holds a processing slot
         self.processing = False
+        #: First exception within DATA, sent as output on the end of DATA
+        self.data_error = None
 
 
 def _parse_ports(ports):
@@ -428,6 +441,12 @@ class SmtpdServer:
         self.io_cmd_timeout = settings.get('io_cmd_timeout', DEFAULT_IO_CMD_TIMEOUT)
         self.io_buffer_max_size = settings.get('io_buffer_max_size', DEFAULT_IO_BUFFER_MAX_SIZE)
         self.crlf_mode = _parse_mode(CrlfMode, settings.get('crlf_mode'), 'CRLF_ENSURE', 'crlf_mode')
+        self.crlf_data_mode = _parse_mode(
+            CrlfDataMode,
+            settings.get('crlf_data_mode'),
+            'CRLF_DATA_STRICT' if self.crlf_mode is CrlfMode.CRLF_STRICT else 'CRLF_DATA_MODERATE',
+            'crlf_data_mode',
+        )
         self.pipelining_extension = bool(settings.get('pipelining_extension', False))
         self.proxy_extension = bool(settings.get('proxy_extension', False))
         self.io_proxy_cmd_timeout = settings.get('io_proxy_cmd_timeout', DEFAULT_IO_PROXY_CMD_TIMEOUT)
@@ -452,6 +471,11 @@ class SmtpdServer:
         self.max_processings = settings.get('max_processings', DEFAULT_SMTPD_MAX_PROCESSINGS)
         self.max_connections = settings.get('max_connections', None)
         # validation
+        if self.crlf_mode is CrlfMode.CRLF_STRICT and self.crlf_data_mode not in (
+            CrlfDataMode.CRLF_DATA_STRICT,
+            CrlfDataMode.CRLF_DATA_STRICT_CLOSE,
+        ):
+            raise ValueError('Line breaks in DATA (crlf_data_mode) must be CRLF_DATA_STRICT or CRLF_DATA_STRICT_CLOSE with CRLF_STRICT!')
         if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not tls_immediate_supported():
             raise ValueError('Immediate TLS (encrypt_mode TLS_IMMEDIATE) requires Python 3.13.13+ or 3.14.4+!')
         if not (type(self.io_cmd_timeout) in (int, float) and self.io_cmd_timeout >= 1):
@@ -565,6 +589,8 @@ class SmtpdServer:
         self._asyncio_shutdown_signal = self._asyncio_running_loop.create_future()
         if listeners is None:
             listeners = self._default_listeners()
+        if self.crlf_data_mode is CrlfDataMode.CRLF_DATA_UNSAFE:
+            self.logger.warning('Line breaks in DATA (crlf_data_mode) CRLF_DATA_UNSAFE allow SMTP smuggling!')
         for lst in listeners:
             host, port = lst.get('host', '127.0.0.1'), int(lst.get('port', 2525))
             self.logger.info(f'Starting service on {f"[{host}]" if ":" in host else host}:{port or "(auto)"}')
@@ -886,6 +912,8 @@ class SmtpdServer:
 
                 # initialize \r\n line_break for CRLF_ENSURE and CRLF_STRICT
                 line_break = b'\r\n'
+                # the line before ended by CRLF, needed by the end of DATA
+                line_break_before_has_crlf = True
 
                 # greet on connect only when CMD_HELO and empty ctx.server.helo
                 output = self._greet_message(session)
@@ -929,10 +957,14 @@ class SmtpdServer:
                     raw = await self._read_line(
                         reader, self.io_proxy_cmd_timeout if session.cmd_sequence is CMD_PROXY else self.io_cmd_timeout
                     )
+
+                    # an empty raw comes from a close of the client (also within
+                    # a line) or from a shutdown that ended the wait in _wait_line
                     if raw == b'':
                         # a shutdown ends by 421, a closed peer gets no reply
                         if self._shutdown:
                             break
+                        # not by a shutdown: the client has closed the input
                         raise EOFError
 
                     try:
@@ -945,6 +977,25 @@ class SmtpdServer:
                         ):
                             raise Smtpd500PipeliningException
 
+                        # test that <CRLF>.<CRLF> ends DATA (RFC 5321 4.1.1.4),
+                        # CRLF_DATA_UNSAFE ignores it (SMTP smuggling)
+                        # the last line ended by CRLF and this raw is b'.\r\n'
+                        data_dialog_end_rfc_conform = line_break_before_has_crlf and raw == b'.\r\n'
+                        # renew the last line flag by this line (raw) or sequence
+                        line_break_before_has_crlf = raw.endswith(b'\r\n') or session.cmd_sequence is not CMD_DATA
+                        # in DATA the strict modes allow no other CR in the raw;
+                        # raw comes from _read_line, so its last char is always LF
+                        if (
+                            # inside the data dialog
+                            session.cmd_sequence is CMD_DATA
+                            # strict modes are enforced
+                            and self.crlf_data_mode in (CrlfDataMode.CRLF_DATA_STRICT, CrlfDataMode.CRLF_DATA_STRICT_CLOSE)
+                            # not ending by CRLF, or another CR before the CRLF
+                            and (not raw.endswith(b'\r\n') or raw.find(b'\r', 0, -2) >= 0)
+                        ):
+                            # a bare CR or LF makes the message invalid
+                            raise Smtpd554Exception if self.crlf_data_mode is CrlfDataMode.CRLF_DATA_STRICT else Smtpd521Exception
+
                         if self.crlf_mode is CrlfMode.CRLF_ENSURE:
                             line = raw.replace(b'\r', b'').replace(b'\n', b'')
                         elif self.crlf_mode is CrlfMode.CRLF_LEAVE:
@@ -956,11 +1007,21 @@ class SmtpdServer:
                         elif self.crlf_mode is CrlfMode.CRLF_STRICT:
                             if not raw.endswith(b'\r\n'):
                                 raise Smtpd500CrLfSequenceException
-                            line = raw[:-2]
-                            if b'\r' in line:
+                            line = raw.removesuffix(b'\r\n')
+                            if line.find(b'\r') >= 0:
                                 raise Smtpd500Exception('Line contains additional CR chars!')
                         else:
                             raise Smtpd500Exception(f'Unknown crlf_mode {self.crlf_mode}!')
+
+                        # a dot line that does not end DATA stays data, passed on
+                        # dot-stuffed to keep its dot
+                        if (
+                            line == b'.'
+                            and not data_dialog_end_rfc_conform
+                            and session.cmd_sequence is CMD_DATA
+                            and self.crlf_data_mode is not CrlfDataMode.CRLF_DATA_UNSAFE
+                        ):
+                            line = b'..'
 
                         # log the received command line (never the DATA payload);
                         # the DATA check first: it skips the membership test and
@@ -980,20 +1041,34 @@ class SmtpdServer:
                         # re-raise to exit the loop and drop the connection
                         raise
 
-                    except SmtpdException as e:
-                        ctx.server.exceptions += 1
-                        ctx.server.errors.append(e)
-                        if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
-                            await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.ERROR, f'{e} ({type(e).__name__})', e)
-                        output = e.smtp_response
-
-                    # any other error maps to a 500
+                    # an SmtpdException answers by its code, any other error by
+                    # 500; within DATA only after its end, then any other by 451
                     except Exception as e:  # noqa: B902
+                        # within DATA keep the first error, the end of DATA raises
+                        # it again: read DATA to its end, answer then (RFC 1870)
+                        if session.cmd_sequence is CMD_DATA:
+                            if session.data_error is None:
+                                session.data_error = e
+                                if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                                    await self._emit(
+                                        SmtpdEvent.ON_LOGGING_EVENT,
+                                        ctx,
+                                        Severity.ERROR,
+                                        f'Error within DATA, further DATA is ignored up to its end: {e} ({type(e).__name__})',
+                                        e,
+                                    )
+                            output = ''
+                            # go on reading DATA until end, nothing to answer
+                            continue
+                        # a 521 drops the connection like a 421
+                        if isinstance(e, Smtpd521Exception):
+                            raise
                         ctx.server.exceptions += 1
                         ctx.server.errors.append(e)
                         if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
                             await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.ERROR, f'{e} ({type(e).__name__})', e)
-                        output = Smtpd500Exception().smtp_response
+                        # respond the smtp error of the exception to the client
+                        output = e.smtp_response if isinstance(e, SmtpdException) else Smtpd500Exception().smtp_response
 
                     # still in CMD_PROXY: the header failed, end without a dialog
                     if session.cmd_sequence is CMD_PROXY:
@@ -1016,25 +1091,29 @@ class SmtpdServer:
                 # (RFC 5321 3.8)
                 if self._shutdown:
                     try:
+                        # no drain: a client that does not read must not block
                         writer.write(REPLY_421_FOR_SHUTDOWN.encode() + b'\r\n')
                     except (OSError, RuntimeError):
                         pass
                 raise
 
-            # any other error drops the connection with a 421
+            # any other error drops the connection with a 421, 521
             except Exception as e:  # noqa: B902
                 ctx = session.ctx
                 ctx.server.exceptions += 1
                 ctx.server.errors.append(e)
                 if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
                     await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.ERROR, f'{e} ({type(e).__name__})', e)
-                # power down connection with smtp abort return code 421
+                # power down connection with smtp abort return code 421 or 521
+                _err = Smtpd521Exception() if isinstance(e, Smtpd521Exception) else Smtpd421Exception()
                 try:
-                    writer.write(Smtpd421Exception().smtp_response.encode() + b'\r\n')
+                    writer.write(_err.smtp_response.encode() + b'\r\n')
                     await writer.drain()
                 except OSError as e2:
                     if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
-                        await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, "Can't send 421 abort code! (IOError)", e2)
+                        await self._emit(
+                            SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, f"Can't send {_err.smtp_code} abort code! (IOError)", e2
+                        )
 
         finally:
             try:
@@ -1113,7 +1192,7 @@ class SmtpdServer:
     @staticmethod
     def _buffered_line_lf(reader):
         """io_buffer_line_lf: is a further complete line already buffered?"""
-        return b'\n' in getattr(reader, '_buffer', b'')
+        return getattr(reader, '_buffer', b'').find(b'\n') >= 0
 
     async def _reverse_lookup(self, ip):
         """Reverse-resolve an IP to a hostname (best effort)."""
@@ -1468,7 +1547,8 @@ class SmtpdServer:
         else:
             # If we are in data mode then ...
 
-            if not ctx.message.data:
+            # the first line of DATA, not after an error
+            if session.data_error is None and ctx.message.bytesize < 0:
                 if SmtpdEvent.ON_MESSAGE_DATA_START_EVENT in self.emit_events:
                     await self._emit(SmtpdEvent.ON_MESSAGE_DATA_START_EVENT, ctx)
                 # always initialize bytesize on data
@@ -1478,6 +1558,10 @@ class SmtpdServer:
             # solely of a period (.) on a line by itself then we are being
             # told to continue data mode
             if line != b'.':
+                # on error drop anything until end of data dialog
+                if session.data_error:
+                    return ''
+
                 # remove a preceding first dot (RFC 5321 section-4.5.2)
                 if line[:1] == b'.':
                     line = line[1:]
@@ -1518,7 +1602,6 @@ class SmtpdServer:
 
                 # Tokeo-only option: enforce a hard data_size cap
                 if self.data_size and ctx.message.bytesize > int(self.data_size):
-                    self.process_reset_session(session)
                     raise Smtpd552Exception
 
                 # e.g. abort while receiving too big incoming mail or
@@ -1539,10 +1622,18 @@ class SmtpdServer:
 
             # save delivered UTC time
             ctx.message.delivered = utc_now()
-            # call event to process message
+
+            # end of data dialog processing
             try:
+                # when recorded an error while receiving data, raise it now
+                if session.data_error:
+                    raise session.data_error
+
+                # call event to process message
                 if SmtpdEvent.ON_MESSAGE_DATA_EVENT in self.emit_events:
                     await self._emit(SmtpdEvent.ON_MESSAGE_DATA_EVENT, ctx)
+
+                # signal client successfully processed message
                 return '250 Requested mail action okay, completed'
 
             # test for SmtpdException
@@ -1553,7 +1644,7 @@ class SmtpdServer:
             # test all other Exceptions
             except Exception as e:  # noqa: B902 - Ruby: StandardError => 451
                 # send correct aborted message to smtp dialog
-                raise Smtpd451Exception(str(e))
+                raise Smtpd451Exception(str(e)) from e
 
             finally:
                 # always start with empty values after finishing incoming message
@@ -1727,6 +1818,8 @@ class SmtpdServer:
             session.cmd_sequence = CMD_HELO
         # drop any auth challenge
         session.auth_challenge = {}
+        # reset error signaling for data dialog
+        session.data_error = None
         # test existing of ctx
         if session.ctx is None:
             # create a new one
