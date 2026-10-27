@@ -16,6 +16,7 @@ from tokeo.core.smtpd.server import (
     DEFAULT_SMTPD_PORT,
     DEFAULT_IO_CMD_TIMEOUT,
     DEFAULT_IO_PROXY_CMD_TIMEOUT,
+    DEFAULT_IO_SESSION_TIMEOUT,
     DEFAULT_IO_BUFFER_MAX_SIZE,
 )
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
@@ -115,6 +116,26 @@ def test_io_timeouts_below_one_second_are_rejected(name, value):
     """An io timeout below 1 second, null or not a number stops the server setup."""
     with pytest.raises(ValueError, match=name):
         _smtpd(settings={name: value})
+
+
+def test_defaults_io_session_timeout():
+    """io_session_timeout defaults to 3600 seconds, also when set to None."""
+    assert DEFAULT_IO_SESSION_TIMEOUT == 3600
+    assert _smtpd().io_session_timeout == DEFAULT_IO_SESSION_TIMEOUT
+    assert _smtpd(settings={'io_session_timeout': None}).io_session_timeout == DEFAULT_IO_SESSION_TIMEOUT
+
+
+@pytest.mark.parametrize('value', [1, 1.5, 86400])
+def test_io_session_timeout_takes_seconds_from_1_to_86400(value):
+    """io_session_timeout takes an int or a float from 1 to 86400 seconds."""
+    assert _smtpd(settings={'io_session_timeout': value}).io_session_timeout == value
+
+
+@pytest.mark.parametrize('value', [0, 0.5, -1, 86401, True, '10'])
+def test_io_session_timeout_out_of_range_is_rejected(value):
+    """io_session_timeout outside 1 to 86400 or not a number stops the setup."""
+    with pytest.raises(ValueError, match='io_session_timeout'):
+        _smtpd(settings={'io_session_timeout': value})
 
 
 def test_defaults_io_buffer_max_size():

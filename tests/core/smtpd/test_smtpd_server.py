@@ -12,12 +12,13 @@ limits, the PROXY protocol, the graceful shutdown, AUTH PLAIN/LOGIN and STARTTLS
 import base64
 import asyncio
 import threading
+import time
 
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import threaded
-from tokeo.core.smtpd.exc import Smtpd550Exception, Smtpd450Exception, Smtpd421Exception, Smtpd555Exception
+from tokeo.core.smtpd.exc import Smtpd550Exception, Smtpd450Exception, Smtpd421CloseException, Smtpd555Exception
 from tests.utils import wait_until_async
 from tests.core.smtpd.lib.smtpd_tests_helper import (
     RecordingEvents,
@@ -440,10 +441,10 @@ def test_only_the_first_fault_in_data_counts():
     assert seen == [1]
 
 
-def test_buffer_overrun_421():
-    """A line over io_buffer_max_size answers 421 and drops the connection."""
+def test_buffer_overrun_554():
+    """A line over io_buffer_max_size answers 554 and drops the connection."""
     _, r = dialog(RecordingEvents(), {'io_buffer_max_size': 100}, [b'EHLO ' + b'a' * 300 + b'\r\n'])
-    assert r[0][0].startswith('421')
+    assert r[0][0].startswith('554')
 
 
 def test_command_timeout_closes_connection():
@@ -478,15 +479,16 @@ def test_read_line_takes_a_buffered_line_without_waiting(monkeypatch):
             raise AssertionError('asyncio.wait must not be used when a line is buffered')
 
         monkeypatch.setattr(asyncio, 'wait', boom)
-        assert await srv._read_line(reader, srv.io_cmd_timeout) == b'HELO x\r\n'
-        assert await srv._read_line(reader, srv.io_cmd_timeout) == b'MAIL FROM:<a@b>\r\n'
+        deadline = time.monotonic() + srv.io_session_timeout
+        assert await srv._read_line(reader, srv.io_cmd_timeout, deadline) == b'HELO x\r\n'
+        assert await srv._read_line(reader, srv.io_cmd_timeout, deadline) == b'MAIL FROM:<a@b>\r\n'
 
     asyncio.run(go())
 
 
 def test_read_line_times_out_on_partial_buffered_line():
     """A partial line in the buffer still times out."""
-    from tokeo.core.smtpd.exc import SmtpdIOTimeoutException
+    from tokeo.core.smtpd.exc import SmtpdIOCmdTimeoutException
     from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
     async def go():
@@ -494,8 +496,8 @@ def test_read_line_times_out_on_partial_buffered_line():
         reader = asyncio.StreamReader()
         reader.feed_data(b'incomplete without newline')
         # a short timeout of the read itself, the config allows 1 second at least
-        with pytest.raises(SmtpdIOTimeoutException):
-            await srv._read_line(reader, 0.1)
+        with pytest.raises(SmtpdIOCmdTimeoutException):
+            await srv._read_line(reader, 0.1, time.monotonic() + srv.io_session_timeout)
 
     asyncio.run(go())
 
@@ -831,7 +833,7 @@ def test_unknown_command_counts_and_allows_abuse_abort():
 
         def on_process_line_unknown_event(self, ctx, line):
             if ctx.server.exceptions >= 2:
-                raise Smtpd421Exception
+                raise Smtpd421CloseException
 
     _, r = dialog(AbuseGuard(), {}, [b'FOO one\r\n', b'BAR two\r\n', b'BAZ three\r\n'])
     assert r[0][0].startswith('500')

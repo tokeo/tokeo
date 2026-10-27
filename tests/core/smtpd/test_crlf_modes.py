@@ -115,8 +115,8 @@ def test_unsafe_ends_data_at_a_false_end(end):
     assert len(events.messages) == 1
 
 
-def test_strict_close_answers_521_and_closes():
-    """CRLF_DATA_STRICT_CLOSE answers a bare LF by 521 after the end and closes."""
+def test_strict_close_answers_554_and_closes():
+    """CRLF_DATA_STRICT_CLOSE answers a bare LF by 554 after the end and closes."""
     events = RecordingEvents()
 
     async def go():
@@ -143,8 +143,8 @@ def test_strict_close_answers_521_and_closes():
             await stop_server(server, task)
 
     after = asyncio.run(go())
-    # one 521, no 250 for the NOOP, no 221 or 421 on the close
-    assert after == b'521 Service does not accept mail\r\n'
+    # one 554, no 250 for the NOOP, no 221 or 421 on the close
+    assert after == b'554 Transaction failed\r\n'
     assert events.messages == []
     assert 'disconnect' in events.fired
 

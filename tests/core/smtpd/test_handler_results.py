@@ -13,7 +13,7 @@ import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, SmtpdSession
 from tokeo.core.smtpd.events import SmtpdEvents
-from tokeo.core.smtpd.exc import Smtpd421Exception
+from tokeo.core.smtpd.exc import Smtpd421CloseException
 from tests.core.smtpd.lib.smtpd_tests_helper import dialog, run_line
 
 
@@ -123,5 +123,5 @@ def test_proxy_event_updates_the_fields(result, expected):
 @pytest.mark.parametrize('result', [True, 'x', ['a']], ids=['true', 'str', 'list'])
 def test_proxy_event_with_another_result_aborts(result):
     """Any other result of on_proxy_event aborts the connection by 421."""
-    with pytest.raises(Smtpd421Exception, match='on_proxy_event must not return'):
+    with pytest.raises(Smtpd421CloseException, match='on_proxy_event must not return'):
         _proxy(result)

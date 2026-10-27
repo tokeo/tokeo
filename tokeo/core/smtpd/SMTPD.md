@@ -294,8 +294,10 @@ line. The available classes (all importable from ```tokeo.core.smtpd```):
 <tr><th>Exception</th><th>Reply</th><th>Typical use</th></tr>
 </thead>
 <tbody>
-<tr><td>Smtpd421Exception</td><td>421 service not available</td><td>refuse / abort the connection</td></tr>
-<tr><td>Smtpd521Exception</td><td>521 does not accept mail</td><td>refuse the client for good, e.g. in on_connect_event; closes the connection, within DATA after its end</td></tr>
+<tr><td>Smtpd421CloseException</td><td>421 service not available</td><td>abort the connection for a temporary reason; closes the connection</td></tr>
+<tr><td>Smtpd521CloseException</td><td>521 does not accept mail</td><td>a host that never accepts mail (RFC 7504); closes the connection</td></tr>
+<tr><td>Smtpd554CloseException</td><td>554 transaction failed</td><td>refuse a client, e.g. in on_connect_event; closes the connection</td></tr>
+<tr><td>Smtpd421AbortException<br>Smtpd554AbortException</td><td>421 / 554 as above</td><td>abort at once, also within DATA, e.g. malware found while receiving</td></tr>
 <tr><td>Smtpd450Exception<br>Smtpd451Exception<br>Smtpd452Exception</td><td>4xx temporary</td><td>greylisting, transient failure</td></tr>
 <tr><td>Smtpd500Exception<br>Smtpd501Exception<br>Smtpd502Exception</td><td>syntax / not implemented</td><td>bad or unsupported command</td></tr>
 <tr><td>Smtpd503Exception</td><td>503 bad sequence</td><td>command out of order</td></tr>
@@ -309,9 +311,8 @@ line. The available classes (all importable from ```tokeo.core.smtpd```):
 
 The full set is present (```Smtpd432```, ```Smtpd454```, ```Smtpd534```,
 ```Smtpd538```, and the pipelining/CRLF ```Smtpd500``` variants).
-The internal signals (```SmtpdIOTimeoutException```,
-```SmtpdIOBufferOverrunException```) mark a line that timed out or overran
-```io_buffer_max_size```; the server answers both with ```421```.
+The closing exceptions and the internal signals of the server are described
+below in "Closing the connection".
 
 The replies of the server lean towards broad compatibility: where a client bends
 the standard in a harmless way, the server tolerates it, e.g. an address without
@@ -355,6 +356,73 @@ Keywords and values are not case sensitive.
   is answered by ```555```
 - a malformed parameter, a wrong value, an invalid xtext or a parameter given
   twice on ```MAIL FROM``` is answered by ```501```
+
+### Closing the connection
+
+After the reply of a ```SmtpdCloseException``` (```Smtpd421CloseException```,
+```Smtpd521CloseException```, ```Smtpd554CloseException```) the server closes
+the connection. Raised by a handler within DATA, the reply follows after the
+end of DATA like any other error. A ```SmtpdAbortException```
+(```Smtpd421AbortException```, ```Smtpd554AbortException```) closes at once,
+also within DATA without reading it to its end (RFC 5321 3.8 for 421, 7.8 for
+554). Any other exception raised outside of the dialog, e.g. a
+```Smtpd554Exception``` in ```on_connect_event```, closes the connection by
+```421```.
+
+The internal signals are aborting exceptions the server raises itself:
+
+- ```SmtpdIOCmdTimeoutException``` (```421```): no complete line within
+  ```io_cmd_timeout``` (or ```io_proxy_cmd_timeout``` for the PROXY header),
+  or a reply the client did not take within ```io_cmd_timeout```
+- ```SmtpdIOSessionTimeoutException``` (```421```): the session lasted longer
+  than ```io_session_timeout```, e.g. a client that sends ```NOOP``` without
+  end or DATA that the server discards after an error
+- ```SmtpdIOBufferOverrunException``` (```554```): a line, a command or in
+  DATA, exceeds ```io_buffer_max_size```
+
+```io_session_timeout``` runs from the greeting and is never renewed: it is
+the longest time a connection may hold its slot of ```max_processings```, so
+the server can serve the clients that wait. It limits only the wait for input
+of the client, a reply is cut only by ```io_cmd_timeout```.
+
+A client that does not take its replies, e.g. sends commands but never reads,
+is dropped at once on close, the socket does not wait for the send buffer to
+be flushed.
+
+All errors of a connection, the signals too, are in ```ctx.server.errors```
+when ```on_disconnect_event``` runs. A handler can refuse a client that ran
+into the session timeout from then on:
+
+```python
+from tokeo.core.smtpd import SmtpdEvents, Smtpd554CloseException, SmtpdIOSessionTimeoutException
+
+
+class MailHandler(SmtpdEvents):
+
+    def __init__(self, options=None):
+        super().__init__(options)
+        self.blocked = set()
+
+    def on_connect_event(self, ctx):
+        super().on_connect_event(ctx)
+        # refuse a client that ran into the session timeout before
+        if ctx.server.remote_ip in self.blocked:
+            raise Smtpd554CloseException
+
+    def on_disconnect_event(self, ctx):
+        super().on_disconnect_event(ctx)
+        if any(isinstance(e, SmtpdIOSessionTimeoutException) for e in ctx.server.errors):
+            self.blocked.add(ctx.server.remote_ip)
+```
+
+The server reads the standard on 521 and 554 by practice: RFC 7504 lets the
+session go on after a ```521```, the client may still send ```QUIT```, and
+RFC 5321 3.1 expects a server that greets by ```554``` to wait for ```QUIT```
+and to answer other commands by ```503```. The server closes the connection at
+once after both instead. A refused client gains nothing by further commands,
+while its open connection holds a slot of ```max_processings```. To refuse a
+single client use ```Smtpd554CloseException```; ```521``` is meant for a host
+that never accepts mail (RFC 7504).
 
 ### Which replies are valid per command
 
@@ -542,14 +610,15 @@ The constructor keeps the original option names. Key ones:
 <tr><td>encrypt_mode</td><td>'TLS_FORBIDDEN'</td><td>TLS_OPTIONAL / TLS_WHEN_AUTH / TLS_REQUIRED / TLS_IMMEDIATE</td></tr>
 <tr><td>crlf_mode</td><td>'CRLF_ENSURE'</td><td>line breaks of all lines: CRLF_ENSURE ends each line with CRLF and drops a bare CR or LF, CRLF_LEAVE keeps the line break as received, CRLF_STRICT rejects a line without CRLF by 500</td></tr>
 <tr><td>data_size</td><td>None</td><td>maximum message size in bytes, a larger message is answered by 552 after the end of DATA (None = unlimited)</td></tr>
-<tr><td>crlf_data_mode</td><td>'CRLF_DATA_MODERATE', with CRLF_STRICT 'CRLF_DATA_STRICT'</td><td>line breaks in DATA against SMTP smuggling, only &lt;CRLF&gt;.&lt;CRLF&gt; ends DATA: CRLF_DATA_MODERATE keeps a bare CR or LF as data, CRLF_DATA_STRICT answers it by 554 after the end of DATA, CRLF_DATA_STRICT_CLOSE by 521 and closes the connection; CRLF_DATA_UNSAFE ends DATA on any dot line and logs a warning on start; CRLF_STRICT allows only the strict modes</td></tr>
+<tr><td>crlf_data_mode</td><td>'CRLF_DATA_MODERATE', with CRLF_STRICT 'CRLF_DATA_STRICT'</td><td>line breaks in DATA against SMTP smuggling, only &lt;CRLF&gt;.&lt;CRLF&gt; ends DATA: CRLF_DATA_MODERATE keeps a bare CR or LF as data, CRLF_DATA_STRICT answers it by 554 after the end of DATA, CRLF_DATA_STRICT_CLOSE also by 554 and closes the connection then; CRLF_DATA_UNSAFE ends DATA on any dot line and logs a warning on start; CRLF_STRICT allows only the strict modes</td></tr>
 <tr><td>whitespace_mode</td><td>'WHITESPACE_MODERATE'</td><td>unusual whitespace and control chars in the command lines: WHITESPACE_MODERATE strips them at the edges, WHITESPACE_STRICT answers them by 501, WHITESPACE_UNSAFE hands them to the events and logs a warning on start (section 7)</td></tr>
 <tr><td>pipelining_extension</td><td>False</td><td>advertise PIPELINING</td></tr>
 <tr><td>internationalization_extensions</td><td>False</td><td>advertise 8BITMIME and SMTPUTF8</td></tr>
 <tr><td>spool</td><td>None</td><td>path and file name prefix for the spool temp files (section 11)</td></tr>
 <tr><td>do_dns_reverse_lookup</td><td>True</td><td>resolve the remote host name</td></tr>
-<tr><td>io_cmd_timeout</td><td>30</td><td>seconds to await a complete command line, at least 1. When not set the default of DEFAULT_IO_CMD_TIMEOUT is used</td></tr>
-<tr><td>io_buffer_max_size</td><td>1 MiB</td><td>maximum line length before rejection, a positive integer (None = default)</td></tr>
+<tr><td>io_cmd_timeout</td><td>30</td><td>seconds to await a complete command line and for the client to take a reply, at least 1. When not set the default of DEFAULT_IO_CMD_TIMEOUT is used</td></tr>
+<tr><td>io_session_timeout</td><td>3600</td><td>seconds a session may last from the greeting on, never renewed, between 1 and 86400, then 421 and the connection is closed (None = default, section 7)</td></tr>
+<tr><td>io_buffer_max_size</td><td>1 MiB</td><td>maximum line length, a positive integer (None = default); a longer command or DATA line is answered by 554 and the connection is closed</td></tr>
 <tr><td>proxy_extension</td><td>False</td><td>accept the PROXY protocol</td></tr>
 <tr><td>io_proxy_cmd_timeout</td><td>5</td><td>seconds to await the PROXY header line, at least 1. When not set the default of DEFAULT_IO_PROXY_CMD_TIMEOUT is used</td></tr>
 </tbody>
@@ -600,7 +669,8 @@ and can pass SPF for any domain the provider hosts.
   example arrives as one message with its text
 - ```CRLF_DATA_STRICT``` rejects the message: the server reads to the real
   end, discards the message and answers once by 554
-- ```CRLF_DATA_STRICT_CLOSE``` answers by 521 and closes the connection
+- ```CRLF_DATA_STRICT_CLOSE``` reads to the real end like
+  ```CRLF_DATA_STRICT```, answers by 554 and closes the connection then
   (RFC 5321 7.8), for a client that sends bare line breaks only to attack
 - ```CRLF_DATA_UNSAFE``` ends DATA at every dot line like before and is open
   to SMTP smuggling; the server logs a warning on start
@@ -717,14 +787,22 @@ and forward to the ```logging``` module directly.
 
 ## 14. Relationship to the reference implementation
 
-The library follows the original one-to-one: the same 13 events, the same context layout,
-the same configuration options and attribute readers, the same AUTH /
-STARTTLS behaviour, the same exception set and the same lifecycle. Its full test
-suite is a direct port of the original test suite. The differences are the ones asyncio
-forces or Tokeo adds: the events may be ```async def``` (or ```@threaded```)
-instead of Ruby threads; a certificate may be supplied as an in-memory PEM string
-(```tls_cert```/```tls_key```); with ```proxy_extension``` the PROXY header is
-mandatory as the first line and answered by the greeting (section 9); and the
-options that only steered the polling read of the original
-(```io_waitreadable_sleep```, ```io_buffer_chunk_size```) are left out because
-```asyncio``` is event-driven.
+The library started as a one-to-one port of the original: the same 13 events,
+the same context layout, the same configuration options and attribute
+readers, the same AUTH / STARTTLS behaviour and the same lifecycle. Its test
+suite started as a direct port of the original test suite.
+
+Since then the library develops further towards RFC conformance and defense,
+e.g. the closing exceptions (```SmtpdCloseException```), ```whitespace_mode```,
+```crlf_data_mode``` and ```io_session_timeout```. These changes are made here
+first and planned as a backport to MidiSmtpServer 4.x, while MidiSmtpServer
+3.4.x keeps the original behaviour.
+
+The differences that asyncio forces or Tokeo adds: the events may be
+```async def``` (or ```@threaded```) instead of Ruby threads; a certificate may
+be supplied as an in-memory PEM string (```tls_cert```/```tls_key```); with
+```proxy_extension``` the PROXY header is mandatory as the first line and
+answered by the greeting (section 9); and the options that only steered the
+polling read of the original (```io_waitreadable_sleep```,
+```io_buffer_chunk_size```) are left out because ```asyncio``` is
+event-driven.

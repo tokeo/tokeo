@@ -207,7 +207,7 @@ class SmtpdEvents:
 
     def on_connect_event(self, ctx):
         """
-        Called on a new connection; raise ```Smtpd421Exception``` to refuse it.
+        Called on a new connection; raise ```Smtpd554CloseException``` to refuse it.
 
         ### Notes
 

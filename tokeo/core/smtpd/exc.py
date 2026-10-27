@@ -3,7 +3,7 @@ Tokeo SMTPD Exceptions Module.
 
 This module defines the exception model of the SMTPD extension. It mirrors the
 ported exception hierarchy, so a handler raises the very same names like
-(```Smtpd550Exception```, ```Smtpd421Exception```, ...) it did in MidiSmtpServer.
+(```Smtpd550Exception```, ```Smtpd554Exception```, ...) it did in MidiSmtpServer.
 The server is the single place that catches these and translates them into
 SMTP replies; the handler logic never returns raw SMTP codes.
 
@@ -11,11 +11,18 @@ SMTP replies; the handler logic never returns raw SMTP codes.
 
 - Extension-level errors (```SmtpdError```, ```SmtpdContractError```) for
     config, wiring, and contract violations, rooted in ```TokeoError```
-- Internal signals of the dialog (```SmtpdIOTimeoutException```,
-    ```SmtpdIOBufferOverrunException```) that carry no SMTP code; the server
-    answers them with 421
 - SMTP dialog exceptions (```SmtpdException``` and the numeric subclasses)
     that carry a fixed code and text; ```smtp_response``` renders the wire form
+- Closing exceptions (```SmtpdCloseException``` and its
+    ```Smtpd421CloseException```, ```Smtpd521CloseException```,
+    ```Smtpd554CloseException```) after whose reply the server closes the
+    connection, within DATA after its end
+- Aborting exceptions (```SmtpdAbortException``` and its
+    ```Smtpd421AbortException```, ```Smtpd554AbortException```) that close
+    the connection at once, also within DATA
+- Internal signals of the dialog (```SmtpdIOCmdTimeoutException```,
+    ```SmtpdIOSessionTimeoutException```, ```SmtpdIOBufferOverrunException```),
+    aborting exceptions the server raises itself
 - Faithful codes and default texts copied verbatim
 
 """
@@ -50,21 +57,6 @@ class SmtpdContractError(SmtpdError):
         any service starts, never silently at runtime
 
     """
-
-    pass
-
-
-# --- internal signals of the dialog (no SMTP code) ---
-
-
-class SmtpdIOTimeoutException(Exception):
-    """Signal that a complete data line did not arrive within the given timeout."""
-
-    pass
-
-
-class SmtpdIOBufferOverrunException(Exception):
-    """Signal that a data line exceeded io_buffer_max_size before its LF."""
 
     pass
 
@@ -114,11 +106,107 @@ class SmtpdException(Exception):
         return f'{self.smtp_code} {self.smtp_text}'
 
 
-class Smtpd421Exception(SmtpdException):
+# --- closing exceptions (the server closes after the reply) ---
+
+
+class SmtpdCloseException(SmtpdException):
+    """
+    Base of the exceptions after whose reply the server closes the connection.
+
+    ### Notes
+
+    : Raised within DATA, the reply follows after the end of DATA like any
+        other error; a ```SmtpdAbortException``` closes at once
+
+    """
+
+    pass
+
+
+class Smtpd421CloseException(SmtpdCloseException):
     """421 Service too busy or not available, closing transmission channel."""
 
     smtp_code = 421
     smtp_text = 'Service too busy or not available, closing transmission channel'
+
+
+class Smtpd521CloseException(SmtpdCloseException):
+    """
+    521 Service does not accept mail.
+
+    ### Notes
+
+    : Meant for a host that never accepts mail (RFC 7504); to refuse a single
+        client use ```Smtpd554CloseException```
+
+    : RFC 7504 lets the session go on after a 521, the server closes at once
+
+    """
+
+    smtp_code = 521
+    smtp_text = 'Service does not accept mail'
+
+
+class Smtpd554CloseException(SmtpdCloseException):
+    """554 Transaction failed, closing the connection."""
+
+    smtp_code = 554
+    smtp_text = 'Transaction failed'
+
+
+# --- aborting exceptions (the server closes at once, also within DATA) ---
+
+
+class SmtpdAbortException(SmtpdCloseException):
+    """
+    Base of the closing exceptions that close the connection at once.
+
+    ### Notes
+
+    : Raised within DATA, the server answers and closes without reading DATA
+        to its end (RFC 5321 3.8 for 421, 7.8 for 554)
+
+    """
+
+    pass
+
+
+class Smtpd421AbortException(SmtpdAbortException):
+    """421 Service not available, closing transmission channel at once."""
+
+    smtp_code = 421
+    smtp_text = 'Service too busy or not available, closing transmission channel'
+
+
+class Smtpd554AbortException(SmtpdAbortException):
+    """554 Transaction failed, closing the connection at once."""
+
+    smtp_code = 554
+    smtp_text = 'Transaction failed'
+
+
+# --- internal signals of the dialog (raised by the server itself) ---
+
+
+class SmtpdIOCmdTimeoutException(Smtpd421AbortException):
+    """Signal that a line was not read or written within io_cmd_timeout."""
+
+    pass
+
+
+class SmtpdIOSessionTimeoutException(Smtpd421AbortException):
+    """Signal that the session lasted longer than io_session_timeout."""
+
+    pass
+
+
+class SmtpdIOBufferOverrunException(Smtpd554AbortException):
+    """Signal that a line exceeded io_buffer_max_size before its LF."""
+
+    pass
+
+
+# --- numeric dialog exceptions (keep the connection) ---
 
 
 class Smtpd432Exception(SmtpdException):
@@ -203,13 +291,6 @@ class Smtpd504Exception(SmtpdException):
 
     smtp_code = 504
     smtp_text = 'Command parameter not implemented'
-
-
-class Smtpd521Exception(SmtpdException):
-    """521 Service does not accept mail."""
-
-    smtp_code = 521
-    smtp_text = 'Service does not accept mail'
 
 
 class Smtpd530Exception(SmtpdException):

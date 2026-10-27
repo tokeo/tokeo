@@ -30,6 +30,7 @@ import os
 import sys
 import socket
 import ipaddress
+import time
 from enum import Enum, auto
 
 from tokeo.core.utils.date import utc_now
@@ -42,16 +43,19 @@ from .events import SmtpdEvents, SmtpdEvent, SMTPD_EVENT_NAMES
 
 from .exc import (
     SmtpdException,
-    SmtpdIOTimeoutException,
+    SmtpdCloseException,
+    Smtpd421CloseException,
+    Smtpd554CloseException,
+    SmtpdAbortException,
+    SmtpdIOCmdTimeoutException,
+    SmtpdIOSessionTimeoutException,
     SmtpdIOBufferOverrunException,
-    Smtpd421Exception,
     Smtpd500Exception,
     Smtpd500PipeliningException,
     Smtpd500CrLfSequenceException,
     Smtpd501Exception,
     Smtpd503Exception,
     Smtpd504Exception,
-    Smtpd521Exception,
     Smtpd530Exception,
     Smtpd535Exception,
     Smtpd550Exception,
@@ -70,6 +74,7 @@ DEFAULT_SMTPD_PORT = 2525
 DEFAULT_SMTPD_MAX_PROCESSINGS = 4
 DEFAULT_IO_CMD_TIMEOUT = 30
 DEFAULT_IO_PROXY_CMD_TIMEOUT = 5
+DEFAULT_IO_SESSION_TIMEOUT = 3600
 DEFAULT_IO_BUFFER_MAX_SIZE = 1 * 1024 * 1024
 
 
@@ -189,7 +194,7 @@ class SmtpdSession:
 
     """
 
-    __slots__ = ('cmd_sequence', 'ctx', 'auth_challenge', 'processing', 'data_error')
+    __slots__ = ('cmd_sequence', 'ctx', 'auth_challenge', 'processing', 'data_error', 'session_deadline')
 
     def __init__(self):
         #: Current position in the SMTP command sequence (```CmdSequence```)
@@ -202,6 +207,9 @@ class SmtpdSession:
         self.processing = False
         #: First exception within DATA, sent as output on the end of DATA
         self.data_error = None
+        #: Monotonic time the session must end by (io_session_timeout), set on
+        #: the greeting
+        self.session_deadline = None
 
 
 def _parse_ports(ports):
@@ -465,6 +473,9 @@ class SmtpdServer:
         # dialog options
         self.io_cmd_timeout = settings.get('io_cmd_timeout', DEFAULT_IO_CMD_TIMEOUT)
         # like Ruby nil, None is the default
+        self.io_session_timeout = settings.get('io_session_timeout')
+        if self.io_session_timeout is None:
+            self.io_session_timeout = DEFAULT_IO_SESSION_TIMEOUT
         self.io_buffer_max_size = settings.get('io_buffer_max_size')
         if self.io_buffer_max_size is None:
             self.io_buffer_max_size = DEFAULT_IO_BUFFER_MAX_SIZE
@@ -511,6 +522,8 @@ class SmtpdServer:
             raise ValueError('Timeout for a command line (io_cmd_timeout) must be at least 1 second!')
         if not (type(self.io_proxy_cmd_timeout) in (int, float) and self.io_proxy_cmd_timeout >= 1):
             raise ValueError('Timeout for the PROXY header (io_proxy_cmd_timeout) must be at least 1 second!')
+        if not (type(self.io_session_timeout) in (int, float) and 1 <= self.io_session_timeout <= 86400):
+            raise ValueError('Timeout of a session (io_session_timeout) must be between 1 and 86400 seconds!')
         if not (type(self.io_buffer_max_size) is int and self.io_buffer_max_size > 0):
             raise ValueError('Maximum size of a line (io_buffer_max_size) must be a positive integer!')
         if not (
@@ -935,14 +948,17 @@ class SmtpdServer:
 
                 # drop connection (respond 421) if too busy
                 if self._too_many_connections():
-                    raise Smtpd421Exception('Abort connection while too busy, exceeding max_connections!')
+                    raise Smtpd421CloseException('Abort connection while too busy, exceeding max_connections!')
 
                 # when processings exceed the maximum allowed, wait for a free slot
                 await self._acquire_processing_slot(session)
 
                 # a graceful shutdown refuses a connection that was not greeted yet
                 if self._shutdown:
-                    raise Smtpd421Exception('Abort connection while service is shutting down!')
+                    raise Smtpd421CloseException('Abort connection while service is shutting down!')
+
+                # io_session_timeout limits the time a connection holds its slot
+                session.session_deadline = time.monotonic() + self.io_session_timeout
 
                 # initialize \r\n line_break for CRLF_ENSURE and CRLF_STRICT
                 line_break = b'\r\n'
@@ -957,8 +973,7 @@ class SmtpdServer:
                         if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
                             await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, f'>>> {output}')
 
-                        writer.write(output.encode('utf-8', 'surrogateescape') + b'\r\n')
-                        await writer.drain()
+                        await self._write_line(writer, output.encode('utf-8', 'surrogateescape') + b'\r\n')
 
                     if session.cmd_sequence is CMD_QUIT:
                         break
@@ -989,7 +1004,9 @@ class SmtpdServer:
                             continue
 
                     raw = await self._read_line(
-                        reader, self.io_proxy_cmd_timeout if session.cmd_sequence is CMD_PROXY else self.io_cmd_timeout
+                        reader,
+                        self.io_proxy_cmd_timeout if session.cmd_sequence is CMD_PROXY else self.io_cmd_timeout,
+                        session.session_deadline,
                     )
 
                     # an empty raw comes from a close of the client (also within
@@ -1028,7 +1045,7 @@ class SmtpdServer:
                             and (not raw.endswith(b'\r\n') or raw.find(b'\r', 0, -2) >= 0)
                         ):
                             # a bare CR or LF makes the message invalid
-                            raise Smtpd554Exception if self.crlf_data_mode is CrlfDataMode.CRLF_DATA_STRICT else Smtpd521Exception
+                            raise Smtpd554Exception if self.crlf_data_mode is CrlfDataMode.CRLF_DATA_STRICT else Smtpd554CloseException
 
                         if self.crlf_mode is CrlfMode.CRLF_ENSURE:
                             line = raw.replace(b'\r', b'').replace(b'\n', b'')
@@ -1070,16 +1087,15 @@ class SmtpdServer:
 
                         output = await self.process_line(session, line, line_break)
 
-                    # defined abort channel exception
-                    except Smtpd421Exception:
-                        # re-raise to exit the loop and drop the connection
-                        raise
-
                     # an SmtpdException answers by its code, any other error by
                     # 500; within DATA only after its end, then any other by 451
                     except Exception as e:  # noqa: B902
+                        # exit the loop at once, also within DATA
+                        if isinstance(e, SmtpdAbortException):
+                            raise
                         # within DATA keep the first error, the end of DATA raises
-                        # it again: read DATA to its end, answer then (RFC 1870)
+                        # it again: read DATA to its end, answer then (RFC 1870);
+                        # a SmtpdCloseException too closes only after the end
                         if session.cmd_sequence is CMD_DATA:
                             if session.data_error is None:
                                 session.data_error = e
@@ -1094,8 +1110,8 @@ class SmtpdServer:
                             output = ''
                             # go on reading DATA until end, nothing to answer
                             continue
-                        # a 521 drops the connection like a 421
-                        if isinstance(e, Smtpd521Exception):
+                        # exit the loop, the outer handler answers and closes
+                        if isinstance(e, SmtpdCloseException):
                             raise
                         ctx.server.exceptions += 1
                         ctx.server.errors.append(e)
@@ -1106,12 +1122,11 @@ class SmtpdServer:
 
                     # still in CMD_PROXY: the header failed, end without a dialog
                     if session.cmd_sequence is CMD_PROXY:
-                        raise Smtpd421Exception(f'Abort connection while PROXY failed! ({output})')
+                        raise Smtpd421CloseException(f'Abort connection while PROXY failed! ({output})')
 
                 # QUIT closes with 221, a shutdown with 421 (RFC 5321 3.8)
                 output = '221 Service closing transmission channel' if session.cmd_sequence is CMD_QUIT else REPLY_421_FOR_SHUTDOWN
-                writer.write(output.encode() + b'\r\n')
-                await writer.drain()
+                await self._write_line(writer, output.encode() + b'\r\n')
 
             # the peer closed the connection, also within a line
             except (EOFError, ConnectionError) as e:
@@ -1131,19 +1146,22 @@ class SmtpdServer:
                         pass
                 raise
 
-            # any other error drops the connection with a 421, 521
+            # any other error drops the connection, a SmtpdCloseException by
+            # its code, else by 421
             except Exception as e:  # noqa: B902
                 ctx = session.ctx
                 ctx.server.exceptions += 1
                 ctx.server.errors.append(e)
                 if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
                     await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.ERROR, f'{e} ({type(e).__name__})', e)
-                # power down connection with smtp abort return code 421 or 521
-                _err = Smtpd521Exception() if isinstance(e, Smtpd521Exception) else Smtpd421Exception()
+                _err = e if isinstance(e, SmtpdCloseException) else Smtpd421CloseException()
                 try:
-                    writer.write(_err.smtp_response.encode() + b'\r\n')
-                    await writer.drain()
-                except OSError as e2:
+                    # a reply stuck in the send buffer: the client does not
+                    # read, a further one would not arrive either
+                    if writer.transport.get_write_buffer_size():
+                        raise ConnectionAbortedError('Client does not read its replies!')
+                    await self._write_line(writer, _err.smtp_response.encode() + b'\r\n')
+                except (OSError, SmtpdAbortException) as e2:
                     if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
                         await self._emit(
                             SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, f"Can't send {_err.smtp_code} abort code! (IOError)", e2
@@ -1157,26 +1175,34 @@ class SmtpdServer:
             finally:
                 # also when on_disconnect_event failed
                 try:
-                    writer.close()
+                    # close() keeps the socket open until the send buffer is
+                    # flushed, abort() drops a client that does not read
+                    if writer.transport.get_write_buffer_size():
+                        writer.transport.abort()
+                    else:
+                        writer.close()
                 except OSError:
                     pass
                 # finalize the session at least here, drop maybe interrupted parts
                 self.process_reset_session(session)
 
-    async def _read_line(self, reader, io_timeout):
+    async def _read_line(self, reader, io_timeout, session_deadline):
         """
-        Read one raw line (with terminator) enforcing timeout and buffer size.
+        Read one raw line (with terminator) enforcing timeouts and buffer size.
 
         ### Args
 
         - **reader** (StreamReader): The connection input stream
         - **io_timeout** (int|float): Seconds to wait for a complete line
+        - **session_deadline** (float): Monotonic time the session must end by
 
         ### Raises
 
-        - **SmtpdIOTimeoutException**: No line within io timeout
-        - **SmtpdIOBufferOverrunException**: Buffer above io_buffer_max_size;
-            both bubble to the outer handler which answers 421
+        - **SmtpdIOCmdTimeoutException**: No line within io timeout (421)
+        - **SmtpdIOSessionTimeoutException**: Session above io_session_timeout,
+            also checked for a buffered line (421)
+        - **SmtpdIOBufferOverrunException**: Buffer above io_buffer_max_size
+            (554); all bubble to the outer handler which closes the connection
 
         ### Returns
 
@@ -1184,6 +1210,10 @@ class SmtpdServer:
             also within a line, or a shutdown ended the wait
 
         """
+        # also a client that streams endless lines (NOOP or DATA) ends here
+        session_remaining = session_deadline - time.monotonic()
+        if session_remaining <= 0:
+            raise SmtpdIOSessionTimeoutException('Abort connection while exceeding io_session_timeout!')
         try:
             # the timeout and the shutdown guard *waiting on the wire*: when a
             # complete line is already buffered, readuntil returns without
@@ -1191,17 +1221,47 @@ class SmtpdServer:
             if self._buffered_line_lf(reader):
                 raw = await reader.readuntil(b'\n')
             else:
-                raw = await self._wait_line(reader, io_timeout)
+                raw = await self._wait_line(reader, min(io_timeout, session_remaining))
         except asyncio.TimeoutError:
-            raise SmtpdIOTimeoutException
+            if session_remaining < io_timeout:
+                raise SmtpdIOSessionTimeoutException('Abort connection while exceeding io_session_timeout!')
+            raise SmtpdIOCmdTimeoutException('Abort connection while no complete line within io timeout!')
         except asyncio.LimitOverrunError:
-            raise SmtpdIOBufferOverrunException
+            raise SmtpdIOBufferOverrunException('Abort connection while line exceeds io_buffer_max_size!')
         except asyncio.IncompleteReadError:
             # the peer closed, a rest without LF is dropped
             return b''
         if len(raw) > self.io_buffer_max_size:
-            raise SmtpdIOBufferOverrunException
+            raise SmtpdIOBufferOverrunException('Abort connection while line exceeds io_buffer_max_size!')
         return raw
+
+    async def _write_line(self, writer, data):
+        """
+        Write one reply and wait for the client to take it within io_cmd_timeout.
+
+        ### Args
+
+        - **writer** (StreamWriter): The connection output stream
+        - **data** (bytes): The reply with its line break
+
+        ### Raises
+
+        - **SmtpdIOCmdTimeoutException**: Reply not taken within
+            io_cmd_timeout (421); io_session_timeout does not cut a reply
+
+        """
+        writer.write(data)
+        # with an empty send buffer drain does not wait, the timeout costs
+        # about 8 us per reply: only take it for a client that reads slowly
+        # or not at all
+        if not writer.transport.get_write_buffer_size():
+            await writer.drain()
+            return
+        try:
+            async with asyncio.timeout(self.io_cmd_timeout):
+                await writer.drain()
+        except TimeoutError:
+            raise SmtpdIOCmdTimeoutException('Abort connection while the client does not take its replies!')
 
     async def _wait_line(self, reader, io_timeout):
         """Wait for the next line, b'' once a shutdown ends the wait."""
@@ -1340,14 +1400,14 @@ class SmtpdServer:
             if session.cmd_sequence is CMD_PROXY:
                 # with proxy_extension the PROXY header has to be the first line
                 if not re.match(r'^PROXY(\s+)', line, self._RE_CMD_FLAGS):
-                    raise Smtpd421Exception('Abort connection while PROXY is not the first command!')
+                    raise Smtpd421CloseException('Abort connection while PROXY is not the first command!')
                 # test valid proxy command params
                 if not re.match(
                     r'^PROXY(\s+)(UNKNOWN(|(\s+).*)|TCP(4|6)(\s+)([0-9a-f.:]+)(\s+)([0-9a-f.:]+)(\s+)([0-9]+)(\s+)([0-9]+)(\s*))$',
                     line,
                     self._RE_CMD_FLAGS,
                 ):
-                    raise Smtpd421Exception('Abort connection while illegal PROXY command!')
+                    raise Smtpd421CloseException('Abort connection while illegal PROXY command!')
                 # extract params
                 cmd_data = re.sub(r'^PROXY\ ', '', line, flags=self._RE_CMD_FLAGS).strip().split()
                 proxy_data = {
@@ -1379,7 +1439,7 @@ class SmtpdServer:
                         proxy_data['dest_host'] = proxy_data['dest_ip']
                     except (ValueError, IndexError):
                         # change exception into Smtpd exception and drop connection
-                        raise Smtpd421Exception('Abort connection for unsupported PROXY parameters!')
+                        raise Smtpd421CloseException('Abort connection for unsupported PROXY parameters!')
                 if SmtpdEvent.ON_PROXY_EVENT in self.emit_events:
                     return_value = await self._emit(SmtpdEvent.ON_PROXY_EVENT, ctx, proxy_data)
                     # None keeps the parsed data, a dict updates its fields (also
@@ -1387,7 +1447,7 @@ class SmtpdServer:
                     if isinstance(return_value, dict):
                         deep_merge(proxy_data, return_value)
                     elif return_value is not None:
-                        raise Smtpd421Exception(f'on_proxy_event must not return {return_value!r}')
+                        raise Smtpd421CloseException(f'on_proxy_event must not return {return_value!r}')
                 ctx.server.proxy = proxy_data
                 # the server greeting must follow the PROXY header, not the connect
                 if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
@@ -1403,7 +1463,7 @@ class SmtpdServer:
 
             elif self.proxy_extension and re.match(r'^PROXY(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # PROXY is only valid as first line, a later one is an abuse
-                raise Smtpd421Exception('Abort connection while PROXY already set!')
+                raise Smtpd421CloseException('Abort connection while PROXY already set!')
 
             # Handle specific messages from the client
             elif re.match(r'^(HELO|EHLO)(\ .*)?$', line, self._RE_CMD_FLAGS):

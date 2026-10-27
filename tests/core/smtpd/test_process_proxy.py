@@ -12,7 +12,7 @@ mandatory as the first line, so that case aborts with 421 instead of 503.
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, SmtpdSession
-from tokeo.core.smtpd.exc import Smtpd421Exception
+from tokeo.core.smtpd.exc import Smtpd421CloseException
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_tests_helper import run_line
 
@@ -71,7 +71,7 @@ def test_01_proxy_tcp6_valid():
 def test_02_proxy_illegal_command():
     """An illegal PROXY line raises the 421 abort."""
     session = _session()
-    with pytest.raises(Smtpd421Exception):
+    with pytest.raises(Smtpd421CloseException):
         run_line(_SMTPD, session, 'PROXY ILLEGAL COMMAND')
 
 
@@ -79,12 +79,12 @@ def test_03_proxy_multiple_proxy_abort():
     """A second PROXY line raises the 421 abort."""
     session = _session()
     run_line(_SMTPD, session, 'PROXY TCP4 1.1.1.1 2.2.2.2 1111 2222')
-    with pytest.raises(Smtpd421Exception):
+    with pytest.raises(Smtpd421CloseException):
         run_line(_SMTPD, session, 'PROXY TCP6 003::0003 4::4 000003333 4444')
 
 
 def test_04_proxy_not_first_aborts():
     """A first line other than PROXY raises the 421 abort."""
     session = _session()
-    with pytest.raises(Smtpd421Exception):
+    with pytest.raises(Smtpd421CloseException):
         run_line(_SMTPD, session, 'EHLO SEQUENCE')
