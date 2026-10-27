@@ -114,6 +114,14 @@ class CrlfDataMode(Enum):
     CRLF_DATA_STRICT_CLOSE = auto()
 
 
+class WhitespaceMode(Enum):
+    """The whitespace_mode symbols (member names match the config values)."""
+
+    WHITESPACE_UNSAFE = auto()
+    WHITESPACE_MODERATE = auto()
+    WHITESPACE_STRICT = auto()
+
+
 class AuthMode(Enum):
     """The auth_mode symbols (member names match the config values)."""
 
@@ -447,6 +455,7 @@ class SmtpdServer:
             'CRLF_DATA_STRICT' if self.crlf_mode is CrlfMode.CRLF_STRICT else 'CRLF_DATA_MODERATE',
             'crlf_data_mode',
         )
+        self.whitespace_mode = _parse_mode(WhitespaceMode, settings.get('whitespace_mode'), 'WHITESPACE_MODERATE', 'whitespace_mode')
         self.pipelining_extension = bool(settings.get('pipelining_extension', False))
         self.proxy_extension = bool(settings.get('proxy_extension', False))
         self.io_proxy_cmd_timeout = settings.get('io_proxy_cmd_timeout', DEFAULT_IO_PROXY_CMD_TIMEOUT)
@@ -591,6 +600,8 @@ class SmtpdServer:
             listeners = self._default_listeners()
         if self.crlf_data_mode is CrlfDataMode.CRLF_DATA_UNSAFE:
             self.logger.warning('Line breaks in DATA (crlf_data_mode) CRLF_DATA_UNSAFE allow SMTP smuggling!')
+        if self.whitespace_mode is WhitespaceMode.WHITESPACE_UNSAFE:
+            self.logger.warning('Whitespace of commands (whitespace_mode) WHITESPACE_UNSAFE passes control chars to the events!')
         for lst in listeners:
             host, port = lst.get('host', '127.0.0.1'), int(lst.get('port', 2525))
             self.logger.info(f'Starting service on {f"[{host}]" if ":" in host else host}:{port or "(auto)"}')
@@ -1207,6 +1218,32 @@ class SmtpdServer:
 
     # ---- the command dispatcher --------------------------
 
+    #: Flags of every command regex: the verbs match case-insensitive in ASCII
+    #: only, so "ſ" is no "s" and a no-break space no "\s" (RFC 5321 2.4); a
+    #: constant, as "re.IGNORECASE | re.ASCII" costs about 0.5 us per use
+    _RE_CMD_FLAGS = re.IGNORECASE | re.ASCII
+
+    #: A control char except HTAB (NUL, CR, LF, VT, FF, ESC, DEL ...);
+    #: WHITESPACE_MODERATE answers one inside a command line by 501
+    _RE_CONTROL_CHARS = re.compile(r'[\x00-\x08\x0a-\x1f\x7f]')
+
+    #: Any whitespace except SP and HTAB (e.g. a no-break space, the Unicode
+    #: spaces, VT, FF) or a control char except HTAB; WHITESPACE_STRICT
+    #: answers one after the verb by 501
+    _RE_UNUSUAL_CHARS = re.compile(r'[^\S \t]|[\x00-\x08\x0a-\x1f\x7f]')
+
+    #: Any whitespace (Unicode) and control chars, also NUL, at the start or
+    #: the end of a line; WHITESPACE_MODERATE removes them as noise
+    _RE_NOISE_AT_EDGES = re.compile(r'^[\s\x00-\x1f\x7f]+|[\s\x00-\x1f\x7f]+$')
+
+    #: The verb (ASCII letters) of a command, any whitespace (Unicode) as
+    #: separator and the rest; WHITESPACE_MODERATE separates by it
+    _RE_VERB_ANY_SEPARATOR = re.compile(r'([A-Za-z]+)\s+(.*)$')
+
+    #: The verb (ASCII letters) of a command, SP or HTAB as separator and the
+    #: rest; WHITESPACE_STRICT and WHITESPACE_UNSAFE separate by it
+    _RE_VERB_SP_HTAB_SEPARATOR = re.compile(r'([A-Za-z]+)[ \t]+(.*)$')
+
     async def process_line(self, session, line, line_break):
         """
         Process one dialog line (the ported process_line dispatcher).
@@ -1226,45 +1263,70 @@ class SmtpdServer:
         """
         ctx = session.ctx
 
+        if session.cmd_sequence is not CMD_DATA:
+            # commands are text; decode byte-exact
+            line = line.decode('utf-8', 'surrogateescape')
+            # whitespace_mode, not for the PROXY header: MODERATE strips unusual
+            # whitespace and control chars at the edges as noise and refuses
+            # control chars inside, STRICT and UNSAFE strip only SP and HTAB
+            if session.cmd_sequence is not CMD_PROXY:
+                if self.whitespace_mode is WhitespaceMode.WHITESPACE_MODERATE:
+                    line = self._RE_NOISE_AT_EDGES.sub('', line)
+                else:
+                    line = line.strip(' \t')
+                # one SP separates the verb (ASCII) of a command from its
+                # argument; MODERATE separates by any whitespace, STRICT and
+                # UNSAFE by SP and HTAB, without one the command is unknown
+                if session.cmd_sequence not in (CMD_AUTH_PLAIN_VALUES, CMD_AUTH_LOGIN_USER, CMD_AUTH_LOGIN_PASS):
+                    if self.whitespace_mode is WhitespaceMode.WHITESPACE_MODERATE:
+                        match = self._RE_VERB_ANY_SEPARATOR.match(line)
+                    else:
+                        match = self._RE_VERB_SP_HTAB_SEPARATOR.match(line)
+                    if match:
+                        # STRICT refuses unusual whitespace and control chars
+                        if self.whitespace_mode is WhitespaceMode.WHITESPACE_STRICT and self._RE_UNUSUAL_CHARS.search(match.group(2)):
+                            raise Smtpd501Exception
+                        line = f'{match.group(1)} {match.group(2)}'
+                # MODERATE refuses control chars inside, a separator is gone now
+                if self.whitespace_mode is WhitespaceMode.WHITESPACE_MODERATE and self._RE_CONTROL_CHARS.search(line):
+                    raise Smtpd501Exception
+
         # the client cancels a running AUTH exchange (RFC 4954 section 4)
-        if line == b'*' and session.cmd_sequence in (CMD_AUTH_PLAIN_VALUES, CMD_AUTH_LOGIN_USER, CMD_AUTH_LOGIN_PASS):
+        if line == '*' and session.cmd_sequence in (CMD_AUTH_PLAIN_VALUES, CMD_AUTH_LOGIN_USER, CMD_AUTH_LOGIN_PASS):
             session.cmd_sequence = CMD_RSET
             session.auth_challenge = {}
             raise Smtpd501Exception
 
         if session.cmd_sequence is CMD_AUTH_PLAIN_VALUES:
             # handle authentication
-            return await self.process_auth_plain(session, line.decode('utf-8', 'surrogateescape'))
+            return await self.process_auth_plain(session, line)
 
         elif session.cmd_sequence is CMD_AUTH_LOGIN_USER:
             # handle authentication
-            return self.process_auth_login_user(session, line.decode('utf-8', 'surrogateescape'))
+            return self.process_auth_login_user(session, line)
 
         elif session.cmd_sequence is CMD_AUTH_LOGIN_PASS:
             # handle authentication
-            return await self.process_auth_login_pass(session, line.decode('utf-8', 'surrogateescape'))
+            return await self.process_auth_login_pass(session, line)
 
         elif session.cmd_sequence is not CMD_DATA:
-            # commands are text; decode byte-exact
-            line = line.decode('utf-8', 'surrogateescape')
-
             # PROXY
             # Docs: haproxy/doc/proxy-protocol.txt (github.com/haproxy)
             # syntax
             # PROXY PROTO source-ip dest-ip source-port dest-port
             if session.cmd_sequence is CMD_PROXY:
                 # with proxy_extension the PROXY header has to be the first line
-                if not re.match(r'^PROXY(\s+)', line, re.IGNORECASE):
+                if not re.match(r'^PROXY(\s+)', line, self._RE_CMD_FLAGS):
                     raise Smtpd421Exception('Abort connection while PROXY is not the first command!')
                 # test valid proxy command params
                 if not re.match(
                     r'^PROXY(\s+)(UNKNOWN(|(\s+).*)|TCP(4|6)(\s+)([0-9a-f.:]+)(\s+)([0-9a-f.:]+)(\s+)([0-9]+)(\s+)([0-9]+)(\s*))$',
                     line,
-                    re.IGNORECASE,
+                    self._RE_CMD_FLAGS,
                 ):
                     raise Smtpd421Exception('Abort connection while illegal PROXY command!')
                 # extract params
-                cmd_data = re.sub(r'^PROXY\ ', '', line, flags=re.IGNORECASE).strip().split()
+                cmd_data = re.sub(r'^PROXY\ ', '', line, flags=self._RE_CMD_FLAGS).strip().split()
                 proxy_data = {
                     'proto': cmd_data[0].upper(),
                     'source_ip': None,
@@ -1312,21 +1374,24 @@ class SmtpdServer:
                     # send the server greeting next
                     return self._greet_message(session)
 
-            elif self.proxy_extension and re.match(r'^PROXY(\s+)', line, re.IGNORECASE):
+            elif self.proxy_extension and re.match(r'^PROXY(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # PROXY is only valid as first line, a later one is an abuse
                 raise Smtpd421Exception('Abort connection while PROXY already set!')
 
             # Handle specific messages from the client
-            elif re.match(r'^(HELO|EHLO)(\s+.*)?$', line, re.IGNORECASE):
+            elif re.match(r'^(HELO|EHLO)(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # HELO/EHLO
                 if session.cmd_sequence is not CMD_HELO:
                     raise Smtpd503Exception
-                cmd_data = re.sub(r'^(HELO|EHLO)\ ', '', line, flags=re.IGNORECASE).strip()
+                cmd_data = re.sub(r'^(HELO|EHLO)\ ?', '', line, flags=self._RE_CMD_FLAGS)
                 if SmtpdEvent.ON_HELO_EVENT in self.emit_events:
                     await self._emit(SmtpdEvent.ON_HELO_EVENT, ctx, cmd_data)
+                elif cmd_data == '':
+                    # without a handler an empty domain is a syntax error
+                    raise Smtpd501Exception
                 ctx.server.helo = cmd_data
                 session.cmd_sequence = CMD_RSET
-                if re.match(r'^EHLO', line, re.IGNORECASE):
+                if re.match(r'^EHLO', line, self._RE_CMD_FLAGS):
                     return (
                         f'250-{ctx.server.helo_response.strip()}\r\n'
                         # respond with 8BITMIME extension
@@ -1344,10 +1409,13 @@ class SmtpdServer:
                 else:
                     return f'250 OK {ctx.server.helo_response.strip()}'.strip()
 
-            elif re.match(r'^STARTTLS\s*$', line, re.IGNORECASE):
+            elif re.match(r'^STARTTLS(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # STARTTLS
                 if self.encrypt_mode is EncryptMode.TLS_FORBIDDEN:
                     raise Smtpd500Exception
+                # STARTTLS takes no argument
+                if ' ' in line:
+                    raise Smtpd501Exception
                 if session.cmd_sequence is CMD_HELO:
                     raise Smtpd503Exception
                 if not self.tls:
@@ -1358,7 +1426,7 @@ class SmtpdServer:
                 # return with new service ready message
                 return '220 Ready to start TLS'
 
-            elif re.match(r'^AUTH\s+\S+(\s+\S+)?\s*$', line, re.IGNORECASE):
+            elif re.match(r'^AUTH(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # AUTH
                 if self.auth_mode is AuthMode.AUTH_FORBIDDEN:
                     raise Smtpd500Exception
@@ -1368,9 +1436,15 @@ class SmtpdServer:
                     raise Tls530Exception
                 if ctx.server.authenticated:
                     raise Smtpd503Exception
-                # handle command line
-                auth_data = re.sub(r'^AUTH\ ', '', line, flags=re.IGNORECASE).strip()
-                auth_data = re.sub(r'\s+', ' ', auth_data).split(' ')
+                # the mechanism and an optional initial response, split by
+                # whitespace_mode
+                auth_data = re.sub(r'^AUTH\ ?', '', line, flags=self._RE_CMD_FLAGS)
+                if self.whitespace_mode is WhitespaceMode.WHITESPACE_MODERATE:
+                    auth_data = auth_data.split()
+                else:
+                    auth_data = [value for value in re.split(r'[ \t]+', auth_data) if value]
+                if len(auth_data) not in (1, 2):
+                    raise Smtpd501Exception
                 # handle auth command
                 if auth_data[0].upper() == 'PLAIN':
                     if len(auth_data) == 1:
@@ -1401,12 +1475,14 @@ class SmtpdServer:
                     # unsupported auth mechanism (RFC 4954 section 4)
                     raise Smtpd504Exception
 
-            elif re.match(r'^NOOP\s*$', line, re.IGNORECASE):
-                # NOOP
+            elif re.match(r'^NOOP(\ .*)?$', line, self._RE_CMD_FLAGS):
+                # NOOP, an argument is ignored (RFC 5321 4.1.1.9)
                 return '250 OK'
 
-            elif re.match(r'^RSET\s*$', line, re.IGNORECASE):
-                # RSET
+            elif re.match(r'^RSET(\ .*)?$', line, self._RE_CMD_FLAGS):
+                # RSET takes no argument
+                if ' ' in line:
+                    raise Smtpd501Exception
                 if session.cmd_sequence is CMD_HELO:
                     raise Smtpd503Exception
                 if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
@@ -1414,12 +1490,14 @@ class SmtpdServer:
                 self.process_reset_session(session)
                 return '250 OK'
 
-            elif re.match(r'^QUIT\s*$', line, re.IGNORECASE):
-                # QUIT
+            elif re.match(r'^QUIT(\ .*)?$', line, self._RE_CMD_FLAGS):
+                # QUIT takes no argument
+                if ' ' in line:
+                    raise Smtpd501Exception
                 session.cmd_sequence = CMD_QUIT
                 return ''
 
-            elif re.match(r'^MAIL FROM:', line, re.IGNORECASE):
+            elif re.match(r'^MAIL FROM:', line, self._RE_CMD_FLAGS):
                 # MAIL
                 if session.cmd_sequence is not CMD_RSET:
                     raise Smtpd503Exception
@@ -1429,11 +1507,17 @@ class SmtpdServer:
                     raise Smtpd530Exception
                 # a new transaction, nothing of a rejected MAIL remains
                 ctx.reset_on_mail_from()
-                cmd_data = re.sub(r'^MAIL FROM:', '', line, flags=re.IGNORECASE).strip()
-                # separate the address as sent from its parameters (RFC 5321 4.1.2)
-                cmd_data, params = re.match(r'(<[^>]*>|\S*)\s*(.*)$', cmd_data).groups()
+                cmd_data = re.sub(r'^MAIL FROM:', '', line, flags=self._RE_CMD_FLAGS)
+                # separate the address as sent from its params (RFC 5321 4.1.2),
+                # split by whitespace_mode
+                if self.whitespace_mode is WhitespaceMode.WHITESPACE_MODERATE:
+                    cmd_data, params = re.match(r'\s*(<[^>]*>|\S*)\s*(.*)$', cmd_data).groups()
+                    params = params.split()
+                else:
+                    cmd_data, params = re.match(r'[ \t]*(<[^>]*>|[^ \t]*)[ \t]*(.*)$', cmd_data).groups()
+                    params = [param for param in re.split(r'[ \t]+', params) if param]
                 keywords = []
-                for param in params.split():
+                for param in params:
                     match = re.match(r'([A-Za-z0-9][A-Za-z0-9-]*)(?:=([\x21-\x3c\x3e-\x7e]+))?$', param)
                     # a malformed or a repeated parameter
                     if not match or match.group(1).upper() in keywords:
@@ -1487,7 +1571,7 @@ class SmtpdServer:
                 session.cmd_sequence = CMD_MAIL
                 return '250 OK'
 
-            elif re.match(r'^RCPT TO:', line, re.IGNORECASE):
+            elif re.match(r'^RCPT TO:', line, self._RE_CMD_FLAGS):
                 # RCPT
                 if session.cmd_sequence not in (CMD_MAIL, CMD_RCPT):
                     raise Smtpd503Exception
@@ -1495,9 +1579,13 @@ class SmtpdServer:
                     raise Tls530Exception
                 if self.auth_mode is AuthMode.AUTH_REQUIRED and not ctx.server.authenticated:
                     raise Smtpd530Exception
-                cmd_data = re.sub(r'^RCPT TO:', '', line, flags=re.IGNORECASE).strip()
-                # separate the address as sent, no parameter of RCPT TO is announced
-                cmd_data, params = re.match(r'(<[^>]*>|\S*)\s*(.*)$', cmd_data).groups()
+                cmd_data = re.sub(r'^RCPT TO:', '', line, flags=self._RE_CMD_FLAGS)
+                # separate the address as sent, RCPT TO announces no params, split
+                # by whitespace_mode
+                if self.whitespace_mode is WhitespaceMode.WHITESPACE_MODERATE:
+                    cmd_data, params = re.match(r'\s*(<[^>]*>|\S*)\s*(.*)$', cmd_data).groups()
+                else:
+                    cmd_data, params = re.match(r'[ \t]*(<[^>]*>|[^ \t]*)[ \t]*(.*)$', cmd_data).groups()
                 if params:
                     raise Smtpd555Exception
                 if SmtpdEvent.ON_RCPT_TO_EVENT in self.emit_events:
@@ -1519,8 +1607,10 @@ class SmtpdServer:
                 session.cmd_sequence = CMD_RCPT
                 return '250 OK'
 
-            elif re.match(r'^DATA\s*$', line, re.IGNORECASE):
-                # DATA
+            elif re.match(r'^DATA(\ .*)?$', line, self._RE_CMD_FLAGS):
+                # DATA takes no argument
+                if ' ' in line:
+                    raise Smtpd501Exception
                 if session.cmd_sequence is not CMD_RCPT:
                     raise Smtpd503Exception
                 if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
@@ -1656,11 +1746,10 @@ class SmtpdServer:
     @staticmethod
     def _decode64(encoded):
         """
-        Decode base64 like Ruby's ```Base64.decode64``` (tolerant).
+        Decode a base64 response of the AUTH dialog (RFC 4954 section 4).
 
-        Ruby ignores non-alphabet characters and missing padding instead of
-        raising; garbage input yields empty/partial bytes and fails later at the
-        credentials check (Smtpd500), which this mirrors.
+        Only the base64 alphabet is valid, surrounding spaces and a missing
+        padding are tolerated.
 
         ### Args
 
@@ -1670,13 +1759,21 @@ class SmtpdServer:
 
         - **str**: The decoded value (byte-exact via surrogateescape)
 
+        ### Raises
+
+        - **Smtpd501Exception**: The text is not valid base64
+
         """
-        cleaned = re.sub(r'[^A-Za-z0-9+/=]', '', encoded or '')
-        cleaned = cleaned.ljust(len(cleaned) + (-len(cleaned) % 4), '=')
-        try:
-            raw = base64.b64decode(cleaned, validate=False)
-        except ValueError:
+        encoded = (encoded or '').strip(' \t')
+        # a single "=" is an empty initial response (RFC 4954 section 4)
+        if encoded == '=':
             return ''
+        if not re.fullmatch(r'[A-Za-z0-9+/]*={0,2}', encoded):
+            raise Smtpd501Exception
+        try:
+            raw = base64.b64decode(encoded + '=' * (-len(encoded) % 4), validate=True)
+        except ValueError:
+            raise Smtpd501Exception
         return raw.decode('utf-8', 'surrogateescape')
 
     async def process_auth_plain(self, session, encoded_auth_response):
@@ -1696,9 +1793,9 @@ class SmtpdServer:
         try:
             # extract auth id (and password)
             auth_values = self._decode64(encoded_auth_response).split('\x00')
-            # check for valid credentials parameters
-            if len(auth_values) != 3:
-                raise Smtpd500Exception
+            # authzid NUL authcid NUL passwd, authcid and passwd set (RFC 4616)
+            if len(auth_values) != 3 or not auth_values[1] or not auth_values[2]:
+                raise Smtpd535Exception
             # call event function to test credentials
             try:
                 return_value = await self._emit(SmtpdEvent.ON_AUTH_EVENT, session.ctx, auth_values[0], auth_values[1], auth_values[2])
@@ -1738,9 +1835,15 @@ class SmtpdServer:
         - **str**: The 334 password challenge
 
         """
-        # save challenged auth_id
-        session.auth_challenge['authorization_id'] = ''
-        session.auth_challenge['authentication_id'] = self._decode64(encoded_auth_response)
+        try:
+            # save challenged auth_id
+            session.auth_challenge['authorization_id'] = ''
+            session.auth_challenge['authentication_id'] = self._decode64(encoded_auth_response)
+        except SmtpdException:
+            # a fault of the decoding ends the AUTH exchange
+            session.cmd_sequence = CMD_RSET
+            session.auth_challenge = {}
+            raise
         session.cmd_sequence = CMD_AUTH_LOGIN_PASS
         # response code with request for Password
         return '334 ' + base64.b64encode(b'Password:').decode()
@@ -1766,6 +1869,9 @@ class SmtpdServer:
                 session.auth_challenge['authentication_id'],
                 self._decode64(encoded_auth_response),
             ]
+            # authentication id and password must be set
+            if not auth_values[1] or not auth_values[2]:
+                raise Smtpd535Exception
             # check for valid credentials
             try:
                 return_value = await self._emit(SmtpdEvent.ON_AUTH_EVENT, session.ctx, auth_values[0], auth_values[1], auth_values[2])

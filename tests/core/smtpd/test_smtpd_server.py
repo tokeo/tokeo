@@ -1341,8 +1341,8 @@ def test_auth_default_handler_denies_535():
     assert r[1][0].startswith('535')
 
 
-def test_auth_garbage_base64_500_and_recovers():
-    """Invalid credentials answer 500, MAIL works after it."""
+def test_auth_garbage_base64_501_and_recovers():
+    """A response that is not base64 answers 501, MAIL works after it."""
     ev = AuthEvents()
     _, r = dialog(
         ev,
@@ -1350,12 +1350,83 @@ def test_auth_garbage_base64_500_and_recovers():
         [
             b'EHLO me\r\n',
             b'AUTH PLAIN\r\n',
-            b'!!!not-base64!!!\r\n',  # not valid credentials -> 500
+            b'!!!not-base64!!!\r\n',  # not base64 -> 501 (RFC 4954 section 4)
             b'MAIL FROM:<a@x>\r\n',  # sequence was reset to RSET, MAIL works
         ],
     )
-    assert r[2][0].startswith('500')
+    assert r[2][0].startswith('501')
     assert r[3][0] == '250 OK'
+    assert ev.auth_calls == []
+
+
+@pytest.mark.parametrize(
+    'response',
+    ['AHVz ZXIA c2VjcmV0', 'AHVzZXIAc2VjcmV0!', 'AHVzZXIAc2VjcmV0-_', '"AHVzZXIAc2VjcmV0"', 'YQ==YQ==', 'Y'],
+)
+def test_auth_broken_base64_answers_501(response):
+    """Base64 with foreign chars, inner padding or a bad length answers 501."""
+    ev = AuthEvents()
+    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN\r\n', response.encode() + b'\r\n'])
+    assert r[2][0].startswith('501')
+    assert ev.auth_calls == []
+
+
+def test_auth_base64_without_padding_is_accepted():
+    """A missing padding of the base64 is tolerated."""
+    ev = AuthEvents()
+    response = auth_plain('', 'user', 'secret').rstrip('=')
+    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN ' + response.encode() + b'\r\n'])
+    assert r[1][0] == '235 OK'
+
+
+@pytest.mark.parametrize(
+    'message',
+    ['\x00user\x00', '\x00\x00secret', '\x00user\x00secret\x00', 'user'],
+    ids=['no-password', 'no-authcid', 'four-fields', 'one-field'],
+)
+def test_auth_plain_invalid_message_answers_535_without_event(message):
+    """AUTH PLAIN needs authcid and passwd set (RFC 4616), else 535."""
+    ev = AuthEvents()
+    response = base64.b64encode(message.encode()).decode()
+    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN ' + response.encode() + b'\r\n'])
+    assert r[1][0].startswith('535')
+    assert ev.auth_calls == []
+
+
+def test_auth_plain_empty_initial_response_answers_535():
+    """A single "=" is an empty initial response, AUTH PLAIN answers 535."""
+    ev = AuthEvents()
+    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN =\r\n'])
+    assert r[1][0].startswith('535')
+    assert ev.auth_calls == []
+
+
+def test_auth_login_broken_username_ends_the_exchange():
+    """A username that is not base64 answers 501, then commands follow."""
+    ev = AuthEvents()
+    _, r = dialog(
+        ev,
+        {'auth_mode': 'AUTH_OPTIONAL'},
+        [b'EHLO me\r\n', b'AUTH LOGIN\r\n', b'!!!\r\n', b'RSET\r\n', b'MAIL FROM:<a@x>\r\n'],
+    )
+    assert r[2][0].startswith('501')
+    # RSET is valid base64, it must not be taken as the username
+    assert r[3] == ['250 OK']
+    assert r[4] == ['250 OK']
+    assert ev.auth_calls == []
+
+
+@pytest.mark.parametrize('user, password', [('', 'secret'), ('user', '')], ids=['no-user', 'no-password'])
+def test_auth_login_empty_value_answers_535_without_event(user, password):
+    """An empty username or password of AUTH LOGIN answers 535."""
+    ev = AuthEvents()
+    _, r = dialog(
+        ev,
+        {'auth_mode': 'AUTH_OPTIONAL'},
+        [b'EHLO me\r\n', b'AUTH LOGIN\r\n', _b64(user).encode() + b'\r\n', _b64(password).encode() + b'\r\n'],
+    )
+    assert r[3][0].startswith('535')
+    assert ev.auth_calls == []
 
 
 @pytest.mark.parametrize(

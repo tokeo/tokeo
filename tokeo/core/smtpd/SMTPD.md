@@ -312,6 +312,32 @@ The replies of the server lean towards broad compatibility: where a client bends
 the standard in a harmless way, the server tolerates it, e.g. an address without
 angle brackets or a space after the colon of ```MAIL FROM:```/```RCPT TO:```.
 
+The verbs of the commands are recognized in ASCII only, e.g. ```RſET``` is
+answered by ```500```. ```whitespace_mode``` decides on unusual whitespace (any
+whitespace except SP and HTAB, e.g. a no-break space) and control chars (except
+HTAB, e.g. NUL) in a command line and in the AUTH responses (not in the PROXY
+header):
+
+- ```WHITESPACE_MODERATE``` (default) strips them at the edges as noise, any
+  whitespace separates the verb and the parameters; a control char inside is
+  answered by ```501```, unusual whitespace inside stays
+- ```WHITESPACE_STRICT``` answers any of them by ```501```, only SP and HTAB
+  separate
+- ```WHITESPACE_UNSAFE``` strips and separates only by SP and HTAB and hands
+  the values with all other chars to the events; the server logs a warning on
+  start
+
+Without a valid separator after the verb, e.g. ```EHLO``` and a no-break space
+in ```WHITESPACE_STRICT```, the command is unknown (```500```). An argument to
+```QUIT```, ```RSET```, ```DATA``` or ```STARTTLS``` is answered by ```501```,
+one to ```NOOP``` is ignored (RFC 5321 4.1.1.9). ```HELO```/```EHLO``` without
+a domain is left to ```on_helo_event```, without an own handler it is answered
+by ```501```.
+
+AUTH answers a response that is not valid base64 by ```501``` (RFC 4954), only
+surrounding spaces and a missing padding are tolerated; an empty authentication
+id or password is answered by ```535``` without calling ```on_auth_event```.
+
 ```MAIL FROM``` and ```RCPT TO``` hand only the address to the event, as sent:
 ```<a@x>``` or ```a@x```, and ```<>``` or an empty address for the null sender.
 Their parameters are checked strictly (RFC 5321 4.1.2). Valid are only those
@@ -512,6 +538,7 @@ The constructor keeps the original option names. Key ones:
 <tr><td>crlf_mode</td><td>'CRLF_ENSURE'</td><td>line breaks of all lines: CRLF_ENSURE ends each line with CRLF and drops a bare CR or LF, CRLF_LEAVE keeps the line break as received, CRLF_STRICT rejects a line without CRLF by 500</td></tr>
 <tr><td>data_size</td><td>None</td><td>maximum message size in bytes, a larger message is answered by 552 after the end of DATA (None = unlimited)</td></tr>
 <tr><td>crlf_data_mode</td><td>'CRLF_DATA_MODERATE', with CRLF_STRICT 'CRLF_DATA_STRICT'</td><td>line breaks in DATA against SMTP smuggling, only &lt;CRLF&gt;.&lt;CRLF&gt; ends DATA: CRLF_DATA_MODERATE keeps a bare CR or LF as data, CRLF_DATA_STRICT answers it by 554 after the end of DATA, CRLF_DATA_STRICT_CLOSE by 521 and closes the connection; CRLF_DATA_UNSAFE ends DATA on any dot line and logs a warning on start; CRLF_STRICT allows only the strict modes</td></tr>
+<tr><td>whitespace_mode</td><td>'WHITESPACE_MODERATE'</td><td>unusual whitespace and control chars in the command lines: WHITESPACE_MODERATE strips them at the edges, WHITESPACE_STRICT answers them by 501, WHITESPACE_UNSAFE hands them to the events and logs a warning on start (section 7)</td></tr>
 <tr><td>pipelining_extension</td><td>False</td><td>advertise PIPELINING</td></tr>
 <tr><td>internationalization_extensions</td><td>False</td><td>advertise 8BITMIME and SMTPUTF8</td></tr>
 <tr><td>spool</td><td>None</td><td>path and file name prefix for the spool temp files (section 11)</td></tr>
