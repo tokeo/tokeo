@@ -245,7 +245,9 @@ class SmtpdEvents:
 
         ### Returns
 
-        - **dict|None**: A replacement for the stored data, or None to keep it
+        - **dict|None**: Fields to update in the stored data (merged by
+            ```deep_merge```, also ```{}```), or None to keep it; any other
+            result aborts the connection with 421
 
         ### Notes
 
@@ -368,7 +370,16 @@ class SmtpdEvents:
     # --- misc ---
 
     def on_process_line_unknown_event(self, ctx, line):
-        """Called on an unknown command line; raise to abort abusive sessions."""
+        """
+        Called on an unknown command line; raise to abort abusive sessions.
+
+        ### Returns
+
+        - **str|None**: A single reply line with its code (e.g. ```'250 OK'```)
+            to answer the line, or None/False to answer 500; any other result
+            or an exception other than an SmtpdException answers 451
+
+        """
         pass
 
     def on_logging_event(self, ctx, severity, msg, err=None):

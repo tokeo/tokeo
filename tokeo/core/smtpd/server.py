@@ -33,6 +33,7 @@ import ipaddress
 from enum import Enum, auto
 
 from tokeo.core.utils.date import utc_now
+from tokeo.core.utils.dict import deep_merge
 from .context import SmtpdContext, ServerCtx, EnvelopeCtx, MessageCtx, MessageSpooler
 from .tls import TlsTransport, EncryptMode
 from .logger import Severity, ForwardingLogger
@@ -867,7 +868,8 @@ class SmtpdServer:
         To be done
         """
         # return greet response when in CMD_HELO sequence
-        return f'220 {session.ctx.server.local_response.strip()}' if session.cmd_sequence is CMD_HELO else ''
+        # like Ruby to_s, None is an empty text
+        return f'220 {str(session.ctx.server.local_response or "").strip()}' if session.cmd_sequence is CMD_HELO else ''
 
     # ---- per-connection dialog --------------------------
 
@@ -1359,8 +1361,12 @@ class SmtpdServer:
                         raise Smtpd421Exception('Abort connection for unsupported PROXY parameters!')
                 if SmtpdEvent.ON_PROXY_EVENT in self.emit_events:
                     return_value = await self._emit(SmtpdEvent.ON_PROXY_EVENT, ctx, proxy_data)
-                    if return_value:
-                        proxy_data = return_value
+                    # None keeps the parsed data, a dict updates its fields (also
+                    # {}), else a fault of the handler
+                    if isinstance(return_value, dict):
+                        deep_merge(proxy_data, return_value)
+                    elif return_value is not None:
+                        raise Smtpd421Exception(f'on_proxy_event must not return {return_value!r}')
                 ctx.server.proxy = proxy_data
                 # the server greeting must follow the PROXY header, not the connect
                 if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
@@ -1391,9 +1397,11 @@ class SmtpdServer:
                     raise Smtpd501Exception
                 ctx.server.helo = cmd_data
                 session.cmd_sequence = CMD_RSET
+                # like Ruby to_s, None is an empty text
+                helo_response = str(ctx.server.helo_response or '').strip()
                 if re.match(r'^EHLO', line, self._RE_CMD_FLAGS):
                     return (
-                        f'250-{ctx.server.helo_response.strip()}\r\n'
+                        f'250-{helo_response}\r\n'
                         # respond with 8BITMIME extension
                         + ('250-8BITMIME\r\n' if self.internationalization_extensions else '')
                         # respond with SMTPUTF8 extension
@@ -1407,7 +1415,7 @@ class SmtpdServer:
                         + '250 OK'
                     )
                 else:
-                    return f'250 OK {ctx.server.helo_response.strip()}'.strip()
+                    return f'250 OK {helo_response}'.strip()
 
             elif re.match(r'^STARTTLS(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # STARTTLS
@@ -1625,13 +1633,21 @@ class SmtpdServer:
                 # If we somehow get to this point then
                 # allow handling of unknown command line
                 if SmtpdEvent.ON_PROCESS_LINE_UNKNOWN_EVENT in self.emit_events:
-                    return_value = await self._emit(SmtpdEvent.ON_PROCESS_LINE_UNKNOWN_EVENT, ctx, line)
-                    if return_value:
+                    try:
+                        return_value = await self._emit(SmtpdEvent.ON_PROCESS_LINE_UNKNOWN_EVENT, ctx, line)
+                    except SmtpdException:
+                        raise
+                    # any other handler fault is a local error
+                    except Exception as e:  # noqa: B902
+                        raise Smtpd451Exception(f'{e} ({type(e).__name__})')
+                    # None/False keeps the line unknown, a single reply line
+                    # answers, anything else is a fault of the handler
+                    if isinstance(return_value, str) and re.fullmatch(r'[2-5][0-9]{2}( [^\r\n]*)?', return_value):
                         return return_value
-                # the default on_process_line_unknown_event raises
-                # Smtpd500Exception; raising here keeps the same behaviour: the
-                # serve loop counts it, records the error and logs it, and the
-                # full 500 wire response is produced
+                    if return_value is not None and return_value is not False:
+                        raise Smtpd451Exception(f'on_process_line_unknown_event must not return {return_value!r}')
+                # an unknown command: the serve loop counts it, records the error,
+                # logs it and answers 500
                 raise Smtpd500Exception
 
         else:

@@ -151,7 +151,12 @@ Two conventions matter:
   refuses it by ```550```. Any other result, a string with surrounding
   whitespace or an exception other than an ```Smtpd*Exception``` is a fault of
   the handler and answered by ```451```. Not overriding the event accepts every
-  address.
+  address. ```on_process_line_unknown_event``` answers an unknown line by a
+  returned single reply line with its code (e.g. ```'250 OK'```), by ```500```
+  on ```None``` or ```False```, and by ```451``` on any other result.
+  ```on_proxy_event``` updates the fields of ```ctx.server.proxy``` by a
+  returned ```dict``` (also ```{}```), keeps them on ```None``` and ends the
+  connection by ```421``` on any other result.
 - **Raising decides the reply.** Raise one of the ```Smtpd*Exception``` classes
   (section 7) to reject a step; the exception carries the SMTP status line the
   client receives.

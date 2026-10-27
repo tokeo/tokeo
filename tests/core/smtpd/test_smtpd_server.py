@@ -883,7 +883,7 @@ def test_proxy_unknown_is_accepted():
 
 
 def test_proxy_event_can_rewrite():
-    """The data returned by on_proxy_event is stored instead."""
+    """The fields returned by on_proxy_event update the stored data."""
     ev = ProxyEvents()
     ev.proxy_rewrite = {'proto': 'TCP4', 'source_ip': '9.9.9.9'}
 
@@ -896,9 +896,10 @@ def test_proxy_event_can_rewrite():
         )
 
     asyncio.run(go())
-    # the event saw the parsed data, but its return value replaced what is stored
+    # the event saw the parsed data, its return value updated only its fields
     assert ev.proxy_seen['source_ip'] == '1.2.3.4'
-    assert ev.proxy_on_ctx == {'proto': 'TCP4', 'source_ip': '9.9.9.9'}
+    assert ev.proxy_on_ctx['source_ip'] == '9.9.9.9'
+    assert ev.proxy_on_ctx['dest_ip'] == '5.6.7.8' and ev.proxy_on_ctx['source_port'] == 1111
 
 
 def test_proxy_not_first_aborts_421():
