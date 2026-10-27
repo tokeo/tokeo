@@ -221,7 +221,9 @@ def _parse_ports(ports):
     - **ValueError**: On a missing or an empty ```''``` port item
 
     """
-    items = str(ports).replace(' ', '').split(',')
+    # like Ruby split, empty items at the end are dropped ('2525,')
+    value = str(ports).replace(' ', '').rstrip(',')
+    items = value.split(',') if value else []
     if not items:
         raise ValueError('Missing port(s) to bind service(s) to!')
     if '' in items:
@@ -250,7 +252,9 @@ def _parse_hosts(hosts):
     if isinstance(hosts, (list, tuple)):
         items = [str(host).strip() for host in hosts]
     else:
-        items = str(hosts).replace(' ', '').split(',')
+        # like Ruby split, empty items at the end are dropped ('127.0.0.1,')
+        value = str(hosts).replace(' ', '').rstrip(',')
+        items = value.split(',') if value else []
     if not items or items == ['']:
         raise ValueError('No hosts defined! Please use specific hostnames and / or ip_addresses or "*" for wildcard!')
     if '' in items:
@@ -263,12 +267,15 @@ def _parse_hosts(hosts):
 def _resolve_host(host):
     """Resolve a host to its ip addresses (an ip literal maps to itself)."""
     if host == '*':
+        # all interfaces by the wildcard addresses (AI_PASSIVE), also the ones
+        # added later, IPv6 only when configured (AI_ADDRCONFIG); asyncio binds
+        # IPv6 with IPV6_V6ONLY, so both families bind side by side
         ips = []
-        for info in socket.getaddrinfo(None, 0, proto=socket.IPPROTO_TCP):
+        for info in socket.getaddrinfo(None, 0, proto=socket.IPPROTO_TCP, flags=socket.AI_PASSIVE | socket.AI_ADDRCONFIG):
             ip = info[4][0]
             if ip not in ips:
                 ips.append(ip)
-        return ips or [DEFAULT_SMTPD_HOST]
+        return ips or ['0.0.0.0']
     try:
         # an ip literal resolves to itself (no DNS)
         ipaddress.ip_address(host)
@@ -371,13 +378,22 @@ def _tls_cert_names(cert_cn, cert_san, hosts, addresses):
     from the configured hosts and addresses: hosts plus the address host
     parts, deduplicated, ```'*'``` and empties dropped -- the CN becomes
     ```'localhost.local'``` when the first name is a loopback identifier,
-    else the first name itself.
+    else the first name itself. With ```'*'``` the names and addresses of the
+    local host take the place of the wildcard addresses.
 
     """
     if cert_cn is not None:
         return cert_cn, cert_san
-    sans = list(dict.fromkeys(list(hosts) + [host for host, _port in addresses]))
-    sans = [san for san in sans if san and san != '*']
+    names = list(hosts) + [host for host, _port in addresses]
+    # the wildcard binds all interfaces: name the local host instead (best effort)
+    if '*' in hosts:
+        names += ['localhost', '127.0.0.1', '::1', socket.gethostname(), socket.getfqdn()]
+        try:
+            names += [info[4][0] for info in socket.getaddrinfo(socket.gethostname(), None, proto=socket.IPPROTO_TCP)]
+        except OSError:
+            pass
+    # neither the wildcard nor its addresses are names of the server
+    sans = [san for san in dict.fromkeys(names) if san and san not in ('*', '0.0.0.0', '::')]
     if not sans or re.match(r'^(127\.0?0?0\.0?0?0\.0?0?1|::1|localhost)$', sans[0], re.IGNORECASE):
         return 'localhost.local', sans
     return sans[0], sans
@@ -448,7 +464,10 @@ class SmtpdServer:
         self._addresses = _build_addresses(self.ports, self.hosts)
         # dialog options
         self.io_cmd_timeout = settings.get('io_cmd_timeout', DEFAULT_IO_CMD_TIMEOUT)
-        self.io_buffer_max_size = settings.get('io_buffer_max_size', DEFAULT_IO_BUFFER_MAX_SIZE)
+        # like Ruby nil, None is the default
+        self.io_buffer_max_size = settings.get('io_buffer_max_size')
+        if self.io_buffer_max_size is None:
+            self.io_buffer_max_size = DEFAULT_IO_BUFFER_MAX_SIZE
         self.crlf_mode = _parse_mode(CrlfMode, settings.get('crlf_mode'), 'CRLF_ENSURE', 'crlf_mode')
         self.crlf_data_mode = _parse_mode(
             CrlfDataMode,
@@ -492,6 +511,8 @@ class SmtpdServer:
             raise ValueError('Timeout for a command line (io_cmd_timeout) must be at least 1 second!')
         if not (type(self.io_proxy_cmd_timeout) in (int, float) and self.io_proxy_cmd_timeout >= 1):
             raise ValueError('Timeout for the PROXY header (io_proxy_cmd_timeout) must be at least 1 second!')
+        if not (type(self.io_buffer_max_size) is int and self.io_buffer_max_size > 0):
+            raise ValueError('Maximum size of a line (io_buffer_max_size) must be a positive integer!')
         if not (
             isinstance(self.trusted_relay_auth_ids, list)
             and all(isinstance(i, str) and i != '' and i == i.strip() for i in self.trusted_relay_auth_ids)
@@ -610,7 +631,7 @@ class SmtpdServer:
                 self._on_connection,
                 host=host,
                 port=port,
-                limit=int(self.io_buffer_max_size),
+                limit=self.io_buffer_max_size,
                 reuse_port=bool(lst.get('reuse_port', False)),
             )
             # a name may bind several addresses, port 0 gets its port only now
@@ -1178,7 +1199,7 @@ class SmtpdServer:
         except asyncio.IncompleteReadError:
             # the peer closed, a rest without LF is dropped
             return b''
-        if self.io_buffer_max_size and len(raw) > int(self.io_buffer_max_size):
+        if len(raw) > self.io_buffer_max_size:
             raise SmtpdIOBufferOverrunException
         return raw
 

@@ -532,8 +532,8 @@ The constructor keeps the original option names. Key ones:
 <tr><th>Option</th><th>Default</th><th>Meaning</th></tr>
 </thead>
 <tbody>
-<tr><td>ports</td><td>2525</td><td>port(s); '2525, 3535' or a '2525:3535' range</td></tr>
-<tr><td>hosts</td><td>127.0.0.1</td><td>host(s); '127.0.0.1, ::1' or '*' for all interfaces</td></tr>
+<tr><td>ports</td><td>2525</td><td>port(s); '2525, 3535' or a '2525:3535' range, a comma at the end is ignored</td></tr>
+<tr><td>hosts</td><td>127.0.0.1</td><td>host(s); '127.0.0.1, ::1' or '*' for all interfaces (binds 0.0.0.0, and :: when IPv6 is configured), a comma at the end is ignored</td></tr>
 <tr><td>max_processings</td><td>4</td><td>connections processed simultaneously</td></tr>
 <tr><td>max_connections</td><td>None</td><td>concurrent connections accepted (None = unlimited)</td></tr>
 <tr><td>auth_mode</td><td>'AUTH_FORBIDDEN'</td><td>AUTH_OPTIONAL / AUTH_REQUIRED</td></tr>
@@ -549,7 +549,7 @@ The constructor keeps the original option names. Key ones:
 <tr><td>spool</td><td>None</td><td>path and file name prefix for the spool temp files (section 11)</td></tr>
 <tr><td>do_dns_reverse_lookup</td><td>True</td><td>resolve the remote host name</td></tr>
 <tr><td>io_cmd_timeout</td><td>30</td><td>seconds to await a complete command line, at least 1. When not set the default of DEFAULT_IO_CMD_TIMEOUT is used</td></tr>
-<tr><td>io_buffer_max_size</td><td>1 MiB</td><td>maximum line length before rejection</td></tr>
+<tr><td>io_buffer_max_size</td><td>1 MiB</td><td>maximum line length before rejection, a positive integer (None = default)</td></tr>
 <tr><td>proxy_extension</td><td>False</td><td>accept the PROXY protocol</td></tr>
 <tr><td>io_proxy_cmd_timeout</td><td>5</td><td>seconds to await the PROXY header line, at least 1. When not set the default of DEFAULT_IO_PROXY_CMD_TIMEOUT is used</td></tr>
 </tbody>

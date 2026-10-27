@@ -238,10 +238,13 @@ def test_tls_cert_names_derivation_rules():
     # loopback first -> generic localhost.local (reference behaviour)
     assert _tls_cert_names(None, None, ['127.0.0.1'], [('127.0.0.1', 2525)]) == ('localhost.local', ['127.0.0.1'])
     assert _tls_cert_names(None, None, ['localhost', 'mx.example.org'], [])[0] == 'localhost.local'
-    # non-loopback first -> first name becomes the cn; '*' and empties drop
-    assert _tls_cert_names(None, None, ['*', 'mx.example.org'], [('10.0.0.5', 25)]) == ('mx.example.org', ['mx.example.org', '10.0.0.5'])
+    # non-loopback first -> first name becomes the cn; '*' and empties drop,
+    # the names of the local host follow for the wildcard
+    cn, sans = _tls_cert_names(None, None, ['*', 'mx.example.org'], [('10.0.0.5', 25)])
+    assert cn == 'mx.example.org'
+    assert sans[:2] == ['mx.example.org', '10.0.0.5'] and 'localhost' in sans
     # nothing usable left -> generic fallback
-    assert _tls_cert_names(None, None, ['*'], []) == ('localhost.local', [])
+    assert _tls_cert_names(None, None, [], []) == ('localhost.local', [])
 
 
 def test_self_signed_derives_names_from_hosts():
