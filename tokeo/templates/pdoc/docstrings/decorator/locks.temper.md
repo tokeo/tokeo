@@ -20,7 +20,7 @@ the counter. When the function completes, the counter is incremented again.
 - **count** (int): Maximum number of concurrent calls allowed
 - **name** (str, optional): Custom cache key name for this temper instance
 - **name_f** (str, optional): Format string to generate key name based on function arguments
-- **expire** (float, optional): Expiration time for the temper key in seconds
+- **expire** (float, optional): Expiration time for the temper key in seconds, longer than the longest call. Defaults to 3600.
 - **sleep_func** (callable, optional): Sleep function on resource limit. Defaults to time.sleep.
 - **cb_on_locked** (callable, optional): Function to call on limit instead of waiting
 - **verbose** (bool, optional): Whether to log tempering information. Defaults to True.

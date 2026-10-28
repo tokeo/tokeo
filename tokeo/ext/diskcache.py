@@ -80,6 +80,13 @@ class TokeoDiskCacheLockError(TokeoError):
 _missing = object()
 
 
+def _check_expire(expire):
+    """Return expire, raise a ValueError unless it is a number above 0."""
+    if isinstance(expire, bool) or not isinstance(expire, (int, float)) or expire <= 0:
+        raise ValueError(f'expire must be a number of seconds above 0, not {expire!r}')
+    return expire
+
+
 class _ThreadConnection:
     """Holds the connection of one thread and closes it when the thread ends."""
 
@@ -202,21 +209,27 @@ class TokeoDiskCacheLocksHandler:
         """
         return self._cache.delete(self._key_prefix + key, retry=True)
 
-    def acquire(self, key, expire=None):
+    def acquire(self, key, expire=3600):
         """
         Acquire a lock with the given key, waits until the lock is free.
 
         ### Args
 
         - **key** (str): The lock key to acquire
-        - **expire** (float, optional): Time in seconds after which the lock
-            automatically expires. Defaults to None.
+        - **expire** (float, optional): Seconds after which the lock expires,
+            also when its holder died without release. Must be longer than
+            the lock is held. Defaults to 3600.
 
         ### Returns
 
         - **bool**: True once the lock is acquired
 
+        ### Raises
+
+        - **ValueError**: If expire is not a number above 0
+
         """
+        _check_expire(expire)
         lock = diskcache.Lock(self._cache, self._key_prefix + key, expire=expire, tag=self._tag)
         lock.acquire()
         return True
@@ -250,7 +263,7 @@ class TokeoDiskCacheLocksHandler:
         return lock.locked()
 
     @contextmanager
-    def lock(self, key, expire=None):
+    def lock(self, key, expire=3600):
         """
         Context manager for acquiring and releasing a lock.
 
@@ -260,12 +273,17 @@ class TokeoDiskCacheLocksHandler:
         ### Args
 
         - **key** (str): The lock key to acquire
-        - **expire** (float, optional): Time in seconds after which the lock
-            automatically expires. Defaults to None.
+        - **expire** (float, optional): Seconds after which the lock expires,
+            also when its holder died within the block. Must be longer than
+            the block runs. Defaults to 3600.
 
         ### Yields
 
         - **None**: Control is yielded to the block inside the with statement
+
+        ### Raises
+
+        - **ValueError**: If expire is not a number above 0
 
         ### Notes
 
@@ -282,6 +300,7 @@ class TokeoDiskCacheLocksHandler:
         # Lock is automatically released here
         ```
         """
+        _check_expire(expire)
         key = self._key_prefix + key
         # the own token tells on release whether the lock is still ours
         token = uuid.uuid4().hex
@@ -338,9 +357,10 @@ class TokeoDiskCacheLocksHandler:
             throttle.
         - **name_f** (str, optional): Format string to build the key name
             from the function arguments.
-        - **expire** (float, optional): Expiration time for the throttle
-            key in seconds. When the key expires, the bucket simply starts
-            full again on the next call.
+        - **expire** (float, optional): Seconds without a call after which
+            the throttle key expires and the bucket starts full again. Must
+            not be below per_seconds, otherwise the bucket is full too early.
+            Defaults to per_seconds plus 10.
         - **time_func** (callable, optional): Function to get the current
             time. Defaults to time.time.
         - **sleep_func** (callable, optional): Function to sleep while rate
@@ -355,6 +375,11 @@ class TokeoDiskCacheLocksHandler:
         ### Returns
 
         - **callable**: The decorated function with rate limiting applied.
+
+        ### Raises
+
+        - **ValueError**: If expire is not a number above 0 or below
+            per_seconds
 
         ### Example
 
@@ -374,6 +399,11 @@ class TokeoDiskCacheLocksHandler:
         - The token bucket allows bursts up to count calls at once.
 
         """
+        if expire is None:
+            # the bucket is full again after per_seconds, plus a margin
+            expire = per_seconds + 10
+        elif _check_expire(expire) < per_seconds:
+            raise ValueError(f'expire must not be below per_seconds {per_seconds}, not {expire!r}')
 
         def decorator(func):
             # create the full name of the @decorated function
@@ -487,7 +517,7 @@ class TokeoDiskCacheLocksHandler:
         count=1,
         name=None,
         name_f=None,
-        expire=None,
+        expire=3600,
         sleep_func=time.sleep,
         sleep_time=0.05,
         cb_on_locked=None,
@@ -520,7 +550,7 @@ class TokeoDiskCacheLocksHandler:
             from the function arguments.
         - **expire** (float, optional): Expiration time for the temper key
             in seconds. Also acts as a safety net: a crashed holder frees
-            its slot once the key expires.
+            its slot once the key expires. Defaults to 3600.
         - **sleep_func** (callable, optional): Sleep function used while
             waiting for a free slot. Defaults to time.sleep. If falsy and
             no cb_on_locked is set, a blocked call returns immediately
@@ -537,6 +567,10 @@ class TokeoDiskCacheLocksHandler:
 
         - **callable**: The decorated function with concurrency control
             applied.
+
+        ### Raises
+
+        - **ValueError**: If expire is not a number above 0
 
         ### Example
 
@@ -562,13 +596,13 @@ class TokeoDiskCacheLocksHandler:
             expire, its key expires mid-run and the next caller treats the
             key as uninitialized, resets the counter to count and may start
             up to count additional calls on top of those still running,
-            breaking the limit. Choose expire generously, or set it to None
-            to disable expiry (losing the crash-safety net in return).
+            breaking the limit. Choose expire generously.
         - Purging the cache while calls are in flight is destructive: it
             clears the very counter that enforces the limit and resets the
             accounting, so it can breach the limit temporarily as well.
 
         """
+        _check_expire(expire)
 
         def decorator(func):
             # create the full name of the @decorated function

@@ -461,3 +461,66 @@ def test_throttle_process_rate_cap(tmp):
     payloads = [payload for kind, payload in results if kind == 'ok']
     assert payloads.count('ran') == count
     assert payloads.count('locked') == workers - count
+
+
+# --------------------------------------------------------------------------------------
+# expire: a default for every key, only numbers above 0
+# --------------------------------------------------------------------------------------
+
+
+def _expires_in(app, key):
+    # the seconds until the key expires
+    _, expire_time = app.cache._cache.get(key, expire_time=True)
+    return expire_time - time.time()
+
+
+@pytest.mark.parametrize('expire', [None, 0, -1, True, '60'], ids=['none', 'zero', 'negative', 'bool', 'str'])
+def test_expire_must_be_a_number_above_0(tmp, expire):
+    """temper, throttle, lock and acquire refuse an expire not above 0."""
+    with DiskcacheTest(tmp.dir) as app:
+        with pytest.raises(ValueError, match='expire must be a number of seconds above 0'):
+            app.cache.locks.temper(expire=expire)
+        if expire is not None:
+            with pytest.raises(ValueError, match='expire must be a number of seconds above 0'):
+                app.cache.locks.throttle(expire=expire)
+        with pytest.raises(ValueError, match='expire must be a number of seconds above 0'):
+            with app.cache.locks.lock('bad', expire=expire):
+                pass
+        with pytest.raises(ValueError, match='expire must be a number of seconds above 0'):
+            app.cache.locks.acquire('bad', expire=expire)
+        assert app.cache.locks.locked('bad') is False
+
+
+def test_throttle_expire_must_not_be_below_per_seconds(tmp):
+    """throttle refuses an expire below per_seconds and takes one equal to it."""
+    with DiskcacheTest(tmp.dir) as app:
+        with pytest.raises(ValueError, match='expire must not be below per_seconds 60'):
+            app.cache.locks.throttle(count=10, per_seconds=60, expire=5)
+        assert app.cache.locks.throttle(count=10, per_seconds=60, expire=60)
+
+
+def test_throttle_expire_defaults_to_per_seconds_plus_10(tmp):
+    """Without expire the throttle key expires 10 s after per_seconds."""
+    with DiskcacheTest(tmp.dir) as app:
+
+        @app.cache.locks.throttle(count=1, per_seconds=60, name='default', verbose=False)
+        def job():
+            return 'ran'
+
+        assert job() == 'ran'
+        assert 69 < _expires_in(app, 'dc_default') <= 70
+
+
+def test_temper_lock_and_acquire_expire_defaults_to_3600(tmp):
+    """Without expire the keys of temper, lock and acquire expire after 3600 s."""
+    with DiskcacheTest(tmp.dir) as app:
+
+        @app.cache.locks.temper(name='default', verbose=False)
+        def job():
+            return _expires_in(app, 'dc_default')
+
+        assert 3599 < job() <= 3600
+        with app.cache.locks.lock('lock'):
+            assert 3599 < _expires_in(app, 'dc_lock') <= 3600
+        app.cache.locks.acquire('acquire')
+        assert 3599 < _expires_in(app, 'dc_acquire') <= 3600
