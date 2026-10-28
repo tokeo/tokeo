@@ -44,6 +44,11 @@ lists, process topology with pre-forked workers and machine-wide limits.
     per service, e.g. ```tokeo smtpd serve mx1```. Starting the same service
     twice fails at the port bind
 
+: Without a configured certificate every process generates its own
+    self-signed test certificate, so the workers of a service present
+    different ones; configure ```tls_cert_path``` or ```tls_cert``` for one
+    certificate in all processes
+
 : The servers log to the application log (```app.log```), its level comes
     from the log config of the application; a ```logger_severity``` in the
     settings of a service is left out

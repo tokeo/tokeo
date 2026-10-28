@@ -9,7 +9,10 @@ detect readiness through the SMTP banner on the port and cleanup through
 the process group and the port becoming bindable again.
 """
 
+import ssl
 import asyncio
+import hashlib
+import datetime
 import multiprocessing
 import os
 import re
@@ -21,6 +24,10 @@ import sys
 import time
 
 import pytest
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 
 from tokeo.core.smtpd import GlobalLimits
 from tokeo.ext.smtpd import (
@@ -540,5 +547,54 @@ def test_prefork_logs_the_started_service_of_every_process(tmp_path):
         assert wait_until(lambda: all(line in proc.probe_log.read_text() for line in started))
         forked = re.search(r'smtpd: forked workers \[([0-9, ]+)\]', proc.probe_log.read_text())
         assert {int(pid) for pid in forked.group(1).split(',')} == set(pids[1:])
+    finally:
+        _kill_group(proc)
+
+
+@pytest.fixture(scope='module')
+def cert_files(tmp_path_factory):
+    """A self-signed certificate and its key as files, with its SHA256."""
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'localhost')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(1)
+        .not_valid_before(now)
+        .not_valid_after(now + datetime.timedelta(days=1))
+        .sign(key, hashes.SHA256())
+    )
+    tmp = tmp_path_factory.mktemp('certs')
+    (tmp / 'cert.pem').write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    (tmp / 'key.pem').write_bytes(key_pem)
+    return str(tmp / 'cert.pem'), str(tmp / 'key.pem'), hashlib.sha256(cert.public_bytes(serialization.Encoding.DER)).hexdigest()
+
+
+def test_prefork_workers_present_the_configured_certificate(tmp_path, cert_files):
+    """All processes of a group of 3 present the certificate of tls_cert_path."""
+    cert_path, key_path, fingerprint = cert_files
+    port = _free_port()
+    settings = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_path': cert_path, 'tls_key_path': key_path}
+    proc = _spawn(tmp_path, {'services': [_tagged_service('mx1', port, pre_fork=3, settings=settings)]}, names=None)
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    try:
+        _wait_banner(proc, port)
+        pids, fingerprints = set(), set()
+        for _ in range(40):
+            client = smtplib.SMTP('127.0.0.1', port, timeout=5)
+            _, msg = client.ehlo('probe')
+            pids.add(msg.decode().splitlines()[0].rsplit(' ', 1)[1])
+            client.starttls(context=context)
+            fingerprints.add(hashlib.sha256(client.sock.getpeercert(binary_form=True)).hexdigest())
+            client.quit()
+        # more than one process served, all with the one certificate
+        assert len(pids) > 1
+        assert fingerprints == {fingerprint}
     finally:
         _kill_group(proc)

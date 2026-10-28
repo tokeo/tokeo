@@ -517,14 +517,16 @@ works as well: pass it as ```tls_cert_path``` alone and leave
 ```tls_key_path``` unset - the key is then read from the same file.
 
 The self-signed certificate is generated in-process with ```cryptography```
-(RSA 4096, SHA256, valid for 90 days, serverAuth) - no subprocess and no temp
+(EC P-256, SHA256, valid for 90 days, serverAuth) - no subprocess and no temp
 file is involved. It is meant for tests and debugging only, never for
-production. To prevent client errors like ```hostname does not match``` its
-CN and subject alt names derive from the hosts and addresses configured on
-the server (reference behaviour): every name becomes a subject alt name, a
-loopback-only setup gets the generic CN ```localhost.local```, otherwise the
-first name is used - and a configured ```tls_cert_cn``` / ```tls_cert_san```
-always wins over the derivation.
+production. Every server generates its own, so the workers of ```pre_fork```
+present different ones; configure a certificate (```tls_cert_path``` or
+```tls_cert```) when all have to present the same. To prevent client errors
+like ```hostname does not match``` its CN and subject alt names derive from
+the hosts and addresses configured on the server (reference behaviour): every
+name becomes a subject alt name, a loopback-only setup gets the generic CN
+```localhost.local```, otherwise the first name is used - and a configured
+```tls_cert_cn``` / ```tls_cert_san``` always wins over the derivation.
 
 .. note::
 

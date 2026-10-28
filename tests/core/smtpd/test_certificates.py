@@ -4,7 +4,8 @@ memory_only_certificate,invalid_certificate_name}_test.rb.
 
 Delivery over a TLS_REQUIRED service with: a self-signed cert (simple, with a
 chain, and with the key embedded in the chain file), an in-memory generated
-cert, and an invalid certificate name (hostname mismatch) that fails.
+cert, and an invalid certificate name (hostname mismatch) that fails. The
+generated test certificate carries an EC P-256 key.
 """
 
 import os
@@ -13,8 +14,10 @@ import sys
 import subprocess
 
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric import ec
 
-from tokeo.core.smtpd.tls import TLS_METHODS_LEGACY, TLS_CIPHERS_LEGACY
+from tokeo.core.smtpd.tls import TlsTransport, TLS_METHODS_LEGACY, TLS_CIPHERS_LEGACY
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_tests_helper import (
     read_message,
@@ -293,3 +296,12 @@ def test_self_signed_without_cryptography_raises(monkeypatch):
     monkeypatch.setitem(sys.modules, 'cryptography', None)
     with pytest.raises(ImportError):
         SmtpdServer(CaptureSmtpdEvents(), settings={'encrypt_mode': 'TLS_OPTIONAL'})
+
+
+def test_generated_test_certificate_has_an_ec_p256_key():
+    """The generated self-signed test certificate carries an EC P-256 key."""
+    lines = []
+    TlsTransport(logger=lambda severity, msg: lines.append(msg))
+    pem = next(msg for msg in lines if msg.startswith('SSL: generated test certificate')).split('\n', 1)[1]
+    key = x509.load_pem_x509_certificate(pem.encode()).public_key()
+    assert isinstance(key, ec.EllipticCurvePublicKey) and key.curve.name == 'secp256r1'

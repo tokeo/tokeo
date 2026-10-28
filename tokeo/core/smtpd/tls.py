@@ -189,7 +189,7 @@ class TlsTransport:
 
         ### Notes
 
-        : RSA 4096, 90-day validity, SHA256, subject CN and subject alt names
+        : EC P-256, 90-day validity, SHA256, subject CN and subject alt names
             (DNS for every SAN plus IP entries for those that are IP addresses),
             generated in-process with ```cryptography``` and loaded from memory
 
@@ -199,7 +199,7 @@ class TlsTransport:
         from cryptography import x509
         from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
         from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives.asymmetric import ec
 
         # normalize the subject alt name list
         if cert_san is None:
@@ -217,7 +217,8 @@ class TlsTransport:
                 pass
         self._log(Severity.DEBUG, f'SSL: using self generated test certificate! CN={cn} SAN=[{",".join(sans)}]')
         # generate the key and the self-signed certificate
-        key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
+        # EC P-256: generated in about a millisecond, a key per process is cheap
+        key = ec.generate_private_key(ec.SECP256R1())
         name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
         now = datetime.now(timezone.utc)
         certificate = (
@@ -235,7 +236,8 @@ class TlsTransport:
                 x509.KeyUsage(
                     digital_signature=True,
                     content_commitment=False,
-                    key_encipherment=True,
+                    # an EC key only signs, the key exchange is ECDHE
+                    key_encipherment=False,
                     data_encipherment=False,
                     key_agreement=False,
                     key_cert_sign=False,
