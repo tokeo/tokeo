@@ -10,8 +10,9 @@ when the extension is enabled.
 - Command history, suggestions from the history and completion while typing
 - Output of other threads, prints and log lines alike, appears above the
     prompt, which is drawn again below it
-- Ctrl-C clears the line, Ctrl-D and the shutdown signals of the app end the
-    shell
+- Ctrl-C clears the line or aborts the running command, Ctrl-D and the
+    shutdown signals SIGTERM and SIGHUP end the shell, also while the prompt
+    waits
 
 ### Example
 
@@ -30,7 +31,9 @@ app.tui.input.shell(command, prompt='MyApp> ', completer=completer)
 """
 
 import sys
+import signal
 import logging
+import threading
 from contextlib import contextmanager
 from cement.core.exc import CaughtSignal
 from cement.core.foundation import SIGNALS
@@ -71,6 +74,9 @@ class TokeoTuiInput:
         : A failing command is logged as error and its line is kept, the shell
             goes on
 
+        : Ctrl-C, also a SIGINT while a command runs, aborts only the line or
+            the command; SIGTERM and SIGHUP end the shell
+
         """
         from prompt_toolkit import PromptSession
         from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -93,7 +99,7 @@ class TokeoTuiInput:
         consoles = (sys.stdout, sys.stderr, sys.__stdout__, sys.__stderr__)
         line = ''
         # raw keeps the colors; sys.stdout is the proxy of patch_stdout for the logs
-        with patch_stdout(raw=True), _logs_to(sys.stdout, consoles):
+        with patch_stdout(raw=True), _logs_to(sys.stdout, consoles), _ends_by_signals(prompt_session):
             while True:
                 try:
                     line = prompt_session.prompt(prompt, default=line)
@@ -104,6 +110,10 @@ class TokeoTuiInput:
                 except EOFError:
                     break
                 except CaughtSignal as e:
+                    # a SIGINT while a command runs aborts only the command
+                    if e.signum == signal.SIGINT:
+                        line = ''
+                        continue
                     if e.signum in SIGNALS:
                         break
                     raise
@@ -127,6 +137,37 @@ def _logs_to(stream, consoles):
     finally:
         for handler, original in moved:
             handler.setStream(original)
+
+
+@contextmanager
+def _ends_by_signals(prompt_session):
+    """End the shell by SIGTERM and SIGHUP, also while the prompt waits."""
+    # signal handlers are set by the main thread only
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+
+    def end(signum, frame):
+        try:
+            # the handler of the app, e.g. cement runs its signal hooks and raises
+            previous[signum](signum, frame)
+        except CaughtSignal as caught:
+            # raised in the event loop of the prompt, prompt_toolkit would catch
+            # it and ask for ENTER, so the prompt ends with it instead
+            if not prompt_session.app.is_running:
+                raise
+            prompt_session.app.exit(exception=caught)
+
+    # only signals the app handles, a default or ignored signal stays as it is
+    previous = {signum: signal.getsignal(signum) for signum in SIGNALS if signum != signal.SIGINT}
+    previous = {signum: handler for signum, handler in previous.items() if callable(handler)}
+    for signum in previous:
+        signal.signal(signum, end)
+    try:
+        yield
+    finally:
+        for signum, handler in previous.items():
+            signal.signal(signum, handler)
 
 
 def load(app):

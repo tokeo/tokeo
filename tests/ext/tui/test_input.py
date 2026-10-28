@@ -1,8 +1,10 @@
 """
 Tests for tokeo.ext.tui.input: the shell with its lines, history, signals and
-the output of other threads. The shell gets its keys from a pipe; one test
-runs a real app in a pseudo terminal and reads its screen by pyte, a terminal
-emulator.
+the output of other threads. The shell gets its keys from a pipe; the tests
+of the output and of the signals run a real app in a pseudo terminal and read
+its screen by pyte, a terminal emulator. SIGTERM and SIGHUP end the shell,
+also while the prompt waits; Ctrl-C and SIGINT abort only the line or the
+running command.
 """
 
 import sys
@@ -97,14 +99,56 @@ def test_command_ends_shell_by_eof(shell):
     assert shell('one\rexit\rnever\r', command=command) == ['one', 'exit']
 
 
-@pytest.mark.parametrize('signum', [signal.SIGINT, signal.SIGTERM])
+@pytest.mark.parametrize('signum', [signal.SIGTERM, signal.SIGHUP])
 def test_shutdown_signal_ends_shell(shell, signum):
-    """SIGINT or SIGTERM raised by the command ends the shell."""
+    """SIGTERM or SIGHUP raised by the command ends the shell."""
 
     def command(line):
         raise CaughtSignal(signum, None)
 
     assert shell('one\rtwo\r', command=command) == ['one']
+
+
+def test_sigint_of_a_command_aborts_only_the_command(shell):
+    """SIGINT raised by the command aborts it, the shell reads the next line."""
+
+    def command(line):
+        if line == 'one':
+            raise CaughtSignal(signal.SIGINT, None)
+        return True
+
+    assert shell(f'one\rtwo\r{CTRL_D}', command=command) == ['one', 'two']
+
+
+def test_signal_handlers_of_the_app_return_after_the_shell(shell):
+    """The shell wraps SIGTERM and SIGHUP of the app, then restores them."""
+    handlers = []
+
+    def command(line):
+        handlers.append((signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGHUP)))
+        return True
+
+    with TuiInputTest() as app, create_pipe_input() as keyboard:
+        before = (signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGHUP))
+        keyboard.send_text(f'x\r{CTRL_D}')
+        app.tui.input.shell(command, input=keyboard, output=DummyOutput())
+        after = (signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGHUP))
+    assert callable(before[0]) and callable(before[1])
+    assert handlers[0][0] is not before[0] and handlers[0][1] is not before[1]
+    assert after == before
+
+
+def test_default_signal_stays_as_it_is(shell):
+    """A signal the app does not handle keeps its default during the shell."""
+    seen = []
+    with TuiInputTest() as app, create_pipe_input() as keyboard:
+        previous = signal.signal(signal.SIGHUP, signal.SIG_DFL)
+        try:
+            keyboard.send_text(f'x\r{CTRL_D}')
+            app.tui.input.shell(lambda line: seen.append(signal.getsignal(signal.SIGHUP)) or True, input=keyboard, output=DummyOutput())
+        finally:
+            signal.signal(signal.SIGHUP, previous)
+    assert seen == [signal.SIG_DFL]
 
 
 def test_other_signal_passes(shell):
@@ -148,3 +192,65 @@ def test_output_of_other_threads_appears_above_the_prompt():
     assert any(line.endswith('MARK-LOG') and 'Probe>' not in line for line in shown)
     assert 'MARK-APP-PRINT' in shown
     assert shown[-1] == 'Probe>'
+
+
+PROBE = 'tests.ext.tui.tui_tests_input_probe'
+
+
+def _probe():
+    """The probe in a pseudo terminal that is its controlling terminal."""
+    return Terminal([sys.executable, '-m', PROBE], rows=12, columns=80, ctty=True)
+
+
+@needs_pty
+@pytest.mark.parametrize('signum', [signal.SIGTERM, signal.SIGHUP], ids=['sigterm', 'sighup'])
+def test_shutdown_signal_ends_the_waiting_prompt(signum):
+    """SIGTERM or SIGHUP at the waiting prompt end the probe by 0, no ENTER."""
+    with _probe() as terminal:
+        assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
+        terminal.process.send_signal(signum)
+        code = terminal.wait()
+    assert code == 0
+    assert b'Press ENTER' not in terminal.raw
+
+
+@needs_pty
+def test_sigint_and_ctrl_c_at_the_prompt_keep_the_shell():
+    """A SIGINT and a Ctrl-C at the prompt clear the line, the shell goes on."""
+    with _probe() as terminal:
+        assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
+        terminal.process.send_signal(signal.SIGINT)
+        terminal.send(f'abc{CTRL_C}'.encode())
+        assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>' and 'Probe> abc' in lines)
+        terminal.send(b'exit\r')
+        code = terminal.wait()
+    assert code == 0
+
+
+@needs_pty
+def test_ctrl_c_aborts_the_running_command():
+    """Ctrl-C while the command slow runs aborts it, the prompt comes back."""
+    with _probe() as terminal:
+        assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
+        terminal.send(b'slow\r')
+        assert terminal.wait_for(lambda lines: 'MARK-SLOW-START' in lines)
+        terminal.send(CTRL_C.encode())
+        back = terminal.wait_for(lambda lines: lines[-1] == 'Probe>' and lines.index('MARK-SLOW-START') < len(lines) - 1)
+        assert back is not None, '\n'.join(terminal.screen.display)
+        terminal.send(b'exit\r')
+        code = terminal.wait()
+    assert code == 0
+    assert b'MARK-SLOW-END' not in terminal.raw
+
+
+@needs_pty
+def test_sigterm_ends_the_running_command_and_the_shell():
+    """SIGTERM while slow runs ends the probe by 0, the command does not finish."""
+    with _probe() as terminal:
+        assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
+        terminal.send(b'slow\r')
+        assert terminal.wait_for(lambda lines: 'MARK-SLOW-START' in lines)
+        terminal.process.send_signal(signal.SIGTERM)
+        code = terminal.wait()
+    assert code == 0
+    assert b'MARK-SLOW-END' not in terminal.raw

@@ -2,7 +2,8 @@
 A tokeo app with a tui shell, run by test_input in a pseudo terminal.
 
 Half a second after the start another thread prints, logs and calls
-app.print, the shell ends on the line exit.
+app.print, the line slow runs a command of 3 seconds, the shell ends on the
+line exit.
 """
 
 import time
@@ -19,6 +20,10 @@ class TuiInputProbeTest(TuiInputTest):
 def command(line):
     if line == 'exit':
         raise EOFError()
+    if line == 'slow':
+        print('MARK-SLOW-START', flush=True)
+        time.sleep(3)
+        print('MARK-SLOW-END', flush=True)
     return True
 
 
