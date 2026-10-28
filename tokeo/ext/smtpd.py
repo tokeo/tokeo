@@ -44,6 +44,10 @@ lists, process topology with pre-forked workers and machine-wide limits.
     per service, e.g. ```tokeo smtpd serve mx1```. Starting the same service
     twice fails at the port bind
 
+: The servers log to the application log (```app.log```), its level comes
+    from the log config of the application; a ```logger_severity``` in the
+    settings of a service is left out
+
 : Every selected service is built before a worker forks, so a broken config
     ends the start with the name of the service and nothing is bound. A
     worker that ends on its own, e.g. as it cannot bind its port, ends the
@@ -384,9 +388,11 @@ class TokeoSmtpd(MetaMixin):
             # hand the listener hosts to the server so a self-signed certificate
             # derives its CN and SAN from them
             hosts = list(dict.fromkeys(lst.get('host') for lst in svc.get('listeners') or [] if lst.get('host')))
+            # the server logs to app.log, the level of the app log config applies
+            settings = {key: value for key, value in (svc.get('settings') or {}).items() if key != 'logger_severity'}
             return SmtpdServer(
                 events_handler,
-                settings=svc.get('settings'),
+                settings=settings,
                 global_limits=global_limits,
                 logger=self.app.log,
                 debug=self.app.debug,

@@ -12,6 +12,7 @@ the process group and the port becoming bindable again.
 import asyncio
 import multiprocessing
 import os
+import re
 import signal
 import smtplib
 import socket
@@ -28,7 +29,7 @@ from tokeo.ext.smtpd import (
     _resolve_events_handler,
     _plan,
 )
-from tests.utils import ROOT, wait_process_group_ended
+from tests.utils import ROOT, wait_until, wait_process_group_ended
 from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
 needs_pdeathsig = pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the parent-death signal is Linux-only')
@@ -185,6 +186,31 @@ def test_build_server_names_the_service(svc, reason):
     with SmtpdTest() as app:
         with pytest.raises(TokeoSmtpdError, match=f"^smtpd: service 'mx-x': {reason}"):
             app.smtpd._build_server(dict(svc, name='mx-x', listeners=[]), None)
+
+
+def _build(svc):
+    """Build the server of one service of a test app."""
+    with SmtpdTest() as app:
+        server = app.smtpd._build_server(dict(svc, name='mx-x', listeners=[], events_handler='tokeo.ext.smtpd.TokeoSmtpdEvents'), None)
+        return app, server
+
+
+def test_build_server_hands_the_options_to_the_handler():
+    """The options of a service reach its events handler (ctx.options is gone)."""
+    _, server = _build({'options': {'tag': 'opt-42'}})
+    assert server.events_handler.options == {'tag': 'opt-42'}
+
+
+def test_build_server_hands_the_settings_to_the_server():
+    """The settings of a service reach its server."""
+    _, server = _build({'settings': {'io_session_timeout': 60, 'crlf_data_mode': 'CRLF_DATA_STRICT', 'pre_fork': 2}})
+    assert (server.io_session_timeout, server.crlf_data_mode.name) == (60, 'CRLF_DATA_STRICT')
+
+
+def test_build_server_leaves_out_logger_severity():
+    """A logger_severity of a service is left out, the server logs to app.log."""
+    app, server = _build({'settings': {'logger_severity': 'DEBUG'}})
+    assert server.events_handler._logger_protected is app.log
 
 
 # --- process tests: real termination behaviour ----------------------------------
@@ -415,3 +441,104 @@ def test_failed_worker_stops_all_services(tmp_path):
         _assert_port_free(port_a)
     finally:
         proc.kill()
+
+
+# --- process tests: services in the forked workers ------------------------------
+
+
+def _tagged_service(name, port, pre_fork, settings=None):
+    """A service whose handler answers EHLO with its tag and pid."""
+    svc = _service(name, port, pre_fork=pre_fork)
+    svc['events_handler'] = 'tests.ext.smtpd.smtpd_tests_helper.TaggedSmtpdEvents'
+    svc['options'] = {'tag': 'opt-42'}
+    svc['settings'].update(settings or {})
+    return svc
+
+
+def _kill_group(proc):
+    """End the probe and all its workers, also when a test failed."""
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    proc.wait(timeout=8)
+
+
+def _open_dialogs(port, count):
+    """Open count connections and read their banner."""
+    socks = []
+    for _ in range(count):
+        sock = socket.create_connection(('127.0.0.1', port), timeout=5)
+        assert sock.recv(1024).startswith(b'220')
+        socks.append(sock)
+    return socks
+
+
+def test_prefork_workers_hand_the_options_to_their_handler(tmp_path):
+    """Every process of a group of 3 answers EHLO with the tag of the options."""
+    port = _free_port()
+    proc = _spawn(tmp_path, {'services': [_tagged_service('mx1', port, pre_fork=3)]}, names=None)
+    try:
+        _wait_banner(proc, port)
+        pids = set()
+        for _ in range(40):
+            client = smtplib.SMTP('127.0.0.1', port, timeout=5)
+            code, msg = client.ehlo('probe')
+            client.quit()
+            first = msg.decode().splitlines()[0]
+            assert code == 250 and first.startswith('opt-42 pid ')
+            pids.add(int(first.rsplit(' ', 1)[1]))
+        # SO_REUSEPORT spreads 40 connections over more than one process
+        assert len(pids) > 1
+        if sys.platform.startswith('linux'):
+            assert pids <= {proc.pid, *_child_pids(proc.pid)}
+    finally:
+        _kill_group(proc)
+
+
+def test_prefork_workers_apply_the_settings(tmp_path):
+    """Open dialogs of a group of 3 end by 421 after io_session_timeout of 1 s."""
+    port = _free_port()
+    proc = _spawn(tmp_path, {'services': [_tagged_service('mx1', port, pre_fork=3, settings={'io_session_timeout': 1})]}, names=None)
+    try:
+        _wait_banner(proc, port)
+        socks = _open_dialogs(port, 6)
+        for sock in socks:
+            assert sock.recv(1024).startswith(b'421')
+            sock.close()
+    finally:
+        _kill_group(proc)
+
+
+def test_term_prefork_group_ends_open_dialogs_with_421(tmp_path):
+    """SIGTERM ends the waiting dialogs of all processes of a group of 3 by 421."""
+    port = _free_port()
+    proc = _spawn(tmp_path, {'services': [_tagged_service('mx1', port, pre_fork=3)]}, names=None)
+    try:
+        _wait_banner(proc, port)
+        socks = _open_dialogs(port, 6)
+        proc.send_signal(signal.SIGTERM)
+        for sock in socks:
+            assert sock.recv(1024).startswith(b'421')
+            sock.close()
+        assert proc.wait(timeout=8) == 0
+        assert wait_process_group_ended(proc.pid)
+    finally:
+        _kill_group(proc)
+
+
+@needs_pdeathsig
+def test_prefork_logs_the_started_service_of_every_process(tmp_path):
+    """The master logs its workers, every process its started service and pid."""
+    port = _free_port()
+    proc = _spawn(tmp_path, {'services': [_tagged_service('mx1', port, pre_fork=3)]}, names=None)
+    try:
+        _wait_banner(proc, port)
+        pids = [proc.pid, *_child_pids(proc.pid)]
+        assert len(pids) == 3
+        started = [f"smtpd: service 'mx1' started (pid {pid})" for pid in pids]
+        assert wait_until(lambda: all(line in proc.probe_log.read_text() for line in started))
+        forked = re.search(r'smtpd: forked workers \[([0-9, ]+)\]', proc.probe_log.read_text())
+        assert {int(pid) for pid in forked.group(1).split(',')} == set(pids[1:])
+    finally:
+        _kill_group(proc)
