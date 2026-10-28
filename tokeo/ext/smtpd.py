@@ -419,8 +419,8 @@ class TokeoSmtpd(MetaMixin):
                 server = self._build_server(svc, global_limits)
                 listeners = self._listeners(svc, svc.get('name') in reuse)
                 await server.start(listeners)
-                where = ', '.join(f"{lst.get('host')}:{lst.get('port')}" for lst in listeners)
-                self.app.log.info(f"smtpd: service '{svc.get('name')}' listening on {where} (pid {os.getpid()})")
+                # the server logs its addresses, here the service and its process
+                self.app.log.info(f"smtpd: service '{svc.get('name')}' started (pid {os.getpid()})")
                 servers.append(server)
             stop = asyncio.Event()
             loop = asyncio.get_running_loop()
