@@ -202,6 +202,9 @@ per-line events and never to ```async def``` events (a coroutine can already
 Inside a handler, two helpers report connection state:
 ```self.authenticated(ctx)``` is true once the client has authenticated, and
 ```self.encrypted(ctx)``` is true once the connection is running over TLS.
+They only report ```ctx.server.authenticated``` and ```ctx.server.encrypted```:
+the server checks these fields itself, so overriding a helper does not change
+its decisions, unlike ```authenticated?```/```encrypted?``` of the original.
 
 ## 5. The context object
 
@@ -311,6 +314,22 @@ line. The available classes (all importable from ```tokeo.core.smtpd```):
 
 The full set is present (```Smtpd432```, ```Smtpd454```, ```Smtpd534```,
 ```Smtpd538```, and the pipelining/CRLF ```Smtpd500``` variants).
+
+Code and text are fixed by the class, the constructor takes only a message
+for the log. An own text, or a code without a class, comes by a subclass, so
+no internal detail of a handler reaches the client:
+
+```python
+from tokeo.core.smtpd import Smtpd450Exception
+
+
+class GreylistedException(Smtpd450Exception):
+    smtp_text = 'Greylisted, try again later'
+
+
+raise GreylistedException(f'greylisted {ctx.server.remote_ip}')
+```
+
 The closing exceptions and the internal signals of the server are described
 below in "Closing the connection".
 
@@ -785,12 +804,21 @@ class MailHandler(SmtpdEvents):
 ```Severity``` values map onto the standard ```logging``` levels, so they compare
 and forward to the ```logging``` module directly.
 
+With ```DEBUG``` the server logs the dialog: ```<<< ``` for a command line
+of the client, ```>>> ``` for a reply. A command line is decoded as UTF-8,
+other bytes appear as ```\xNN```, and every CR as ```[\r]```, so a bare CR or
+a byte used for SMTP smuggling stays visible. The lines of DATA are never
+logged.
+
 ## 14. Relationship to the reference implementation
 
 The library started as a one-to-one port of the original: the same 13 events,
 the same context layout, the same configuration options and attribute
 readers, the same AUTH / STARTTLS behaviour and the same lifecycle. Its test
-suite started as a direct port of the original test suite.
+suite started as a direct port of the original test suite. The context is
+read by attributes instead of hash keys (```ctx.server.remote_ip``` for
+```ctx[:server][:remote_ip]```), its times are ```datetime``` in UTC and the
+message is a ```bytearray```.
 
 Since then the library develops further towards RFC conformance and defense,
 e.g. the closing exceptions (```SmtpdCloseException```), ```whitespace_mode```,
