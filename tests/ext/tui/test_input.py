@@ -4,9 +4,12 @@ the output of other threads. The shell gets its keys from a pipe; the tests
 of the output and of the signals run a real app in a pseudo terminal and read
 its screen by pyte, a terminal emulator. SIGTERM and SIGHUP end the shell,
 also while the prompt waits; Ctrl-C and SIGINT abort only the line or the
-running command.
+running command. The shell reads the terminal by a descriptor of its own, so
+code that closes or moves stdin does not end it; a lost terminal ends it with
+one error.
 """
 
+import os
 import sys
 import signal
 import logging
@@ -161,6 +164,20 @@ def test_other_signal_passes(shell):
         shell('one\r', command=command)
 
 
+def test_closed_input_ends_the_shell_with_one_error():
+    """An input that closes ends the shell with one error, a Ctrl-D quietly."""
+    errors = {}
+    for name, end in (('closed', None), ('ctrl_d', CTRL_D)):
+        errors[name] = []
+        with TuiInputTest() as app, create_pipe_input() as keyboard:
+            app.log.error = errors[name].append
+            keyboard.send_text('x\r' + (end or ''))
+            if end is None:
+                keyboard.close()
+            app.tui.input.shell(lambda line: True, input=keyboard, output=DummyOutput())
+    assert errors == {'closed': ['Shell input closed or left the terminal, the shell ends'], 'ctrl_d': []}
+
+
 def test_log_handlers_write_to_the_shell_meanwhile(shell):
     """A console log handler writes through the shell while it runs."""
     handler = logging.StreamHandler(sys.stderr)
@@ -254,3 +271,41 @@ def test_sigterm_ends_the_running_command_and_the_shell():
         code = terminal.wait()
     assert code == 0
     assert b'MARK-SLOW-END' not in terminal.raw
+
+
+def _probe_logging(log_file, ctty=True):
+    """The probe in a pseudo terminal, logging into log_file as well."""
+    return Terminal([sys.executable, '-m', PROBE, str(log_file)], rows=12, columns=80, ctty=ctty)
+
+
+@needs_pty
+@pytest.mark.parametrize('line', ['closestdin', 'devnull'])
+def test_closed_or_moved_stdin_keeps_the_shell(tmp_path, line):
+    """Stdin closed or moved to /dev/null: the shell reads on, exit ends it by 0."""
+    log_file = tmp_path / 'probe.log'
+    with _probe_logging(log_file) as terminal:
+        assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
+        terminal.send(f'{line}\r'.encode())
+        terminal.send(b'hello\r')
+        assert terminal.wait_for(lambda lines: 'Probe> hello' in lines and lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
+        terminal.send(b'exit\r')
+        code = terminal.wait()
+    assert code == 0
+    assert 'Shell input' not in log_file.read_text()
+
+
+@needs_pty
+@pytest.mark.parametrize('ctty', [True, False], ids=['controlling', 'not_controlling'])
+def test_lost_terminal_ends_the_shell_with_one_error(tmp_path, ctty):
+    """A terminal that goes away ends the probe by 0 after one error."""
+    log_file = tmp_path / 'probe.log'
+    with _probe_logging(log_file, ctty=ctty) as terminal:
+        assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
+        # the terminal goes away: its master side closes
+        os.close(terminal.master)
+        terminal.master = os.open(os.devnull, os.O_RDWR)
+        code = terminal.process.wait(10)
+    log = log_file.read_text()
+    assert code == 0
+    assert log.count('Shell input failed, the shell ends') == 1
+    assert log.endswith('SHELL-ENDED\n')

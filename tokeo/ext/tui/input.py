@@ -13,6 +13,9 @@ when the extension is enabled.
 - Ctrl-C clears the line or aborts the running command, Ctrl-D and the
     shutdown signals SIGTERM and SIGHUP end the shell, also while the prompt
     waits
+- The shell reads the terminal by a descriptor of its own, code of the
+    process that closes or moves stdin does not reach it; an input that is
+    lost anyway ends the shell with an error
 
 ### Example
 
@@ -30,11 +33,12 @@ app.tui.input.shell(command, prompt='MyApp> ', completer=completer)
 
 """
 
+import os
 import sys
 import signal
 import logging
 import threading
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from cement.core.exc import CaughtSignal
 from cement.core.foundation import SIGNALS
 from tokeo.ext.tui import register, require
@@ -77,17 +81,34 @@ class TokeoTuiInput:
         : Ctrl-C, also a SIGINT while a command runs, aborts only the line or
             the command; SIGTERM and SIGHUP end the shell
 
+        : Without an own ```input``` the shell reads the terminal of stdin by a
+            descriptor of its own, so code of the process that closes stdin or
+            moves it, e.g. to /dev/null, does not end the shell; an input that
+            is lost anyway, closed or no terminal anymore, ends the shell with
+            an error instead of reading it again and again
+
         """
         from prompt_toolkit import PromptSession
         from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
         from prompt_toolkit.completion import NestedCompleter
         from prompt_toolkit.history import InMemoryHistory
+        from prompt_toolkit.input import create_input
         from prompt_toolkit.patch_stdout import patch_stdout
 
         if isinstance(completer, dict):
             completer = NestedCompleter.from_nested_dict(completer)
         if history is None or isinstance(history, (list, tuple)):
             history = InMemoryHistory(history or [])
+        # a descriptor of its own on the terminal: code that closes or moves
+        # fd 0, e.g. a job of the scheduler, does not reach the shell
+        own_stdin = None
+        if 'input' not in session:
+            try:
+                if os.isatty(sys.stdin.fileno()):
+                    own_stdin = os.fdopen(os.dup(sys.stdin.fileno()), 'r')
+                    session['input'] = create_input(own_stdin)
+            except (OSError, ValueError):
+                pass
         # complete while typing excludes history search, so it is not set
         prompt_session = PromptSession(
             history=history,
@@ -97,17 +118,34 @@ class TokeoTuiInput:
             **session,
         )
         consoles = (sys.stdout, sys.stderr, sys.__stdout__, sys.__stderr__)
+        # an input that starts on a terminal has to stay on it
+        try:
+            on_tty = os.isatty(prompt_session.input.fileno())
+        except (OSError, ValueError):
+            on_tty = False
         line = ''
         # raw keeps the colors; sys.stdout is the proxy of patch_stdout for the logs
-        with patch_stdout(raw=True), _logs_to(sys.stdout, consoles), _ends_by_signals(prompt_session):
+        with own_stdin or nullcontext(), patch_stdout(raw=True), _logs_to(sys.stdout, consoles), _ends_by_signals(prompt_session):
             while True:
                 try:
-                    line = prompt_session.prompt(prompt, default=line)
+                    try:
+                        line = prompt_session.prompt(prompt, default=line)
+                    except (OSError, ValueError) as e:
+                        # a closed or unusable input fails each next prompt
+                        self.app.log.error(f'Shell input failed, the shell ends: {e}')
+                        break
                     if command(line):
                         line = ''
                 except KeyboardInterrupt:
                     line = ''
                 except EOFError:
+                    # Ctrl-D and exit end quietly, a lost input with an error
+                    try:
+                        lost = prompt_session.input.closed or (on_tty and not os.isatty(prompt_session.input.fileno()))
+                    except (OSError, ValueError):
+                        lost = True
+                    if lost:
+                        self.app.log.error('Shell input closed or left the terminal, the shell ends')
                     break
                 except CaughtSignal as e:
                     # a SIGINT while a command runs aborts only the command
