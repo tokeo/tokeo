@@ -1129,11 +1129,20 @@ class SmtpdServer:
                 await self._write_line(writer, output.encode() + b'\r\n')
 
             # the peer closed the connection, also within a line
-            except (EOFError, ConnectionError) as e:
+            except EOFError as e:
                 if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
                     await self._emit(
                         SmtpdEvent.ON_LOGGING_EVENT, session.ctx, Severity.DEBUG, 'Connection lost due abort by client! (EOFError)', e
                     )
+
+            # the peer reset the connection: count and log it like Ruby, a 421
+            # can not arrive any more
+            except ConnectionError as e:
+                ctx = session.ctx
+                ctx.server.exceptions += 1
+                ctx.server.errors.append(e)
+                if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                    await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.ERROR, 'Connection lost due reset by client!', e)
 
             except asyncio.CancelledError:
                 # a stop drops the connection, after a last attempt to send 421

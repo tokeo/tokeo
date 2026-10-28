@@ -6,17 +6,20 @@ DATA only after the end of DATA; a ```SmtpdAbortException``` closes at once,
 also within DATA. The internal signals abort at once: a line over
 ```io_buffer_max_size``` by 554, a session over ```io_session_timeout``` and
 a client that does not take its replies within ```io_cmd_timeout``` by 421.
-Every error of the connection is in ```ctx.server.errors``` when
+A reset by the client is counted and logged by ERROR without a reply. Every
+error of the connection is in ```ctx.server.errors``` when
 ```on_disconnect_event``` runs. These tests speak to the socket directly.
 """
 
 import time
 import socket
+import struct
 import asyncio
 
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer
+from tokeo.core.smtpd.logger import Severity
 from tokeo.core.smtpd.exc import (
     Smtpd421CloseException,
     Smtpd521CloseException,
@@ -42,6 +45,8 @@ class ClosingEvents(RecordingEvents):
         self.raise_in = raise_in
         self.exc = exc
         self.errors = None
+        self.exceptions = None
+        self.logged = []
 
     def on_connect_event(self, ctx):
         super().on_connect_event(ctx)
@@ -58,9 +63,13 @@ class ClosingEvents(RecordingEvents):
         if self.raise_in == 'receiving':
             raise self.exc
 
+    def on_logging_event(self, ctx, severity, msg, err=None):
+        self.logged.append((severity, msg))
+
     def on_disconnect_event(self, ctx):
         super().on_disconnect_event(ctx)
         self.errors = [type(e) for e in ctx.server.errors]
+        self.exceptions = ctx.server.exceptions
 
 
 def _run(events, settings, client):
@@ -305,3 +314,24 @@ def test_client_that_does_not_read_is_dropped_after_io_cmd_timeout():
     elapsed = asyncio.run(go())
     assert elapsed < 3
     assert events.errors == [SmtpdIOCmdTimeoutException]
+
+
+# reset by the client
+
+
+def test_reset_by_client_is_counted_and_logged_as_error():
+    """An RST after HELO counts one exception, logs ERROR and sends no 421."""
+    events = ClosingEvents()
+
+    async def client(reader, writer):
+        await read_reply(reader)
+        await send_command(reader, writer, b'HELO a\r\n')
+        # SO_LINGER with 0 seconds closes by RST instead of FIN
+        writer.get_extra_info('socket').setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+        writer.transport.abort()
+
+    _run(events, {}, client)
+    assert events.exceptions == 1
+    assert events.errors == [ConnectionResetError]
+    assert (Severity.ERROR, 'Connection lost due reset by client!') in events.logged
+    assert not any(msg.startswith("Can't send") for _, msg in events.logged)
