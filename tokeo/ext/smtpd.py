@@ -387,7 +387,6 @@ class TokeoSmtpd(MetaMixin):
             return SmtpdServer(
                 events_handler,
                 settings=svc.get('settings'),
-                options=svc.get('options'),
                 global_limits=global_limits,
                 logger=self.app.log,
                 debug=self.app.debug,

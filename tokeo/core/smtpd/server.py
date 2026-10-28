@@ -418,7 +418,6 @@ class SmtpdServer:
 
     - **events_handler** (SmtpdEvents): The bound handler implementation instance
     - **settings** (dict): The service settings
-    - **options** (dict, optional): The service ```options``` block for the ctx
     - **global_limits** (GlobalLimits, optional): Shared caps across services
     - **logger** (optional): Target of the default ```on_logging_event```, any
         logger with ```debug```/```info```/```warning```/```error```/```critical```;
@@ -426,7 +425,7 @@ class SmtpdServer:
 
     """
 
-    def __init__(self, events_handler, settings=None, *, options=None, global_limits=None, logger=None, debug=False, **kwargs):
+    def __init__(self, events_handler, settings=None, *, global_limits=None, logger=None, debug=False, **kwargs):
         # accept both the Tokeo settings-dict and the keyword style;
         # keyword args merge into settings, which takes precedence
         settings = dict(settings or {})
@@ -437,7 +436,6 @@ class SmtpdServer:
                 settings.setdefault(key, value)
         self.events_handler = events_handler
         self.emit_events = self._build_emit_events_dispatcher(events_handler)
-        self.options = options or {}
         self.debug = bool(debug)
         self.global_limits = global_limits
         #: Strong refs to scheduled log tasks (the loop only holds them weakly)
@@ -2035,7 +2033,7 @@ class SmtpdServer:
         # test existing of ctx
         if session.ctx is None:
             # create a new one
-            session.ctx = SmtpdContext(id=secrets.token_hex(self.session_id_bytes), options=self.options)
+            session.ctx = SmtpdContext(id=secrets.token_hex(self.session_id_bytes))
         else:
             # make sure to finish all interrupted actions
             session.ctx.finalize()
@@ -2046,7 +2044,6 @@ class SmtpdServer:
         # reset envelope and message values
         ctx.envelope = EnvelopeCtx()
         ctx.message = MessageCtx()
-        ctx.options = self.options
 
     # ---- event dispatch -------------------------------------------------------
 

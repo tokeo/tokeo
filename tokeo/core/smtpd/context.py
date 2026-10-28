@@ -280,7 +280,6 @@ class SmtpdContext:
     server: ServerCtx = field(default_factory=ServerCtx)
     envelope: EnvelopeCtx = field(default_factory=EnvelopeCtx)
     message: MessageCtx = field(default_factory=MessageCtx)
-    options: dict = field(default_factory=dict)
 
     def __setattr__(self, name, value):
         """Guard the write-once session ```id``` against a second assignment."""

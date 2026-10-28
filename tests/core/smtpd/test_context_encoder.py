@@ -4,7 +4,8 @@ JSON of a live ```ctx``` with ```SmtpdContextEncoder```.
 A real dialog over smtplib serializes its ```ctx``` in
 ```on_message_data_event```, the way a handler logs a message or enqueues a
 job: the raw body (```data```) and the spooler stay out of the JSON, the
-envelope and the facts of the connection and the message are in.
+envelope and the facts of the connection and the message are in. The
+```options``` of the service reach only the handler, never the ```ctx```.
 """
 
 import json
@@ -43,3 +44,12 @@ def test_context_encoder_keeps_the_body_out_of_the_json():
     assert isinstance(ctx['message']['delivered'], str)
     assert (ctx['envelope']['mail_from'], ctx['envelope']['rcpt_tos']) == events.envelopes[0]
     assert ctx['server']['remote_ip'] == '127.0.0.1'
+
+
+def test_context_encoder_has_no_options_of_the_service():
+    """The options of the service stay at the handler, the ctx JSON has none."""
+    events = JsonEvents(options={'api_key': 'THE-OPTIONS-MUST-NOT-REACH-THE-JSON'})
+    run_server_client(events, {'do_dns_reverse_lookup': False}, lambda port: send_mail(port, 'a@local', 'b@local', BODY))
+    assert 'THE-OPTIONS-MUST-NOT-REACH-THE-JSON' not in events.json[0]
+    assert set(json.loads(events.json[0])) == {'id', 'server', 'envelope', 'message'}
+    assert events.options == {'api_key': 'THE-OPTIONS-MUST-NOT-REACH-THE-JSON'}
