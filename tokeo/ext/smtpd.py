@@ -529,7 +529,7 @@ class TokeoSmtpd(MetaMixin):
         # fork the worker groups BEFORE any event loop exists; the shared
         # limits above are inherited by every worker
         if plan['forks'] and not sys.platform.startswith('linux'):
-            self.app.log.warning('smtpd: no parent-death signal on this platform -- a crashed master leaves the workers running')
+            self.app.log.warning('smtpd: no parent-death signal on this platform, a crashed master leaves the workers running')
         master_pid = os.getpid()
         workers = {}
         # a worker keeps the stop signals blocked until its handlers are set,
@@ -542,7 +542,7 @@ class TokeoSmtpd(MetaMixin):
                     if pid == 0:
                         _set_pdeathsig(signal.SIGTERM)
                         # the master died between fork and prctl, so the parent
-                        # death signal can never fire -- end at once
+                        # death signal can never fire, so end at once
                         if os.getppid() != master_pid:
                             os._exit(0)
                         status = 0

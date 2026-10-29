@@ -119,7 +119,7 @@ def make_cert(common_name, san_ips=(), san_dns=(), issuer_cert=None, issuer_key=
     if alt:
         builder = builder.add_extension(x509.SubjectAlternativeName(alt), critical=False)
     # subject key identifier on every cert, and an authority key identifier that
-    # points at the issuer's key -- required for strict chain verification
+    # points at the issuer's key; both are required for strict chain verification
     # (Python 3.13's ssl rejects a chain that is missing these)
     builder = builder.add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
     if issuer_cert is not None:

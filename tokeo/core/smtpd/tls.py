@@ -52,7 +52,7 @@ TLS_CIPHERS_ADVANCED = (
     + ':ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384'
     + ':DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256'
 )
-# LEGACY: the widest compatible set that still keeps forward secrecy -- it adds
+# LEGACY: the widest compatible set that still keeps forward secrecy: it adds
 # the SHA1 CBC suites needed by TLS 1.0/1.1 clients, but deliberately excludes
 # the broken/legacy suites (3DES/Sweet32, RC4, DES, MD5, static-RSA). Opt-in.
 TLS_CIPHERS_LEGACY = (
@@ -63,7 +63,7 @@ TLS_CIPHERS_LEGACY = (
 )
 # TLS floor presets. The default (ADVANCED) is TLS 1.2, the RFC 8996 minimum for
 # a secure server. MODERN is TLS 1.3 only. LEGACY drops the floor to TLS 1.0 for
-# maximum client/server interoperability -- an explicit opt-in trade-off (TLS
+# maximum client/server interoperability, an explicit opt-in trade-off (TLS
 # 1.0/1.1 are deprecated) that is still useful for opportunistic SMTP TLS, where
 # an old, weakly-encrypted hop beats a cleartext one.
 TLS_METHODS_MODERN = 'TLSv1_3'

@@ -463,7 +463,7 @@ class TokeoPdoc(Handler):
         # traceback) for every module it cannot import, every unresolved
         # ``__all__`` entry, type-annotation parse issues, suppressed subprocess
         # calls during import, and name ambiguities. For a doc build that is
-        # just noise — the loader below records what it skipped and prints one
+        # just noise; the loader below records what it skipped and prints one
         # clean summary. Silence pdoc's own UserWarning/RuntimeWarning stream.
         warnings.filterwarnings('ignore', category=UserWarning)
         warnings.filterwarnings('ignore', category=RuntimeWarning)
@@ -489,7 +489,7 @@ class TokeoPdoc(Handler):
 
         # additional template search paths: every configured directory must sit
         # BEFORE pdoc's bundled defaults, so a derived project (e.g. Spiral) can
-        # override individual files while tokeo — and only then pdoc — supply the
+        # override individual files while tokeo, and only then pdoc, supply the
         # rest. pdoc's configure() puts its own template dirs right after the
         # primary, so we insert the extras just after the primary (index 1+),
         # keeping the configured order and pushing pdoc's defaults to the back.
@@ -565,7 +565,7 @@ class TokeoPdoc(Handler):
 
         # subclasses: the loaded direct subclasses (type.__subclasses__()).
         # Because the render imports every module first, subclasses defined in
-        # other modules are present by the time a class is rendered — mirroring
+        # other modules are present by the time a class is rendered, mirroring
         # the previous behaviour. Returned sorted by name.
         def _subclasses(cls):
             out = []
@@ -627,7 +627,7 @@ class TokeoPdoc(Handler):
         module_names = self._modules
 
         # discover the full set of modules (incl. namespace subtrees) that
-        # walk_specs would miss, then load each — preserving the order the
+        # walk_specs would miss, then load each, preserving the order the
         # modules were configured in (roots appear as named, not alphabetical)
         ordered_specs = []
         seen = set()
@@ -952,7 +952,7 @@ class TokeoPdoc(Handler):
         """Fill empty variable docstrings from ```#:``` comments.
 
         Only members pdoc already found are touched, and only when their
-        docstring is empty — a string literal after the assignment stays
+        docstring is empty; a string literal after the assignment stays
         authoritative, exactly as under pdoc3.
 
         ### Args
@@ -1063,7 +1063,7 @@ class TokeoPdoc(Handler):
 
         # honour the package's own `__pdoc__` overrides: an entry mapped to
         # False hides that submodule (pdoc's native mechanism). This is how a
-        # package opts a subtree — e.g. code-generation templates — out of the
+        # package opts a subtree (e.g. code-generation templates) out of the
         # documentation, without the extension hard-coding anything.
         pdoc_over = getattr(mod, '__pdoc__', None) or {}
 
@@ -1299,7 +1299,7 @@ class TokeoPdoc(Handler):
 
         The module specs exactly as configured, plus ```config``` when the yaml
         config page is written. Used for the one-line summary; it says what is
-        *documented*, which is not the same as what ```--watch``` observes — an
+        *documented*, which is not the same as what ```--watch``` observes: an
         installed ```tokeo``` is documented but never watched. The ```--watch```
         detail is on debug level.
 
@@ -1321,7 +1321,7 @@ class TokeoPdoc(Handler):
     def _watch_dirs(self):
         """Every directory whose contents can change and be edited here.
 
-        Modules, external docstring snippets and — when appenv is loaded —
+        Modules, external docstring snippets and, when appenv is loaded,
         the config directory. Nested entries are collapsed into their parent
         so no directory is watched twice.
 
@@ -1338,7 +1338,7 @@ class TokeoPdoc(Handler):
 
         ### Returns
 
-        - **tuple**: ```(roots, outside)``` — the directories to watch and the
+        - **tuple**: ```(roots, outside)```: the directories to watch and the
           ones dropped for sitting outside the project
 
         """
@@ -1481,7 +1481,7 @@ class TokeoPdoc(Handler):
         Ends on its own in three cases: a settled change, the stop event set
         by ```shutdown()```, or an unexpected error. It waits on the event rather
         than sleeping, so Ctrl+C does not leave it lingering for another
-        interval — and the stop check shares the lock with the restart flag,
+        interval, and the stop check shares the lock with the restart flag,
         so a change arriving during the shutdown cannot turn a quit into a
         restart.
 
@@ -1582,7 +1582,7 @@ class TokeoPdoc(Handler):
 
         The render step already produced static HTML in ```output_dir```. Serving
         that directory (rather than pdoc's live ```DocServer```) avoids importing
-        every module again on each request — which would re-hit modules that
+        every module again on each request, which would re-hit modules that
         cannot be imported (missing optional deps) or are not valid Python at
         all (code-generation templates), crashing the request handler.
 
@@ -1599,8 +1599,8 @@ class TokeoPdoc(Handler):
 
         ### Raises
 
-        - **TokeoPdocError**: When the port cannot be bound, or — with
-            ```watch``` — when watchdog is missing or there is nothing to watch
+        - **TokeoPdocError**: When the port cannot be bound, or, with
+            ```watch```, when watchdog is missing or there is nothing to watch
 
         """
         import functools
@@ -1623,7 +1623,7 @@ class TokeoPdoc(Handler):
             httpd = http.server.ThreadingHTTPServer((host, port), handler)
         except OSError as err:
             # binding failed (port taken, address not assignable, privileged
-            # port, …) — report it as a tokeo error so the CLI prints a clean
+            # port, …); report it as a tokeo error so the CLI prints a clean
             # message instead of a socket traceback
             reason = err.strerror or str(err)
             raise TokeoPdocError(

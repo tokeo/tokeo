@@ -355,7 +355,7 @@ class TokeoScheduler(MetaMixin):
         try:
             executor = self.scheduler._lookup_executor(job.executor)
         except Exception:
-            self.app.log.error(f'Executor lookup "{job.executor}" failed for job "{job}" -- removing it from the job store')
+            self.app.log.error(f'Executor lookup "{job.executor}" failed for job "{job}", removing it from the job store')
             job.remove()
             # bail out: without an executor the submit below would hit an
             # unbound name and the real error would be masked by the broad

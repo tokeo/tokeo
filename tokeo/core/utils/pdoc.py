@@ -123,7 +123,7 @@ class DecoratedFunction:
         # get the source block from zero to function definition and
         # replace by simplest method just for ast parsing
         # methods arrive indented (pdoc keeps the original indentation), which
-        # ast.parse rejects — dedent so class members parse like plain funcs
+        # ast.parse rejects; dedent so class members parse like plain funcs
         block = textwrap.dedent(f'{self.func.source[:block_start.end()]}_decorator(): pass')
         try:
             # safe parse the block

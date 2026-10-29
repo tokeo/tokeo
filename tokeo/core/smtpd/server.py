@@ -1224,7 +1224,7 @@ class SmtpdServer:
         try:
             # the timeout and the shutdown guard *waiting on the wire*: when a
             # complete line is already buffered, readuntil returns without
-            # waiting -- in pipelined/DATA bulk traffic that is nearly every line
+            # waiting; in pipelined/DATA bulk traffic that is nearly every line
             if self._buffered_line_lf(reader):
                 raw = await reader.readuntil(b'\n')
             else:

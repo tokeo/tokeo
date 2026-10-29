@@ -10,7 +10,7 @@ Tests for tokeo.ext.pdoc, on what it adds on top of pdoc, not on pdoc itself:
 
 Everything that can fail at runtime is executed rather than inspected: the
 server really binds and answers a request. The watch machinery itself is not
-covered here — it needs a live filesystem observer and a process replacement,
+covered here; it needs a live filesystem observer and a process replacement,
 which do not belong in a unit test run.
 """
 
@@ -519,7 +519,7 @@ def _stub_dirs(app, monkeypatch, dirs):
 def test_watch_dirs_drops_directories_outside_the_project(app, tmp_path, monkeypatch):
     """Directories outside the project are not watched but reported."""
     # an installed tokeo lives in site-packages and is never edited there,
-    # so it must not be watched — but it has to be reported back
+    # so it must not be watched, but it has to be reported back
     project = tmp_path / 'project'
     (project / 'spiral').mkdir(parents=True)
     (project / 'tests').mkdir()
