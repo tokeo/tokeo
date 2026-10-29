@@ -137,6 +137,9 @@ as a single method. The full set, in the order they can occur:
 <tr><td>on_message_data_receiving_event</td><td>repeatedly, while the body arrives</td><td>-</td></tr>
 <tr><td>on_message_data_headers_event</td><td>when the header/body boundary is reached</td><td>-</td></tr>
 <tr><td>on_message_data_event</td><td>the complete message has arrived</td><td>-</td></tr>
+<tr><td>on_vrfy_event</td><td>on VRFY</td><td>vrfy_data</td></tr>
+<tr><td>on_expn_event</td><td>on EXPN</td><td>expn_data</td></tr>
+<tr><td>on_help_event</td><td>on HELP</td><td>help_data</td></tr>
 <tr><td>on_process_line_unknown_event</td><td>an unrecognized command line</td><td>line</td></tr>
 <tr><td>on_disconnect_event</td><td>connection closing</td><td>-</td></tr>
 <tr><td>on_logging_event</td><td>a log message is emitted</td><td>severity, msg, err=None</td></tr>
@@ -153,7 +156,10 @@ Two conventions matter:
   answered by ```451```. Not overriding the event accepts every address.
   ```on_process_line_unknown_event``` answers an unknown line by a returned single
   reply line with its code (e.g. ```'250 OK'```), by ```500``` on ```None``` or
-  ```False```, and by ```451``` on any other result. ```on_proxy_event``` updates
+  ```False```, and by ```451``` on any other result. ```on_vrfy_event```,
+  ```on_expn_event``` and ```on_help_event``` answer the same way; on ```None```
+  or ```False``` VRFY answers ```252``` (neither verified nor denied, RFC 5321
+  7.3), EXPN and HELP answer ```502```. ```on_proxy_event``` updates
   the fields of ```ctx.server.proxy``` by a returned ```dict``` (also ```{}```),
   keeps them on ```None``` and ends the connection by ```421``` on any other result.
 - Raising decides the reply. Raise one of the ```Smtpd*Exception``` classes
@@ -174,6 +180,52 @@ Two conventions matter:
     the original error is its ```__cause__```. The fault is logged as ERROR
     when it occurs (```Error within DATA, further DATA is ignored up to its
     end: ...```); at the end it is counted once and logged with its reply.
+
+### The trace header
+
+RFC 5321 4.4 asks every server that receives a message to add a trace header
+at its top. The server leaves this to the handler, which knows the names and
+the policy of its site. ```on_message_data_start_event``` runs before the first
+line of the body, so a ```Received``` header written there heads the message,
+in memory as in the spool file:
+
+```python
+import email.utils
+
+
+class MyEvents(SmtpdEvents):
+
+    def on_message_data_start_event(self, ctx):
+        server = ctx.server
+        ctx.message.data += (
+            f'Received: from {server.helo} ({server.remote_host} [{server.remote_ip}])\r\n'
+            f'\tby {server.local_host} with ESMTP id {ctx.id};\r\n'
+            f'\t{email.utils.format_datetime(ctx.message.received)}\r\n'
+        ).encode()
+```
+
+The header counts against ```data_size``` like every other byte of the message.
+
+### Addresses with non-ASCII characters
+
+With ```internationalization_extensions``` the server announces SMTPUTF8 and
+marks a transaction that asks for it by ```ctx.envelope.encoding_utf8```. An
+address with non-ASCII characters in a transaction without SMTPUTF8 is refused
+by the handler, with ```553``` (RFC 6531):
+
+```python
+from tokeo.core.smtpd import Smtpd553Exception
+
+
+class MyEvents(SmtpdEvents):
+
+    def on_rcpt_to_event(self, ctx, rcpt_to_data):
+        if not rcpt_to_data.isascii() and ctx.envelope.encoding_utf8 != 'utf8':
+            raise Smtpd553Exception
+        return True
+```
+
+The same test fits ```on_mail_from_event``` for the sender.
 
 ### Slow work with ```@threaded```
 
@@ -305,6 +357,7 @@ line. The available classes (all importable from ```tokeo.core.smtpd```):
 <tr><td>Smtpd503Exception</td><td>503 bad sequence</td><td>command out of order</td></tr>
 <tr><td>Smtpd530Exception</td><td>530 authentication required</td><td>gate before MAIL</td></tr>
 <tr><td>Smtpd535Exception</td><td>535 authentication failed</td><td>deny AUTH</td></tr>
+<tr><td>Smtpd538Exception</td><td>538 encryption required for the mechanism</td><td>AUTH on a plaintext channel with TLS_WHEN_AUTH</td></tr>
 <tr><td>Smtpd550Exception<br>Smtpd552Exception<br>Smtpd553Exception<br>Smtpd554Exception</td><td>5xx permanent</td><td>reject recipient / message</td></tr>
 <tr><td>Smtpd555Exception</td><td>555 parameters not recognized or not implemented</td><td>reject MAIL / RCPT parameters</td></tr>
 <tr><td>Tls454Exception<br>Tls530Exception</td><td>TLS-related</td><td>STARTTLS problems / TLS required</td></tr>
@@ -312,7 +365,7 @@ line. The available classes (all importable from ```tokeo.core.smtpd```):
 </table>
 
 The full set is present (```Smtpd432```, ```Smtpd454```, ```Smtpd534```,
-```Smtpd538```, and the pipelining/CRLF ```Smtpd500``` variants).
+and the pipelining/CRLF ```Smtpd500``` variants).
 
 Code and text are fixed by the class, the constructor takes only a message
 for the log. An own text, or a code without a class, comes by a subclass, so
@@ -461,6 +514,9 @@ I intermediate, F failure, E error.
 <tr><td>DATA (accept)</td><td>I: 354</td><td>451, 554</td><td>500, 501, 503, 421</td></tr>
 <tr><td>DATA (after body)</td><td>250</td><td>552, 554, 451, 452</td><td>-</td></tr>
 <tr><td>RSET</td><td>250</td><td>-</td><td>500, 501, 504, 421</td></tr>
+<tr><td>VRFY</td><td>250, 251, 252</td><td>550, 551, 553</td><td>500, 501, 502, 504, 421</td></tr>
+<tr><td>EXPN</td><td>250</td><td>550</td><td>500, 501, 502, 504, 421</td></tr>
+<tr><td>HELP</td><td>211, 214</td><td>-</td><td>500, 501, 502, 504, 421</td></tr>
 <tr><td>NOOP</td><td>250</td><td>-</td><td>500, 421</td></tr>
 <tr><td>QUIT</td><td>221</td><td>-</td><td>500</td></tr>
 </tbody>
@@ -589,7 +645,7 @@ To sit behind a proxy or load balancer that speaks the PROXY protocol
 (haproxy, version 1), set ```proxy_extension=True```. The PROXY header is
 then mandatory as the very first line of each connection: the server sends
 no greeting on connect, validates the header (TCP4/TCP6/UNKNOWN, normalized
-addresses and ports), stores the parsed result on ```ctx.server.proxy```,
+addresses), stores the parsed result on ```ctx.server.proxy```,
 calls ```on_proxy_event``` and answers with the ```220``` greeting only
 after that. The original client address is thus available to your handler.
 
@@ -603,11 +659,12 @@ is not a valid PROXY header, when the header does not arrive within
 fails, or when a later line sends PROXY again (a Tokeo safeguard, the
 specification only defines the leading header).
 
-Deviations from the specification, kept for compatibility:
+The header follows the specification: exactly one space between its fields,
+ports from 0 to 65535 without leading zeros and at most 107 bytes with its
+CRLF. Deviations from the specification, kept for compatibility:
 
 - the header is matched case-insensitive
 - a bare LF ends the header as well (except with ```CRLF_STRICT```)
-- the header length is limited by ```io_buffer_max_size```, not 107 bytes
 - only version 1 (text) is supported, a version 2 (binary) header is
   rejected with ```421```
 
@@ -823,9 +880,13 @@ message is a ```bytearray```.
 
 Since then the library develops further towards RFC conformance and defense,
 e.g. the closing exceptions (```SmtpdCloseException```), ```whitespace_mode```,
-```crlf_data_mode``` and ```io_session_timeout```. These changes are made here
-first and planned as a backport to MidiSmtpServer 4.x, while MidiSmtpServer
-3.4.x keeps the original behaviour.
+```crlf_data_mode```, ```io_session_timeout``` and the RFC 5321 dialog rules:
+RSET at any time, a later EHLO that resets the transaction, the server named
+by an address literal without a host name, the last EHLO line as an extension,
+VRFY, EXPN and HELP with their own events, ```538``` for AUTH on a plaintext
+channel with ```TLS_WHEN_AUTH``` and the strict PROXY header. These changes are
+made here first and planned as a backport to MidiSmtpServer 4.x, while
+MidiSmtpServer 3.4.x keeps the original behaviour.
 
 The differences that asyncio forces or Tokeo adds: the events may be
 ```async def``` (or ```@threaded```) instead of Ruby threads; a certificate may

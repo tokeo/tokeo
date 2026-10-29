@@ -1587,21 +1587,21 @@ class SmtpdServer:
                 return '250 OK'
 
             elif re.match(r'^RSET(\ .*)?$', line, self._RE_CMD_FLAGS):
+                # RSET is valid at any time (RFC 5321 4.1.1.5, 4.1.4)
                 # RSET takes no argument
                 if ' ' in line:
-                # RSET is valid at any time (RFC 5321 4.1.1.5, 4.1.4)
                     raise Smtpd501Exception
                 if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
                     raise Tls530Exception
-                self.process_reset_session(session)
-                return '250 OK'
                 # continue with CMD_HELO when in it
                 was_cmd_helo = session.cmd_sequence is CMD_HELO
                 # always clean session on RSET
-
+                self.process_reset_session(session)
                 # need to restore CMD_HELO state
                 if was_cmd_helo:
                     session.cmd_sequence = CMD_HELO
+                return '250 OK'
+
             elif re.match(r'^QUIT(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # QUIT takes no argument
                 if ' ' in line:
@@ -1743,10 +1743,6 @@ class SmtpdServer:
                     return '252 Cannot VRFY user, but will accept message and attempt delivery'
                 raise Smtpd502Exception
 
-                session.cmd_sequence = CMD_DATA
-                ctx.message.received = utc_now()
-                return '354 Enter message, ending with "." on a line by itself'
-
             else:
                 # If we somehow get to this point then
                 # allow handling of unknown command line
@@ -1860,6 +1856,10 @@ class SmtpdServer:
                 raise Smtpd451Exception(str(e)) from e
 
             finally:
+                # always start with empty values after finishing incoming message
+                # and rset command sequence
+                self.process_reset_session(session)
+
     async def _emit_reply(self, event, ctx, data):
         """
         Emit an event whose handler may answer by a single reply line.
@@ -1895,10 +1895,6 @@ class SmtpdServer:
         if return_value is not None and return_value is not False:
             raise Smtpd451Exception(f'{SMTPD_EVENT_NAMES[event]} must not return {return_value!r}')
         return None
-
-                # always start with empty values after finishing incoming message
-                # and rset command sequence
-                self.process_reset_session(session)
 
     # ---- authentication --------------------------------
 
