@@ -51,8 +51,8 @@ def resource_intensive_operation(data):
 - If a process crashes while holding a slot, the slot is released at
     its own deadline, preventing permanent deadlock
 - ```temper``` never stops a running call, also not after its expire; a call
-    that must end in time needs its own limit, e.g. the time_limit of a
-    dramatiq actor below expire
+    that must end in time needs its own limit below expire, e.g.
+    ```@timelimit``` or the time_limit of a dramatiq actor
 - Unlike throttle, temper has a fixed delay when blocked
     (0.05 seconds by default)
 - The function will automatically restore slots when complete, ensuring

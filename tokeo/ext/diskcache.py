@@ -596,8 +596,8 @@ class TokeoDiskCacheLocksHandler:
             different expire may share it by name.
 
         : ```temper``` never stops a running call, also not after its expire. A
-            call that must end in time needs its own limit, e.g. the
-            time_limit of a dramatiq actor below expire.
+            call that must end in time needs its own limit below expire, e.g.
+            ```@timelimit``` or the time_limit of a dramatiq actor.
 
         : Purging the cache while calls are in flight is destructive: it
             clears the very deadlines that enforce the limit, so it can

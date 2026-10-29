@@ -46,3 +46,5 @@ def job():
     generator, not its iteration; limit the function that consumes it
 - Dramatiq actors have their own ```time_limit``` option that works the same
     way; use ```@timelimit``` for functions that also run outside dramatiq
+- Combine it with ```temper``` so a hanging call frees its slot before the
+    expire
