@@ -119,9 +119,9 @@ def main():
 
     - Returns nothing; the process exit code is set on ```app.exit_code``` and
         applied on close via the app's exit_on_close behavior
-    - AssertionError and TokeoBaseException, so TokeoError and the abort of a
-        time limit, are caught and reported with exit code 1; a CaughtSignal
-        (SIGINT/SIGTERM) is caught and exits with code 0
+    - An AssertionError and a TokeoBaseException, when a tokeo specific error
+        occurs and is not handled, are caught and reported with exit code 1;
+        a CaughtSignal (SIGINT/SIGTERM) is caught and exits with code 0
 
     """
     app = None
