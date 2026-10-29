@@ -133,7 +133,7 @@ Windows is not a target of tokeo and not tested.
   not larger.
 - Every connection and every open file uses a descriptor of ```ulimit -n```.
 
-## Example: a loaded system
+## Example of a loaded system
 
 About 10000 jobs at the same moment on one host, all with ```@timelimit```:
 

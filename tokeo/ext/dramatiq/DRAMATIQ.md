@@ -281,7 +281,7 @@ raises instead of being lost silently.
 
 ## 5. Queues
 
-### One task at a time: ```_unparalleled```
+### One task at a time with ```_unparalleled```
 
 A queue whose name contains ```_unparalleled``` runs one task at a time
 across all workers:
@@ -339,7 +339,7 @@ matches ```throws```. Inspect and handle dead letters with ```dramatiq queues```
     and ```retries``` stays 0. ```on_retry_exhausted``` gets the complete
     message, including the final error, when an app must keep it.
 
-### Changing queue arguments: PRECONDITION_FAILED
+### Changing queue arguments (PRECONDITION_FAILED)
 
 RabbitMQ fixes the arguments of a queue when it is created. Changing
 ```rabbitmq.max_priority``` or ```rabbitmq.dead_message_ttl``` later does not
@@ -360,7 +360,7 @@ myapp dramatiq queues --recreate --yes            # empty queues only
 myapp dramatiq queues mail --recreate --yes --force   # drops their messages
 ```
 
-## 6. Workers: ```dramatiq serve```
+## 6. Workers with ```dramatiq serve```
 
 ```serve``` starts dramatiq's worker pool from the config; the switches override
 single values:
@@ -488,7 +488,7 @@ The ```rabbitmq``` block:
 (never), ```on```, ```true``` or ```yes``` (always) and ```debug``` (only when the
 workers run with ```--debug```).
 
-## 8. Queue management: ```dramatiq queues```
+## 8. Queue management with ```dramatiq queues```
 
 ```bash
 myapp dramatiq queues                       # state of all queues of the actors
@@ -542,7 +542,7 @@ The same is available in code as ```app.dramatiq.queues```:
 It keeps one connection to RabbitMQ for its calls and opens it again when
 RabbitMQ closed it in the meantime; it is safe to use from several threads.
 
-## 9. Monitoring: ```dramatiq monitor```
+## 9. Monitoring with ```dramatiq monitor```
 
 With ```monitoring: true``` every worker process sends a small heartbeat
 every ```monitoring_interval``` seconds to the fanout exchange

@@ -175,7 +175,7 @@ Two conventions matter:
     when it occurs (```Error within DATA, further DATA is ignored up to its
     end: ...```); at the end it is counted once and logged with its reply.
 
-### Slow work: ```@threaded```
+### Slow work with ```@threaded```
 
 If an event does something slow (a database call, a network request), decorate it
 with ```threaded``` so it runs in a worker thread instead of blocking the event
