@@ -99,7 +99,7 @@ class TokeoDramatiqHeartbeat(Middleware):
         self._connection = None
         self._channel = None
 
-    # --- worker hooks -------------------------------------------------------------
+    # ---- worker hooks ------------------------------------------------------------
 
     def after_worker_boot(self, broker, worker):
         self._worker = worker
@@ -163,7 +163,7 @@ class TokeoDramatiqHeartbeat(Middleware):
         with self._lock:
             self._totals['dead'] += 1
 
-    # --- heartbeat ----------------------------------------------------------------
+    # ---- heartbeat ---------------------------------------------------------------
 
     def heartbeat(self, state='running'):
         """

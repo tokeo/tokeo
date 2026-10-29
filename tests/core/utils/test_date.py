@@ -40,7 +40,7 @@ def tokyo():
     time.tzset()
 
 
-# --- utc_now ------------------------------------------------------------------
+# ---- utc_now -----------------------------------------------------------------
 # utc_now returns an aware UTC datetime at roughly the current instant.
 
 
@@ -57,7 +57,7 @@ def test_utc_now_is_close_to_now():
     assert delta < 5
 
 
-# --- to_utc -------------------------------------------------------------------
+# ---- to_utc ------------------------------------------------------------------
 # to_utc brings any input to a UTC datetime, shifting by the offset.
 
 
@@ -157,7 +157,7 @@ def test_to_utc_short_string_raises():
         to_utc('2026')
 
 
-# --- as_utc -------------------------------------------------------------------
+# ---- as_utc ------------------------------------------------------------------
 # as_utc relabels any input as UTC, keeping the wall clock time.
 
 
@@ -223,7 +223,7 @@ def test_as_utc_wrong_type_raises():
         as_utc(None)
 
 
-# --- to_utc_vs_as_utc ---------------------------------------------------------
+# ---- to_utc_vs_as_utc --------------------------------------------------------
 # The defining contrast: to_utc shifts, as_utc relabels.
 
 
@@ -247,7 +247,7 @@ def test_to_utc_vs_as_utc_string_date_day_under_pinned_zone(tokyo):
     assert as_utc('2026-06-23', auto_type=True) == date(2026, 6, 23)
 
 
-# --- to_utc_timestring --------------------------------------------------------
+# ---- to_utc_timestring -------------------------------------------------------
 # to_utc_timestring formats as 'YYYY-MM-DD HH:MM:SS.MMMZ'.
 
 
@@ -280,7 +280,7 @@ def test_to_utc_timestring_wrong_type_raises():
         to_utc_timestring(42)
 
 
-# --- to_utc_datestring --------------------------------------------------------
+# ---- to_utc_datestring -------------------------------------------------------
 # to_utc_datestring formats as 'YYYY-MM-DD' (the date part).
 
 
@@ -301,7 +301,7 @@ def test_to_utc_datestring_offset_can_shift_the_day():
     assert to_utc_datestring(d) == '2026-06-22'
 
 
-# --- fromisoformat_compat -----------------------------------------------------
+# ---- fromisoformat_compat ----------------------------------------------------
 # fromisoformat_compat must agree with the builtin on every version.
 
 
@@ -363,7 +363,7 @@ def test_fromisoformat_compat_rejects_non_string():
         date_compat.fromisoformat_compat(12345)
 
 
-# --- fromisoformat export -----------------------------------------------------
+# ---- fromisoformat export ----------------------------------------------------
 # The version switch picks the right fromisoformat for the running version.
 
 

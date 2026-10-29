@@ -149,7 +149,7 @@ def _dead_letter(actor='send_mail', queue='mail', args=('a@b.c',), **options):
     return Message(queue_name=queue, actor_name=actor, args=args, kwargs={}, options=options).encode()
 
 
-# --- names and state -----------------------------------------------------------
+# ---- names and state ----------------------------------------------------------
 
 
 def test_names_from_actors(app):
@@ -196,7 +196,7 @@ def test_state_of_queue_without_actor(app, server):
     assert (state['name'], state['exists'], state['actors']) == ('old', True, [])
 
 
-# --- dead letters --------------------------------------------------------------
+# ---- dead letters -------------------------------------------------------------
 
 
 def test_peek_dead_leaves_letters(app, server):
@@ -251,7 +251,7 @@ def test_requeue_dead_keeps_letter_when_publish_fails(app, server):
     assert len(server.queues['mail.XQ']['messages']) == 1
 
 
-# --- maintenance ---------------------------------------------------------------
+# ---- maintenance --------------------------------------------------------------
 
 
 def test_purge(app, server):
@@ -309,7 +309,7 @@ def test_recreate_refuses_queue_without_actor(app):
         app.dramatiq.queues.recreate(['mail', 'old'])
 
 
-# --- connection ----------------------------------------------------------------
+# ---- connection ---------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -347,7 +347,7 @@ def test_connection_is_kept_and_reopened(app, server):
     assert queues._connection is None
 
 
-# --- queues command ------------------------------------------------------------
+# ---- queues command -----------------------------------------------------------
 
 
 @pytest.fixture
@@ -410,7 +410,7 @@ def test_command_refuses(command, options, error):
         command(*options)
 
 
-# --- cache ---------------------------------------------------------------------
+# ---- cache --------------------------------------------------------------------
 
 
 def test_state_without_cache_asks_each_time(app, server):

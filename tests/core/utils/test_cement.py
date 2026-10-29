@@ -74,7 +74,7 @@ def _run(argv, monkeypatch=None):
         return app.seen, logged
 
 
-# --- controllers ----------------------------------------------------------------
+# ---- controllers ---------------------------------------------------------------
 
 
 def test_controllers_subcmdmeta_is_the_dispatched_command():
@@ -110,7 +110,7 @@ def test_controllers_log_info_help_logs_the_help(monkeypatch):
     assert logged == ['the help of command']
 
 
-# --- extensions -----------------------------------------------------------------
+# ---- extensions ----------------------------------------------------------------
 
 
 def test_extensions_required_names_the_missing_ones():

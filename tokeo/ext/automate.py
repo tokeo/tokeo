@@ -466,7 +466,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         stdout_buffer = b''
         stderr_buffer = b''
 
-        # --- THE POLLING LOOP ---
+        # ---- THE POLLING LOOP ----
         while not channel.exit_status_ready():
             # 1. Enforce the Timeout
             if timeout and (time.time() - start_time) > timeout:

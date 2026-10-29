@@ -41,7 +41,7 @@ from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
 needs_pdeathsig = pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the parent-death signal is Linux-only')
 
-# --- unit: handler resolving -----------------------------------------------------
+# ---- unit: handler resolving ----------------------------------------------------
 
 
 def test_resolve_events_handler_imports_and_rejects():
@@ -67,7 +67,7 @@ def test_events_handler_carries_the_app():
     assert events_handler.options == {'answer': 42}
 
 
-# --- unit: topology planning ----------------------------------------------------
+# ---- unit: topology planning ---------------------------------------------------
 
 
 def _svc(name, pre_fork=0):
@@ -107,7 +107,7 @@ def test_plan_multi_services_rules():
     assert plan['inloop'] == [] and plan['shared'] is False
 
 
-# --- unit: shared limits ---------------------------------------------------------
+# ---- unit: shared limits --------------------------------------------------------
 
 
 def test_shared_limits_count_across_processes():
@@ -147,7 +147,7 @@ def test_shared_limits_slot_wait_recheck_interval():
     assert asyncio.run(go()) < 0.5  # returns via the poll
 
 
-# --- cement wiring ---------------------------------------------------------------
+# ---- cement wiring --------------------------------------------------------------
 
 
 def test_extension_loads_into_cement_app():
@@ -220,7 +220,7 @@ def test_build_server_leaves_out_logger_severity():
     assert server.events_handler._logger_protected is app.log
 
 
-# --- process tests: real termination behaviour ----------------------------------
+# ---- process tests: real termination behaviour ---------------------------------
 
 
 PROBE = 'tests.ext.smtpd.smtpd_tests_serve_probe'
@@ -454,7 +454,7 @@ def test_failed_worker_stops_all_services(tmp_path):
         proc.kill()
 
 
-# --- process tests: services in the forked workers ------------------------------
+# ---- process tests: services in the forked workers -----------------------------
 
 
 def _tagged_service(name, port, pre_fork, settings=None):

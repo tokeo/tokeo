@@ -110,7 +110,7 @@ def _run(events, settings, messages=(MESSAGE,), debug=False):
     asyncio.run(go())
 
 
-# --- contract: file vs data vs bytesize ---------------------------------------
+# ---- contract: file vs data vs bytesize --------------------------------------
 
 
 def test_file_is_byte_identical_to_ram_mode(tmp_path):
@@ -168,7 +168,7 @@ def test_message_without_separator_gets_no_spooler(tmp_path):
     assert os.listdir(tmp_path) == []
 
 
-# --- file naming and lifecycle -------------------------------------------------
+# ---- file naming and lifecycle ------------------------------------------------
 
 
 def test_file_name_pattern_and_prefix(tmp_path):
@@ -232,7 +232,7 @@ def test_two_messages_one_connection_get_fresh_files(tmp_path):
     assert events.seen[1]['file'].endswith(b'second')
 
 
-# --- takeover via keep() -------------------------------------------------------
+# ---- takeover via keep() ------------------------------------------------------
 
 
 def test_keep_returns_path_and_file_survives(tmp_path):
@@ -281,7 +281,7 @@ def test_manual_rename_takeover_still_safe(tmp_path):
         assert f.read() == events.seen[0]['file']
 
 
-# --- aborts and caps -----------------------------------------------------------
+# ---- aborts and caps ----------------------------------------------------------
 
 
 def _abort_mid_data(tmp_path, debug):

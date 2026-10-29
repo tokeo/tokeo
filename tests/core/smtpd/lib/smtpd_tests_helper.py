@@ -244,7 +244,7 @@ def run_server_client(events, settings, client_fn, listeners=None, settle=0.15):
     return asyncio.run(_run(events, settings, client_fn, listeners, settle))
 
 
-# --- events and dialog of the tests --------------------------------------------
+# ---- events and dialog of the tests -------------------------------------------
 
 
 class RecordingEvents(SmtpdEvents):
@@ -377,7 +377,7 @@ def auth_plain(authzid, authcid, password):
     return base64.b64encode(f'{authzid}\x00{authcid}\x00{password}'.encode()).decode()
 
 
-# --- tls client and raw wire ---------------------------------------------------
+# ---- tls client and raw wire --------------------------------------------------
 
 
 TLS_SETTINGS = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}

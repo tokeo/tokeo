@@ -57,7 +57,7 @@ class TokeoDramatiqQueues:
         self._channel = None
         self._cache = {}
 
-    # --- connection ---------------------------------------------------------------
+    # ---- connection --------------------------------------------------------------
 
     def close(self):
         """Close the connection to rabbitmq, the next call opens a new one."""
@@ -112,7 +112,7 @@ class TokeoDramatiqQueues:
             self._channel = None
             return None
 
-    # --- names --------------------------------------------------------------------
+    # ---- names -------------------------------------------------------------------
 
     def _actors(self):
         broker = self._dramatiq.broker
@@ -144,7 +144,7 @@ class TokeoDramatiqQueues:
             return self.names()
         return [q_name(name) for name in ([names] if isinstance(names, str) else names)]
 
-    # --- state --------------------------------------------------------------------
+    # ---- state -------------------------------------------------------------------
 
     def state(self, names=None, cache_ttl=0):
         """
@@ -198,7 +198,7 @@ class TokeoDramatiqQueues:
             )
         return result
 
-    # --- dead letters -------------------------------------------------------------
+    # ---- dead letters ------------------------------------------------------------
 
     def peek_dead(self, name, limit=10):
         """
@@ -293,7 +293,7 @@ class TokeoDramatiqQueues:
             requeued += 1
         return dict(name=name, requeued=requeued)
 
-    # --- maintenance --------------------------------------------------------------
+    # ---- maintenance -------------------------------------------------------------
 
     def purge(self, names=None, dead_only=False):
         """

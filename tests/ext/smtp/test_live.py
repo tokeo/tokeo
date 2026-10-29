@@ -99,7 +99,7 @@ def _tls_settings(mode, cert):
     return {'encrypt_mode': mode, 'tls_cert': cert[0], 'tls_key': cert[1]}
 
 
-# --- tls end to end ----------------------------------------------------------
+# ---- tls end to end ---------------------------------------------------------
 
 
 _MODES = [
@@ -145,7 +145,7 @@ def test_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
         assert smtpd.events.messages == []
 
 
-# --- connection end on errors ------------------------------------------------
+# ---- connection end on errors -----------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -169,7 +169,7 @@ def test_closes_connection_on_error(smtp, error):
     assert smtpd.events.messages == []
 
 
-# --- delivery of a complete message ------------------------------------------
+# ---- delivery of a complete message -----------------------------------------
 
 
 def test_qp_delivered_to_smtpd(tmp):

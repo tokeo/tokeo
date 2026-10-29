@@ -203,7 +203,7 @@ class SmtpdEvents:
         """
         return bool(ctx.server.encrypted) and str(ctx.server.encrypted) != ''
 
-    # --- connection lifecycle ---
+    # ---- connection lifecycle ----
 
     def on_connect_event(self, ctx):
         """
@@ -258,7 +258,7 @@ class SmtpdEvents:
         """
         pass
 
-    # --- envelope ---
+    # ---- envelope ----
 
     def on_helo_event(self, ctx, helo_data):
         """Called on HELO/EHLO with the client greeting string."""
@@ -315,7 +315,7 @@ class SmtpdEvents:
         """
         return True
 
-    # --- message data (streamed) ---
+    # ---- message data (streamed) ----
 
     def on_message_data_start_event(self, ctx):
         """Called when DATA begins, before any body byte."""
@@ -367,7 +367,7 @@ class SmtpdEvents:
         """
         pass
 
-    # --- misc ---
+    # ---- misc ----
 
     def on_process_line_unknown_event(self, ctx, line):
         """

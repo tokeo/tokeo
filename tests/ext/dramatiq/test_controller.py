@@ -91,7 +91,7 @@ def test_serve_no_purge_survives_watch_restart(serve):
     assert calls['main'][0].watch is not None
 
 
-# --- worker options ------------------------------------------------------------
+# ---- worker options -----------------------------------------------------------
 
 
 def test_serve_worker_options_from_config(serve):
@@ -203,7 +203,7 @@ def test_serve_invalid_config(serve, key, value):
     assert sys.argv == ['tokeo']
 
 
-# --- start method --------------------------------------------------------------
+# ---- start method -------------------------------------------------------------
 
 
 def test_serve_starts_workers_by_forkserver(serve):
@@ -247,7 +247,7 @@ def test_serve_invalid_use_spawn_config(serve, value):
     assert sys.argv == ['tokeo']
 
 
-# --- verbosity -----------------------------------------------------------------
+# ---- verbosity ----------------------------------------------------------------
 
 
 # cement 3.0.x warns on --debug in sys.argv, our --debug is the app debug only
@@ -271,7 +271,7 @@ def test_serve_verbose_follows_debug(serve, options, debug, verbose, skip_loggin
     assert (args.verbose, args.skip_logging) == (verbose, skip_logging)
 
 
-# --- queue binding -------------------------------------------------------------
+# ---- queue binding ------------------------------------------------------------
 
 
 def test_serve_consumes_all_queues_without_switch(serve):
@@ -300,7 +300,7 @@ def test_serve_queues_needs_a_name(serve, capsys):
     assert '--queues' in capsys.readouterr().err
 
 
-# --- worker poll interval ------------------------------------------------------
+# ---- worker poll interval -----------------------------------------------------
 
 
 def test_serve_poll_interval_default_keeps_env(serve):

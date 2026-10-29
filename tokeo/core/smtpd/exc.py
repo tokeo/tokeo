@@ -61,7 +61,7 @@ class SmtpdContractError(SmtpdError):
     pass
 
 
-# --- SMTP dialog exceptions (carry code + text) ---
+# ---- SMTP dialog exceptions (carry code + text) ----
 
 
 class SmtpdException(Exception):
@@ -106,7 +106,7 @@ class SmtpdException(Exception):
         return f'{self.smtp_code} {self.smtp_text}'
 
 
-# --- closing exceptions (the server closes after the reply) ---
+# ---- closing exceptions (the server closes after the reply) ----
 
 
 class SmtpdCloseException(SmtpdException):
@@ -154,7 +154,7 @@ class Smtpd554CloseException(SmtpdCloseException):
     smtp_text = 'Transaction failed'
 
 
-# --- aborting exceptions (the server closes at once, also within DATA) ---
+# ---- aborting exceptions (the server closes at once, also within DATA) ----
 
 
 class SmtpdAbortException(SmtpdCloseException):
@@ -185,7 +185,7 @@ class Smtpd554AbortException(SmtpdAbortException):
     smtp_text = 'Transaction failed'
 
 
-# --- internal signals of the dialog (raised by the server itself) ---
+# ---- internal signals of the dialog (raised by the server itself) ----
 
 
 class SmtpdIOCmdTimeoutException(Smtpd421AbortException):
@@ -206,7 +206,7 @@ class SmtpdIOBufferOverrunException(Smtpd554AbortException):
     pass
 
 
-# --- numeric dialog exceptions (keep the connection) ---
+# ---- numeric dialog exceptions (keep the connection) ----
 
 
 class Smtpd432Exception(SmtpdException):

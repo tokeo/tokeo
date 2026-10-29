@@ -34,7 +34,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     TLS_SETTINGS,
 )
 
-# --- full delivery and events ------------------------------------------------
+# ---- full delivery and events -----------------------------------------------
 
 
 def test_full_delivery_and_events():
@@ -80,7 +80,7 @@ def test_ehlo_advertises_extensions_when_enabled():
     assert r[0][-1] == '250 OK'
 
 
-# --- reference-faithful behaviour --------------------------------------------
+# ---- reference-faithful behaviour -------------------------------------------
 
 
 def test_null_sender_accepted():
@@ -155,7 +155,7 @@ def test_noop_and_unknown_command():
     assert r[2][0].startswith('500')
 
 
-# --- sequence and reject codes ---------------------------------
+# ---- sequence and reject codes --------------------------------
 
 
 def test_sequence_rcpt_before_mail_is_503():
@@ -279,7 +279,7 @@ def test_mail_rcpt_event_results(event, result, reply, address):
         assert ev.seen[-1] == ('<m@x>', [address] if address is not None else [])
 
 
-# --- security we own ---------------------------------------------------------
+# ---- security we own --------------------------------------------------------
 
 
 def test_pipelining_rejected_when_disabled():
@@ -502,7 +502,7 @@ def test_read_line_times_out_on_partial_buffered_line():
     asyncio.run(go())
 
 
-# --- internationalization ----------------------------------------------------
+# ---- internationalization ---------------------------------------------------
 
 
 def test_body_and_smtputf8_params_stripped():
@@ -626,7 +626,7 @@ def test_rejected_mail_leaves_no_envelope_behind():
     assert ev.encodings == [('<bad@x>', '7bit', 'utf8'), ('<good@x>', '', ''), ('data', '', '')]
 
 
-# --- limits ------------------------------------------------------------------
+# ---- limits -----------------------------------------------------------------
 
 
 def test_max_connections_refuses_with_421():
@@ -755,7 +755,7 @@ def test_max_processings_waits_for_free_slot():
     assert b2[0].startswith('220')
 
 
-# --- PROXY protocol ----------------------------------------------------------
+# ---- PROXY protocol ---------------------------------------------------------
 
 
 class ProxyEvents(RecordingEvents):
@@ -1009,7 +1009,7 @@ def test_proxy_event_error_aborts_421():
     assert closed is True
 
 
-# --- graceful shutdown -------------------------------------------------------
+# ---- graceful shutdown ------------------------------------------------------
 
 
 def test_stop_stops_accepting_new_connections():
@@ -1224,7 +1224,7 @@ def test_lifecycle_state_flags():
     assert after is True
 
 
-# --- AUTH (PLAIN / LOGIN) ------------------------------------------------------
+# ---- AUTH (PLAIN / LOGIN) -----------------------------------------------------
 
 
 def _b64(text):
@@ -1644,7 +1644,7 @@ def test_mail_from_auth_parameter_ends_with_the_transaction():
     assert mails == [('<a@x>', 's@example.com', 's@example.com'), ('<b@x>', '', '')]
 
 
-# --- STARTTLS --------------------
+# ---- STARTTLS -------------------
 
 
 class TlsEvents(RecordingEvents):
