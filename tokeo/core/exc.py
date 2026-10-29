@@ -5,8 +5,8 @@ class TokeoBaseException(BaseException):
     ### Notes
 
     : TokeoError derives from Exception and from this class, so it stays an
-        Exception; an exception that only derives from this class, like the
-        abort of a time limit, passes ```except Exception```
+      Exception; an exception that only derives from this class, like the
+      abort of a time limit, passes ```except Exception```
 
     : ```except TokeoBaseException``` catches both, e.g. in the main of an app
 

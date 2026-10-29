@@ -11,18 +11,18 @@ method/cipher options can still be supplied.
 ### Notes
 
 : The default TLS floor is TLS 1.2 (the RFC 8996 minimum); the maximum stays
-    at the runtime's highest, so TLS 1.3 is used when available. Use
-    ```methods='TLSv1_3'``` for a TLS 1.3-only listener, or the opt-in
-    ```TLS_METHODS_LEGACY```/```TLS_CIPHERS_LEGACY``` presets to reach old
-    (deprecated TLS 1.0/1.1) clients for opportunistic SMTP TLS.
+  at the runtime's highest, so TLS 1.3 is used when available. Use
+  ```methods='TLSv1_3'``` for a TLS 1.3-only listener, or the opt-in
+  ```TLS_METHODS_LEGACY```/```TLS_CIPHERS_LEGACY``` presets to reach old
+  (deprecated TLS 1.0/1.1) clients for opportunistic SMTP TLS.
 : TLS 1.3 key-exchange groups are not restricted, so a runtime built on
-    OpenSSL 3.5+ negotiates the post-quantum hybrid (X25519MLKEM768) with no
-    code change. Do not pin a single curve, or the hybrid group is disabled.
+  OpenSSL 3.5+ negotiates the post-quantum hybrid (X25519MLKEM768) with no
+  code change. Do not pin a single curve, or the hybrid group is disabled.
 : A configured certificate is loaded with the ```ssl``` stdlib (chain and an
-    embedded key are handled by ```load_cert_chain```). A self-signed test
-    certificate is generated in-process with ```cryptography``` and loaded from
-    memory, so no subprocess and no temp file is involved. A certificate can
-    also be supplied as PEM content in memory.
+  embedded key are handled by ```load_cert_chain```). A self-signed test
+  certificate is generated in-process with ```cryptography``` and loaded from
+  memory, so no subprocess and no temp file is involved. A certificate can
+  also be supplied as PEM content in memory.
 
 """
 
@@ -190,8 +190,8 @@ class TlsTransport:
         ### Notes
 
         : EC P-256, 90-day validity, SHA256, subject CN and subject alt names
-            (DNS for every SAN plus IP entries for those that are IP addresses),
-            generated in-process with ```cryptography``` and loaded from memory
+          (DNS for every SAN plus IP entries for those that are IP addresses),
+          generated in-process with ```cryptography``` and loaded from memory
 
         """
         # lazy: the cryptography package is only needed to GENERATE the

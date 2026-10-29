@@ -21,43 +21,43 @@ lists, process topology with pre-forked workers and machine-wide limits.
 ### Notes
 
 : Process topology of one invocation: a service without ```pre_fork``` runs
-    in the main process loop; ```pre_fork: N``` (N >= 1) gives the service N
-    dedicated worker processes -- note that ```pre_fork: 1``` here means "an
-    own process".
-    With only pre-forked services the main process just supervises. A single
-    service is optimized: ```pre_fork <= 1``` runs directly in the main
-    process without forking, ```pre_fork: N > 1``` runs the main process as
-    worker #1 plus N-1 forks
+  in the main process loop; ```pre_fork: N``` (N >= 1) gives the service N
+  dedicated worker processes -- note that ```pre_fork: 1``` here means "an
+  own process".
+  With only pre-forked services the main process just supervises. A single
+  service is optimized: ```pre_fork <= 1``` runs directly in the main
+  process without forking, ```pre_fork: N > 1``` runs the main process as
+  worker #1 plus N-1 forks
 
 : With a global cap set and any forked worker, the counters live in shared
-    memory and the caps are exact across all processes OF THIS INVOCATION.
-    Per-service caps of a multi-worker group count per worker -- for a group
-    total of X over N workers configure X/N. Services started by separate
-    invocations do not share limits
+  memory and the caps are exact across all processes OF THIS INVOCATION.
+  Per-service caps of a multi-worker group count per worker -- for a group
+  total of X over N workers configure X/N. Services started by separate
+  invocations do not share limits
 
 : A worker killed together with a crashed master relies on the Linux
-    parent-death signal; on other platforms orphaned workers keep running
-    until stopped manually (the regular SIGTERM shutdown is unaffected)
+  parent-death signal; on other platforms orphaned workers keep running
+  until stopped manually (the regular SIGTERM shutdown is unaffected)
 
 : One invocation is one unit: start it, stop it (Ctrl-C/SIGTERM), restart it
-    (which re-reads the config). For individual control run one invocation
-    per service, e.g. ```tokeo smtpd serve mx1```. Starting the same service
-    twice fails at the port bind
+  (which re-reads the config). For individual control run one invocation
+  per service, e.g. ```tokeo smtpd serve mx1```. Starting the same service
+  twice fails at the port bind
 
 : Without a configured certificate every process generates its own
-    self-signed test certificate, so the workers of a service present
-    different ones; configure ```tls_cert_path``` or ```tls_cert``` for one
-    certificate in all processes
+  self-signed test certificate, so the workers of a service present
+  different ones; configure ```tls_cert_path``` or ```tls_cert``` for one
+  certificate in all processes
 
 : The servers log to the application log (```app.log```), its level comes
-    from the log config of the application; a ```logger_severity``` in the
-    settings of a service is left out
+  from the log config of the application; a ```logger_severity``` in the
+  settings of a service is left out
 
 : Every selected service is built before a worker forks, so a broken config
-    ends the start with the name of the service and nothing is bound. A
-    worker that ends on its own, e.g. as it cannot bind its port, ends the
-    whole invocation with an error; a restart is left to the supervisor of
-    the system, e.g. systemd with ```Restart=on-failure```
+  ends the start with the name of the service and nothing is bound. A
+  worker that ends on its own, e.g. as it cannot bind its port, ends the
+  whole invocation with an error; a restart is left to the supervisor of
+  the system, e.g. systemd with ```Restart=on-failure```
 
 ### Example
 
@@ -166,7 +166,7 @@ def _plan(services, has_global_limit):
     ### Notes
 
     : Implements the topology rules from the module notes, including the
-        single-service optimization (main process serves as worker #1)
+      single-service optimization (main process serves as worker #1)
 
     """
     plan = {'inloop': [], 'forks': [], 'reuse': set(), 'shared': False}
@@ -244,8 +244,8 @@ class SharedGlobalLimits(GlobalLimits):
     ### Notes
 
     : The wake event stays per process (an event cannot cross a fork), so
-        ```slot_wait``` re-checks the shared counters at a short interval --
-        a slot released in another process is seen at most 50 ms later
+      ```slot_wait``` re-checks the shared counters at a short interval --
+      a slot released in another process is seen at most 50 ms later
 
     """
 

@@ -47,7 +47,7 @@ class TokeoTui:
     ### Notes
 
     : Accessing a part whose extension is not enabled raises a
-        ```TokeoTuiError``` that names the extension to enable
+      ```TokeoTuiError``` that names the extension to enable
 
     """
 

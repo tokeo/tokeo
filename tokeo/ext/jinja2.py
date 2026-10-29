@@ -141,8 +141,8 @@ def tokeo_jinja2_config(app):
     ### Notes
 
     : Resolves the template handler with setup=True so it has access to the
-        application and can read its own config; the handler instance is used
-        only to look up template_dirs
+      application and can read its own config; the handler instance is used
+      only to look up template_dirs
 
     : Adds template directories from the configuration if specified
 

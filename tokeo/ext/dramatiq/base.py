@@ -394,11 +394,11 @@ class TokeoDramatiq(MetaMixin):
         ### Notes
 
         : Configures the middleware AgeLimit, TimeLimit, ShutdownNotifications,
-            Callbacks, Pipelines, Retries, CurrentMessage and TokeoAsyncIO,
-            with ```monitoring``` also TokeoDramatiqHeartbeat
+          Callbacks, Pipelines, Retries, CurrentMessage and TokeoAsyncIO,
+          with ```monitoring``` also TokeoDramatiqHeartbeat
 
         : Creates an ExtendedRabbitmqBroker instance with the configured URL
-            and registers it as the global Dramatiq broker
+          and registers it as the global Dramatiq broker
 
         : Missing keys of the ```rabbitmq``` config take their defaults
 

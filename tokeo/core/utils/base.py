@@ -395,7 +395,7 @@ def as_int_or_auto(value, min_value=1):
     ### Notes
 
     : ```'auto'``` is not mapped to ```None```, so a caller can still tell
-        it apart from an unset value
+      it apart from an unset value
 
     """
     if isinstance(value, str) and value.strip().lower() == 'auto':

@@ -223,8 +223,8 @@ class TokeoVaultController(Controller):
     ### Notes
 
     : Encryption and decryption use the vault profile named on the command
-        line (or referenced by the config); the key material is taken from
-        the environment variable that profile points to.
+      line (or referenced by the config); the key material is taken from
+      the environment variable that profile points to.
 
     """
 

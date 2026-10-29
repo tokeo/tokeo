@@ -26,9 +26,9 @@ dispatches to these methods and turns any raised SMTP exception into a response.
 ### Notes
 
 : The threading model is two orthogonal axes -- placement (inline ```def``` /
-    ```async def``` vs threaded ```@threaded def```) and, inline only, whether it
-    may ```await```. Plain ```def``` is assumed fast; ```@threaded def``` may
-    block; ```async def``` may ```await```
+  ```async def``` vs threaded ```@threaded def```) and, inline only, whether it
+  may ```await```. Plain ```def``` is assumed fast; ```@threaded def``` may
+  block; ```async def``` may ```await```
 
 """
 
@@ -100,7 +100,7 @@ def threaded(fn):
     ### Notes
 
     : This guard fires at decoration time, i.e. at import, so the mistake is
-        caught before the service starts
+      caught before the service starts
 
     """
     # guard 1: @threaded on async def is meaningless (async runs inline, awaits)
@@ -130,11 +130,11 @@ class SmtpdEvents:
     ### Notes
 
     : ```_no_thread``` lists event methods that must stay inline. Currently only
-        ```on_message_data_receiving_event```, which fires per data line -- a
-        thread hop per line would be catastrophic on large messages
+      ```on_message_data_receiving_event```, which fires per data line -- a
+      thread hop per line would be catastrophic on large messages
 
     : ```__init_subclass__``` enforces ```_no_thread``` at class definition time
-        (import), so a forbidden ```@threaded``` fails before the service starts
+      (import), so a forbidden ```@threaded``` fails before the service starts
 
     """
 
@@ -252,7 +252,7 @@ class SmtpdEvents:
         ### Notes
 
         : Only fires when ```proxy_extension``` is enabled for the service; the
-            real client address is then available via ```ctx.server.proxy```
+          real client address is then available via ```ctx.server.proxy```
         : Any exception aborts the connection with 421 (no greeting is sent)
 
         """
@@ -271,16 +271,16 @@ class SmtpdEvents:
         ### Notes
 
         : If authentication is used, override this event and implement
-            your own user management -- otherwise all authentications are
-            blocked per default (deny with ```Smtpd535Exception```)
+          your own user management -- otherwise all authentications are
+          blocked per default (deny with ```Smtpd535Exception```)
         : The credential check and its source (vault, DB, LDAP) live entirely in
-            the handler; only a returned non-empty string grants the access and
-            is used as the authorization id, any other result is denied by 535
+          the handler; only a returned non-empty string grants the access and
+          is used as the authorization id, any other result is denied by 535
         : The returned string must be stripped, leading or trailing whitespace
-            is a fault of the handler and answered by 454 like any exception
-            other than an SmtpdException
+          is a fault of the handler and answered by 454 like any exception
+          other than an SmtpdException
         : Return the authorization_id sent by the client only after checking
-            that the authentication_id may act as it
+          that the authentication_id may act as it
 
         """
         # the password stays out of the log
@@ -298,8 +298,8 @@ class SmtpdEvents:
         ### Notes
 
         : None or False refuses the address by 550, True accepts it as sent and
-            a stripped string accepts it as the replaced address; any other
-            result or exception other than an SmtpdException answers 451
+          a stripped string accepts it as the replaced address; any other
+          result or exception other than an SmtpdException answers 451
 
         """
         return True
@@ -328,8 +328,8 @@ class SmtpdEvents:
         ### Notes
 
         : Must stay inline -- ```@threaded``` here is rejected at import. Keep it
-            light (e.g. an incremental size check or a teergrube via
-            ```await asyncio.sleep``` in an async override)
+          light (e.g. an incremental size check or a teergrube via
+          ```await asyncio.sleep``` in an async override)
 
         """
         pass
@@ -341,8 +341,8 @@ class SmtpdEvents:
         ### Notes
 
         : Header lines appended to ```ctx.message.data``` here become part
-            of the message: they change ```bytesize``` (and count against a
-            ```data_size``` cap) and reach the spool file when spooling
+          of the message: they change ```bytesize``` (and count against a
+          ```data_size``` cap) and reach the spool file when spooling
 
         """
         pass
@@ -354,15 +354,15 @@ class SmtpdEvents:
         ### Notes
 
         : ```ctx.message.spooler``` is a ```MessageSpooler``` or None. When
-            spooling the file gets the complete message (incl. headers
-            injected on ```on_message_data_headers_event```) while
-            ```ctx.message.data``` carries ONLY the headers (no separator
-            line) for fast in-memory checks. The file lives until this event
-            ends: take it over via ```spooler.keep(path)``` (move) or
-            ```spooler.keep()``` (leave in place), else it gets deleted. It
-            is always kept in ```debug``` mode
+          spooling the file gets the complete message (incl. headers
+          injected on ```on_message_data_headers_event```) while
+          ```ctx.message.data``` carries ONLY the headers (no separator
+          line) for fast in-memory checks. The file lives until this event
+          ends: take it over via ```spooler.keep(path)``` (move) or
+          ```spooler.keep()``` (leave in place), else it gets deleted. It
+          is always kept in ```debug``` mode
         : The raw body and spool file are never part of the ctx JSON;
-            forwarding and handling is the handler's job
+          forwarding and handling is the handler's job
 
         """
         pass
@@ -389,7 +389,7 @@ class SmtpdEvents:
         ### Notes
 
         : The default writes by severity to the logger of the server, a
-            CRITICAL error is followed by its traceback
+          CRITICAL error is followed by its traceback
 
         """
         getattr(self._logger_protected, severity.name.lower())(msg.rstrip('\r\n'))

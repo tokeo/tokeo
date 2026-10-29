@@ -76,16 +76,16 @@ class TokeoTuiInput:
         ### Notes
 
         : A failing command is logged as error and its line is kept, the shell
-            goes on
+          goes on
 
         : Ctrl-C, also a SIGINT while a command runs, aborts only the line or
-            the command; SIGTERM and SIGHUP end the shell
+          the command; SIGTERM and SIGHUP end the shell
 
         : Without an own ```input``` the shell reads the terminal of stdin by a
-            descriptor of its own, so code of the process that closes stdin or
-            moves it, e.g. to /dev/null, does not end the shell; an input that
-            is lost anyway, closed or no terminal anymore, ends the shell with
-            an error instead of reading it again and again
+          descriptor of its own, so code of the process that closes stdin or
+          moves it, e.g. to /dev/null, does not end the shell; an input that
+          is lost anyway, closed or no terminal anymore, ends the shell with
+          an error instead of reading it again and again
 
         """
         from prompt_toolkit import PromptSession

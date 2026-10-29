@@ -10,8 +10,8 @@ numerically, while the members themselves still compare by identity.
 ### Notes
 
 : The member names are the level names of ```logging```, so
-    ```severity.name.lower()``` names the matching log method, e.g.
-    ```getattr(app.log, severity.name.lower())```.
+  ```severity.name.lower()``` names the matching log method, e.g.
+  ```getattr(app.log, severity.name.lower())```.
 
 """
 

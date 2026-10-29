@@ -55,8 +55,8 @@ class TokeoCronAndFireTrigger(CronTrigger):
     ### Notes
 
     : The delay parameter adds a fixed delay after the cron-calculated trigger time,
-        while jitter adds a random amount of time (up to the specified maximum).
-        Used together, they provide flexible control over task execution timing.
+      while jitter adds a random amount of time (up to the specified maximum).
+      Used together, they provide flexible control over task execution timing.
 
     """
 
@@ -211,9 +211,9 @@ class TokeoScheduler(MetaMixin):
     ### Notes
 
     : The scheduler can operate in two modes: background (non-blocking) and
-        interactive (with command shell). It provides fine-grained control over
-        task execution, including support for jitter, delay, and concurrency
-        limits. Tasks can be defined programmatically or via configuration.
+      interactive (with command shell). It provides fine-grained control over
+      task execution, including support for jitter, delay, and concurrency
+      limits. Tasks can be defined programmatically or via configuration.
 
     """
 
@@ -224,8 +224,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This class defines the configuration section, default values, and
-            unique identifier required by the Cement framework for proper handler
-            registration and operation.
+          unique identifier required by the Cement framework for proper handler
+          registration and operation.
 
         """
 
@@ -264,8 +264,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This constructor only initializes basic attributes. The actual scheduler
-            is created on-demand when needed, and tasks are loaded during
-            the startup process rather than at initialization time.
+          is created on-demand when needed, and tasks are loaded during
+          the startup process rather than at initialization time.
 
         """
         super(TokeoScheduler, self).__init__(*args, **kw)
@@ -290,8 +290,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This method is called automatically by the Cement framework during
-            the application's setup process. It ensures the scheduler's
-            configuration section exists with proper default values.
+          the application's setup process. It ensures the scheduler's
+          configuration section exists with proper default values.
 
         """
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
@@ -335,10 +335,10 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This property creates the scheduler on first access, configuring it
-            with the appropriate executor and thread pool size. In interactive
-            mode, it uses a BackgroundScheduler that doesn't block the main
-            thread. In non-interactive mode, it uses a BlockingScheduler that
-            keeps the application running.
+          with the appropriate executor and thread pool size. In interactive
+          mode, it uses a BackgroundScheduler that doesn't block the main
+          thread. In non-interactive mode, it uses a BlockingScheduler that
+          keeps the application running.
 
         """
         if self._scheduler is None:
@@ -360,8 +360,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This method is primarily used by the manual fire command in the
-            interactive shell to trigger a job on demand. It bypasses the normal
-            scheduling mechanism but still respects concurrent execution limits.
+          interactive shell to trigger a job on demand. It bypasses the normal
+          scheduling mechanism but still respects concurrent execution limits.
 
         ### Raises
 
@@ -451,9 +451,9 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : The function is identified by its fully qualified name in the format
-            'module:func' and must be importable by the application when the task
-            runs. The title is used for display purposes in logs and the interactive
-            shell.
+          'module:func' and must be importable by the application when the task
+          runs. The title is used for display purposes in logs and the interactive
+          shell.
 
         """
         if title == '':
@@ -559,11 +559,11 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : In interactive mode, the scheduler runs in the background and doesn't
-            block the application's main thread. In non-interactive mode, it uses
-            a blocking scheduler that keeps the application running until shutdown.
+          block the application's main thread. In non-interactive mode, it uses
+          a blocking scheduler that keeps the application running until shutdown.
 
         : Starting with paused=True allows you to load all tasks but defer their
-            execution until explicitly resumed.
+          execution until explicitly resumed.
 
         """
         self._interactive = interactive
@@ -611,7 +611,7 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : Both modes block: with interactive until the shell ends, without
-            until the scheduler is stopped.
+          until the scheduler is stopped.
 
         """
         self.app.scheduler.startup(interactive=interactive, paused=paused)
@@ -699,8 +699,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : When paused, the scheduler will not execute any jobs, but will keep
-            track of the scheduled times. When resumed, the scheduler will decide
-            which jobs to execute based on the misfire policy.
+          track of the scheduled times. When resumed, the scheduler will decide
+          which jobs to execute based on the misfire policy.
 
         """
         self._scheduler.pause()
@@ -719,9 +719,9 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : When the scheduler is resumed, it will determine which jobs should
-            be executed based on their scheduled times and misfire policies.
-            Depending on the configuration, it may immediately execute jobs that
-            were scheduled to run while the scheduler was paused.
+          be executed based on their scheduled times and misfire policies.
+          Depending on the configuration, it may immediately execute jobs that
+          were scheduled to run while the scheduler was paused.
 
         """
         self._scheduler.resume()
@@ -741,11 +741,11 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This command first pauses the scheduler (if it's running), then removes
-            all jobs, reloads the task configuration, and finally resumes the
-            scheduler if it was previously running or if the restart flag is set.
+          all jobs, reloads the task configuration, and finally resumes the
+          scheduler if it was previously running or if the restart flag is set.
 
         : The configuration itself is not reloaded from disk; only the tasks
-            defined in the current application configuration are reloaded.
+          defined in the current application configuration are reloaded.
 
         """
         # save running state
@@ -776,8 +776,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This is equivalent to calling ```reload --restart``` and is provided
-            as a convenience command for the common case of wanting to reload
-            tasks and ensure the scheduler is running afterward.
+          as a convenience command for the common case of wanting to reload
+          tasks and ensure the scheduler is running afterward.
 
         """
         args.restart = True
@@ -797,8 +797,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This command is useful when you've added jobs while the scheduler
-            is running and want to ensure they're checked immediately, rather than
-            waiting for the scheduler's next normal wakeup interval.
+          is running and want to ensure they're checked immediately, rather than
+          waiting for the scheduler's next normal wakeup interval.
 
         """
         self._scheduler.wakeup()
@@ -865,8 +865,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This method is called when a subcommand is used without specifying
-            an action (e.g., 'tasks' without 'pause', 'resume', etc.). It displays
-            help information showing the available actions for that subcommand.
+          an action (e.g., 'tasks' without 'pause', 'resume', etc.). It displays
+          help information showing the available actions for that subcommand.
 
         """
         args.print_help()
@@ -886,8 +886,8 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : The parser defines all available commands and their arguments for the
-            interactive shell. It supports commands for managing the scheduler as
-            a whole and commands for operating on individual tasks.
+          interactive shell. It supports commands for managing the scheduler as
+          a whole and commands for operating on individual tasks.
 
         : Available commands include:
 
@@ -979,10 +979,10 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This method is the central command processor for the interactive shell.
-            It parses the command string, executes the appropriate handler for the
-            command, and returns a success indicator. The return value is used to
-            determine whether to add the command to the history and whether to clear
-            the input field for the next command.
+          It parses the command string, executes the appropriate handler for the
+          command, and returns a success indicator. The return value is used to
+          determine whether to add the command to the history and whether to clear
+          the input field for the next command.
 
         : Special commands:
 
@@ -1068,12 +1068,12 @@ class TokeoSchedulerController(Controller):
     ### Notes
 
     : The controller is registered with the Cement framework and adds a
-        'scheduler' command to the application's command-line interface.
-        It handles command-line arguments for controlling the scheduler
-        behavior and appearance.
+      'scheduler' command to the application's command-line interface.
+      It handles command-line arguments for controlling the scheduler
+      behavior and appearance.
 
     : This controller works in conjunction with the TokeoScheduler class,
-        providing a CLI wrapper around its functionality.
+      providing a CLI wrapper around its functionality.
 
     ### Example
 
@@ -1097,9 +1097,9 @@ class TokeoSchedulerController(Controller):
         ### Notes
 
         : This class defines the metadata required by the Cement framework for
-            proper controller registration and CLI integration. It specifies how
-            the controller is displayed in help text and how it relates to other
-            controllers in the application.
+          proper controller registration and CLI integration. It specifies how
+          the controller is displayed in help text and how it relates to other
+          controllers in the application.
 
         """
 
@@ -1129,8 +1129,8 @@ class TokeoSchedulerController(Controller):
         ### Notes
 
         : This method is called automatically by the Cement framework during
-            controller registration. It performs any necessary initialization
-            for the controller.
+          controller registration. It performs any necessary initialization
+          for the controller.
 
         """
         super(TokeoSchedulerController, self)._setup(app)
@@ -1182,8 +1182,8 @@ def tokeo_scheduler_extend_app(app):
     ### Notes
 
     : This function is called automatically during the application's post_setup
-        phase. It creates an instance of TokeoScheduler, configures it, and
-        attaches it to the application as the 'scheduler' attribute.
+      phase. It creates an instance of TokeoScheduler, configures it, and
+      attaches it to the application as the 'scheduler' attribute.
 
     """
     extensions_required(app, 'tokeo.ext.scheduler', 'tokeo.ext.tui.input', 'tokeo.ext.tui.output')
@@ -1205,8 +1205,8 @@ def tokeo_scheduler_shutdown(app):
     ### Notes
 
     : This function is called automatically during the application's pre_close
-        phase. It ensures the scheduler is properly shut down, stopping all
-        running jobs and releasing resources before the application exits.
+      phase. It ensures the scheduler is properly shut down, stopping all
+      running jobs and releasing resources before the application exits.
 
     """
     app.scheduler.shutdown()
@@ -1247,8 +1247,8 @@ def load(app):
         - Registers a pre_close hook for proper cleanup
 
     : After loading this extension, the scheduler is available as
-        app.scheduler and the 'scheduler' CLI command is added to the
-        application.
+      app.scheduler and the 'scheduler' CLI command is added to the
+      application.
 
     """
     app.handler.register(TokeoSchedulerController)

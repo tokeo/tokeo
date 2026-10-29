@@ -25,27 +25,27 @@ def deep_merge(a, b):
     ### Notes
 
     : **IMPORTANT**: Tuples and arbitrary objects are not handled as
-        their merge behavior would be ambiguous.
+      their merge behavior would be ambiguous.
 
     : Lists are always appended, never replaced or de-duplicated. Merging
-        the same b into a more than once (or re-merging an already merged
-        result) therefore grows the list with duplicate entries each time.
-        Callers needing replace-or-dedupe semantics should clear or
-        post-process the list themselves, or a future variant could take an
-        explicit list strategy (append vs. replace).
+      the same b into a more than once (or re-merging an already merged
+      result) therefore grows the list with duplicate entries each time.
+      Callers needing replace-or-dedupe semantics should clear or
+      post-process the list themselves, or a future variant could take an
+      explicit list strategy (append vs. replace).
 
     : a is merged in place and is also returned, so the original a is
-        modified by the call and should not be assumed to stay untouched.
+      modified by the call and should not be assumed to stay untouched.
 
     : For new keys, appended list items and primitive replacements the
-        result keeps references to b's objects instead of copying them, so
-        the merged result and b can share the same nested mutable objects;
-        a later merge into the result, or a change to b, may then overwrite
-        values on the other side unexpectedly.
+      result keeps references to b's objects instead of copying them, so
+      the merged result and b can share the same nested mutable objects;
+      a later merge into the result, or a change to b, may then overwrite
+      values on the other side unexpectedly.
 
     : If a caller needs its inputs encapsulated, it should pass copies,
-        e.g. deep_merge(a, copy.deepcopy(b)); copying b keeps the result
-        free of references into the caller's b.
+      e.g. deep_merge(a, copy.deepcopy(b)); copying b keeps the result
+      free of references into the caller's b.
 
     """
     # track the current dict key so the TypeError handler can name it;

@@ -39,7 +39,7 @@ class SmtpdError(TokeoError):
     : Inherits from TokeoError to keep consistent error handling across Tokeo
 
     : Raised by the extension, not by handler logic; handler logic raises the
-        SMTP dialog exceptions below instead
+      SMTP dialog exceptions below instead
 
     """
 
@@ -53,8 +53,8 @@ class SmtpdContractError(SmtpdError):
     ### Notes
 
     : Fired at import time by the ```@threaded``` decorator and by
-        ```SmtpdEvents.__init_subclass__```, so a mis-wired handler fails before
-        any service starts, never silently at runtime
+      ```SmtpdEvents.__init_subclass__```, so a mis-wired handler fails before
+      any service starts, never silently at runtime
 
     """
 
@@ -79,7 +79,7 @@ class SmtpdException(Exception):
     ### Notes
 
     : ```smtp_response``` is built from the fixed code and text, not from
-        ```message```, so internal details never reach the client
+      ```message```, so internal details never reach the client
 
     """
 
@@ -116,7 +116,7 @@ class SmtpdCloseException(SmtpdException):
     ### Notes
 
     : Raised within DATA, the reply follows after the end of DATA like any
-        other error; a ```SmtpdAbortException``` closes at once
+      other error; a ```SmtpdAbortException``` closes at once
 
     """
 
@@ -137,7 +137,7 @@ class Smtpd521CloseException(SmtpdCloseException):
     ### Notes
 
     : Meant for a host that never accepts mail (RFC 7504); to refuse a single
-        client use ```Smtpd554CloseException```
+      client use ```Smtpd554CloseException```
 
     : RFC 7504 lets the session go on after a 521, the server closes at once
 
@@ -164,7 +164,7 @@ class SmtpdAbortException(SmtpdCloseException):
     ### Notes
 
     : Raised within DATA, the server answers and closes without reading DATA
-        to its end (RFC 5321 3.8 for 421, 7.8 for 554)
+      to its end (RFC 5321 3.8 for 421, 7.8 for 554)
 
     """
 

@@ -185,10 +185,10 @@ class TokeoTuiOutput:
         ### Notes
 
         : Repainting uses the alternate screen of the terminal, so the screen
-            shows its former content again after Ctrl-C
+          shows its former content again after Ctrl-C
 
         : Ctrl-C and the signals the app shuts down on end the display, other
-            caught signals pass
+          caught signals pass
 
         """
         from rich.live import Live

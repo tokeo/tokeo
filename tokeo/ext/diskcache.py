@@ -70,7 +70,7 @@ class TokeoDiskCacheLockError(TokeoError):
     ### Notes
 
     : Inherits from TokeoError to keep error handling consistent across
-        the framework's extensions
+      the framework's extensions
 
     """
 
@@ -109,9 +109,9 @@ class _ThreadConnections(threading.local):
     ### Notes
 
     : diskcache keeps one sqlite connection per thread in ```Cache._local```
-        and closes only the one of the calling thread, so every thread would
-        have to call ```close``` itself; this storage closes the connection of
-        a thread when the thread ends
+      and closes only the one of the calling thread, so every thread would
+      have to call ```close``` itself; this storage closes the connection of
+      a thread when the thread ends
 
     """
 
@@ -286,8 +286,8 @@ class TokeoDiskCacheLocksHandler:
         ### Notes
 
         : The lock releases only itself; when a purge or its expire took it
-            before the end of the block, it logs a warning and leaves any
-            lock of another holder in place
+          before the end of the block, it logs a warning and leaves any
+          lock of another holder in place
 
         ### Example
 
@@ -943,8 +943,8 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         ### Notes
 
         : The app closes its own connection on close, the connection of
-            any other thread is closed when the thread ends; a later access
-            opens a new connection
+          any other thread is closed when the thread ends; a later access
+          opens a new connection
 
         """
         self._cache.close()
@@ -1177,7 +1177,7 @@ class TokeoDiskCacheController(Controller):
         ### Notes
 
         : All operations are performed with database locking retry enabled
-            to ensure reliability even when the cache is under heavy use.
+          to ensure reliability even when the cache is under heavy use.
 
         """
         directory = self.app.cache._cache.directory

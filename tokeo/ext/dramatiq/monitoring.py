@@ -76,8 +76,8 @@ class TokeoDramatiqHeartbeat(Middleware):
     ### Notes
 
     : The heartbeat thread uses a connection of its own, as pika connections
-        are not thread-safe; a lost connection is opened again on the next
-        heartbeat without disturbing the worker
+      are not thread-safe; a lost connection is opened again on the next
+      heartbeat without disturbing the worker
 
     """
 
@@ -250,11 +250,11 @@ class TokeoDramatiqMonitor:
     ### Notes
 
     : The monitor knows only the workers it heard of since its first call;
-        the first call waits one interval to hear each running worker
+      the first call waits one interval to hear each running worker
 
     : A worker is ```late``` after 2 and ```gone``` after 3 of its intervals
-        without a heartbeat; a gone or stopped worker is shown for 10 more
-        intervals
+      without a heartbeat; a gone or stopped worker is shown for 10 more
+      intervals
 
     """
 

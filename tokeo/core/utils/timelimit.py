@@ -24,28 +24,28 @@ async def page():
 ### Notes
 
 : A normal function gets the exception only between two Python steps; a
-    call blocked in C code, e.g. in a socket, a driver or a regex, gets it
-    afterwards or not at all
+  call blocked in C code, e.g. in a socket, a driver or a regex, gets it
+  afterwards or not at all
 
 : A coroutine stops only at an ```await```; blocking code in it runs on and
-    blocks the event loop
+  blocks the event loop
 
 : Each call of a normal function runs its own timer thread while it runs; on
-    a crowded system check the task limits (pid_max, ulimit -u, pids.max,
-    TasksMax)
+  a crowded system check the task limits (pid_max, ulimit -u, pids.max,
+  TasksMax)
 
 : TokeoTimeLimitExceeded derives from TokeoBaseException and not from
-    Exception, so an ```except Exception``` in the function does not swallow
-    it; ```finally``` blocks run as usual
+  Exception, so an ```except Exception``` in the function does not swallow
+  it; ```finally``` blocks run as usual
 
 : A function that catches BaseException itself and goes on swallows the
-    exception, its limit is lost
+  exception, its limit is lost
 
 : For a generator function the limit covers only the creation of the
-    generator, not its iteration; limit the function that consumes it
+  generator, not its iteration; limit the function that consumes it
 
 : dramatiq actors have their own ```time_limit``` option that works the same
-    way; use ```@time_limit``` for functions that also run outside dramatiq
+  way; use ```@time_limit``` for functions that also run outside dramatiq
 
 """
 
@@ -64,7 +64,7 @@ class TokeoTimeLimitExceeded(TokeoBaseException):
     ### Notes
 
     : Not an Exception, so ```except Exception``` and ```except TokeoError```
-        do not catch it; catch it by its name or by TokeoBaseException
+      do not catch it; catch it by its name or by TokeoBaseException
 
     """
 

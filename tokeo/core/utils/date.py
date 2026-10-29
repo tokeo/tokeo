@@ -51,7 +51,7 @@ def to_utc(date, auto_type=False):
     ### Notes
 
     : Use this to bring any supported value to UTC. To merely label a datetime
-        as UTC without shifting it, use as_utc() instead
+      as UTC without shifting it, use as_utc() instead
 
     """
     if isinstance(date, datetime_type):
@@ -162,7 +162,7 @@ def as_utc(date, auto_type=False):
     ### Notes
 
     : This assumes the value already represents UTC. To convert a datetime from
-        another timezone into UTC, use to_utc() instead
+      another timezone into UTC, use to_utc() instead
 
     """
     if isinstance(date, datetime_type):
