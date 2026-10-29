@@ -1,11 +1,11 @@
 # The ```smtpd``` core library
 
-```tokeo.core.smtpd``` is a standalone, ```asyncio```-based SMTP **receiving**
+```tokeo.core.smtpd``` is a standalone, ```asyncio```-based SMTP receiving
 server. You write a small handler class; the server runs the SMTP conversation,
 calls your handler at each step, and turns your decisions into the correct SMTP
 responses.
 
-Note: Tokeo smtpd is based on MidiSmtpServer -- a faithful, one-to-one port of
+Note: Tokeo smtpd is based on MidiSmtpServer, a faithful, one-to-one port of
 the Ruby gem
 [midi-smtp-server](https://github.com/4commerce-technologies-AG/midi-smtp-server):
 the events, the context object, the configuration options, the exceptions and the
@@ -19,7 +19,7 @@ not need to know the original to use the library.
 
 .. note::
 
-    This page documents the **library** (```tokeo.core.smtpd```): you construct
+    This page documents the library (```tokeo.core.smtpd```): you construct
     and drive ```SmtpdServer``` yourself. Running it as a managed Cement service
     (config blocks, CLI, pre-forking) is the job of the ```tokeo.ext.smtpd```
     extension and is documented there.
@@ -28,10 +28,10 @@ not need to know the original to use the library.
 
 Two things:
 
-1. **A handler class** — a subclass of ```SmtpdEvents``` with the event methods
+1. A handler class: a subclass of ```SmtpdEvents``` with the event methods
    you care about. Every event has a safe default, so you override only what you
    need.
-2. **A server** — an ```SmtpdServer``` bound to your handler, told which ports and
+2. A server: an ```SmtpdServer``` bound to your handler, told which ports and
    hosts to listen on, then served.
 
 ## 2. Quick start
@@ -73,7 +73,7 @@ Point any mail client at ```127.0.0.1:2525``` and send a message.
 ## 3. How it fits together
 
 The server accepts a TCP connection and drives the SMTP conversation on it. At
-each meaningful step it calls **your** handler; your return value or raised
+each meaningful step it calls your handler; your return value or raised
 exception becomes the SMTP response.
 
 ```mermaid
@@ -127,37 +127,36 @@ as a single method. The full set, in the order they can occur:
 <tr><th>Event</th><th>Called</th><th>Argument(s) beyond ctx</th></tr>
 </thead>
 <tbody>
-<tr><td>on_connect_event</td><td>new connection accepted</td><td>—</td></tr>
+<tr><td>on_connect_event</td><td>new connection accepted</td><td>-</td></tr>
 <tr><td>on_proxy_event</td><td>after a valid PROXY line</td><td>proxy_data</td></tr>
 <tr><td>on_helo_event</td><td>on HELO/EHLO</td><td>helo_data</td></tr>
 <tr><td>on_auth_event</td><td>on AUTH (see below)</td><td>authorization_id, authentication_id, authentication</td></tr>
 <tr><td>on_mail_from_event</td><td>on MAIL FROM</td><td>mail_from_data</td></tr>
 <tr><td>on_rcpt_to_event</td><td>on RCPT TO</td><td>rcpt_to_data</td></tr>
-<tr><td>on_message_data_start_event</td><td>DATA accepted, before body</td><td>—</td></tr>
-<tr><td>on_message_data_receiving_event</td><td>repeatedly, while the body arrives</td><td>—</td></tr>
-<tr><td>on_message_data_headers_event</td><td>when the header/body boundary is reached</td><td>—</td></tr>
-<tr><td>on_message_data_event</td><td>the complete message has arrived</td><td>—</td></tr>
+<tr><td>on_message_data_start_event</td><td>DATA accepted, before body</td><td>-</td></tr>
+<tr><td>on_message_data_receiving_event</td><td>repeatedly, while the body arrives</td><td>-</td></tr>
+<tr><td>on_message_data_headers_event</td><td>when the header/body boundary is reached</td><td>-</td></tr>
+<tr><td>on_message_data_event</td><td>the complete message has arrived</td><td>-</td></tr>
 <tr><td>on_process_line_unknown_event</td><td>an unrecognized command line</td><td>line</td></tr>
-<tr><td>on_disconnect_event</td><td>connection closing</td><td>—</td></tr>
+<tr><td>on_disconnect_event</td><td>connection closing</td><td>-</td></tr>
 <tr><td>on_logging_event</td><td>a log message is emitted</td><td>severity, msg, err=None</td></tr>
 </tbody>
 </table>
 
 Two conventions matter:
 
-- **Return value.** ```on_mail_from_event``` and ```on_rcpt_to_event``` decide
-  by their result: ```True``` accepts the address as sent, a stripped string
+- The return value decides. ```on_mail_from_event``` and ```on_rcpt_to_event```
+  decide by their result: ```True``` accepts the address as sent, a stripped string
   accepts it as the replaced address (also ```''```), ```None``` or ```False```
-  refuses it by ```550```. Any other result, a string with surrounding
-  whitespace or an exception other than an ```Smtpd*Exception``` is a fault of
-  the handler and answered by ```451```. Not overriding the event accepts every
-  address. ```on_process_line_unknown_event``` answers an unknown line by a
-  returned single reply line with its code (e.g. ```'250 OK'```), by ```500```
-  on ```None``` or ```False```, and by ```451``` on any other result.
-  ```on_proxy_event``` updates the fields of ```ctx.server.proxy``` by a
-  returned ```dict``` (also ```{}```), keeps them on ```None``` and ends the
-  connection by ```421``` on any other result.
-- **Raising decides the reply.** Raise one of the ```Smtpd*Exception``` classes
+  refuses it by ```550```. Any other result, a string with surrounding whitespace or
+  an exception other than an ```Smtpd*Exception``` is a fault of the handler and
+  answered by ```451```. Not overriding the event accepts every address.
+  ```on_process_line_unknown_event``` answers an unknown line by a returned single
+  reply line with its code (e.g. ```'250 OK'```), by ```500``` on ```None``` or
+  ```False```, and by ```451``` on any other result. ```on_proxy_event``` updates
+  the fields of ```ctx.server.proxy``` by a returned ```dict``` (also ```{}```),
+  keeps them on ```None``` and ends the connection by ```421``` on any other result.
+- Raising decides the reply. Raise one of the ```Smtpd*Exception``` classes
   (section 7) to reject a step; the exception carries the SMTP status line the
   client receives.
 
@@ -211,19 +210,19 @@ its decisions, unlike ```authenticated?```/```encrypted?``` of the original.
 Every event receives the same per-connection ```ctx``` (an ```SmtpdContext```),
 which carries the whole state of the conversation. It has three parts:
 
-**```ctx.server```** — the connection and session:
+```ctx.server``` holds the connection and session:
 ```local_host```, ```local_ip```, ```local_port```, ```remote_host```,
 ```remote_ip```, ```remote_port```, ```helo```, ```proxy```, ```connected```,
 ```authorization_id```, ```authentication_id```, ```authenticated```,
 ```encrypted```, plus ```exceptions``` and ```errors``` accumulated during the
 session.
 
-**```ctx.envelope```** — the current transaction:
+```ctx.envelope``` holds the current transaction:
 ```mail_from``` (the sender), ```rcpt_tos``` (the list of recipients),
 ```encoding_body```, ```encoding_utf8```, ```auth_for_id``` and
 ```auth_for_id_raw``` (section 6).
 
-**```ctx.message```** — the message being received:
+```ctx.message``` holds the message being received:
 ```data``` (a ```bytearray``` of the raw message), ```bytesize```,
 ```received```, ```delivered```, ```headers``` and ```crlf```.
 
@@ -447,27 +446,27 @@ that never accepts mail (RFC 7504).
 
 Not every reply code is allowed after every command. The command/reply sequences
 below are the SMTP standard (RFC 821 §4.3) and
-are what the server produces for each state. Reply classes: **S** success,
-**I** intermediate, **F** failure, **E** error.
+are what the server produces for each state. Reply classes: S success,
+I intermediate, F failure, E error.
 
 <table border="1" cellpadding="6" cellspacing="0">
 <thead>
 <tr><th>Command / state</th><th>Success (S)</th><th>Failure (F)</th><th>Error (E)</th></tr>
 </thead>
 <tbody>
-<tr><td>Connection established</td><td>220</td><td>421</td><td>—</td></tr>
-<tr><td>HELO / EHLO</td><td>250</td><td>—</td><td>500, 501, 504, 421</td></tr>
+<tr><td>Connection established</td><td>220</td><td>421</td><td>-</td></tr>
+<tr><td>HELO / EHLO</td><td>250</td><td>-</td><td>500, 501, 504, 421</td></tr>
 <tr><td>MAIL FROM</td><td>250</td><td>552, 451, 452</td><td>500, 501, 421</td></tr>
 <tr><td>RCPT TO</td><td>250, 251</td><td>550, 551, 552, 553, 450, 451, 452</td><td>500, 501, 503, 421</td></tr>
 <tr><td>DATA (accept)</td><td>I: 354</td><td>451, 554</td><td>500, 501, 503, 421</td></tr>
-<tr><td>DATA (after body)</td><td>250</td><td>552, 554, 451, 452</td><td>—</td></tr>
-<tr><td>RSET</td><td>250</td><td>—</td><td>500, 501, 504, 421</td></tr>
-<tr><td>NOOP</td><td>250</td><td>—</td><td>500, 421</td></tr>
-<tr><td>QUIT</td><td>221</td><td>—</td><td>500</td></tr>
+<tr><td>DATA (after body)</td><td>250</td><td>552, 554, 451, 452</td><td>-</td></tr>
+<tr><td>RSET</td><td>250</td><td>-</td><td>500, 501, 504, 421</td></tr>
+<tr><td>NOOP</td><td>250</td><td>-</td><td>500, 421</td></tr>
+<tr><td>QUIT</td><td>221</td><td>-</td><td>500</td></tr>
 </tbody>
 </table>
 
-The **421** reply (service not available, closing the channel) may be returned for
+The 421 reply (service not available, closing the channel) may be returned for
 any command when the server must shut down. Raising the matching ```Smtpd*Exception```
 from a handler produces one of the failure/error codes above; returning normally
 produces the success code.
@@ -718,7 +717,7 @@ server_b = SmtpdServer(handler, ports=2526, global_limits=limits)
 
 With ```spool``` set (a directory ending in ```/```, or directory plus the
 start of a file name) every incoming message is streamed to a temp file
-named ```<prefix>YYYYMMDD-HHMMSS-<unique>.eml``` -- the timestamp comes from
+named ```<prefix>YYYYMMDD-HHMMSS-<unique>.eml```. The timestamp comes from
 the connection start (UTC), the unique part from ```mkstemp```, so parallel
 messages and pre-forked workers never collide.
 
@@ -728,8 +727,8 @@ the whole block is written to the file once; from then on body lines go to
 the file only. At ```on_message_data_event``` the file holds the complete
 de-dot-stuffed, chomped message while ```ctx.message.data``` carries ONLY
 the headers (no separator line). ```ctx.message.bytesize``` always counts
-the whole message -- header lines added by the handler change it too (and
-count against a ```data_size``` cap) -- and equals the final file size.
+the whole message and equals the final file size. Header lines added by the
+handler change it too and count against a ```data_size``` cap.
 
 ```ctx.message.spooler``` is the owning ```MessageSpooler``` (None without
 spooling, and None for a message that ends before a header/body separator).
@@ -740,7 +739,7 @@ With ```debug=True``` on the server all files are kept, including
 interrupted ones.
 
 ```keep``` does not flush: called before the message completed it only
-relocates the still growing file -- the server keeps writing through the
+relocates the still growing file; the server keeps writing through the
 open handle and flushes and closes it as usual, so the content is complete
 only after ```on_message_data_event```.
 

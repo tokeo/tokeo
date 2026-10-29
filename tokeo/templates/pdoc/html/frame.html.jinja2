@@ -2,7 +2,7 @@
 {#- Page frame, replacing pdoc's `default/frame.html.jinja2`.              -#}
 {#-                                                                        -#}
 {#- pdoc hardcodes `<html lang="en">` outside of any Jinja block, so the   -#}
-{#- language cannot be set by overriding a block — the whole frame has to  -#}
+{#- language cannot be set by overriding a block, the whole frame has to   -#}
 {#- be supplied. That is cheap here: our page templates override `title`,  -#}
 {#- `style`, `head` and `body` anyway, so nothing else of pdoc's frame is  -#}
 {#- used. Its `nav`, `content` and `style_*` blocks stay unused, and the   -#}

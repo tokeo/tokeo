@@ -7,7 +7,7 @@ welcome. Please read this page before you open one.
 
 ## How this project is licensed
 
-Tokeo is released under the **Apache License, Version 2.0**, see
+Tokeo is released under the Apache License, Version 2.0, see
 ```LICENSE.txt``` and ```NOTICE.md```. That will not change.
 
 Contributions are covered by Section 5 of that license. Unless you state
@@ -31,19 +31,19 @@ must stay intact in any change you make there.
 
 ## What we accept
 
-**Keep the human in the loop.** We use AI as an exoskeleton, not a replacement.
-Purely AI-generated issues or pull requests are not accepted. If AI helped you
-write code or text, that is fine. You must have read it, understood it, and be
-able to explain and defend it.
+Keep the human in the loop. We use AI as an exoskeleton that strengthens the
+people who work on tokeo. Purely AI-generated issues or pull requests are not
+accepted. If AI helped you write code or text, that is fine. You must have read
+it, understood it, and be able to explain and defend it.
 
-**Small and focused beats large and sweeping.** One concern per pull request.
+Small and focused beats large and sweeping. One concern per pull request.
 A change that touches an extension should say in the description what it
 changes about the behaviour that extension guarantees.
 
-**Tests belong to the change.** New behaviour comes with tests. Changed
+Tests belong to the change. New behaviour comes with tests. Changed
 behaviour comes with changed tests. Tests must run without any external service.
 
-**Documentation belongs to the change.** If a change affects how the runtime is
+Documentation belongs to the change. If a change affects how the runtime is
 configured or used, update the relevant document in the same pull request.
 
 <br/>

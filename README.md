@@ -9,7 +9,7 @@
   <strong>Unleashing the Power of Python, Cement, Dramatiq, APScheduler, and gRPC for Superior EDA Solutions!</strong>
 </p>
 <p align="center">
-  — Event-Driven Architecture, Backend Automation, Governed AI Agents —
+  Event-Driven Architecture, Backend Automation, Governed AI Agents
 </p>
 
 <br/>

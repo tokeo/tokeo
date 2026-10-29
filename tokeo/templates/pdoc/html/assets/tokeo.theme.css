@@ -1,12 +1,12 @@
 /* ============================================================================
- * tokeo.theme.css — editable, NON-minified theme source for the tokeo pdoc docs.
- * Loaded AFTER tailwind.min.css. No build step: edit this file and reload.
+ * tokeo.theme.css: editable, non-minified theme source for the tokeo pdoc docs.
+ * Loaded after tailwind.min.css. No build step: edit this file and reload.
  *   - Brand colours live in :root below (they re-colour the utilities in
  *     tailwind.min.css too, since those reference var(--color-brand-*)).
  *   - @font-face and all component styles (tk-doc, tk-chev, type badges,
- *     admonitions, inline code, …) follow as plain CSS.
+ *     admonitions, inline code, ...) follow as plain CSS.
  * tailwind.min.css is a fixed, pre-built framework file (like a CDN drop-in);
- * you only regenerate it if you add NEW utility classes to the templates.
+ * you only regenerate it if you add new utility classes to the templates.
  * ========================================================================== */
 
 :root {

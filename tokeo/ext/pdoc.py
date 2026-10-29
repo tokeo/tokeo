@@ -1390,7 +1390,7 @@ class TokeoPdoc(Handler):
         so no directory is watched twice.
 
         Roots outside the project are dropped. ```modules``` documents the app,
-        its tests **and** the framework, but an installed ```tokeo``` lives in
+        its tests and the framework, but an installed ```tokeo``` lives in
         site-packages and nobody edits it there. The rule adjusts itself:
         working on the framework in its own checkout puts ```tokeo/``` below the
         project root, so it is watched again.

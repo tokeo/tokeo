@@ -22,27 +22,27 @@ bundles the following third-party assets. Each retains its own license.
 
 Web fonts (self-hosted under ```assets/fonts/```):
 
-- Inter — Copyright The Inter Project Authors; SIL Open Font License 1.1.
+- Inter: Copyright The Inter Project Authors; SIL Open Font License 1.1.
   Full text: ```assets/fonts/Inter-OFL.txt```.
-- Source Code Pro — Copyright 2010, 2012 Adobe Systems Incorporated, with
+- Source Code Pro: Copyright 2010, 2012 Adobe Systems Incorporated, with
   Reserved Font Name 'Source'; SIL Open Font License 1.1.
   Full text: ```assets/fonts/SourceCodePro-OFL.txt```.
 
 Styles and scripts:
 
-- Tailwind CSS — Copyright Tailwind Labs, Inc.; MIT License. The bundled
+- Tailwind CSS: Copyright Tailwind Labs, Inc.; MIT License. The bundled
   ```assets/tailwind.min.css``` is generated with Tailwind CSS and contains its
   code; the MIT banner is retained at the top of the file.
   Full text: ```assets/tailwind-LICENSE.txt```.
   The accompanying ```assets/tokeo.theme.css``` is tokeo's own plain-CSS theme
   (Apache-2.0, part of this product) and carries no third-party code.
-- highlight.js — Copyright (c) 2006 Ivan Sagalaev; BSD-3-Clause. Bundled as
+- highlight.js: Copyright (c) 2006 Ivan Sagalaev; BSD-3-Clause. Bundled as
   ```assets/highlight.min.js``` together with the theme files under
   ```assets/hljs/styles/```, which are part of the same distribution and
   covered by the same license. Individual theme files may name their own
   author and license terms in the file.
   Full text: ```assets/highlight-LICENSE.txt```.
-- Mermaid — Copyright (c) 2014-2022 Knut Sveidqvist; MIT License. Bundled as
+- Mermaid: Copyright (c) 2014-2022 Knut Sveidqvist; MIT License. Bundled as
   ```assets/mermaid.min.js```. That build embeds further third-party
   components under their own licenses; see the note in the license file.
   Full text: ```assets/mermaid-LICENSE.txt```.

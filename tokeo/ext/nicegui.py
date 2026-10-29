@@ -215,7 +215,7 @@ class NiceguiElementHelper:
     - Accessible via app.nicegui.ux in Tokeo applications
     - Creates HTML elements dynamically based on attribute access
     - Handles both empty elements and text-containing elements
-    - Allows creating **ANY** HTML element even if not directly supported by NiceGUI
+    - Allows creating any HTML element even if not directly supported by NiceGUI
 
     """
 

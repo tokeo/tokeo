@@ -1,6 +1,6 @@
 # The ```dramatiq``` extension
 
-```tokeo.ext.dramatiq``` runs functions of your app as **background tasks**. You
+```tokeo.ext.dramatiq``` runs functions of your app as background tasks. You
 mark a function as an *actor*; calling ```send``` on it does not run the function
 but puts a message into RabbitMQ. Separate *worker* processes, started by
 ```myapp dramatiq serve```, take the messages and run the function there.
@@ -26,13 +26,13 @@ limits through diskcache locks, and clear errors when RabbitMQ is not reachable.
 
 Four parts work together:
 
-- **Actor** -- a function of your app decorated with ```@app.dramatiq.actor```.
-  It belongs to a **queue** (```queue_name```, default ```default```).
-- **Message** -- what ```actor.send(...)``` creates: the actor name, the
+- An actor is a function of your app decorated with ```@app.dramatiq.actor```.
+  It belongs to a queue (```queue_name```, default ```default```).
+- A message is what ```actor.send(...)``` creates: the actor name, the
   arguments and options as JSON. Arguments must be JSON-serializable.
-- **Broker** -- RabbitMQ. It keeps the messages in durable queues until a worker
-  takes them.
-- **Worker** -- a process started by ```dramatiq serve```. It imports your app
+- The broker is RabbitMQ. It keeps the messages in durable queues until a
+  worker takes them.
+- A worker is a process started by ```dramatiq serve```. It imports your app
   and its actors, consumes the queues and runs the actor functions in its
   worker threads.
 
@@ -53,9 +53,9 @@ flowchart LR
 
 Every queue comes with two companions that dramatiq declares together with it:
 
-- ```<queue>.DQ``` holds **delayed** messages: sent with a ```delay``` or waiting
+- ```<queue>.DQ``` holds delayed messages: sent with a ```delay``` or waiting
   for a retry.
-- ```<queue>.XQ``` holds **dead letters**: messages that failed for good. RabbitMQ
+- ```<queue>.XQ``` holds dead letters: messages that failed for good. RabbitMQ
   keeps them for ```rabbitmq.dead_message_ttl``` (7 days by default).
 
 The life of one message, including a retry:
@@ -157,7 +157,7 @@ The decorator takes these arguments:
 </tbody>
 </table>
 
-Further **options** configure the middleware for this actor. Without them the
+Further options configure the middleware for this actor. Without them the
 values from the config apply (section 7):
 
 <table border="1" cellpadding="6" cellspacing="0">
@@ -168,14 +168,14 @@ values from the config apply (section 7):
 <tr><td>max_retries</td><td>20</td><td>retries after a failure; 0 sends a failed message to the dead letters at once</td></tr>
 <tr><td>min_backoff</td><td>15_000 ms</td><td>delay of the first retry; it about doubles with each retry (with jitter)</td></tr>
 <tr><td>max_backoff</td><td>604_800_000 ms</td><td>longest delay of a retry; dramatiq caps it at 7 days</td></tr>
-<tr><td>retry_when</td><td>—</td><td>callable(retries, exception) -> bool, decides instead of max_retries</td></tr>
-<tr><td>throws</td><td>—</td><td>exception class(es) that are expected: no retry, logged as info</td></tr>
-<tr><td>on_retry_exhausted</td><td>—</td><td>name of an actor called with the message once the retries are used up</td></tr>
+<tr><td>retry_when</td><td>-</td><td>callable(retries, exception) -> bool, decides instead of max_retries</td></tr>
+<tr><td>throws</td><td>-</td><td>exception class(es) that are expected: no retry, logged as info</td></tr>
+<tr><td>on_retry_exhausted</td><td>-</td><td>name of an actor called with the message once the retries are used up</td></tr>
 <tr><td>time_limit</td><td>600_000 ms</td><td>longest run of the actor; then a TimeLimitExceeded is raised in it</td></tr>
 <tr><td>max_age</td><td>None</td><td>messages older than this are not run but go to the dead letters</td></tr>
 <tr><td>notify_shutdown</td><td>False</td><td>raise Shutdown in a running actor when its worker stops</td></tr>
-<tr><td>on_success</td><td>—</td><td>name of an actor called with the message and the result</td></tr>
-<tr><td>on_failure</td><td>—</td><td>name of an actor called with the message and the exception</td></tr>
+<tr><td>on_success</td><td>-</td><td>name of an actor called with the message and the result</td></tr>
+<tr><td>on_failure</td><td>-</td><td>name of an actor called with the message and the exception</td></tr>
 <tr><td>pipe_ignore</td><td>False</td><td>in a pipeline, do not pass the previous result as argument</td></tr>
 </tbody>
 </table>
@@ -283,7 +283,7 @@ raises instead of being lost silently.
 
 ### One task at a time: ```_unparalleled```
 
-A queue whose name contains ```_unparalleled``` runs **one task at a time**
+A queue whose name contains ```_unparalleled``` runs one task at a time
 across all workers:
 
 - It is declared with RabbitMQ's ```x-single-active-consumer```: of all
@@ -332,7 +332,7 @@ matches ```throws```. Inspect and handle dead letters with ```dramatiq queues```
 
 .. note::
 
-    A dead letter keeps the state of its **last retry**: its error text and
+    A dead letter keeps the state of its last retry: its error text and
     retry count are those of the previous attempt, the error of the final
     attempt is only in the worker log (and in the monitor). With
     ```max_retries=0``` there is no retry, so its dead letter has no error text
@@ -392,7 +392,7 @@ flowchart TB
 </tbody>
 </table>
 
-The worker processes start by **forkserver** (or by spawn where forkserver is
+The worker processes start by forkserver (or by spawn where forkserver is
 not available): they do not inherit the state of the main process, so its open
 connections like gRPC channels or database pools do not leak into them.
 
@@ -403,8 +403,8 @@ pool; run ```serve``` under a supervisor like systemd that restarts it.
 
 ### Connections to RabbitMQ
 
-Each worker process holds about **4 connections per queue it consumes** (the
-queue and its DQ), **1 more with monitoring**, and 1 per worker thread that
+Each worker process holds about 4 connections per queue it consumes (the
+queue and its DQ), 1 more with monitoring, and 1 per worker thread that
 sends messages itself. ```dramatiq queues``` and ```dramatiq monitor``` hold one
 while they run. For example 2 processes consuming 3 queues with monitoring:
 2 × (3 × 4 + 1) = 26 connections. Bind workers to fewer queues with ```--queues```
@@ -544,7 +544,7 @@ RabbitMQ closed it in the meantime; it is safe to use from several threads.
 
 ## 9. Monitoring: ```dramatiq monitor```
 
-With ```monitoring: true``` every worker process sends a small **heartbeat**
+With ```monitoring: true``` every worker process sends a small heartbeat
 every ```monitoring_interval``` seconds to the fanout exchange
 ```<app label>.dramatiq.monitoring```. Each running monitor listens on a queue of
 its own, so any number of monitors see the same workers:
@@ -613,7 +613,7 @@ the age of its messages, so a stuck monitor piles nothing up.
 
 In code, ```app.dramatiq.monitor.workers(wait=0)``` returns the workers with their
 state and last heartbeat, ```app.dramatiq.monitor.snapshot(wait=0)``` adds the
-summed actors and the queues -- the data of ```--json```.
+summed actors and the queues, the data of ```--json```.
 
 ## 10. Locks and rate limits
 
@@ -634,7 +634,7 @@ def export(customer_id):
 ```
 
 The locks live in the diskcache directory, so they count across all worker
-processes of **one machine** (or of machines sharing that directory).
+processes of one machine (or of machines sharing that directory).
 ```serve``` purges stale locks on start, ```dramatiq locks --purge``` does it by
 hand.
 
@@ -652,7 +652,7 @@ their details as fields:
 <tr><td>TokeoDramatiqConnectionError</td><td>RabbitMQ is not reachable; also a dramatiq ConnectionClosed</td><td>address, cause, actor_name</td></tr>
 <tr><td>TokeoDramatiqRefusedError</td><td>RabbitMQ refused a request, e.g. missing permissions</td><td>address, cause</td></tr>
 <tr><td>TokeoDramatiqQueueError</td><td>the state of a queue prevents an action</td><td>queue, reason</td></tr>
-<tr><td>TokeoDramatiqError</td><td>switches that do not fit, locks without diskcache</td><td>—</td></tr>
+<tr><td>TokeoDramatiqError</td><td>switches that do not fit, locks without diskcache</td><td>-</td></tr>
 </tbody>
 </table>
 
