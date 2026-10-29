@@ -41,18 +41,12 @@ app.inspect(complex_object, debug=True)
 
 """
 
-from __future__ import annotations
 import sys
-from typing import Any, Dict, Union, TYPE_CHECKING
 from cement.core import output
-
-if TYPE_CHECKING:
-    from cement.core.foundation import App  # pragma: nocover
-
 import inspect
 
 
-def register_tokeo_print(app: App) -> None:
+def register_tokeo_print(app):
     """
     Register print and inspect functionality with the application.
 
@@ -72,7 +66,7 @@ def register_tokeo_print(app: App) -> None:
 
     """
 
-    def _print(*args: Any, name=None, sep=' ', end='\n', divider=None) -> None:
+    def _print(*args, name=None, sep=' ', end='\n', divider=None):
         """
         Print output using the application's print handler.
 
@@ -95,7 +89,7 @@ def register_tokeo_print(app: App) -> None:
     app.extend('print', _print)
 
     def _inspect(
-        *args: Any,
+        *args,
         name=None,
         system=False,
         methods=False,
@@ -104,7 +98,7 @@ def register_tokeo_print(app: App) -> None:
         types=True,
         debug=False,
         divider=None,
-    ) -> None:
+    ):
         """
         Inspect objects and print their details.
 
@@ -185,8 +179,6 @@ class TokeoPrintOutputHandler(output.OutputHandler):
         #: to override the ```output_handler``` via command line options.
         overridable = False
 
-    _meta: Meta  # type: ignore
-
     def _print(self, args, sep=' ', end='\n', divider=None):
         """
         Format arguments for printing.
@@ -223,7 +215,7 @@ class TokeoPrintOutputHandler(output.OutputHandler):
 
         return (divider * 40 + end if divider else '') + out + end
 
-    def render(self, data: Dict[str, Any], *args: Any, **kw: Any) -> Union[str, None]:
+    def render(self, data, *args, **kw):
         """
         Render data as text output.
 
@@ -324,9 +316,7 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
         #: to override the ```output_handler``` via command line options.
         overridable = False
 
-    _meta: Meta  # type: ignore
-
-    def render(self, data: Dict[str, Any], *args: Any, **kw: Any) -> str:
+    def render(self, data, *args, **kw):
         """
         Render a dictionary as text output.
 
@@ -401,8 +391,6 @@ class TokeoInspectOutputHandler(output.OutputHandler):
         #: Whether or not to include ```json``` as an available choice
         #: to override the ```output_handler``` via command line options.
         overridable = False
-
-    _meta: Meta  # type: ignore
 
     def _inspect(
         self,
@@ -502,7 +490,7 @@ class TokeoInspectOutputHandler(output.OutputHandler):
 
         return (divider * 40 + '\n' if divider else '') + out
 
-    def render(self, data: Dict[str, Any], *args: Any, **kw: Any) -> Union[str, None]:
+    def render(self, data, *args, **kw):
         """
         Render object inspection as text output.
 
@@ -569,7 +557,7 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             return None
 
 
-def load(app: App) -> None:
+def load(app):
     """
     Load the print extension into a Tokeo application.
 
