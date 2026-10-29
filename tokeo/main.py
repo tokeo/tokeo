@@ -5,7 +5,7 @@ import tokeo.core.utils.strict  # noqa: F401
 from cement import App, TestApp
 from cement.core.exc import CaughtSignal
 from cement.utils import fs
-from .core.exc import TokeoError
+from .core.exc import TokeoBaseException
 from .controllers.base import BaseController
 
 
@@ -119,8 +119,9 @@ def main():
 
     - Returns nothing; the process exit code is set on ```app.exit_code``` and
         applied on close via the app's exit_on_close behavior
-    - AssertionError and TokeoError are caught and reported with exit code 1;
-        a CaughtSignal (SIGINT/SIGTERM) is caught and exits with code 0
+    - AssertionError and TokeoBaseException, so TokeoError and the abort of a
+        time limit, are caught and reported with exit code 1; a CaughtSignal
+        (SIGINT/SIGTERM) is caught and exits with code 0
 
     """
     app = None
@@ -139,7 +140,7 @@ def main():
 
             app.run()
 
-    except (TokeoError, AssertionError) as e:
+    except (TokeoBaseException, AssertionError) as e:
         # a clean message for any error from setup or run; app is already bound,
         # so the application logger is used when it is available
         if app and app.log:
