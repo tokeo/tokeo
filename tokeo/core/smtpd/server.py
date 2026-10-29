@@ -66,7 +66,6 @@ from .exc import (
     Smtpd555Exception,
     Smtpd451Exception,
     Smtpd454Exception,
-    Tls454Exception,
     Tls530Exception,
 )
 
@@ -1064,14 +1063,12 @@ class SmtpdServer:
                             if session.cmd_sequence is CMD_DATA:
                                 ctx.message.crlf = line_break
                             line = raw.removesuffix(line_break)
-                        elif self.crlf_mode is CrlfMode.CRLF_STRICT:
+                        else:  # is CrlfMode.CRLF_STRICT
                             if not raw.endswith(b'\r\n'):
                                 raise Smtpd500CrLfSequenceException
                             line = raw.removesuffix(b'\r\n')
                             if line.find(b'\r') >= 0:
                                 raise Smtpd500Exception('Line contains additional CR chars!')
-                        else:
-                            raise Smtpd500Exception(f'Unknown crlf_mode {self.crlf_mode}!')
 
                         # a dot line that does not end DATA stays data, passed on
                         # dot-stuffed to keep its dot
@@ -1526,8 +1523,8 @@ class SmtpdServer:
                     raise Smtpd501Exception
                 if session.cmd_sequence is CMD_HELO:
                     raise Smtpd503Exception
-                if not self.tls:
-                    raise Tls454Exception
+                # no test for self.tls, it is built whenever encrypt_mode is not
+                # TLS_FORBIDDEN
                 if ctx.server.encrypted:
                     raise Smtpd503Exception
                 session.cmd_sequence = CMD_STARTTLS
@@ -1688,12 +1685,9 @@ class SmtpdServer:
 
             elif re.match(r'^RCPT TO:', line, self._RE_CMD_FLAGS):
                 # RCPT
+                # TLS and AUTH were tested by MAIL and stay for the transaction
                 if session.cmd_sequence not in (CMD_MAIL, CMD_RCPT):
                     raise Smtpd503Exception
-                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
-                    raise Tls530Exception
-                if self.auth_mode is AuthMode.AUTH_REQUIRED and not ctx.server.authenticated:
-                    raise Smtpd530Exception
                 cmd_data = re.sub(r'^RCPT TO:', '', line, flags=self._RE_CMD_FLAGS)
                 # separate the address as sent, RCPT TO announces no params, split
                 # by whitespace_mode
@@ -1726,12 +1720,13 @@ class SmtpdServer:
                 # DATA takes no argument
                 if ' ' in line:
                     raise Smtpd501Exception
+                # TLS and AUTH were tested by MAIL and stay for the transaction
                 if session.cmd_sequence is not CMD_RCPT:
                     raise Smtpd503Exception
-                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
-                    raise Tls530Exception
-                if self.auth_mode is AuthMode.AUTH_REQUIRED and not ctx.server.authenticated:
-                    raise Smtpd530Exception
+                session.cmd_sequence = CMD_DATA
+                ctx.message.received = utc_now()
+                return '354 Enter message, ending with "." on a line by itself'
+
             elif re.match(r'^(VRFY|EXPN|HELP)(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # VRFY, EXPN and HELP are valid at any time (RFC 5321 4.1.4)
                 if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
