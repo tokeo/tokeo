@@ -1643,7 +1643,7 @@ class TokeoDiskCacheController(Controller):
 
 def tokeo_diskcache_pdoc_render_decorator(app, func, decorator, args, kwargs):
     """
-    Handle docstrings for dramatiq decorators in pdoc
+    Handle docstrings for the throttle and temper decorators in pdoc.
     """
     if re.match(r'@app\.[^.]+\.locks\.throttle', decorator):
         params = None
@@ -1658,8 +1658,8 @@ def tokeo_diskcache_pdoc_render_decorator(app, func, decorator, args, kwargs):
 
                 if 'count' in kwargs:
                     params += f', count={kwargs["count"].value}'
-                if 'per_second' in kwargs:
-                    params += f', per_second={kwargs["per_second"].value}'
+                if 'per_seconds' in kwargs:
+                    params += f', per_seconds={kwargs["per_seconds"].value}'
 
             except Exception:
                 pass
