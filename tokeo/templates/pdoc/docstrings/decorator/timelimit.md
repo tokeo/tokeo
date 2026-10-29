@@ -1,8 +1,8 @@
 Limits the run time of the decorated function.
 
-A normal function gets ```TokeoTimeLimitExceeded``` raised into its own
+A normal function gets ```TokeoTimelimitExceeded``` raised into its own
 thread when it runs longer than its limit. A coroutine function is cancelled
-at its next ```await``` and raises ```TokeoTimeLimitExceeded``` instead.
+at its next ```await``` and raises ```TokeoTimelimitExceeded``` instead.
 
 ### Args
 
@@ -15,14 +15,14 @@ at its next ```await``` and raises ```TokeoTimeLimitExceeded``` instead.
 ### Raises
 
 - **ValueError**: If seconds is not a number above 0
-- **TokeoTimeLimitExceeded**: In the call, when it runs longer
+- **TokeoTimelimitExceeded**: In the call, when it runs longer
 
 ### Example
 
 ```python
-from tokeo.core.utils.timelimit import time_limit
+from tokeo.core.utils.timelimit import timelimit
 
-@time_limit(60)
+@timelimit(60)
 def job():
     ...
 ```
@@ -37,7 +37,7 @@ def job():
 - Each call of a normal function runs its own timer thread while it runs; on
   a crowded system check the task limits (pid_max, ulimit -u, pids.max,
   TasksMax)
-- TokeoTimeLimitExceeded derives from TokeoBaseException and not from
+- TokeoTimelimitExceeded derives from TokeoBaseException and not from
   Exception, so an ```except Exception``` in the function does not swallow
   it; ```finally``` blocks run as usual
 - A function that catches BaseException itself and goes on swallows the
@@ -45,4 +45,4 @@ def job():
 - For a generator function the limit covers only the creation of the
   generator, not its iteration; limit the function that consumes it
 - dramatiq actors have their own ```time_limit``` option that works the same
-  way; use ```@time_limit``` for functions that also run outside dramatiq
+  way; use ```@timelimit``` for functions that also run outside dramatiq

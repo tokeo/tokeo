@@ -1,22 +1,22 @@
 """
 Tokeo Time Limit Module.
 
-Limits the run time of a function by the decorator ```@time_limit```.
+Limits the run time of a function by the decorator ```@timelimit```.
 
-A normal function gets ```TokeoTimeLimitExceeded``` raised into its own
+A normal function gets ```TokeoTimelimitExceeded``` raised into its own
 thread when it runs longer than its limit. A coroutine function is cancelled
-at its next ```await``` and raises ```TokeoTimeLimitExceeded``` instead.
+at its next ```await``` and raises ```TokeoTimelimitExceeded``` instead.
 
 ### Example
 
 ```python
-from tokeo.core.utils.timelimit import time_limit, TokeoTimeLimitExceeded
+from tokeo.core.utils.timelimit import timelimit, TokeoTimelimitExceeded
 
-@time_limit(60)
+@timelimit(60)
 def job():
     ...
 
-@time_limit(10)
+@timelimit(10)
 async def page():
     ...
 ```
@@ -34,7 +34,7 @@ async def page():
   a crowded system check the task limits (pid_max, ulimit -u, pids.max,
   TasksMax)
 
-: TokeoTimeLimitExceeded derives from TokeoBaseException and not from
+: TokeoTimelimitExceeded derives from TokeoBaseException and not from
   Exception, so an ```except Exception``` in the function does not swallow
   it; ```finally``` blocks run as usual
 
@@ -45,7 +45,7 @@ async def page():
   generator, not its iteration; limit the function that consumes it
 
 : dramatiq actors have their own ```time_limit``` option that works the same
-  way; use ```@time_limit``` for functions that also run outside dramatiq
+  way; use ```@timelimit``` for functions that also run outside dramatiq
 
 """
 
@@ -57,7 +57,7 @@ import threading
 from tokeo.core.exc import TokeoBaseException
 
 
-class TokeoTimeLimitExceeded(TokeoBaseException):
+class TokeoTimelimitExceeded(TokeoBaseException):
     """
     Raised in a call that runs longer than its time limit.
 
@@ -71,7 +71,7 @@ class TokeoTimeLimitExceeded(TokeoBaseException):
     pass
 
 
-def time_limit(seconds):
+def timelimit(seconds):
     """
     Decorator to limit the run time of a function.
 
@@ -86,7 +86,7 @@ def time_limit(seconds):
     ### Raises
 
     - **ValueError**: If seconds is not a number above 0
-    - **TokeoTimeLimitExceeded**: In the call, when it runs longer
+    - **TokeoTimelimitExceeded**: In the call, when it runs longer
 
     """
     if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or seconds <= 0:
@@ -110,7 +110,7 @@ def time_limit(seconds):
                     # a TimeoutError of the function itself goes on
                     if not timeout.expired():
                         raise
-                    raise TokeoTimeLimitExceeded(message) from None
+                    raise TokeoTimelimitExceeded(message) from None
 
             return wrapper
 
@@ -122,7 +122,7 @@ def time_limit(seconds):
 
             def abort():
                 raised.append(True)
-                ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(TokeoTimeLimitExceeded))
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(TokeoTimelimitExceeded))
 
             # an own timer for each call
             timer = threading.Timer(seconds, abort)
@@ -131,10 +131,10 @@ def time_limit(seconds):
             try:
                 # call the wrapped function
                 return func(*args, **kwargs)
-            except TokeoTimeLimitExceeded:
+            except TokeoTimelimitExceeded:
                 # raised by the own limit, give it the message
                 if raised:
-                    raise TokeoTimeLimitExceeded(message) from None
+                    raise TokeoTimelimitExceeded(message) from None
                 # raised by the limit of an outer call, let it go on
                 raise
             finally:

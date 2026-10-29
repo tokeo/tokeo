@@ -33,7 +33,7 @@ service runs at most at the same moment and which setting controls it.
 | nicegui, FastAPI | 1 | event loop + thread pool for ```def``` endpoints | anyio thread pool, 40 |
 | grpc | 1 | thread pool | ```grpc.max_worker```, 1 |
 | automate | 1 | one thread per host in parallel runs | the hosts of a task |
-| ```@time_limit``` | | one timer thread per running call | |
+| ```@timelimit``` | | one timer thread per running call | |
 
 More that adds to the count:
 
@@ -135,7 +135,7 @@ Windows is not a target of tokeo and not tested.
 
 ## Example: a loaded system
 
-About 10000 jobs at the same moment on one host, all with ```@time_limit```:
+About 10000 jobs at the same moment on one host, all with ```@timelimit```:
 
 | What | Estimate |
 |---|---|
