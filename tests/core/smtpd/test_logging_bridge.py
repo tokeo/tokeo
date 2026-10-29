@@ -1,11 +1,11 @@
 """
 Tests for the logging bridge (SmtpdServer._log_bridge) and the handler's
-bound ``self.log``.
+bound ```self.log```.
 
-``on_logging_event`` is free to be a plain ``def``, an ``async def`` or a
-``@threaded def``; the bridge hands the ``_emit`` coroutine to the event loop,
+```on_logging_event``` is free to be a plain ```def```, an ```async def``` or a
+```@threaded def```; the bridge hands the ```_emit``` coroutine to the event loop,
 so the execution model stays with the precomputed dispatcher. Every event, in
-any of its three forms, logs the same way: ``self.log.warning(...)``, never
+any of its three forms, logs the same way: ```self.log.warning(...)```, never
 awaited.
 """
 

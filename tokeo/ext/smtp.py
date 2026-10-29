@@ -42,11 +42,18 @@ class TokeoSMTPMailHandler(mail.MailHandler):
     multipart messages with attachments, and inline images. It also provides
     template-based email generation using Tokeo's and Jinja's templating system.
 
+    ### Keyword Args
+
+    - **kw**: Keyword arguments passed to the parent handler
+
     ### Notes
 
     : This handler requires proper SMTP server configuration in the application
         configuration. The configuration can be overridden per message via keyword
         arguments when sending emails.
+
+    : An internal cache speeds up the template existence checks during
+        template-based email generation.
 
     ### References
 
@@ -110,21 +117,6 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         }
 
     def __init__(self, **kw):
-        """
-        Initialize the SMTP mail handler.
-
-        Sets up the handler and initializes the template cache.
-
-        ### Keyword Args
-
-        - **kw**: Keyword arguments passed to the parent handler
-
-        ### Notes
-
-        : Initializes an internal cache to optimize template existence checks
-            during template-based email generation.
-
-        """
         super().__init__(**kw)
         self._template_exists_cache = dict()
 

@@ -1,11 +1,11 @@
 """
 Tests for the whitespace_mode of the command lines.
 
-The verb of a command is ASCII only. ``WHITESPACE_MODERATE`` (default) strips
+The verb of a command is ASCII only. ```WHITESPACE_MODERATE``` (default) strips
 unusual whitespace (any except SP and HTAB) and control chars at the edges as
 noise, separates by any whitespace and refuses a control char inside by 501.
-``WHITESPACE_STRICT`` refuses them by 501 and separates only by SP and HTAB,
-``WHITESPACE_UNSAFE`` separates only by SP and HTAB and hands all other chars
+```WHITESPACE_STRICT``` refuses them by 501 and separates only by SP and HTAB,
+```WHITESPACE_UNSAFE``` separates only by SP and HTAB and hands all other chars
 to the events. Without a valid separator after the verb a command is unknown
 (500); QUIT, RSET, DATA and STARTTLS answer an argument by 501, NOOP ignores
 it.

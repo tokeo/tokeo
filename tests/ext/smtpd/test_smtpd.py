@@ -3,8 +3,8 @@ Tests for tokeo.ext.smtpd: settings mapping, topology planning, shared
 limits across processes and the termination guarantees with real processes.
 
 The termination guarantees are process properties (exit code, port release,
-SIGKILL survival) and are observed from outside: ``smtpd_tests_serve_probe.py``
-runs a real ``TokeoTest`` Cement app in its own process group; the tests
+SIGKILL survival) and are observed from outside: ```smtpd_tests_serve_probe.py```
+runs a real ```TokeoTest``` Cement app in its own process group; the tests
 detect readiness through the SMTP banner on the port and cleanup through
 the process group and the port becoming bindable again.
 """

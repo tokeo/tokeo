@@ -197,7 +197,7 @@ def _plan(services, has_global_limit):
     return plan
 
 
-#: ``prctl`` option number for the parent-death signal (Linux ``<sys/prctl.h>``)
+#: ```prctl``` option number for the parent-death signal (Linux ```<sys/prctl.h>```)
 _PR_SET_PDEATHSIG = 1
 
 
@@ -251,9 +251,9 @@ class SharedGlobalLimits(GlobalLimits):
 
     ### Args
 
-    - **max_processings** (int|None): global concurrent-processing cap
+    - **max_processings** (int|None): Global concurrent-processing cap
         (None/0 = unlimited)
-    - **max_connections** (int|None): global open-connection cap
+    - **max_connections** (int|None): Global open-connection cap
         (None/0 = unlimited)
 
     ### Notes

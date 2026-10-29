@@ -1,11 +1,11 @@
 {% extends "frame.html.jinja2" %}
 
-{#- ================================================================== -#}
+{#- =================================================================== -#}
 {#- Tokeo configuration page: same shell, sidebar and type scale as     -#}
 {#- module.html.jinja2. Content extraction (comment blocks, per-setting -#}
 {#- yaml source, .local redaction) happens in tokeo/ext/pdoc.py; this   -#}
-{#- template is presentation only.                                     -#}
-{#- ================================================================== -#}
+{#- template is presentation only.                                      -#}
+{#- =================================================================== -#}
 
 {% block title %}Configuration · {{ doc_title | default("Tokeo API") }}{% endblock %}
 {% block style %}<link rel="stylesheet" href="/assets/tailwind.min.css"><link rel="stylesheet" href="/assets/tokeo.theme.css">{% endblock %}

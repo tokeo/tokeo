@@ -39,9 +39,6 @@ class App:
     """
 
     def __init__(self):
-        """
-        Initialize the App class with an unset app reference.
-        """
         self._app = None
 
     def __getattr__(self, key):

@@ -221,7 +221,7 @@ def _parse_ports(ports):
 
     ### Args
 
-    - **ports**: e.g. ```'2525'```, ```'2525, 3535'```, ```'2525:3535, 2525'```
+    - **ports**: E.g. ```'2525'```, ```'2525, 3535'```, ```'2525:3535, 2525'```
 
     ### Returns
 
@@ -248,7 +248,7 @@ def _parse_hosts(hosts):
 
     ### Args
 
-    - **hosts**: e.g. ```'127.0.0.1'```, ```'127.0.0.1, ::1'```, ```'*'```
+    - **hosts**: E.g. ```'127.0.0.1'```, ```'127.0.0.1, ::1'```, ```'*'```
         or an already split list of host identifiers
 
     ### Returns
@@ -332,9 +332,9 @@ class GlobalLimits:
 
     ### Args
 
-    - **max_processings** (int|None): global concurrent-processing cap
+    - **max_processings** (int|None): Global concurrent-processing cap
         (None/0 = unlimited)
-    - **max_connections** (int|None): global open-connection cap
+    - **max_connections** (int|None): Global open-connection cap
         (None/0 = unlimited)
 
     """

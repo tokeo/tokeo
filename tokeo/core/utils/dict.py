@@ -24,8 +24,8 @@ def deep_merge(a, b):
 
     ### Notes
 
-    : **IMPORTANT**: Tuples and arbitrary objects are not handled as
-        their merge behavior would be ambiguous.
+    : Tuples and arbitrary objects are not handled, as their merge behavior
+        would be ambiguous.
 
     : Lists are always appended, never replaced or de-duplicated. Merging
         the same b into a more than once (or re-merging an already merged

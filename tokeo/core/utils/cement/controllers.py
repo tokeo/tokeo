@@ -8,7 +8,7 @@ def subcmdmeta(controller):
 
     ### Returns
 
-    - **\\_\\_cement_meta\\_\\_** (CommandMeta|None): object ref to Meta
+    - **\\_\\_cement_meta\\_\\_** (CommandMeta|None): Object ref to Meta
         information of the subcommand, None outside a dispatched subcommand
 
     ### Notes
@@ -30,7 +30,7 @@ def defaultmeta(controller):
 
     ### Returns
 
-    - **\\_\\_cement_meta\\_\\_** (CommandMeta|None): object ref to Meta
+    - **\\_\\_cement_meta\\_\\_** (CommandMeta|None): Object ref to Meta
         information of the _default_ subcommand, None when ```default_func```
         is not an exposed command
 

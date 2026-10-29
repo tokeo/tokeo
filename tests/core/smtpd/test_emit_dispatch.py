@@ -1,10 +1,10 @@
 """
 Tests for the precomputed event dispatch (SmtpdServer.emit_events).
 
-The table is built once per handler class and keyed by ``SmtpdEvent``:
+The table is built once per handler class and keyed by ```SmtpdEvent```:
 overridden events get an entry with their resolved execution kind (sync /
-async / @threaded); base no-ops get none, so call sites skip ``_emit``
-entirely; events whose base carries behaviour (``ON_AUTH_EVENT``'s default
+async / @threaded); base no-ops get none, so call sites skip ```_emit```
+entirely; events whose base carries behaviour (```ON_AUTH_EVENT```'s default
 deny) always stay dispatchable.
 """
 

@@ -1,8 +1,8 @@
 """
 Tests for the connections / processings readers on SmtpdServer.
 
-Mirrors the ``connections`` / ``connections?`` / ``processings`` /
-``processings?`` by driving a live server: the counters read zero when idle,
+Mirrors the ```connections``` / ```connections?``` / ```processings``` /
+```processings?``` by driving a live server: the counters read zero when idle,
 rise while clients stay connected or while a message is being processed, and
 fall back once the clients close or the message is delivered.
 """

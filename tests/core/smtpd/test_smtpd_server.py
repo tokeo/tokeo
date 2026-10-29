@@ -782,9 +782,9 @@ async def _dialog_raw(events, settings, steps, has_server_greeting=True):
 
     ### Args
 
-    - **steps** (list): tuples ```(bytes_to_send, expect_reply)```; when
+    - **steps** (list): Tuples ```(bytes_to_send, expect_reply)```; when
         expect_reply is False nothing is read
-    - **has_server_greeting** (bool): read the 220 greeting on connect; False
+    - **has_server_greeting** (bool): Read the 220 greeting on connect; False
         with proxy_extension, where the greeting answers the PROXY header
 
     ### Returns

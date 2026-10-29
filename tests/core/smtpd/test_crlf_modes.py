@@ -1,13 +1,13 @@
 """
 Tests for the crlf_mode handling on the raw wire.
 
-``CRLF_LEAVE`` must deliver the message bytes exactly as received (only the
-protocol-mandated de-dot-stuffing and the final chomp apply), ``CRLF_ENSURE``
-normalizes every line to CRLF and strips stray CR/LF octets, ``CRLF_STRICT``
+```CRLF_LEAVE``` must deliver the message bytes exactly as received (only the
+protocol-mandated de-dot-stuffing and the final chomp apply), ```CRLF_ENSURE```
+normalizes every line to CRLF and strips stray CR/LF octets, ```CRLF_STRICT```
 rejects lines that do not end with CRLF. A rest without LF that the client
-leaves at its close is dropped in every mode. ``crlf_data_mode`` decides on bare
-CR and LF in DATA: only ``<CRLF>.<CRLF>`` ends DATA, except with
-``CRLF_DATA_UNSAFE`` (SMTP smuggling). smtplib normalizes line endings on send,
+leaves at its close is dropped in every mode. ```crlf_data_mode``` decides on bare
+CR and LF in DATA: only ```<CRLF>.<CRLF>``` ends DATA, except with
+```CRLF_DATA_UNSAFE``` (SMTP smuggling). smtplib normalizes line endings on send,
 so these tests speak to the socket directly.
 """
 

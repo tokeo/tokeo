@@ -4,7 +4,7 @@ Tests for the TLS_WHEN_AUTH encrypt mode (Tokeo-only, beyond the reference).
 TLS_WHEN_AUTH behaves like TLS_OPTIONAL for the dialog, but AUTH is only
 offered (EHLO) and accepted on an encrypted channel: on plaintext the AUTH
 line is hidden and an AUTH command answers 530; after STARTTLS it follows
-``auth_mode`` alone. TLS_OPTIONAL itself keeps the reference behaviour
+```auth_mode``` alone. TLS_OPTIONAL itself keeps the reference behaviour
 (plaintext AUTH allowed).
 """
 

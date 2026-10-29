@@ -875,15 +875,15 @@ class TokeoScheduler(MetaMixin):
 
         : Available commands include:
 
-            - **list**: Show active scheduler tasks
-            - **pause**/**resume**: Control overall scheduler state
-            - **reload**: Reload tasks from configuration
-            - **restart**: Reload and restart the scheduler
-            - **wakeup**: Force the scheduler to check for due jobs
-            - **tasks**: Commands for managing individual tasks:
-                - **pause**/**resume**: Control specific task state
-                - **remove**: Delete a task
-                - **fire**: Execute a task immediately
+            - ```list```: Show active scheduler tasks
+            - ```pause```/```resume```: Control overall scheduler state
+            - ```reload```: Reload tasks from configuration
+            - ```restart```: Reload and restart the scheduler
+            - ```wakeup```: Force the scheduler to check for due jobs
+            - ```tasks```: Commands for managing individual tasks:
+                - ```pause```/```resume```: Control specific task state
+                - ```remove```: Delete a task
+                - ```fire```: Execute a task immediately
 
         """
         if self._command_parser is None:

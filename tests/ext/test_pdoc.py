@@ -1,11 +1,11 @@
 """
 Tests for tokeo.ext.pdoc, on what it adds on top of pdoc, not on pdoc itself:
 
-- `#:` variable comments, which pdoc3 understood and pdoc 16 does not
-- the yaml config page: comment extraction, per-setting slicing, `.local`
+- ```#:``` variable comments, which pdoc3 understood and pdoc 16 does not
+- the yaml config page: comment extraction, per-setting slicing, ```.local```
   redaction and the block boundaries
 - namespace-aware module discovery, which pkgutil-based walking misses
-- `serve()`, including the daemon thread it starts for the watch monitor
+- ```serve()```, including the daemon thread it starts for the watch monitor
 - the controller's flag handling, driven through the real CLI
 
 Everything that can fail at runtime is executed rather than inspected: the
@@ -39,8 +39,8 @@ class PdocTest(TokeoTest):
     """
     A TokeoTest app with the pdoc extension loaded.
 
-    Its pdoc section is pinned to a temp dir and a free port, `overrides`
-    change single settings. `port=0` lets the kernel pick a free one, so
+    Its pdoc section is pinned to a temp dir and a free port, ```overrides```
+    change single settings. ```port=0``` lets the kernel pick a free one, so
     parallel runs never collide. The watch timings are shortened so the
     monitor reacts inside a test.
     """
@@ -79,7 +79,7 @@ def no_process_replacement(monkeypatch):
 
 @pytest.fixture
 def app(tmp_path):
-    """A booted app; `app.pdoc` is the handler under test."""
+    """A booted app; ```app.pdoc``` is the handler under test."""
     with PdocTest(tmp_path) as booted:
         booted.run()
         yield booted
@@ -104,14 +104,14 @@ def log_lines(app, monkeypatch):
 
 
 def _write(path, text):
-    """Write `text` to `path`, creating parent directories."""
+    """Write ```text``` to ```path```, creating parent directories."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding='utf-8')
     return path
 
 
 def _has(lines, needle):
-    """Did any captured log line contain `needle`?"""
+    """Did any captured log line contain ```needle```?"""
     return any(needle in line for line in lines)
 
 
@@ -526,7 +526,7 @@ def _build_config_tree(root):
 
 
 def _collect_config_sections(app, tmp_path, monkeypatch):
-    """Run `_render_config_page` and return the section names it produced."""
+    """Run ```_render_config_page``` and return the section names it produced."""
     import types
 
     config_dir = _build_config_tree(tmp_path / 'config' / 'spiral')
@@ -559,9 +559,9 @@ def _fake_appenv_files(config_dir, app_env, suffix):
     """
     Reproduce appenv's resolver, including its ordering.
 
-    Env file, then `.d/*`, then the top-level `.local`, then `.d/*.local`.
-    That is cement's load order, and the config page follows it so the
-    entries read in the order the values are applied.
+    Env file, then ```.d/*```, then the top-level ```.local```, then
+    ```.d/*.local```. That is cement's load order, and the config page follows
+    it so the entries read in the order the values are applied.
     """
     import glob
     import os
@@ -673,7 +673,7 @@ def test_discover_honours_pdoc_overrides(app, tmp_path, monkeypatch):
 
 
 def _stub_dirs(app, monkeypatch, dirs):
-    """Pretend the documented modules resolve to `dirs`."""
+    """Pretend the documented modules resolve to ```dirs```."""
     monkeypatch.setattr(app.pdoc, '_module_dirs', lambda: dirs)
     monkeypatch.setattr(app.pdoc, '_resolve_docstrings_dirs', lambda: [])
 
@@ -950,10 +950,10 @@ class SidebarEntries(HTMLParser):
     """
     Read the sidebar's class entries with a real parser.
 
-    A regex cannot do this: `<details>` nests its own `<div>` and carries
+    A regex cannot do this: ```<details>``` nests its own ```<div>``` and carries
     several links, so any non-greedy pattern stops in the wrong place. This
     tracks nesting depth instead and records, per class, whether it rendered
-    as an expandable `<details>` or as a plain link, plus that link
+    as an expandable ```<details>``` or as a plain link, plus that link
     wrapper's css classes.
     """
 
@@ -1570,7 +1570,7 @@ def _run_cli(tmp_path, monkeypatch, argv):
     Run the real CLI and record what the handler was asked to do.
 
     Goes through cement's argument parsing, so the flag combinations are
-    exercised exactly as a user types them. `render()` and `serve()` are
+    exercised exactly as a user types them. ```render()``` and ```serve()``` are
     stubbed out because the point here is the controller's branching, not
     another full render.
     """

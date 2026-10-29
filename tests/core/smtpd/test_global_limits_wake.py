@@ -2,7 +2,7 @@
 Tests for the shared GlobalLimits wake-up (cross-service and cross-process).
 
 The global processing cap makes admission WAIT. The wake event lives on
-``GlobalLimits`` and is shared by every server bound to it, so a slot released
+```GlobalLimits``` and is shared by every server bound to it, so a slot released
 on any service wakes waiters on every service. When the cap may also be
 released by another process (shared counters under pre_fork), the waiter
 additionally re-checks the counters at a short interval.
