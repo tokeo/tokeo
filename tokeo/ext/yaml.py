@@ -55,12 +55,6 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     structures. It enables loading and parsing YAML configuration files with
     proper handling of nested configuration sections.
 
-    ### Notes
-
-    : The handler preserves nested dictionary structures during merges using
-        a deep merge algorithm, which allows for more complex configuration
-        structures than the standard Cement config handlers support.
-
     ### Example
 
     ```python
@@ -80,6 +74,12 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         }
     })
     ```
+
+    ### Notes
+
+    : The handler preserves nested dictionary structures during merges using
+        a deep merge algorithm, which allows for more complex configuration
+        structures than the standard Cement config handlers support.
 
     ### References
 

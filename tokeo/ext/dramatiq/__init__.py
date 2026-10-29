@@ -122,16 +122,16 @@ def tokeo_dramatiq_extend_app(app):
 
     - **app** (Application): The Cement application instance
 
+    ### Raises
+
+    - **TokeoError**: If the extension tokeo.ext.tui.output is not enabled
+
     ### Notes
 
     : This function is called during application setup
 
     : It creates the TokeoDramatiq instance and attaches it to the app
         as app.dramatiq
-
-    ### Raises
-
-    - **TokeoError**: If the extension tokeo.ext.tui.output is not enabled
 
     """
     extensions_required(app, 'tokeo.ext.dramatiq', 'tokeo.ext.tui.output')

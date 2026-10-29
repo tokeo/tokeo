@@ -18,6 +18,23 @@ lists, process topology with pre-forked workers and machine-wide limits.
 - Machine-wide ```max_connections``` / ```max_processings``` across all
     services and worker processes of the invocation
 
+### Example
+
+```python
+from tokeo.ext.smtpd import TokeoSmtpdEvents
+
+class MailHandler(TokeoSmtpdEvents):
+    def on_message_data_event(self, ctx):
+        path = ctx.message.spooler.keep('/var/mail/inbound.eml')
+        self.app.log.info(f'received {path}')
+```
+
+```shell
+tokeo smtpd list
+tokeo smtpd serve --all
+tokeo smtpd serve mx1 mx3
+```
+
 ### Notes
 
 : Process topology of one invocation: a service without ```pre_fork``` runs
@@ -58,23 +75,6 @@ lists, process topology with pre-forked workers and machine-wide limits.
     worker that ends on its own, e.g. as it cannot bind its port, ends the
     whole invocation with an error; a restart is left to the supervisor of
     the system, e.g. systemd with ```Restart=on-failure```
-
-### Example
-
-```python
-from tokeo.ext.smtpd import TokeoSmtpdEvents
-
-class MailHandler(TokeoSmtpdEvents):
-    def on_message_data_event(self, ctx):
-        path = ctx.message.spooler.keep('/var/mail/inbound.eml')
-        self.app.log.info(f'received {path}')
-```
-
-```shell
-tokeo smtpd list
-tokeo smtpd serve --all
-tokeo smtpd serve mx1 mx3
-```
 
 """
 
@@ -205,6 +205,14 @@ def _set_pdeathsig(sig=signal.SIGTERM):
     """
     Arm the parent-death signal for the calling process (Linux only).
 
+    ### Args
+
+    - **sig** (int): Signal to receive on parent death (default ```SIGTERM```)
+
+    ### Returns
+
+    - **bool**: True if the signal was armed, False on non-Linux or on error
+
     ### Notes
 
     : On Linux, asks the kernel (```prctl(PR_SET_PDEATHSIG, sig)```) to send
@@ -217,14 +225,6 @@ def _set_pdeathsig(sig=signal.SIGTERM):
     : ```ctypes.CDLL(None)``` resolves ```prctl``` from the C library already
         loaded into the running process, so no library filename is hardcoded
         (```libc.so``` is often a linker script and will not ```dlopen```)
-
-    ### Args
-
-    - **sig** (int): Signal to receive on parent death (default ```SIGTERM```)
-
-    ### Returns
-
-    - **bool**: True if the signal was armed, False on non-Linux or on error
 
     """
     if not sys.platform.startswith('linux'):

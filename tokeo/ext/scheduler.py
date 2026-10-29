@@ -340,16 +340,16 @@ class TokeoScheduler(MetaMixin):
 
         - **job**: The job to process
 
+        ### Raises
+
+        - **MaxInstancesReachedError**: If the job's maximum number of concurrent
+            instances has been reached
+
         ### Notes
 
         : This method is primarily used by the manual fire command in the
             interactive shell to trigger a job on demand. It bypasses the normal
             scheduling mechanism but still respects concurrent execution limits.
-
-        ### Raises
-
-        - **MaxInstancesReachedError**: If the job's maximum number of concurrent
-            instances has been reached
 
         """
         try:
@@ -798,6 +798,10 @@ class TokeoScheduler(MetaMixin):
 
         - **args**: Command arguments from the parser with cmd and task attributes
 
+        ### Raises
+
+        - **ValueError**: If a specified task ID is not found
+
         ### Notes
 
         : This method handles several task-specific commands:
@@ -809,10 +813,6 @@ class TokeoScheduler(MetaMixin):
             - **fire**: Executes tasks immediately, regardless of their schedule
 
         : Each command operates on one or more tasks specified by their IDs.
-
-        ### Raises
-
-        - **ValueError**: If a specified task ID is not found
 
         """
         for task in args.task:
@@ -1048,16 +1048,6 @@ class TokeoSchedulerController(Controller):
     the scheduler. It integrates with the Cement framework's command-line
     interface to expose scheduler commands to the application's CLI.
 
-    ### Notes
-
-    : The controller is registered with the Cement framework and adds a
-        'scheduler' command to the application's command-line interface.
-        It handles command-line arguments for controlling the scheduler
-        behavior and appearance.
-
-    : This controller works in conjunction with the TokeoScheduler class,
-        providing a CLI wrapper around its functionality.
-
     ### Example
 
     ```bash
@@ -1070,6 +1060,16 @@ class TokeoSchedulerController(Controller):
     # Start in paused mode
     myapp scheduler launch --shell --paused
     ```
+
+    ### Notes
+
+    : The controller is registered with the Cement framework and adds a
+        'scheduler' command to the application's command-line interface.
+        It handles command-line arguments for controlling the scheduler
+        behavior and appearance.
+
+    : This controller works in conjunction with the TokeoScheduler class,
+        providing a CLI wrapper around its functionality.
 
     """
 

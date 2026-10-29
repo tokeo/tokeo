@@ -1203,6 +1203,11 @@ class SmtpdServer:
         - **io_timeout** (int|float): Seconds to wait for a complete line
         - **session_deadline** (float): Monotonic time the session must end by
 
+        ### Returns
+
+        - **bytes**: The line, always ending by LF; b'' when the peer closed,
+            also within a line, or a shutdown ended the wait
+
         ### Raises
 
         - **SmtpdIOCmdTimeoutException**: No line within io timeout (421)
@@ -1210,11 +1215,6 @@ class SmtpdServer:
             also checked for a buffered line (421)
         - **SmtpdIOBufferOverrunException**: Buffer above io_buffer_max_size
             (554); all bubble to the outer handler which closes the connection
-
-        ### Returns
-
-        - **bytes**: The line, always ending by LF; b'' when the peer closed,
-            also within a line, or a shutdown ended the wait
 
         """
         # also a client that streams endless lines (NOOP or DATA) ends here
@@ -2054,6 +2054,14 @@ class SmtpdServer:
         """
         Precompute the dispatch table ```SmtpdEvent -> (kind, bound method)```.
 
+        ### Args
+
+        - **events_handler** (SmtpdEvents): The bound handler instance
+
+        ### Returns
+
+        - **dict**: ```{event_name: (kind, method)}``` for dispatchable events
+
         ### Notes
 
         : Resolves per event *once* what ```_emit``` previously resolved on
@@ -2065,14 +2073,6 @@ class SmtpdServer:
             via ```in self.emit_events```; ```ON_AUTH_EVENT``` always keeps
             an entry because its base carries behaviour (the default deny
             raises 535 when not overridden)
-
-        ### Args
-
-        - **events_handler** (SmtpdEvents): The bound handler instance
-
-        ### Returns
-
-        - **dict**: ```{event_name: (kind, method)}``` for dispatchable events
 
         """
         dispatcher = {}

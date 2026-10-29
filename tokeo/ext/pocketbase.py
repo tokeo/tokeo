@@ -285,6 +285,10 @@ class TokeoPocketBaseHandler(MetaMixin):
         credentials configured the handler stays anonymous and this is a
         no-op.
 
+        ### Raises
+
+        - **TokeoPocketBaseAuthError**: If authentication ultimately fails
+
         ### Notes
 
         : The whole check-and-refresh runs under a lock, because the shared
@@ -294,10 +298,6 @@ class TokeoPocketBaseHandler(MetaMixin):
         : A token with more than auth_token_min_valid_seconds of life left is
             used as is; one near expiry is refreshed on its collection, and a
             failed refresh falls through to a full re-login
-
-        ### Raises
-
-        - **TokeoPocketBaseAuthError**: If authentication ultimately fails
 
         """
         # nothing to do unless a service identity is configured

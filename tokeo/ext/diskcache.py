@@ -279,12 +279,6 @@ class TokeoDiskCacheLocksHandler:
 
         - **ValueError**: If expire is not a number above 0
 
-        ### Notes
-
-        : The lock releases only itself; when a purge or its expire took it
-            before the end of the block, it logs a warning and leaves any
-            lock of another holder in place
-
         ### Example
 
         ```python
@@ -293,6 +287,13 @@ class TokeoDiskCacheLocksHandler:
             perform_critical_operation()
         # Lock is automatically released here
         ```
+
+        ### Notes
+
+        : The lock releases only itself; when a purge or its expire took it
+            before the end of the block, it logs a warning and leaves any
+            lock of another holder in place
+
         """
         _check_expire(expire)
         key = self._key_prefix + key

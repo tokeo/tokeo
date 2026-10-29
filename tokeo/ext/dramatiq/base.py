@@ -389,6 +389,11 @@ class TokeoDramatiq(MetaMixin):
         instance with the configured settings. This method is called during
         initialization and configures Dramatiq for use within the application.
 
+        ### Raises
+
+        - **TokeoDramatiqConfigError**: If a config value or a dramatiq env is
+            not allowed
+
         ### Notes
 
         : Configures the middleware AgeLimit, TimeLimit, ShutdownNotifications,
@@ -399,11 +404,6 @@ class TokeoDramatiq(MetaMixin):
             and registers it as the global Dramatiq broker
 
         : Missing keys of the ```rabbitmq``` config take their defaults
-
-        ### Raises
-
-        - **TokeoDramatiqConfigError**: If a config value or a dramatiq env is
-            not allowed
 
         """
         self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')

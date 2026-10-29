@@ -269,16 +269,6 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
     It renders dictionaries as key-value pairs, one per line, which is useful
     for development and debugging.
 
-    ### Notes
-
-    : This handler is registered with the label 'print_dict' and provides
-        specialized rendering for dictionary objects. Unlike the standard print
-        handler, it formats each key-value pair on its own line, making it easier
-        to read complex dictionary structures.
-
-    : This handler is particularly useful for debugging configuration data,
-        API responses, and other structured data formats.
-
     ### Example
 
     ```python
@@ -293,6 +283,16 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
     # Render with print_dict handler
     app.render(config, handler='print_dict')
     ```
+
+    ### Notes
+
+    : This handler is registered with the label 'print_dict' and provides
+        specialized rendering for dictionary objects. Unlike the standard print
+        handler, it formats each key-value pair on its own line, making it easier
+        to read complex dictionary structures.
+
+    : This handler is particularly useful for debugging configuration data,
+        API responses, and other structured data formats.
 
     """
 
@@ -568,6 +568,18 @@ def load(app):
 
     - **app**: The application object to extend
 
+    ### Example
+
+    ```python
+    # In your application configuration:
+    class MyApp(App):
+        class Meta:
+            extensions = [
+                'tokeo.ext.print',
+                # other extensions...
+            ]
+    ```
+
     ### Notes
 
     : This function is called automatically by the Cement framework when the
@@ -580,17 +592,6 @@ def load(app):
     : It also extends the application with app.print() and app.inspect() methods
         via the register_tokeo_print function.
 
-    ### Example
-
-    ```python
-    # In your application configuration:
-    class MyApp(App):
-        class Meta:
-            extensions = [
-                'tokeo.ext.print',
-                # other extensions...
-            ]
-    ```
     """
     app.handler.register(TokeoInspectOutputHandler)
     app.handler.register(TokeoPrintDictOutputHandler)

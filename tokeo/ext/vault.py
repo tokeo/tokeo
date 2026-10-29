@@ -269,14 +269,14 @@ class TokeoVaultController(Controller):
         a fresh Fernet key, a ```scrypt``` profile gets a fresh salt plus a
         placeholder passphrase to replace.
 
+        ### Raises
+
+        - **TokeoVaultError**: If the type is unknown or cannot be scaffolded
+
         ### Output
 
         - The ```vault``` profile block, then a blank line, then the
             ```NAME=value``` environment assignment(s)
-
-        ### Raises
-
-        - **TokeoVaultError**: If the type is unknown or cannot be scaffolded
 
         """
         name = self.app.pargs.name
@@ -313,14 +313,14 @@ class TokeoVaultController(Controller):
         The value is the positional argument. Only the encrypted payload is
         printed, never the profile's key, passphrase or salt.
 
-        ### Output
-
-        - A ready-to-paste ```!vault:<profile> <payload>``` line
-
         ### Raises
 
         - **TokeoVaultError**: If the profile is unknown or its key material
             is missing or invalid
+
+        ### Output
+
+        - A ready-to-paste ```!vault:<profile> <payload>``` line
 
         """
         name = self.app.pargs.profile
@@ -357,15 +357,15 @@ class TokeoVaultController(Controller):
         Otherwise the positional payload is decrypted with the given
         ```--profile```.
 
-        ### Output
-
-        - The decrypted plaintext is printed to the console
-
         ### Raises
 
         - **TokeoVaultError**: If no input is given, ```--config``` is combined
             with ```--profile```, the reference is not found, a profile is
             missing, or the secret cannot be decrypted
+
+        ### Output
+
+        - The decrypted plaintext is printed to the console
 
         """
         ref = self.app.pargs.config_ref
