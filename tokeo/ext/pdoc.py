@@ -21,6 +21,7 @@ from time import monotonic
 import importlib
 import ast
 import inspect
+import types
 import shutil
 from pathlib import Path
 import warnings
@@ -329,6 +330,27 @@ class TokeoPdoc(Handler):
 
         return self._aliases_cache[group].get(name, name)
 
+    @staticmethod
+    def is_instance_attribute(cls, var):
+        """Tell whether a variable of a class is set on its instances.
+
+        pdoc lists the attributes that ```__init__``` assigns to ```self``` among
+        the variables of the class. They are not in the ```__dict__``` of the
+        class, or only as the slot of a ```__slots__``` entry.
+
+        ### Args
+
+        - **cls** (pdoc.doc.Class): The documented class
+        - **var** (pdoc.doc.Variable): One of its variables
+
+        ### Returns
+
+        - **bool**: True for an attribute of the instances
+
+        """
+        attrs = vars(cls.obj)
+        return var.name not in attrs or isinstance(attrs[var.name], types.MemberDescriptorType)
+
     def decorators(self, func):
         """Decorator metadata for a pdoc function, for use from templates.
 
@@ -511,6 +533,8 @@ class TokeoPdoc(Handler):
         # docstrings to the documented function, so call it before rendering
         # the function's docstring)
         pdoc.render.env.globals['decorators'] = self.decorators
+        # instance attributes are shown only with a text, see is_instance_attribute
+        pdoc.render.env.globals['is_instance_attribute'] = self.is_instance_attribute
 
         # is a config page going to be written? (index links to it)
         pdoc.render.env.globals['has_config'] = bool(self._show_config and getattr(self.app, 'env', None) is not None)
@@ -881,6 +905,8 @@ class TokeoPdoc(Handler):
         - a ```#:``` comment at the end of the assignment line
         - plain assignments, annotated ones (```x: int = 1```) and multiple
           targets (```a = b = 1```), at module level and inside classes
+        - instance attributes, ```self.x = ...``` in ```__init__``` of a class,
+          as ```Class.x```
 
         ### Args
 
@@ -932,10 +958,28 @@ class TokeoPdoc(Handler):
 
         docs = {}
 
+        def walk_init(init, prefix):
+            # the instance attributes, assigned to self anywhere in __init__
+            for node in ast.walk(init):
+                if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                    continue
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                text = comment_above(node.lineno) or comment_behind(node.lineno)
+                if not text:
+                    continue
+                # a tuple target gives its text to every attribute in it
+                for target in targets:
+                    for item in target.elts if isinstance(target, ast.Tuple) else [target]:
+                        if isinstance(item, ast.Attribute) and isinstance(item.value, ast.Name) and item.value.id == 'self':
+                            docs[f'{prefix}{item.attr}'] = text
+
         def walk(body, prefix=''):
             for node in body:
                 if isinstance(node, ast.ClassDef):
                     walk(node.body, f'{prefix}{node.name}.')
+                    for init in node.body:
+                        if isinstance(init, ast.FunctionDef) and init.name == '__init__':
+                            walk_init(init, f'{prefix}{node.name}.')
                     continue
                 if not isinstance(node, (ast.Assign, ast.AnnAssign)):
                     continue
@@ -1247,6 +1291,11 @@ class TokeoPdoc(Handler):
             # would otherwise render literally, so drop it (keeping indentation).
             return re.sub(r'^([ \t]*): (?=\S)', r'\1', text, flags=re.MULTILINE)
 
+        def strip_visibility_markers(text):
+            # @public and @private steer is_public in the template, they are no
+            # part of the text shown
+            return re.sub(r'(?<!\S)@(public|private)\b[ \t]*', '', text)
+
         # bind the current module's directory for include resolution
         state = {'module_dir': None}
 
@@ -1257,6 +1306,7 @@ class TokeoPdoc(Handler):
             text = resolve_includes(text, state['module_dir'])
             text = convert_admonitions(text)
             text = strip_note_markers(text)
+            text = strip_visibility_markers(text)
             html = pymd.markdown(text, extensions=extensions, extension_configs=extension_configs)
             # pdoc's env autoescapes; return a safe string so the generated
             # markup (admonition divs, code blocks) is not HTML-escaped

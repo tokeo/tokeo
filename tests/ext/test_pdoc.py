@@ -204,6 +204,15 @@ class Klass:
 
         #: nested attribute
         J = 9
+
+    def __init__(self):
+        #: instance attribute above
+        self.k = 10
+        self.l = 11  #: instance attribute trailing
+        # ordinary comment on an instance attribute
+        self.m = 12
+        #: tuple of instance attributes
+        self.n, self.o = 13, 14
 '''
 
 
@@ -223,6 +232,10 @@ def hash_colon_docs(app):
         ('Klass.H', 'class attribute above'),
         ('Klass.I', 'class attribute trailing'),
         ('Klass.Inner.J', 'nested attribute'),
+        ('Klass.k', 'instance attribute above'),
+        ('Klass.l', 'instance attribute trailing'),
+        ('Klass.n', 'tuple of instance attributes'),
+        ('Klass.o', 'tuple of instance attributes'),
     ],
 )
 def test_collect_hash_colon_docs_finds_every_form(hash_colon_docs, name, expected):
@@ -233,6 +246,7 @@ def test_collect_hash_colon_docs_finds_every_form(hash_colon_docs, name, expecte
 def test_collect_hash_colon_docs_ignores_plain_comments(hash_colon_docs):
     """A comment without colon gives no documentation."""
     assert 'E' not in hash_colon_docs
+    assert 'Klass.m' not in hash_colon_docs
 
 
 def test_collect_hash_colon_docs_ignores_colon_inside_a_string(hash_colon_docs):
@@ -261,6 +275,68 @@ def test_inject_hash_colon_docstrings_fills_pdoc_members(app, tmp_path, monkeypa
     assert module.members['D'].docstring == 'Literal wins.'
     # an ordinary comment does not become documentation
     assert module.members['E'].docstring == ''
+    # instance attributes of __init__ are filled the same way
+    assert module.members['Klass'].members['k'].docstring == 'instance attribute above'
+    assert module.members['Klass'].members['m'].docstring == ''
+
+
+VISIBILITY_SOURCE = '''"""Module."""
+
+#: @public Size of the buffer in bytes
+_BUFFER = 64
+
+#: Hidden size
+_HIDDEN = 32
+
+
+class Box:
+    """A box."""
+
+    LIMIT = 3
+
+    def __init__(self, app):
+        #: The app of the box
+        self.app = app
+        self.undocumented = 1
+        #: @public Inner state of the box
+        self._state = 1
+        self._hidden = 2
+'''
+
+
+@pytest.mark.parametrize(
+    'name,shown',
+    [
+        ('_BUFFER', True),
+        ('_HIDDEN', False),
+        ('Box.LIMIT', True),
+        ('Box.app', True),
+        ('Box.undocumented', False),
+        ('Box._state', True),
+        ('Box._hidden', False),
+    ],
+)
+def test_render_shows_values_by_their_documentation(tmp_path, monkeypatch, name, shown):
+    """An instance attribute shows with a text, a private name with @public."""
+    import pdoc.doc
+
+    package = tmp_path / 'visibility'
+    _write(package / '__init__.py', '"""Visibility."""\n')
+    _write(package / 'main.py', VISIBILITY_SOURCE)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.syspath_prepend(str(tmp_path))
+    pdoc.doc.Module.from_name.cache_clear()
+
+    with PdocTest(tmp_path, modules=['visibility'], show_config=False) as booted:
+        booted.run()
+        booted.pdoc.render()
+
+    html = (tmp_path / 'html' / 'visibility' / 'main.html').read_text()
+    assert (f'id="{name}"' in html) is shown
+    # the marker steers the visibility and is not shown in the text, only in
+    # the source code of the class
+    text = re.sub(r'<pre.*?</pre>', '', html, flags=re.S)
+    assert '@public' not in text
 
 
 # --------------------------------------------------------------------------------------
