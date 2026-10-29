@@ -59,6 +59,7 @@ from .exc import (
     Smtpd530Exception,
     Smtpd502Exception,
     Smtpd535Exception,
+    Smtpd538Exception,
     Smtpd550Exception,
     Smtpd552Exception,
     Smtpd554Exception,
@@ -1418,9 +1419,11 @@ class SmtpdServer:
                 # with proxy_extension the PROXY header has to be the first line
                 if not re.match(r'^PROXY(\s+)', line, self._RE_CMD_FLAGS):
                     raise Smtpd421CloseException('Abort connection while PROXY is not the first command!')
-                # test valid proxy command params
-                if not re.match(
-                    r'^PROXY(\s+)(UNKNOWN(|(\s+).*)|TCP(4|6)(\s+)([0-9a-f.:]+)(\s+)([0-9a-f.:]+)(\s+)([0-9]+)(\s+)([0-9]+)(\s*))$',
+                # test valid proxy command params: at most 107 bytes with CRLF,
+                # exactly one SP between the fields, ports without leading zeros
+                # (haproxy doc/proxy-protocol.txt, version 1)
+                if len(line) > 105 or not re.match(
+                    r'^PROXY (UNKNOWN( .*)?|TCP[46] [0-9a-f.:]+ [0-9a-f.:]+ (0|[1-9][0-9]{0,4}) (0|[1-9][0-9]{0,4}))$',
                     line,
                     self._RE_CMD_FLAGS,
                 ):
@@ -1447,7 +1450,7 @@ class SmtpdServer:
                         expected = 4 if proxy_data['proto'] == 'TCP4' else 6
                         if proxy_data['source_ip'].version != expected or proxy_data['dest_ip'].version != expected:
                             raise ValueError
-                        if not (1 <= proxy_data['source_port'] <= 65535 and 1 <= proxy_data['dest_port'] <= 65535):
+                        if not (0 <= proxy_data['source_port'] <= 65535 and 0 <= proxy_data['dest_port'] <= 65535):
                             raise ValueError
                         # normalize ip addresses
                         proxy_data['source_ip'] = str(proxy_data['source_ip'])
@@ -1538,7 +1541,9 @@ class SmtpdServer:
                 if session.cmd_sequence is not CMD_RSET:
                     raise Smtpd503Exception
                 if not self._auth_available(ctx):
-                    raise Tls530Exception
+                    # TLS_WHEN_AUTH asks for encryption by AUTH (RFC 4954 6),
+                    # TLS_REQUIRED by every command (RFC 3207 4)
+                    raise Smtpd538Exception if self.encrypt_mode is EncryptMode.TLS_WHEN_AUTH else Tls530Exception
                 if ctx.server.authenticated:
                     raise Smtpd503Exception
                 # the mechanism and an optional initial response, split by
