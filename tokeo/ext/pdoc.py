@@ -46,6 +46,10 @@ _RE_COMMENT_MARKER = re.compile(r'^[ \t]*#+[ \t]?', re.MULTILINE)
 #: introducing the next one.
 _RE_BLOCK_END = re.compile(r'^([a-zA-Z0-9_.-]+:$|#)')
 
+#: The type at the start of a ```#:``` text, ```(str) Text``` like an Args entry,
+#: after an optional ```@public``` or ```@private``` marker
+_RE_HASH_COLON_TYPE = re.compile(r'^((?:@(?:public|private)\s+)?)\(([\w.|\[\]]+(?:, ?[\w.|\[\]]+)*)\)\s+')
+
 
 def _strip_comment_markers(text):
     """Turn a block of yaml comment lines into plain Markdown."""
@@ -997,7 +1001,8 @@ class TokeoPdoc(Handler):
 
         Only members pdoc already found are touched, and only when their
         docstring is empty; a string literal after the assignment stays
-        authoritative, exactly as under pdoc3.
+        authoritative, exactly as under pdoc3. A type at the start of the
+        text, ```#: (str) Text```, becomes the annotation shown at the value.
 
         ### Args
 
@@ -1026,6 +1031,12 @@ class TokeoPdoc(Handler):
                     continue
                 text = docs.get(qualname)
                 if text and hasattr(member, 'docstring'):
+                    # the type goes to the annotation, a marker stays in the text
+                    match = _RE_HASH_COLON_TYPE.match(text)
+                    if match:
+                        text = _RE_HASH_COLON_TYPE.sub(r'\1', text, count=1)
+                        if not getattr(member, 'annotation_str', ''):
+                            member.annotation_str = f': {match.group(2)}'
                     member.docstring = text
 
         fill(module.members)

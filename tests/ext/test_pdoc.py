@@ -190,6 +190,12 @@ F: int = 6
 
 G = "text with #: inside, not a comment"
 
+#: (int) typed value
+T = 1
+
+#: @public (str|None) typed private value
+_P = None
+
 
 class Klass:
     """Class."""
@@ -275,6 +281,11 @@ def test_inject_hash_colon_docstrings_fills_pdoc_members(app, tmp_path, monkeypa
     assert module.members['D'].docstring == 'Literal wins.'
     # an ordinary comment does not become documentation
     assert module.members['E'].docstring == ''
+    # a type at the start becomes the annotation, a marker stays in the text
+    assert module.members['T'].docstring == 'typed value'
+    assert module.members['T'].annotation_str == ': int'
+    assert module.members['_P'].docstring == '@public typed private value'
+    assert module.members['_P'].annotation_str == ': str|None'
     # instance attributes of __init__ are filled the same way
     assert module.members['Klass'].members['k'].docstring == 'instance attribute above'
     assert module.members['Klass'].members['m'].docstring == ''
@@ -282,7 +293,7 @@ def test_inject_hash_colon_docstrings_fills_pdoc_members(app, tmp_path, monkeypa
 
 VISIBILITY_SOURCE = '''"""Module."""
 
-#: @public Size of the buffer in bytes
+#: @public (int) Size of the buffer in bytes
 _BUFFER = 64
 
 #: Hidden size
@@ -337,6 +348,8 @@ def test_render_shows_values_by_their_documentation(tmp_path, monkeypatch, name,
     # the source code of the class
     text = re.sub(r'<pre.*?</pre>', '', html, flags=re.S)
     assert '@public' not in text
+    # the type is shown as the annotation of the value, not in its text
+    assert '>: int</span>' in text and '(int)' not in text
 
 
 TESTS_SOURCE = '''"""Tests of a sample."""
