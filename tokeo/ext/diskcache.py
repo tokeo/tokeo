@@ -108,7 +108,7 @@ class _ThreadConnections(threading.local):
 
     ### Notes
 
-    : diskcache keeps one sqlite connection per thread in ```Cache._local```
+    : ```diskcache``` keeps one sqlite connection per thread in ```Cache._local```
         and closes only the one of the calling thread, so every thread would
         have to call ```close``` itself; this storage closes the connection of
         a thread when the thread ends
@@ -599,7 +599,7 @@ class TokeoDiskCacheLocksHandler:
         : The key lives as long as the latest deadline, so calls with a
             different expire may share it by name.
 
-        : temper never stops a running call, also not after its expire. A
+        : ```temper``` never stops a running call, also not after its expire. A
             call that must end in time needs its own limit, e.g. the
             time_limit of a dramatiq actor below expire.
 

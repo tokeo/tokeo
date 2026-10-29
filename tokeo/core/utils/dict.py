@@ -34,7 +34,7 @@ def deep_merge(a, b):
         post-process the list themselves, or a future variant could take an
         explicit list strategy (append vs. replace).
 
-    : a is merged in place and is also returned, so the original a is
+    : ```a``` is merged in place and is also returned, so the original ```a``` is
         modified by the call and should not be assumed to stay untouched.
 
     : For new keys, appended list items and primitive replacements the

@@ -18,10 +18,10 @@ class TokeoJsonEncoder:
 
     ### Notes
 
-    - datetime objects are checked first and converted via
+    - ```datetime``` objects are checked first and converted via
         date.to_utc_timestring() to 'YYYY-MM-DD HH:MM:SS.MMMZ' format
-    - date objects are converted to 'YYYY-MM-DD' format
-    - a dataclass is unpacked one level via __dict__ so json recurses through its
+    - ```date``` objects are converted to 'YYYY-MM-DD' format
+    - A dataclass is unpacked one level via __dict__ so json recurses through its
         fields -- not dataclasses.asdict, which deepcopies the whole graph and
         dies on a field holding a live object (one json cannot copy or serialize)
 

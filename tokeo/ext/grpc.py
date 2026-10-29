@@ -311,7 +311,7 @@ class TokeoGrpc(MetaMixin):
             added as an ip address when it parses as one, otherwise as a dns
             name; client validation uses these SANs, not the CN
 
-        : tls_cn only sets the (cosmetic) subject common name; when unset the
+        : ```tls_cn``` only sets the (cosmetic) subject common name; when unset the
             url host is used
 
         """

@@ -44,7 +44,7 @@ async def page():
 : For a generator function the limit covers only the creation of the
     generator, not its iteration; limit the function that consumes it
 
-: dramatiq actors have their own ```time_limit``` option that works the same
+: Dramatiq actors have their own ```time_limit``` option that works the same
     way; use ```@timelimit``` for functions that also run outside dramatiq
 
 """

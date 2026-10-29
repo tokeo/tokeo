@@ -190,7 +190,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             default; the tls options build a custom ssl context that is
             passed to the underlying httpx client
 
-        : concurrent_connections caps concurrent http connections per process
+        : ```concurrent_connections``` caps concurrent http connections per process
             via httpx; it is not a request-rate limit and does not span
             processes, so apply any rate or cross-process throttling in your
             application (e.g. the diskcache throttle recipe)

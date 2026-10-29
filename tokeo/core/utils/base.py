@@ -13,7 +13,7 @@ def isbasetype(obj):
     ### Notes
 
     - Base types: int, str, float, bool, bytes, list, dict, set, tuple
-    - bool is listed explicitly for readability even though it is a
+    - ```bool``` is listed explicitly for readability even though it is a
         subclass of int and would already match via int
 
     """
