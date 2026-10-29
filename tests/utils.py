@@ -5,7 +5,7 @@ General tools every test may import: the root of the project, the marker of
 the stress tests, waiting for a condition and running a program in a pseudo
 terminal. They hold no asserts, the test asserts on what they return.
 
-### Usage
+### Example
 
 ```python
 from tests.utils import ROOT, stresstest, wait_until, wait_until_async
@@ -63,7 +63,7 @@ def wait_until(check, timeout=5.0, interval=0.02):
 
     - **Any**: The last value of check, true when it held in time
 
-    ### Usage
+    ### Example
 
     ```python
     # the assert fails with the last value of the check
@@ -96,7 +96,7 @@ def wait_process_group_ended(pgid, timeout=5.0):
 
     - **bool**: True when no process of the group is left
 
-    ### Usage
+    ### Example
 
     ```python
     def test_program_ends_with_its_group():
@@ -138,7 +138,7 @@ async def wait_until_async(check, timeout=5.0, interval=0.02):
 
     - **Any**: The last value of check, true when it held in time
 
-    ### Usage
+    ### Example
 
     ```python
     def test_server_counts_its_connections():
@@ -173,7 +173,7 @@ class Terminal:
     - **ctty** (bool): Make the terminal the controlling one of the program
     - **timeout** (float): The seconds ```wait_for``` waits at most in all
 
-    ### Usage
+    ### Example
 
     ```python
     def test_prompt_greets():

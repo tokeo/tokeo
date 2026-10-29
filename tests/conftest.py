@@ -5,7 +5,7 @@ pytest loads this file before any test. It keeps the temporary files of a run
 in ```tmp/tests/``` of the project and gives every test the fixtures ```tmp```
 and ```rando```; a test takes a fixture by naming it as argument.
 
-### Usage
+### Example
 
 ```python
 def test_report_is_written(tmp):
