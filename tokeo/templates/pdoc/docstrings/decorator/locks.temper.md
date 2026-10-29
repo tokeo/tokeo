@@ -19,11 +19,16 @@ deadline, now plus expire, and removes it when the function completes.
 
 - **count** (int): Maximum number of concurrent calls allowed, at least 1
 - **name** (str, optional): Custom cache key name for this temper instance
-- **name_f** (str, optional): Format string to generate key name based on function arguments
-- **expire** (float, optional): Seconds a call holds its slot at most, longer than the longest call. Defaults to 3600.
-- **sleep_func** (callable, optional): Sleep function on resource limit. Defaults to time.sleep.
-- **cb_on_locked** (callable, optional): Function to call on limit instead of waiting
-- **verbose** (bool, optional): Whether to log tempering information. Defaults to True.
+- **name_f** (str, optional): Format string to generate key name based on function
+    arguments
+- **expire** (float, optional): Seconds a call holds its slot at most, longer than
+    the longest call. Defaults to 3600.
+- **sleep_func** (callable, optional): Sleep function on resource limit. Defaults to
+    time.sleep.
+- **cb_on_locked** (callable, optional): Function to call on limit instead of
+    waiting
+- **verbose** (bool, optional): Whether to log tempering information. Defaults to
+    True.
 
 ### Returns
 

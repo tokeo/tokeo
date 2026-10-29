@@ -16,12 +16,18 @@ When the rate limit is exceeded, the decorator will either:
 - **count** (int): Number of calls allowed in the specified time period
 - **per_seconds** (float): Time period in seconds over which to limit calls
 - **name** (str, optional): Custom cache key name for this throttle
-- **name_f** (str, optional): Format string to generate key name based on function arguments
-- **expire** (float, optional): Seconds without a call after which the throttle key expires, not below per_seconds. Defaults to per_seconds plus 10.
-- **time_func** (callable, optional): Function to get current time. Defaults to time.time.
-- **sleep_func** (callable, optional): Function to sleep when rate limited. Defaults to time.sleep.
-- **cb_on_locked** (callable, optional): Function to call when rate limited instead of waiting
-- **verbose** (bool, optional): Whether to log throttling information. Defaults to True.
+- **name_f** (str, optional): Format string to generate key name based on function
+    arguments
+- **expire** (float, optional): Seconds without a call after which the throttle key
+    expires, not below per_seconds. Defaults to per_seconds plus 10.
+- **time_func** (callable, optional): Function to get current time. Defaults to
+    time.time.
+- **sleep_func** (callable, optional): Function to sleep when rate limited. Defaults
+    to time.sleep.
+- **cb_on_locked** (callable, optional): Function to call when rate limited instead
+    of waiting
+- **verbose** (bool, optional): Whether to log throttling information. Defaults to
+    True.
 
 ### Returns
 
