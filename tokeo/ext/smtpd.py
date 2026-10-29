@@ -428,6 +428,13 @@ class TokeoSmtpd(MetaMixin):
         servers = []
         ended = []
         try:
+            # the stop handlers come first, a stop during the start is kept
+            stop = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(sig, stop.set)
+            # a forked worker starts with the stop signals blocked (see serve)
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, (signal.SIGINT, signal.SIGTERM))
             for svc in services:
                 server = self._build_server(svc, global_limits)
                 listeners = self._listeners(svc, svc.get('name') in reuse)
@@ -435,10 +442,6 @@ class TokeoSmtpd(MetaMixin):
                 # the server logs its addresses, here the service and its process
                 self.app.log.info(f"smtpd: service '{svc.get('name')}' started (pid {os.getpid()})")
                 servers.append(server)
-            stop = asyncio.Event()
-            loop = asyncio.get_running_loop()
-            for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(sig, stop.set)
 
             def reap():
                 # a worker that ends before the stop signal ends all services
@@ -507,25 +510,32 @@ class TokeoSmtpd(MetaMixin):
             self.app.log.warning('smtpd: no parent-death signal on this platform -- a crashed master leaves the workers running')
         master_pid = os.getpid()
         workers = {}
-        for svc, count in plan['forks']:
-            for _ in range(count):
-                pid = os.fork()
-                if pid == 0:
-                    _set_pdeathsig(signal.SIGTERM)
-                    # the master died between fork and prctl, so the parent
-                    # death signal can never fire -- end at once
-                    if os.getppid() != master_pid:
-                        os._exit(0)
-                    status = 0
-                    try:
-                        self._run_worker(svc, global_limits, plan['reuse'])
-                    except Exception as err:
-                        self.app.log.error(f"smtpd: worker {os.getpid()} of service '{svc.get('name')}' failed: {err}")
-                        status = 1
-                    finally:
-                        # a forked worker must never run the parent's code path
-                        os._exit(status)
-                workers[pid] = svc.get('name')
+        # a worker keeps the stop signals blocked until its handlers are set,
+        # so a stop sent right after the fork stays pending and is not lost
+        mask = signal.pthread_sigmask(signal.SIG_BLOCK, (signal.SIGINT, signal.SIGTERM))
+        try:
+            for svc, count in plan['forks']:
+                for _ in range(count):
+                    pid = os.fork()
+                    if pid == 0:
+                        _set_pdeathsig(signal.SIGTERM)
+                        # the master died between fork and prctl, so the parent
+                        # death signal can never fire -- end at once
+                        if os.getppid() != master_pid:
+                            os._exit(0)
+                        status = 0
+                        try:
+                            self._run_worker(svc, global_limits, plan['reuse'])
+                        except Exception as err:
+                            self.app.log.error(f"smtpd: worker {os.getpid()} of service '{svc.get('name')}' failed: {err}")
+                            status = 1
+                        finally:
+                            # a forked worker must never run the parent's code path
+                            os._exit(status)
+                    workers[pid] = svc.get('name')
+        finally:
+            # the master goes on with its own mask
+            signal.pthread_sigmask(signal.SIG_SETMASK, mask)
         child_pids = list(workers)
         if child_pids:
             self.app.log.info(f'smtpd: forked workers {child_pids}')

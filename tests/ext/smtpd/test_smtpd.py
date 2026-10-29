@@ -407,11 +407,15 @@ def test_failed_service_start_aborts_and_stops_started_ones(tmp_path):
 
 
 def test_failed_start_terminates_forked_workers(tmp_path):
-    """A failed start in main also ends the forked workers."""
+    """A failed start in main also ends the forked workers, before their SIGKILL."""
     port_a = _free_port()
+    started = time.monotonic()
     proc = _spawn(tmp_path, {'services': [_service('mx1', port_a, pre_fork=2), _broken_service('mx2')]}, names=None)
     try:
         assert _wait_exit(proc) != 0
+        # the workers stop on the SIGTERM of the master; a lost one costs the
+        # 5 s until the SIGKILL of the reap
+        assert time.monotonic() - started < 4.0
         assert wait_process_group_ended(proc.pid)
         _assert_port_free(port_a)
     finally:
