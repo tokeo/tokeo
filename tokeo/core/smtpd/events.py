@@ -54,6 +54,9 @@ class SmtpdEvent(Enum):
     ON_MESSAGE_DATA_RECEIVING_EVENT = auto()
     ON_MESSAGE_DATA_HEADERS_EVENT = auto()
     ON_MESSAGE_DATA_EVENT = auto()
+    ON_VRFY_EVENT = auto()
+    ON_EXPN_EVENT = auto()
+    ON_HELP_EVENT = auto()
     ON_PROCESS_LINE_UNKNOWN_EVENT = auto()
     ON_LOGGING_EVENT = auto()
 
@@ -71,6 +74,9 @@ SMTPD_EVENT_NAMES = {
     SmtpdEvent.ON_MESSAGE_DATA_RECEIVING_EVENT: 'on_message_data_receiving_event',
     SmtpdEvent.ON_MESSAGE_DATA_HEADERS_EVENT: 'on_message_data_headers_event',
     SmtpdEvent.ON_MESSAGE_DATA_EVENT: 'on_message_data_event',
+    SmtpdEvent.ON_VRFY_EVENT: 'on_vrfy_event',
+    SmtpdEvent.ON_EXPN_EVENT: 'on_expn_event',
+    SmtpdEvent.ON_HELP_EVENT: 'on_help_event',
     SmtpdEvent.ON_PROCESS_LINE_UNKNOWN_EVENT: 'on_process_line_unknown_event',
     SmtpdEvent.ON_LOGGING_EVENT: 'on_logging_event',
 }
@@ -368,6 +374,46 @@ class SmtpdEvents:
         pass
 
     # ---- misc ----
+
+    def on_vrfy_event(self, ctx, vrfy_data):
+        """
+        Called on VRFY with the argument as sent.
+
+        ### Returns
+
+        - **str|None**: A single reply line with its code (e.g.
+            ```'250 <postmaster@example.com>'```) to answer, or None/False to
+            answer 252 (neither verified nor denied, RFC 5321 7.3); any other
+            result or an exception other than an SmtpdException answers 451
+
+        """
+        pass
+
+    def on_expn_event(self, ctx, expn_data):
+        """
+        Called on EXPN with the argument as sent.
+
+        ### Returns
+
+        - **str|None**: A single reply line with its code to answer, or
+            None/False to answer 502 (not implemented); any other result or an
+            exception other than an SmtpdException answers 451
+
+        """
+        pass
+
+    def on_help_event(self, ctx, help_data):
+        """
+        Called on HELP with the argument as sent, empty without one.
+
+        ### Returns
+
+        - **str|None**: A single reply line with its code (e.g. ```'214 ...'```)
+            to answer, or None/False to answer 502 (not implemented); any other
+            result or an exception other than an SmtpdException answers 451
+
+        """
+        pass
 
     def on_process_line_unknown_event(self, ctx, line):
         """

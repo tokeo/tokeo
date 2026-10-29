@@ -57,6 +57,7 @@ from .exc import (
     Smtpd503Exception,
     Smtpd504Exception,
     Smtpd530Exception,
+    Smtpd502Exception,
     Smtpd535Exception,
     Smtpd550Exception,
     Smtpd552Exception,
@@ -941,8 +942,13 @@ class SmtpdServer:
 
                 ctx.server.connected = utc_now()
 
-                ctx.server.local_response = f'{ctx.server.local_host} says welcome!'
-                ctx.server.helo_response = f'{ctx.server.local_host} at your service!'
+                local_name = (
+                    (f'[IPv6:{ctx.server.local_ip}]' if ':' in ctx.server.local_ip else f'[{ctx.server.local_ip}]')
+                    if ctx.server.local_ip == ctx.server.local_host
+                    else ctx.server.local_host
+                )
+                ctx.server.local_response = f'{local_name} says welcome!'
+                ctx.server.helo_response = f'{local_name} at your service!'
 
                 # check if we want to let this remote station connect us
                 if SmtpdEvent.ON_CONNECT_EVENT in self.emit_events:
@@ -1478,9 +1484,10 @@ class SmtpdServer:
 
             # Handle specific messages from the client
             elif re.match(r'^(HELO|EHLO)(\ .*)?$', line, self._RE_CMD_FLAGS):
-                # HELO/EHLO
+                # a later HELO/EHLO resets the transaction like RSET
+                # an AUTH stays (RFC 5321 4.1.4)
                 if session.cmd_sequence is not CMD_HELO:
-                    raise Smtpd503Exception
+                    self.process_reset_session(session)
                 cmd_data = re.sub(r'^(HELO|EHLO)\ ?', '', line, flags=self._RE_CMD_FLAGS)
                 if SmtpdEvent.ON_HELO_EVENT in self.emit_events:
                     await self._emit(SmtpdEvent.ON_HELO_EVENT, ctx, cmd_data)
@@ -1492,22 +1499,20 @@ class SmtpdServer:
                 # like Ruby to_s, None is an empty text
                 helo_response = str(ctx.server.helo_response or '').strip()
                 if re.match(r'^EHLO', line, self._RE_CMD_FLAGS):
-                    return (
-                        f'250-{helo_response}\r\n'
-                        # respond with 8BITMIME extension
-                        + ('250-8BITMIME\r\n' if self.internationalization_extensions else '')
-                        # respond with SMTPUTF8 extension
-                        + ('250-SMTPUTF8\r\n' if self.internationalization_extensions else '')
-                        # respond with PIPELINING if enabled
-                        + ('250-PIPELINING\r\n' if self.pipelining_extension else '')
-                        # respond with AUTH extensions if enabled
-                        + ('250-AUTH LOGIN PLAIN\r\n' if self._auth_available(ctx) else '')
-                        # respond with STARTTLS if available and not already enabled
-                        + ('' if self.encrypt_mode is EncryptMode.TLS_FORBIDDEN or ctx.server.encrypted else '250-STARTTLS\r\n')
-                        + '250 OK'
-                    )
+                    # the greeting line, then the extensions of this channel
+                    lines = [helo_response]
+                    if self.internationalization_extensions:
+                        lines += ['8BITMIME', 'SMTPUTF8']
+                    if self.pipelining_extension:
+                        lines.append('PIPELINING')
+                    if self._auth_available(ctx):
+                        lines.append('AUTH LOGIN PLAIN')
+                    if self.encrypt_mode is not EncryptMode.TLS_FORBIDDEN and not ctx.server.encrypted:
+                        lines.append('STARTTLS')
+                    # the last line ends the reply without a dash (RFC 5321 4.1.1.1)
+                    return '\r\n'.join([f'250-{text}' for text in lines[:-1]] + [f'250 {lines[-1]}'])
                 else:
-                    return f'250 OK {helo_response}'.strip()
+                    return f'250 {helo_response}'.strip()
 
             elif re.match(r'^STARTTLS(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # STARTTLS
@@ -1582,14 +1587,19 @@ class SmtpdServer:
             elif re.match(r'^RSET(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # RSET takes no argument
                 if ' ' in line:
+                # RSET is valid at any time (RFC 5321 4.1.1.5, 4.1.4)
                     raise Smtpd501Exception
-                if session.cmd_sequence is CMD_HELO:
-                    raise Smtpd503Exception
                 if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
                     raise Tls530Exception
                 self.process_reset_session(session)
                 return '250 OK'
+                # continue with CMD_HELO when in it
+                was_cmd_helo = session.cmd_sequence is CMD_HELO
+                # always clean session on RSET
 
+                # need to restore CMD_HELO state
+                if was_cmd_helo:
+                    session.cmd_sequence = CMD_HELO
             elif re.match(r'^QUIT(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # QUIT takes no argument
                 if ' ' in line:
@@ -1717,6 +1727,22 @@ class SmtpdServer:
                     raise Tls530Exception
                 if self.auth_mode is AuthMode.AUTH_REQUIRED and not ctx.server.authenticated:
                     raise Smtpd530Exception
+            elif re.match(r'^(VRFY|EXPN|HELP)(\ .*)?$', line, self._RE_CMD_FLAGS):
+                # VRFY, EXPN and HELP are valid at any time (RFC 5321 4.1.4)
+                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
+                    raise Tls530Exception
+                verb = line[:4].upper()
+                cmd_data = re.sub(r'^(VRFY|EXPN|HELP)\ ?', '', line, flags=self._RE_CMD_FLAGS)
+                event = {'VRFY': SmtpdEvent.ON_VRFY_EVENT, 'EXPN': SmtpdEvent.ON_EXPN_EVENT}.get(verb, SmtpdEvent.ON_HELP_EVENT)
+                reply = await self._emit_reply(event, ctx, cmd_data)
+                if reply:
+                    return reply
+                # without an answer of the handler VRFY neither verifies nor
+                # denies (RFC 5321 7.3), EXPN and HELP are not implemented
+                if verb == 'VRFY':
+                    return '252 Cannot VRFY user, but will accept message and attempt delivery'
+                raise Smtpd502Exception
+
                 session.cmd_sequence = CMD_DATA
                 ctx.message.received = utc_now()
                 return '354 Enter message, ending with "." on a line by itself'
@@ -1724,20 +1750,9 @@ class SmtpdServer:
             else:
                 # If we somehow get to this point then
                 # allow handling of unknown command line
-                if SmtpdEvent.ON_PROCESS_LINE_UNKNOWN_EVENT in self.emit_events:
-                    try:
-                        return_value = await self._emit(SmtpdEvent.ON_PROCESS_LINE_UNKNOWN_EVENT, ctx, line)
-                    except SmtpdException:
-                        raise
-                    # any other handler fault is a local error
-                    except Exception as e:  # noqa: B902
-                        raise Smtpd451Exception(f'{e} ({type(e).__name__})')
-                    # None/False keeps the line unknown, a single reply line
-                    # answers, anything else is a fault of the handler
-                    if isinstance(return_value, str) and re.fullmatch(r'[2-5][0-9]{2}( [^\r\n]*)?', return_value):
-                        return return_value
-                    if return_value is not None and return_value is not False:
-                        raise Smtpd451Exception(f'on_process_line_unknown_event must not return {return_value!r}')
+                reply = await self._emit_reply(SmtpdEvent.ON_PROCESS_LINE_UNKNOWN_EVENT, ctx, line)
+                if reply:
+                    return reply
                 # an unknown command: the serve loop counts it, records the error,
                 # logs it and answers 500
                 raise Smtpd500Exception
@@ -1845,6 +1860,42 @@ class SmtpdServer:
                 raise Smtpd451Exception(str(e)) from e
 
             finally:
+    async def _emit_reply(self, event, ctx, data):
+        """
+        Emit an event whose handler may answer by a single reply line.
+
+        ### Args
+
+        - **event** (SmtpdEvent): The event to emit
+        - **ctx** (SmtpdContext): The context of the connection
+        - **data** (str): The argument of the command, or the whole line
+
+        ### Returns
+
+        - **str|None**: The reply line with its code, or None when the handler
+            is not overridden or leaves the answer to the server (None/False)
+
+        ### Raises
+
+        - **Smtpd451Exception**: On any other result, or on an exception other
+            than an SmtpdException
+
+        """
+        if event not in self.emit_events:
+            return None
+        try:
+            return_value = await self._emit(event, ctx, data)
+        except SmtpdException:
+            raise
+        # any other handler fault is a local error
+        except Exception as e:  # noqa: B902
+            raise Smtpd451Exception(f'{e} ({type(e).__name__})')
+        if isinstance(return_value, str) and re.fullmatch(r'[2-5][0-9]{2}( [^\r\n]*)?', return_value):
+            return return_value
+        if return_value is not None and return_value is not False:
+            raise Smtpd451Exception(f'{SMTPD_EVENT_NAMES[event]} must not return {return_value!r}')
+        return None
+
                 # always start with empty values after finishing incoming message
                 # and rset command sequence
                 self.process_reset_session(session)
