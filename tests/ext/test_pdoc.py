@@ -339,6 +339,68 @@ def test_render_shows_values_by_their_documentation(tmp_path, monkeypatch, name,
     assert '@public' not in text
 
 
+TESTS_SOURCE = '''"""Tests of a sample."""
+
+
+def make_box():
+    """Build a box for the tests."""
+
+
+def test_box_opens():
+    """A box opens."""
+
+
+def test_box_closes():
+    """A box closes."""
+'''
+
+
+def _render_page(tmp_path, monkeypatch, package_name, files):
+    """Render a package of the files and return the html of each file."""
+    # an own package name per test, an imported package stays in sys.modules
+    import pdoc.doc
+
+    package = tmp_path / package_name
+    _write(package / '__init__.py', '"""Sections."""\n')
+    for name, source in files.items():
+        _write(package / f'{name}.py', source)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.syspath_prepend(str(tmp_path))
+    pdoc.doc.Module.from_name.cache_clear()
+
+    with PdocTest(tmp_path, modules=[package_name], show_config=False) as booted:
+        booted.run()
+        booted.pdoc.render()
+
+    return {name: (tmp_path / 'html' / package_name / f'{name}.html').read_text() for name in files}
+
+
+def _section(html, tag, title):
+    """The text of the heading tag with the title up to the next heading."""
+    match = re.search(rf'<{tag}[^>]*>{title}</{tag}>(.*?)(?=<h[23]|</nav>|$)', html, re.S)
+    return match.group(1) if match else None
+
+
+def test_render_shows_the_tests_of_a_test_module_apart(tmp_path, monkeypatch):
+    """In a test module the test_* functions get a section of their own."""
+    html = _render_page(tmp_path, monkeypatch, 'sections_tests', {'test_sample': TESTS_SOURCE})['test_sample']
+
+    for tag in ('h3', 'h2'):
+        tests = _section(html, tag, 'Tests')
+        functions = _section(html, tag, 'Functions')
+        assert 'test_box_opens' in tests and 'test_box_closes' in tests
+        assert 'make_box' not in tests
+        assert 'make_box' in functions and 'test_box' not in functions
+
+
+def test_render_keeps_test_functions_of_other_modules_under_functions(tmp_path, monkeypatch):
+    """Outside a test module a test_* function stays under Functions."""
+    html = _render_page(tmp_path, monkeypatch, 'sections_helpers', {'helpers': TESTS_SOURCE})['helpers']
+
+    assert _section(html, 'h2', 'Tests') is None
+    assert 'test_box_opens' in _section(html, 'h2', 'Functions')
+
+
 # --------------------------------------------------------------------------------------
 # config page: per-setting slicing and redaction
 # --------------------------------------------------------------------------------------

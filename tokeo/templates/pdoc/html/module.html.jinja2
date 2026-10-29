@@ -121,6 +121,10 @@
   {% set re_sources = [] %}{% for m in reexported %}{% if m.taken_from[0] not in re_sources %}{% set _ = re_sources.append(m.taken_from[0]) %}{% endif %}{% endfor %}
   {% set reexported = reexported | sort(attribute='name') %}{% set re_sources = re_sources | sort %}
   {% set own_variables = own_variables | sort(attribute='name') %}{% set own_functions = own_functions | sort(attribute='name') %}{% set own_classes = own_classes | sort(attribute='name') %}
+  {# in a test module the test_* functions get their own section, the helpers stay under Functions #}
+  {% set own_tests = [] %}{% set own_helpers = [] %}{% set is_test_module = module.modulename.rsplit('.', 1)[-1].startswith('test_') %}
+  {% for f in own_functions %}{% if is_test_module and f.name.startswith('test_') %}{% set _ = own_tests.append(f) %}{% else %}{% set _ = own_helpers.append(f) %}{% endif %}{% endfor %}
+  {% set own_functions = own_helpers %}
   {% set parent_name = module.modulename.rsplit('.', 1)[0] if '.' in module.modulename else '' %}
 
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 text-brand-ink font-sans flex flex-col">
@@ -143,6 +147,7 @@
         {% if own_classes %}<div><h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Classes</h3>
         {% set ns = namespace(any_expandable=false) %}{% for c in own_classes %}{% for mm in c.own_members if is_public(mm) | trim and mm.name != "__init__" and (mm.kind == "function" or (mm.kind == "variable" and (mm.docstring or not is_instance_attribute(c, mm)))) %}{% set ns.any_expandable = true %}{% endfor %}{% endfor %}<div class="space-y-1">{% for c in own_classes %}{% set cmembers = [] %}{% for mm in c.own_members if is_public(mm) | trim and mm.name != "__init__" and (mm.kind == "function" or (mm.kind == "variable" and (mm.docstring or not is_instance_attribute(c, mm)))) %}{% set _ = cmembers.append(mm) %}{% endfor %}{% set cmembers = cmembers | sort(attribute='name') %}{% if cmembers %}<details><summary class="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden py-0.5"><span class="tk-chev"></span><a class="text-brand-primary hover:text-brand-accent" href="#{{ c.qualname }}">{{ c.name }}</a></summary><div class="mt-0.5 pl-4 mb-4"><ul class="space-y-0.5 text-[0.9rem] !m-0 !p-0">{% for mm in cmembers %}<li class="flex items-center gap-2">{{ tbadge("function" if mm.kind == "function" else "variable") }}<a class="text-brand-primary hover:text-brand-accent" href="#{{ mm.qualname }}">{{ mm.name }}</a></li>{% endfor %}</ul></div></details>{% else %}{% if ns.any_expandable %}<div class="py-0.5 pl-3.5">{% else %}<div class="py-0.5">{% endif %}<a class="text-brand-primary hover:text-brand-accent" href="#{{ c.qualname }}">{{ c.name }}</a></div>{% endif %}{% endfor %}</div></div>{% endif %}
         {% if own_functions %}<div><h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Functions</h3><ul class="space-y-1">{% for f in own_functions %}<li><a class="text-brand-primary hover:text-brand-accent" href="#{{ f.qualname }}">{{ f.name }}</a></li>{% endfor %}</ul></div>{% endif %}
+        {% if own_tests %}<div><h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Tests</h3><ul class="space-y-1">{% for f in own_tests %}<li><a class="text-brand-primary hover:text-brand-accent" href="#{{ f.qualname }}">{{ f.name }}</a></li>{% endfor %}</ul></div>{% endif %}
         {% if reexported %}<div><h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Re-exported</h3><div class="space-y-1">{% for source in re_sources %}<details><summary class="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden py-0.5"><span class="tk-chev"></span><a class="text-brand-primary hover:text-brand-accent whitespace-nowrap" href="/{{ source.replace(".", "/") }}.html">{{ source }}</a></summary><div class="mt-0.5 pl-4 mb-4"><ul class="space-y-0.5 text-[0.9rem] !m-0 !p-0">{% for m in reexported if m.taken_from[0] == source %}<li class="flex items-center gap-2">{{ tbadge("class") }}<a class="text-brand-primary hover:text-brand-accent whitespace-nowrap" href="/{{ source.replace(".", "/") }}.html#{{ m.qualname }}">{{ m.name }}</a></li>{% endfor %}</ul></div></details>{% endfor %}</div></div>{% endif %}
       </nav>
     </aside>
@@ -171,6 +176,10 @@
 
         {% if own_functions %}<section class="mt-12"><h2 class="text-2xl font-light mb-5 text-brand-primary">Functions</h2><div class="space-y-10">
           {% for f in own_functions %}{{ show_func(f) }}{% endfor %}
+        </div></section>{% endif %}
+
+        {% if own_tests %}<section class="mt-12"><h2 class="text-2xl font-light mb-5 text-brand-primary">Tests</h2><div class="space-y-10">
+          {% for f in own_tests %}{{ show_func(f) }}{% endfor %}
         </div></section>{% endif %}
 
         {% if own_classes %}<section class="mt-12"><h2 class="text-2xl font-light mb-5 text-brand-primary">Classes</h2><div class="space-y-24">
