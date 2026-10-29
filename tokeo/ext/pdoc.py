@@ -227,6 +227,8 @@ class TokeoPdoc(Handler):
         # external decorator/docstring markdown snippets (see `docstrings()`)
         self._docstrings_cache = dict()
         self._docstrings_dirs = None
+        # aliases of the docstring snippets per group (see `alias()`)
+        self._aliases_cache = dict()
         # watchdog files components
         self._watchdog_observer = None
         self._watchdog_handler = None
@@ -285,9 +287,11 @@ class TokeoPdoc(Handler):
         """Retrieve a docstring from external Markdown files.
 
         Loads ```{dir}/{group}/{identifier}.md``` from the configured docstrings
-        directories and caches the result. Used by the extensions' decorator
-        hooks (e.g. ```docstrings('decorator', 'dramatiq.actor')```) to document
-        what a decorator does without repeating it in every docstring.
+        directories and caches the result, also a missing one. Used by the
+        extensions' decorator hooks (e.g.
+        ```docstrings('decorator', 'dramatiq.actor')```) and for any other
+        decorator by its name, to document what a decorator does without
+        repeating it in every docstring.
 
         Returns the file content, or None when no matching file exists.
         """
@@ -304,7 +308,36 @@ class TokeoPdoc(Handler):
             except Exception:
                 pass
 
+        # remember the miss, a decorator without a snippet is asked again and again
+        self._docstrings_cache[key] = None
         return None
+
+    def alias(self, group, name):
+        """Resolve a name to the docstring identifier it is an alias of.
+
+        Merges ```{dir}/{group}/aliases.yaml``` of the configured docstrings
+        directories key by key; on the same alias the earlier directory wins, so
+        a derived project adds its own aliases and overrides those of tokeo.
+
+        Returns the identifier of the alias, or the name itself when it is none.
+        """
+        if group not in self._aliases_cache:
+            import yaml
+
+            aliases = dict()
+            # read the last directory first, so the earlier ones override it
+            for dir in reversed(self._resolve_docstrings_dirs()):
+                path = os.path.join(dir, group, 'aliases.yaml')
+                try:
+                    with open(path, 'r') as f:
+                        aliases.update(yaml.safe_load(f) or {})
+                except FileNotFoundError:
+                    pass
+                except Exception as err:
+                    self.app.log.warning(f'pdoc: aliases not read from {path}: {err}')
+            self._aliases_cache[group] = aliases
+
+        return self._aliases_cache[group].get(name, name)
 
     def decorators(self, func):
         """Decorator metadata for a pdoc function, for use from templates.
@@ -1704,30 +1737,6 @@ def tokeo_pdoc_extend_app(app):
     app.pdoc._setup(app)
 
 
-def tokeo_pdoc_render_decorator(app, func, decorator, args, kwargs):
-    """Handle the generic decorators tokeo documents itself.
-
-    Extensions document their own decorators by registering additional
-    handlers for the ```tokeo_pdoc_render_decorator``` hook; this one covers the
-    stdlib/cement decorators that belong to no particular extension.
-
-    Returns ```dict(decorator, params, docstring)``` for a handled decorator, or
-    None to let other handlers decide.
-    """
-    if decorator == '@contextmanager':
-        return dict(
-            decorator=decorator,
-            params=None,
-            docstring=app.pdoc.docstrings('decorator', 'contextmanager'),
-        )
-    elif decorator == '@ex' or decorator == '@expose':
-        return dict(
-            decorator='@expose',
-            params=None,
-            docstring=app.pdoc.docstrings('decorator', 'argparse.expose'),
-        )
-
-
 def tokeo_pdoc_shutdown(app):
     """Stop the watch observer when the application closes (```pre_close```)."""
     app.pdoc.shutdown()
@@ -1744,7 +1753,6 @@ def load(app):
     app.hook.define('tokeo_pdoc_pre_render')
     app.hook.define('tokeo_pdoc_post_render')
     app.hook.define('tokeo_pdoc_render_decorator')
-    app.hook.register('tokeo_pdoc_render_decorator', tokeo_pdoc_render_decorator)
     app.hook.register('post_setup', tokeo_pdoc_extend_app)
     app.hook.register('pre_close', tokeo_pdoc_shutdown)
     app.hook.register('post_close', tokeo_pdoc_hotload)

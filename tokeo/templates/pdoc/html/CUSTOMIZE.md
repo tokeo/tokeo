@@ -222,6 +222,13 @@ app.hook.register('tokeo_pdoc_render_decorator', my_pdoc_render_decorator)
 The snippet lives at `templates/pdoc/docstrings/decorator/my.thing.md`. It is
 written once and appended to every function carrying that decorator.
 
+A decorator without parameters to show needs no handler. When no handler knows
+a decorator, its snippet is looked up by its name without the `@`, e.g.
+`decorator/time_limit.md` for `@time_limit`. Other names for the same snippet go
+into `decorator/aliases.yaml`, e.g. `ex: argparse.expose`. The `aliases.yaml`
+files of all docstrings directories are merged entry by entry, and on the same
+name the earlier directory wins.
+
 ---
 
 ## 4. Rebuilding Tailwind

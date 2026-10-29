@@ -194,6 +194,9 @@ class DecoratedFunction:
                         self.app.log.error('Hook function for tokeo_pdoc_render_decorator returns invalid result')
                         _decorator = None
                     break
+            else:
+                # no hook knows the decorator, use the snippet of its name or alias
+                _docstring = self.app.pdoc.docstrings('decorator', self.app.pdoc.alias('decorator', _decorator[1:]))
 
             # append to stack
             if _decorator is not None:

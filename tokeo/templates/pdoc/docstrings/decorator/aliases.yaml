@@ -1,0 +1,4 @@
+# decorator names that use the docstring snippet of another name
+# the name is the decorator without its @, the value the snippet without .md
+ex: argparse.expose
+expose: argparse.expose
