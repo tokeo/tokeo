@@ -18,7 +18,7 @@
 
 In an Event-Driven Architecture ([EDA](https://en.wikipedia.org/wiki/Event-driven_architecture)) world, you need a fast and reliable development cycle, even for small projects.
 
-[Cement](https://builtoncement.com) is a well-known [Python](https://www.python.org) project that enables building fast and well-documented CLI apps with ease.
+[Cement](https://builtoncement.com) is a well-known [Python](https://www.python.org) project for building fast and well-documented CLI apps with ease.
 
 The [Dramatiq](https://dramatiq.io) background task processing library, paired with [RabbitMQ Message Broker](https://www.rabbitmq.com), provides a reliable and solid EDA environment.
 
@@ -26,48 +26,47 @@ An integrated [gRPC](https://grpc.io) service allows external access to availabl
 
 For timed job execution, a background and interactive [APScheduler](https://apscheduler.readthedocs.io/en/master/) cron service is included.
 
-Receive mails right inside your application by the smtpd service — a faithful asyncio port of the battle-tested Ruby [midi-smtp-server](https://github.com/4commerce-technologies-AG/midi-smtp-server), turns incoming SMTP messages into events.
+Receive mails right inside your application with the smtpd service, an asyncio port of the battle-tested Ruby [midi-smtp-server](https://github.com/4commerce-technologies-AG/midi-smtp-server) that turns incoming SMTP messages into events.
 
 [Fabric](https://www.fabfile.org) simplifies running task automation locally and remotely, configurable through YAML files and CLI arguments.
 
 Expose your values and functions via [NiceGUI](https://nicegui.io/) web-based API and pages.
 
-Secrets stay encrypted at rest: the ```tokeo.ext.vault``` config handler resolves ```!vault:``` tagged values transparently on read — your YAML never holds a plaintext credential.
+Secrets stay encrypted at rest: the ```tokeo.ext.vault``` config handler resolves ```!vault:``` tagged values transparently on read, so your YAML never holds a plaintext credential.
 
-And when you want AI in the mix, the optional [tokeo-fundi](https://github.com/tokeo/fundi) add-on lets your application speak to AI providers through one governed runtime: typed contracts, guarded tool execution, full traces — the same agent pipeline from a small local micro model up to any large provider.
+And when you want AI in the mix, the optional [tokeo-fundi](https://github.com/tokeo/fundi) add-on lets your application speak to AI providers through one governed runtime with typed contracts, guarded tool execution and full traces. The same agent pipeline runs from a small local micro model up to any large provider.
 
-Kickstart your EDA projects with **tokeo** and experience a seamless development cycle.
+Kickstart your EDA projects with tokeo and experience a seamless development cycle.
 
-**Checkout &nbsp; [Spiral](https://github.com/tokeo/spiral)** &nbsp; 🍒 &nbsp; It takes you on an interactive journey through Tokeo's capabilities, providing a
-fully functional environment where you can witness Event-Driven Architecture in real-time.
+Check out [Spiral](https://github.com/tokeo/spiral), the reference application. It is a working environment that shows the event-driven architecture and all features of Tokeo at work.
 
 Cheers<br/>
 Tom
 
 <br/>
 
-## 💪 Why Choose Tokeo?
+## Why Choose Tokeo?
 
-Tokeo is a robust CLI framework for task automation, message queues, and web interfaces, making it ideal for Python backend projects. Key features include:
+Tokeo is a robust CLI framework for task automation, message queues, and web interfaces, making it ideal for Python backend projects. Its key features:
 
-- **Integrated EDA Stack**: Combines Dramatiq, RabbitMQ, and gRPC for efficient task processing and external access, plus APScheduler for scheduled jobs.
-- **Optional Governed AI Agents**: Add the [tokeo-fundi](https://github.com/tokeo/fundi) extension for a provider-agnostic AI runtime with typed contracts, profiles, and agents as plain configuration — every tool call passes a guard pipeline (validate, policy, audit) and leaves a full trace. Installed via ```tokeo-fundi```, entirely optional.
-- **Encrypted Secrets in Config**: The vault extension (```tokeo.ext.vault```) keeps credentials encrypted inside your YAML (```!vault:<profile>``` tags, built-in ```enc``` and ```scrypt``` handlers, keys from the environment) and decrypts them transparently at the leaf — consumer code never changes, plaintext never lands in the config.
-- **Flexible Task Automation**: Use Fabric-based tools (```tokeo.ext.automate```) to define and run local or remote tasks, with flexible configuration via YAML and CLI overrides.
-- **Extensible CLI**: Built on Cement, Tokeo supports custom commands and plugins, simplifying complex workflows with minimal setup.
-- **Developer-Friendly Tools**: The ```Makefile``` provides one-liners for formatting (```fmt```), linting (```lint```), testing (```test```), and packaging (```sdist```, ```wheel```), speeding up development.
-- **DiskCache** by ```tokeo.ext.diskcache``` enhances performance with disk-based caching for frequently accessed data, reducing load times and improving efficiency.
-- **Manage task execution rates** using ```temper``` and ```throttle``` to prevent overloading with rate-limiting tools, ensuring stable and controlled processing.
-- **SMTP Receiving Services**: Run mail-receiving endpoints with the smtpd extension (```tokeo.ext.smtpd```), dispatch the SMTP dialog by your own events handlers, supports STARTTLS, AUTH, PROXY, limits, message spooling and scaling.
-- **SMTP with Jinja2 Templates**: Send emails with precise, individualized content using Jinja2 templates, supporting text, HTML, inline images, and attachments for dynamic communications.
-- **Simple debugging** when using ```app.inspect```. Provides basic debugging tools to inspect application state of vars and objects.
-- **Web Interface**: Create beautiful UIs with the built-in NiceGUI extension to visualize data and interact with your application.
+- Combines Dramatiq, RabbitMQ and gRPC for efficient task processing and external access, plus APScheduler for scheduled jobs.
+- Adds governed AI agents with the optional [tokeo-fundi](https://github.com/tokeo/fundi) extension, a provider-agnostic AI runtime with typed contracts, profiles and agents as plain configuration. Every tool call passes a guard pipeline (validate, policy, audit) and leaves a full trace. ```tokeo-fundi``` is installed separately and entirely optional.
+- Keeps credentials encrypted inside your YAML with the vault extension (```tokeo.ext.vault```): ```!vault:<profile>``` tags, built-in ```enc``` and ```scrypt``` handlers and keys from the environment. Values are decrypted transparently at the leaf, consumer code never changes and plaintext never lands in the config.
+- Defines and runs local or remote tasks with the Fabric-based ```tokeo.ext.automate```, configured by YAML and CLI overrides.
+- Builds on Cement, tokeo supports custom commands and plugins, simplifying complex workflows with minimal setup.
+- Provides one-liners in the ```Makefile``` for formatting (```fmt```), linting (```lint```), testing (```test```) and packaging (```sdist```, ```wheel```), speeding up deployment.
+- Enhances performance with disk-based caching for frequently accessed data (```tokeo.ext.diskcache```), reducing load times and improving efficiency.
+- Manages task execution rates using ```temper``` and ```throttle``` to prevent overloading with rate-limiting tools, ensuring stable and controlled processing.
+- Runs mail-receiving endpoints with the smtpd extension (```tokeo.ext.smtpd```) and dispatches the SMTP dialog to your own event handlers, with STARTTLS, AUTH, PROXY, limits, message spooling and scaling.
+- Sends emails with individualized content using Jinja2 templates, supporting text, HTML, inline images and attachments for dynamic communications.
+- Provides simple debugging with ```app.inspect```, basic tools to inspect the application state of vars and objects.
+- Creates stylish UIs with the built-in NiceGUI extension to visualize data and interact with your application.
 
 Whether you're building microservices, automating workflows, or prototyping, Tokeo provides the structure and flexibility to get started quickly.
 
 <br/>
 
-## 🛠️ Getting Started
+## Getting Started
 
 ### Installing Tokeo
 
@@ -133,7 +132,7 @@ your_app --help
 
 <br/>
 
-## 📊 Exploring Tokeo Features on New Project
+## Trying the Features in a New Project
 
 ### Process Background Tasks with Dramatiq (needs a running RabbitMQ)
 
@@ -230,40 +229,40 @@ CEMENT_LOG=1 your_app command
 
 <br/>
 
-## 🤖 Governed AI Agents — the optional tokeo-fundi extension
+## 🤖 Governed AI Agents with the Optional tokeo-fundi Extension
 
-> The governed AI runtime described here is the separate **[tokeo-fundi](https://github.com/tokeo/fundi)** project, installed via ```tokeo-fundi```. Tokeo runs fully without it; add it when you want AI. See the [tokeo-fundi README](https://github.com/tokeo/fundi) for the complete picture.
+> The governed AI runtime described here is the separate [tokeo-fundi](https://github.com/tokeo/fundi) project, installed via ```tokeo-fundi```. Tokeo runs fully without it; add it when you want AI. See the [tokeo-fundi README](https://github.com/tokeo/fundi) for the complete picture.
 
-[tokeo-fundi](https://github.com/tokeo/fundi) is a complete, small AI agent runtime — built on one conviction: **the model plans, the pipeline governs, the tools compute**. No step is implicit, every step is inspectable. It is deliberately compact, fully typed, and tested end to end: the same suite drives the mock provider, the guard pipeline, and a real trained model.
+[tokeo-fundi](https://github.com/tokeo/fundi) is a small AI agent runtime built on one rule: the model plans, the pipeline governs and the tools compute. Every step is explicit and can be inspected. It is compact, fully typed and tested end to end: the same suite drives the mock provider, the guard pipeline and a real trained model.
 
-- **Contracts first**: Messages, tool calls, results, and traces are typed values (```tokeo.core.ai```), independent of any provider SDK.
-- **Agents are configuration**: An agent is a named guard chain in YAML. ```audited``` records everything and forbids nothing; ```guarded``` adds validation and policy (e.g. a readonly filesystem). Lean by default: with ```agent: null``` requests run plain and untraced — you opt into governance.
-- **Tools are plain functions**: Registered with a spec, activated in groups (calendar, filesystem, mathematics) per profile. The provider never executes anything itself; results return as feedback through the guards.
-- **Late binding, honestly tested**: Providers are resolved by class path. The built-in ```mock``` provider makes the whole pipeline testable without any external service — the contracts are the product.
+- Messages, tool calls, results and traces are typed values (```tokeo.core.ai```), independent of any provider SDK.
+- An agent is a named guard chain in YAML. ```audited``` records everything and forbids nothing; ```guarded``` adds validation and policy (e.g. a readonly filesystem). With ```agent: null```, the default, requests run plain and untraced; governance is opted into.
+- Tools are plain functions, registered with a spec and activated in groups (calendar, filesystem, mathematics) per profile. The provider never executes anything itself; results return as feedback through the guards.
+- Providers are resolved late, by class path. The built-in ```mock``` provider makes the whole pipeline testable without any external service.
 
-### akili — the train-first micro LLM lab
+### akili
 
-When you generate a project with the AI branch, it ships ```akili```, a complete and teachable micro language model that plans calendar tool calls — small enough to read in an afternoon, real enough to prove the contracts end to end:
+When you generate a project with the AI branch, it ships ```akili```, a train-first micro language model that plans calendar tool calls. It is small enough to read in an afternoon and proves the contracts end to end:
 
-- **A few hundred thousand parameters, ~2.5 MB** — byte-level tokenizer, NumPy-only inference in tens of milliseconds, no GPU and no service.
-- **Train first, no shipped weights**: ```python -m your_app.core.akili.train``` creates the model on your machine (CPU is fine) with an honest held-out evaluation.
-- **The language is data**: every word and sentence pattern lives in ```AKILI-LEX.yaml``` — teaching the model new language (English and German today) is editing a file and retraining. An ablation switch (```--no-minus```) demonstrates the core lesson live: capability lives in the data, not in the code.
-- **Grammar-constrained planning**: a byte-level automaton makes malformed plans impossible — the model chooses *which* legal continuation, never *whether* to be legal.
-- **Taught, not just documented**: ```AKILI-LLM.md``` explains training, the anatomy of the weights, and constrained decoding with detailed diagrams.
+- A few hundred thousand parameters and a few megabytes, with a byte-level tokenizer and NumPy-only inference in tens of milliseconds, without GPU or service.
+- No weights are shipped: ```python -m your_app.core.akili.train``` trains the model on your machine (a CPU is enough) and evaluates it on held-out data.
+- Every word and sentence pattern lives in ```AKILI-LEX.yaml```. Teaching the model new language (English and German today) means editing that file and retraining. An ablation switch (```--no-minus```) shows live that the capability comes from the data while the code stays the same.
+- A byte-level automaton constrains the planning, so the model cannot emit a malformed plan and only chooses among legal continuations.
+- ```AKILI-LLM.md``` explains training, the anatomy of the weights and constrained decoding, with detailed diagrams.
 
-### Providers, one pipeline
+### Providers
 
-The same agents and guards run against every backend, so changing where the intelligence comes from is a profile edit, not a refactor:
+The same agents and guards run against every backend, so a change of provider is an edit of the profile and not a refactor:
 
-- **mock** — the deterministic local provider; no server, no network. The universal test and demo driver.
-- **akili** — the trained micro model, running in-process with plain NumPy.
-- **oai_compat** — any OpenAI-compatible endpoint you run yourself (Ollama, vLLM, llama.cpp, MLX) or a commercial API; the API key resolves through the vault, encrypted right inside the config.
+- ```mock```: the deterministic local provider without server or network, the driver for tests and demos.
+- ```akili```: the trained micro model, running in-process with plain NumPy.
+- ```oai_compat```: any OpenAI-compatible endpoint you run yourself (Ollama, vLLM, llama.cpp, MLX) or a commercial API; the API key resolves through the vault, encrypted inside the config.
 
-Response guards (redact, truncate), sandboxed tool execution (subprocess and a WebAssembly guest), and a code-mode tool that runs model-written Python behind that sandbox are all part of the runtime. The full story lives in the [tokeo-fundi README](https://github.com/tokeo/fundi).
+Response guards (redact, truncate), sandboxed tool execution (subprocess and a WebAssembly guest), and a code-mode tool that runs model-written Python behind that sandbox are all part of the runtime. The full description is in the [tokeo-fundi README](https://github.com/tokeo/fundi).
 
 <br/>
 
-## 🧰 Developer Tools
+## Developer Tools
 
 Tokeo includes comprehensive tools to maintain code quality:
 
@@ -289,7 +288,7 @@ make outdated
 
 <br/>
 
-## 🚀 Deployment Options
+## Deployment Options
 
 ### Package Your Application
 
@@ -306,7 +305,7 @@ make docker
 
 <br/>
 
-## 📚 Project Structure
+## Project Structure
 
 When you create a new project with Tokeo, you get a clean, modular structure:
 
@@ -324,9 +323,9 @@ When you create a new project with Tokeo, you get a clean, modular structure:
 
 <br/>
 
-## 🔮 Next Steps
+## Next Steps
 
-Tokeo is designed to grow with your project. As you build, consider:
+Tokeo is designed to grow with your project. Typical next steps in a new project:
 
 - Customizing the application structure for your specific needs
 - Creating new controllers for additional commands
@@ -340,56 +339,56 @@ Tokeo is designed to grow with your project. As you build, consider:
 
 ## Tokeo packages
 
-- **Tokeo** is the event-driven CLI framework: the command surface, messaging, scheduling, automation, gRPC, web, vault, and the project generator.
-- **Ramani** ships all the project templates, including the AI branch and the akili lab that gets generated into your application.
-- **Fundi** (```tokeo-fundi```) is the source-available AI runtime.
-- **Akili** is generated by ```tokeo generate``` from Ramani's template and placed into your application for demonstration purposes under ```your_app/core/akili/``` when selected during your setup.
+- Tokeo is the event-driven CLI framework: the command surface, messaging, scheduling, automation, gRPC, web, vault, and the project generator.
+- Ramani ships all the project templates, including the AI branch and the akili lab that gets generated into your application.
+- Fundi (```tokeo-fundi```) is the source-available AI runtime.
+- Akili is generated by ```tokeo generate``` from Ramani's template and placed into your application for demonstration purposes under ```your_app/core/akili/``` when selected during your setup.
 
 <br/>
 <br/>
 
 ## ⚖️ Licensing Philosophy: Fair Use & Legal Certainty
 
-I believe in empowering the community while building a sustainable ecosystem. That's why Tokeo and its extensions use a dual-approach to licensing:
+I want the community to use Tokeo freely and the project to stay sustainable. That's why Tokeo and its extensions use two licenses.
 
-**The Tokeo Core Framework (Apache 2.0)**
+### The Tokeo Core Framework (Apache 2.0)
 
-I transitioned the core Tokeo framework from its original MIT license to the **Apache 2.0 license**. This switch wasn't primarily about Tokeo itself. It was made to provide *you*, the implementer and the project, with absolute legal certainty. In addition, the Apache 2.0 license includes explicit patent grants and protection, giving your projects a legally safe and rock-solid foundation to build upon.
+I moved the core Tokeo framework from its original MIT license to the Apache 2.0 license. The switch was made for *you*, the implementer and the project, to give you legal certainty. The Apache 2.0 license also includes explicit patent grants and protection, a legally safe foundation for your projects.
 
-**The Tokeo Fundi Agent AI Extension (Source-Available License)**
+### The Tokeo Fundi Agent AI Extension (Source-Available License)
 
-The optional ```tokeo-fundi``` AI extension is governed by the custom **Tokeo-Fundi Source-Available License 1.0**. Please don't let this scare you off! I am deeply committed to keeping software free for the community. If you are a hobbyist, a startup, or a small team, ```tokeo-fundi``` is **free of charge** for you to use in any personal, internal or commercial project.
+The optional ```tokeo-fundi``` AI extension is governed by the custom Tokeo-Fundi Source-Available License 1.0. I want to keep software free for the community: if you are a hobbyist, a startup or a small team, ```tokeo-fundi``` is free of charge for you to use in any personal, internal or commercial project.
 
-However, to keep this project healthy, actively developed, and sustainable, this license introduces a fair-use threshold. Businesses with highly successful commercial operations (across the whole group: more than EUR 2,000,000 in fiscal year global gross revenue excluding VAT, or more than 50 FTEs) are required to purchase a commercial Enterprise License. The license also restricts using its source code as training data for machine-learning systems. Read the complete and authoritative terms in ```LICENSE.md``` of the [tokeo-fundi](https://github.com/tokeo/fundi/) distribution.
+To keep this project healthy, actively developed, and sustainable, the license introduces a fair-use threshold. Businesses with highly successful commercial operations (across the whole group: more than EUR 2,000,000 in fiscal year global gross revenue excluding VAT, or more than 50 FTEs) are required to purchase a commercial Enterprise License. The license also restricts using its source code as training data for machine-learning systems. Read the complete and authoritative terms in ```LICENSE.md``` of the [tokeo-fundi](https://github.com/tokeo/fundi/) distribution.
 
 Only installing ```tokeo-fundi```, also as a dependency of something else, is always free and carries no conditions. The limits apply only once you actually run it, through its commands or from your own code.
 
 I believe this is a fair balance: those who achieve significant economic success using this software should contribute back to the developers making it possible.
 
-**The Tokeo Akili Demonstration LLM (Apache 2.0)**
+### The Tokeo Akili Demonstration LLM (Apache 2.0)
 
 ```akili``` is not part of this package. It is generated into your application from Ramani's template and stays under the Apache License, Version 2.0. It is meant as a demonstration and is not intended for delivery. It ships so you can experiment and learn, and it can be removed without side effects.
 
 <br/>
 <br/>
 
-## ⭐ Support the Project
+## Support the Project
 
-Tokeo is built in the open, with working code over promises. If this approach is useful to you, a star on [GitHub](https://github.com/tokeo/tokeo) helps others find it. Issues, ideas, and pull requests are just as welcome.
+Tokeo is built in the open. If this approach is useful to you, a star on [GitHub](https://github.com/tokeo/tokeo) helps others find it. Issues, ideas, and pull requests are just as welcome.
 
 <br/>
 <br/>
 
 ## A note on contributions
 
-We keep the human in the loop and use AI as an exoskeleton, not a replacement, the same conviction that shapes the runtime itself. Purely AI-generated issues or pull requests are not accepted.
+We keep the human in the loop and use AI as an exoskeleton, the same conviction that shapes the runtime itself. Purely AI-generated issues or pull requests are not accepted.
 
 Before you open a pull request, please read [CONTRIBUTING.md](CONTRIBUTING.md). It explains how contributions are licensed, what a change should bring with it, and what to run before you submit. Issues and ideas are just as welcome as code.
 
 <br/>
 <br/>
 
-**Checkout the example project at [Tokeo Spiral](https://github.com/tokeo/spiral)** and explore the [Makefile](https://github.com/tokeo/tokeo/blob/master/Makefile) and [extensions](https://github.com/tokeo/tokeo/tree/master/tokeo/ext) for more tools and customization options.  Tokeo's modular design makes it easy to adapt for your backend needs.
+Check out the example project at [Tokeo Spiral](https://github.com/tokeo/spiral) and explore the [Makefile](https://github.com/tokeo/tokeo/blob/master/Makefile) and [extensions](https://github.com/tokeo/tokeo/tree/master/tokeo/ext) for more tools and customization options. Tokeo's modular design makes it easy to adapt for your backend needs.
 
 <br/>
 <br/>
