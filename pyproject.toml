@@ -76,3 +76,8 @@ include-package-data = true
 
 [tool.setuptools.dynamic]
 version = {attr = "tokeo.core.version.get_version"}
+
+[tool.coverage.run]
+# measure the child processes of the tests too (prefork workers, serve probes)
+patch = ["subprocess"]
+parallel = true
