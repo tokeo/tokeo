@@ -2,15 +2,15 @@
 Tokeo Pdoc Extension Module (pdoc / MIT-0 backend).
 
 Wraps pdoc (https://pdoc.dev, MIT-0) behind the existing Tokeo extension
-surface. The controller commands (`pdoc render`, `pdoc serve`), their
-arguments (`--clean`, `--serve`, positional `modules`) and the config keys
-(`modules`, `output_dir`, `host`, `port`, `favicon`, `templates`) are kept
-identical to the previous pdoc3-based extension, so `tokeo pdoc` keeps
-working unchanged.
+surface. The controller commands (```pdoc render```, ```pdoc serve```),
+their arguments (```--clean```, ```--serve```, positional ```modules```) and
+the config keys (```modules```, ```output_dir```, ```host```, ```port```,
+```favicon```, ```templates```) are kept identical to the previous
+pdoc3-based extension, so ```tokeo pdoc``` keeps working unchanged.
 
-The rendering itself uses pdoc's public API: `pdoc.doc.Module`,
-`pdoc.render`, `pdoc.render.env` for custom globals, and pdoc's built-in
-web server for `--serve`. No private APIs are monkeypatched.
+The rendering itself uses pdoc's public API: ```pdoc.doc.Module```,
+```pdoc.render```, ```pdoc.render.env``` for custom globals, and pdoc's built-in
+web server for ```--serve```. No private APIs are monkeypatched.
 """
 
 import sys
@@ -52,7 +52,7 @@ def _strip_comment_markers(text):
 
 
 def _yaml_header_end(lines):
-    """Index of the `---` document marker, or 0 when there is no header."""
+    """Index of the ```---``` document marker, or 0 when there is no header."""
     try:
         return lines.index('---')
     except ValueError:
@@ -62,7 +62,7 @@ def _yaml_header_end(lines):
 class TokeoPdocError(TokeoError):
     """Errors raised by the pdoc extension.
 
-    Inherits from TokeoError so the application's `main()` reports it as a
+    Inherits from TokeoError so the application's ```main()``` reports it as a
     clean message instead of dumping a traceback.
     """
 
@@ -77,20 +77,20 @@ try:
         """
         Event handler for watchdog to monitor file changes.
 
-        Same shape as `TokeoNiceguiWatchdogEventHandler`, with two deliberate
+        Same shape as ```TokeoNiceguiWatchdogEventHandler```, with two deliberate
         differences that rendering forces:
 
-        - only `created`, `deleted`, `modified` and `moved` are forwarded.
-          Rendering imports and reads every documented module, which raises
-          `opened` and `closed_no_write` events on the very files being
-          watched. Reacting to those would make the watcher retrigger itself
-          forever.
+        - only ```created```, ```deleted```, ```modified``` and ```moved``` are
+          forwarded. Rendering imports and reads every documented module,
+          which raises ```opened``` and ```closed_no_write``` events on the very
+          files being watched. Reacting to those would make the watcher
+          retrigger itself forever.
         - the callback receives the event, so the path that triggered the
           restart can be logged.
 
         ### Notes
 
-        - Used for the `--watch` flag of `pdoc render`
+        - Used for the ```--watch``` flag of ```pdoc render```
         - Monitors file changes based on configured patterns
         - Calls the provided callback with the event when changes are detected
         - Only available when the watchdog package is installed
@@ -115,7 +115,7 @@ try:
             ### Notes
 
             - The patterns use glob syntax and are matched against the full
-              path, so a directory is excluded as `*/__pycache__/*`
+              path, so a directory is excluded as ```*/__pycache__/*```
 
             """
             super().__init__(
@@ -242,8 +242,8 @@ class TokeoPdoc(Handler):
     def _config(self, key, default=None):
         """Read a value from the extension's config section, never raising.
 
-        Returns ``default`` when the section or key is absent so the renderer
-        works even in an app that has not declared a ``pdoc`` section.
+        Returns ```default``` when the section or key is absent so the renderer
+        works even in an app that has not declared a ```pdoc``` section.
         """
         try:
             val = self.app.config.get(self._meta.config_section, key)
@@ -254,8 +254,8 @@ class TokeoPdoc(Handler):
     def _resolve_docstrings_dirs(self):
         """Resolve the configured docstrings sources to filesystem paths.
 
-        Accepts dotted module paths (e.g. `tokeo.templates.pdoc.docstrings`)
-        or plain directories, mirroring how `templates` is resolved. The order
+        Accepts dotted module paths (e.g. ```tokeo.templates.pdoc.docstrings```)
+        or plain directories, mirroring how ```templates``` is resolved. The order
         is preserved, so a derived project listing its own package first wins.
         """
         if self._docstrings_dirs is not None:
@@ -284,9 +284,9 @@ class TokeoPdoc(Handler):
     def docstrings(self, group, identifier):
         """Retrieve a docstring from external Markdown files.
 
-        Loads `{dir}/{group}/{identifier}.md` from the configured docstrings
+        Loads ```{dir}/{group}/{identifier}.md``` from the configured docstrings
         directories and caches the result. Used by the extensions' decorator
-        hooks (e.g. `docstrings('decorator', 'dramatiq.actor')`) to document
+        hooks (e.g. ```docstrings('decorator', 'dramatiq.actor')```) to document
         what a decorator does without repeating it in every docstring.
 
         Returns the file content, or None when no matching file exists.
@@ -309,12 +309,12 @@ class TokeoPdoc(Handler):
     def decorators(self, func):
         """Decorator metadata for a pdoc function, for use from templates.
 
-        Wraps the function in `DecoratedFunction`, which AST-parses the source
+        Wraps the function in ```DecoratedFunction```, which AST-parses the source
         for decorators, asks the extensions (via the
-        `tokeo_pdoc_render_decorator` hook) how to present each one, and
+        ```tokeo_pdoc_render_decorator``` hook) how to present each one, and
         appends the decorators' docstrings to the function's own docstring.
 
-        Returns a list of `dict(decorator, params, docstring)`; empty when the
+        Returns a list of ```dict(decorator, params, docstring)```; empty when the
         function carries no (known) decorators.
         """
         try:
@@ -355,7 +355,7 @@ class TokeoPdoc(Handler):
         """Set whether the yaml config page is rendered.
 
         Called once at setup from the config and again from the CLI for
-        `--config` / `--no-config`, which override the setting for one run
+        ```--config``` / ```--no-config```, which override the setting for one run
         without writing it back to the config.
 
         ### Args
@@ -372,9 +372,9 @@ class TokeoPdoc(Handler):
     def _template_dirs(self):
         """Resolve configured template modules/paths to filesystem dirs.
 
-        Accepts dotted module paths (e.g. `tokeo.templates.pdoc.html`) or
+        Accepts dotted module paths (e.g. ```tokeo.templates.pdoc.html```) or
         absolute paths, mirroring the previous extension. The first existing
-        directory wins as pdoc's single `template_directory`; the others are
+        directory wins as pdoc's single ```template_directory```; the others are
         made available to Jinja2 as additional search paths.
         """
 
@@ -409,10 +409,10 @@ class TokeoPdoc(Handler):
         ### Args
 
         - **clean** (bool): Wipe output_dir before rendering
-        - **raise_on_error** (bool): Let a failure through. `--watch` passes
+        - **raise_on_error** (bool): Let a failure through. ```--watch``` passes
             False: a broken template or an unreadable config file must not
             end the watch session, since the next save usually fixes it. A
-            plain `pdoc render` keeps failing loudly.
+            plain ```pdoc render``` keeps failing loudly.
 
         """
         try:
@@ -684,7 +684,7 @@ class TokeoPdoc(Handler):
             pass
 
     def _copy_assets(self, template_dirs, output_dir):
-        """Copy each template dir's `assets/` subtree into `output/assets`."""
+        """Copy each template dir's ```assets/``` into ```output/assets```."""
         for tpl_dir in reversed(template_dirs):
             assets = os.path.join(tpl_dir, 'assets')
             if os.path.isdir(assets):
@@ -699,12 +699,12 @@ class TokeoPdoc(Handler):
 
         For every top-level yaml key this returns the comment block written
         directly above it (as Markdown) and the yaml source of the key itself,
-        reproducing the prior pdoc3 `show_settings` behaviour. Files ending in
-        `.local` are redacted: the structure is kept, every value replaced.
+        reproducing the prior pdoc3 ```show_settings``` behaviour. Files ending in
+        ```.local``` are redacted: the structure is kept, every value replaced.
 
         ### Returns
 
-        - **dict**: `{key: {'intro': str, 'source': str}}`, empty when the file
+        - **dict**: ```{key: {'intro': str, 'source': str}}```, empty when the file
           holds no mapping.
         """
         import yaml
@@ -757,11 +757,11 @@ class TokeoPdoc(Handler):
     def _render_config_page(self, output_dir):
         """Render the app's YAML config files as a documentation page.
 
-        Reproduces the prior pdoc3 `show_config` feature: it collects the
+        Reproduces the prior pdoc3 ```show_config``` feature: it collects the
         config files cement actually loads (via appenv's resolver), reads
-        each into `configdict[section] = {content: [lines], yaml: parsed}`,
-        redacts `.local` files, and renders a synthetic `config/index.html`.
-        Requires the appenv extension (`app.env`); skipped otherwise.
+        each into ```configdict[section] = {content: [lines], yaml: parsed}```,
+        redacts ```.local``` files, and renders a synthetic ```config/index.html```.
+        Requires the appenv extension (```app.env```); skipped otherwise.
         """
         if not self._show_config:
             return
@@ -844,9 +844,9 @@ class TokeoPdoc(Handler):
             self.app.log.warning(f'pdoc: config page skipped: {err}')
 
     def _collect_hash_colon_docs(self, source):
-        """Read Sphinx-style `#:` variable comments out of a source file.
+        """Read Sphinx-style ```#:``` variable comments out of a source file.
 
-        pdoc3 documented module and class variables through `#:` comments;
+        pdoc3 documented module and class variables through ```#:``` comments;
         pdoc 16 dropped that and only reads a string literal placed after the
         assignment. Everything written for pdoc3 would therefore lose its
         description without a word. This restores the pdoc3 behaviour by
@@ -854,10 +854,10 @@ class TokeoPdoc(Handler):
 
         Recognised, all as pdoc3 did:
 
-        - a block of `#:` lines directly above the assignment, joined
-        - a `#:` comment at the end of the assignment line
-        - plain assignments, annotated ones (`x: int = 1`) and multiple
-          targets (`a = b = 1`), at module level and inside classes
+        - a block of ```#:``` lines directly above the assignment, joined
+        - a ```#:``` comment at the end of the assignment line
+        - plain assignments, annotated ones (```x: int = 1```) and multiple
+          targets (```a = b = 1```), at module level and inside classes
 
         ### Args
 
@@ -865,7 +865,7 @@ class TokeoPdoc(Handler):
 
         ### Returns
 
-        - **dict**: Qualified name (`NAME` or `Class.NAME`) to description
+        - **dict**: Qualified name (```NAME``` or ```Class.NAME```) to description
 
         """
 
@@ -876,7 +876,7 @@ class TokeoPdoc(Handler):
         lines = source.split('\n')
 
         def comment_above(lineno):
-            """Join the `#:` block sitting directly above line `lineno`."""
+            """Join the ```#:``` block sitting directly above line ```lineno```."""
             out = []
             i = lineno - 2  # 0-based index of the line above
             while i >= 0:
@@ -888,7 +888,7 @@ class TokeoPdoc(Handler):
             return '\n'.join(reversed(out))
 
         def comment_behind(lineno):
-            """Read a trailing `#:` comment off the assignment line itself."""
+            """Read a trailing ```#:``` comment off the assignment line itself."""
             try:
                 line = lines[lineno - 1]
             except IndexError:
@@ -926,7 +926,7 @@ class TokeoPdoc(Handler):
         return docs
 
     def _inject_hash_colon_docstrings(self, module):
-        """Fill empty variable docstrings from `#:` comments.
+        """Fill empty variable docstrings from ```#:``` comments.
 
         Only members pdoc already found are touched, and only when their
         docstring is empty — a string literal after the assignment stays
@@ -964,13 +964,13 @@ class TokeoPdoc(Handler):
         fill(module.members)
 
     def _inject_external_docstrings(self, module):
-        """Give namespace packages a docstring from their ``__init__.md``.
+        """Give namespace packages a docstring from their ```__init__.md```.
 
-        A package directory that carries only ``__init__.md`` (no
-        ``__init__.py``) has no Python docstring, so pdoc would render it
-        blank. Reading ``__init__.md`` as the module docstring reproduces the
-        prior extension's behaviour and gives namespace packages (``tokeo``,
-        ``tokeo.core``, ...) their intro text.
+        A package directory that carries only ```__init__.md``` (no
+        ```__init__.py```) has no Python docstring, so pdoc would render it
+        blank. Reading ```__init__.md``` as the module docstring reproduces the
+        prior extension's behaviour and gives namespace packages (```tokeo```,
+        ```tokeo.core```, ...) their intro text.
 
         ### Args
 
@@ -991,9 +991,9 @@ class TokeoPdoc(Handler):
                 break
 
     def _excludes(self):
-        """Module prefixes to skip during discovery (from the ``exclude``
+        """Module prefixes to skip during discovery (from the ```exclude```
         config key). Submodule-level exclusion is additionally driven by each
-        package's own ``__pdoc__`` declaration (see ``_discover``)."""
+        package's own ```__pdoc__``` declaration (see ```_discover```)."""
         ex = self._config('exclude')
         if isinstance(ex, str):
             ex = [ex]
@@ -1013,16 +1013,16 @@ class TokeoPdoc(Handler):
         """Filesystem-based, namespace-aware module discovery.
 
         pdoc's walk_specs (and pkgutil.iter_modules) skip namespace
-        sub-packages, i.e. directories without an ``__init__.py``. In the
-        tokeo ecosystem whole subtrees live in the ``tokeo`` namespace
-        (e.g. ``tokeo.core.ai`` is contributed by tokeo-fundi and
-        ``tokeo.core`` carries no ``__init__.py``), so they would be
-        invisible to standard discovery. This walks the package ``__path__``
+        sub-packages, i.e. directories without an ```__init__.py```. In the
+        tokeo ecosystem whole subtrees live in the ```tokeo``` namespace
+        (e.g. ```tokeo.core.ai``` is contributed by tokeo-fundi and
+        ```tokeo.core``` carries no ```__init__.py```), so they would be
+        invisible to standard discovery. This walks the package ```__path__```
         directories and descends into every subdirectory, regular or
         namespace, matching what the previous pdoc3-based extension saw.
 
         Entries under an excluded prefix, and any path carrying a
-        ``{{ ... }}`` template placeholder, are skipped so code-generation
+        ```{{ ... }}``` template placeholder, are skipped so code-generation
         template trees are never treated as importable modules.
         """
 
@@ -1075,13 +1075,13 @@ class TokeoPdoc(Handler):
         """Restrict each class's inherited members to documented origins.
 
         pdoc groups a class's inherited members by the class they come from
-        (``inherited_members`` maps ``(module, qualname)`` to the members). A
-        class that subclasses a third-party base (say invoke's ``Context``)
+        (```inherited_members``` maps ```(module, qualname)``` to the members). A
+        class that subclasses a third-party base (say invoke's ```Context```)
         thus carries that base's entire API. Keeping only origins whose module
         is part of the documented set mirrors the prior pdoc3 output, which
         did not surface members inherited from external, undocumented classes.
-        ``inherited_members`` is a cached_property, so the filtered dict is
-        written into the instance ``__dict__`` to take effect.
+        ```inherited_members``` is a cached_property, so the filtered dict is
+        written into the instance ```__dict__``` to take effect.
         """
 
         def keep(origin_module):
@@ -1132,14 +1132,14 @@ class TokeoPdoc(Handler):
 
         pdoc renders docstrings with markdown2, which understands neither the
         admonition syntax nor the directives the prior pdoc3 extension relied
-        on. This reinstates Python-Markdown with the `admonition` extension and
+        on. This reinstates Python-Markdown with the ```admonition``` extension and
         preprocesses two RST directives before conversion:
 
-        - ``.. include:: ./FILE.md`` inlines an external markdown guide,
+        - ```.. include:: ./FILE.md``` inlines an external markdown guide,
           resolved relative to the module's own directory.
-        - ``.. note::`` / ``.. warning::`` / ``.. tip::`` (and the other
-          admonition kinds) are rewritten to Python-Markdown's ``!!! kind``
-          form so they render to the same ``<div class="admonition kind">``.
+        - ```.. note::``` / ```.. warning::``` / ```.. tip::``` (and the other
+          admonition kinds) are rewritten to Python-Markdown's ```!!! kind```
+          form so they render to the same ```<div class="admonition kind">```.
         """
         import pdoc.render
 
@@ -1274,10 +1274,10 @@ class TokeoPdoc(Handler):
     def _documented(self):
         """Readable names of everything this render documents.
 
-        The module specs exactly as configured, plus `config` when the yaml
+        The module specs exactly as configured, plus ```config``` when the yaml
         config page is written. Used for the one-line summary; it says what is
-        *documented*, which is not the same as what `--watch` observes — an
-        installed `tokeo` is documented but never watched. The `--watch`
+        *documented*, which is not the same as what ```--watch``` observes — an
+        installed ```tokeo``` is documented but never watched. The ```--watch```
         detail is on debug level.
 
         ### Returns
@@ -1302,19 +1302,20 @@ class TokeoPdoc(Handler):
         the config directory. Nested entries are collapsed into their parent
         so no directory is watched twice.
 
-        Roots outside the project are dropped. `modules` documents the app,
-        its tests **and** the framework, but an installed `tokeo` lives in
+        Roots outside the project are dropped. ```modules``` documents the app,
+        its tests **and** the framework, but an installed ```tokeo``` lives in
         site-packages and nobody edits it there. The rule adjusts itself:
-        working on the framework in its own checkout puts `tokeo/` below the
+        working on the framework in its own checkout puts ```tokeo/``` below the
         project root, so it is watched again.
 
-        Template directories are left out on purpose: they hold `.jinja2`,
-        `.html`, `.css` and font files, none of which match `watch_includes`.
-        Adding `*.jinja2` there is therefore a config change plus this line.
+        Template directories are left out on purpose: they hold ```.jinja2```,
+        ```.html```, ```.css``` and font files, none of which match
+        ```watch_includes```. Adding ```*.jinja2``` there is therefore a config
+        change plus this line.
 
         ### Returns
 
-        - **tuple**: `(roots, outside)` — the directories to watch and the
+        - **tuple**: ```(roots, outside)``` — the directories to watch and the
           ones dropped for sitting outside the project
 
         """
@@ -1399,11 +1400,11 @@ class TokeoPdoc(Handler):
     def _watch(self, restarted=False):
         """Start the observer and returns the monitor
 
-        On a settled change the monitor stops the server, `serve()` returns,
-        the command ends, and cement's `post_close` hook replaces the process
-        (see `hotload`). Rendering again in a fresh interpreter is what makes
-        changed docstrings visible at all: pdoc caches `Module.from_name` and
-        Python keeps imported modules in `sys.modules`.
+        On a settled change the monitor stops the server, ```serve()``` returns,
+        the command ends, and cement's ```post_close``` hook replaces the process
+        (see ```hotload```). Rendering again in a fresh interpreter is what makes
+        changed docstrings visible at all: pdoc caches ```Module.from_name``` and
+        Python keeps imported modules in ```sys.modules```.
 
         ### Args
 
@@ -1413,7 +1414,7 @@ class TokeoPdoc(Handler):
 
         ### Returns
 
-        - **callable**: `_watch_file_changes`, watcher for file changes
+        - **callable**: ```_watch_file_changes```, watcher for file changes
 
         ### Raises
 
@@ -1450,12 +1451,12 @@ class TokeoPdoc(Handler):
     def _watch_file_changes(self, httpd):
         """Wait for a settled change, then stop the server.
 
-        Runs as a daemon thread started by `serve()`. Mirrors nicegui's
-        `_watchdog_file_changes`, which polls the same flag and calls
-        `fastapi_app.shutdown()`.
+        Runs as a daemon thread started by ```serve()```. Mirrors nicegui's
+        ```_watchdog_file_changes```, which polls the same flag and calls
+        ```fastapi_app.shutdown()```.
 
         Ends on its own in three cases: a settled change, the stop event set
-        by `shutdown()`, or an unexpected error. It waits on the event rather
+        by ```shutdown()```, or an unexpected error. It waits on the event rather
         than sleeping, so Ctrl+C does not leave it lingering for another
         interval — and the stop check shares the lock with the restart flag,
         so a change arriving during the shutdown cannot turn a quit into a
@@ -1502,11 +1503,11 @@ class TokeoPdoc(Handler):
         """Clean up resources when the application shuts down.
 
         Stops the monitor thread and the watchdog observer, so neither is
-        left behind. Called by the `pre_close` hook and a no-op for every
+        left behind. Called by the ```pre_close``` hook and a no-op for every
         command that never watched.
 
-        Order matters: `pre_close` runs before `post_close`, so the monitor
-        is stopped before `hotload` reads the restart flag. Without that a
+        Order matters: ```pre_close``` runs before ```post_close```, so the monitor
+        is stopped before ```hotload``` reads the restart flag. Without that a
         change detected right after Ctrl+C would turn a quit into a restart.
         """
         if self._watchdog_stop is not None and self._watchdog_lock is not None:
@@ -1519,16 +1520,16 @@ class TokeoPdoc(Handler):
         self._watchdog_handler = None
 
     def hotload(self):
-        """Replace this process when `--watch` saw a change.
+        """Replace this process when ```--watch``` saw a change.
 
-        Called by the `post_close` hook, after cement has torn everything
-        down. `--clean` is dropped from the replayed command line on
+        Called by the ```post_close``` hook, after cement has torn everything
+        down. ```--clean``` is dropped from the replayed command line on
         purpose: it means "wipe the output once at the start", not "wipe it
         on every rebuild".
 
         ### Notes
 
-        - Performs a full process replacement, so caches, `sys.modules` and
+        - Performs a full process replacement, so caches, ```sys.modules``` and
           the observer all start from scratch
         - The listening socket does not survive the replacement: Python marks
           sockets non-inheritable, so the new process rebinds cleanly
@@ -1554,8 +1555,8 @@ class TokeoPdoc(Handler):
     def serve(self, watch=False, restarted=False):
         """Serve the rendered documentation directory over HTTP.
 
-        The render step already produced static HTML in ``output_dir``. Serving
-        that directory (rather than pdoc's live ``DocServer``) avoids importing
+        The render step already produced static HTML in ```output_dir```. Serving
+        that directory (rather than pdoc's live ```DocServer```) avoids importing
         every module again on each request — which would re-hit modules that
         cannot be imported (missing optional deps) or are not valid Python at
         all (code-generation templates), crashing the request handler.
@@ -1564,17 +1565,17 @@ class TokeoPdoc(Handler):
 
         - **watch** (bool): Also watch for file changes. The observer is
             set up here and its monitor runs in a daemon thread beside the
-            server, mirroring nicegui's `fastapi_app.on_startup(...)`: the
+            server, mirroring nicegui's ```fastapi_app.on_startup(...)```: the
             server keeps the foreground, so Ctrl+C lands where expected and
             the monitor ends the session by stopping the server.
         - **restarted** (bool): Suppress the startup output, because this
-            process came out of a `--watch` restart and the interesting line
+            process came out of a ```--watch``` restart and the interesting line
             is the one naming the change.
 
         ### Raises
 
         - **TokeoPdocError**: When the port cannot be bound, or — with
-            `watch` — when watchdog is missing or there is nothing to watch
+            ```watch``` — when watchdog is missing or there is nothing to watch
 
         """
         import functools
@@ -1637,7 +1638,7 @@ class TokeoPdoc(Handler):
 
 
 class TokeoPdocController(Controller):
-    """CLI: `tokeo pdoc render` / `tokeo pdoc serve` (unchanged surface)."""
+    """CLI: ```tokeo pdoc render``` / ```tokeo pdoc serve``` (unchanged surface)."""
 
     class Meta:
         label = 'pdoc'
@@ -1707,10 +1708,10 @@ def tokeo_pdoc_render_decorator(app, func, decorator, args, kwargs):
     """Handle the generic decorators tokeo documents itself.
 
     Extensions document their own decorators by registering additional
-    handlers for the `tokeo_pdoc_render_decorator` hook; this one covers the
+    handlers for the ```tokeo_pdoc_render_decorator``` hook; this one covers the
     stdlib/cement decorators that belong to no particular extension.
 
-    Returns `dict(decorator, params, docstring)` for a handled decorator, or
+    Returns ```dict(decorator, params, docstring)``` for a handled decorator, or
     None to let other handlers decide.
     """
     if decorator == '@contextmanager':
@@ -1728,12 +1729,12 @@ def tokeo_pdoc_render_decorator(app, func, decorator, args, kwargs):
 
 
 def tokeo_pdoc_shutdown(app):
-    """Stop the watch observer when the application closes (`pre_close`)."""
+    """Stop the watch observer when the application closes (```pre_close```)."""
     app.pdoc.shutdown()
 
 
 def tokeo_pdoc_hotload(app):
-    """Replace the process when `--watch` saw a change (`post_close`)."""
+    """Replace the process when ```--watch``` saw a change (```post_close```)."""
     app.pdoc.hotload()
 
 

@@ -18,7 +18,7 @@ The module implements two main rate-control mechanisms:
 Both mechanisms are distributed and work across multiple processes, making them
 suitable for web applications, microservices, and other distributed systems.
 
-### Example:
+### Example
 
     ```python
     # Configure and use the cache
@@ -150,9 +150,6 @@ class TokeoDiskCacheLocksHandler:
     ### Attributes
 
     - **app** (Application): The Cement application instance
-    - **_cache** (diskcache.Cache): The diskcache.Cache instance used for storage
-    - **_tag** (str): Tag used to identify locks in the cache
-    - **_key_prefix** (str): Prefix added to all lock keys for namespace isolation
 
     """
 
@@ -596,12 +593,6 @@ class TokeoDiskCacheLocksHandler:
             leaves it empty.
         - The key lives as long as the latest deadline, so calls with a
             different expire may share it by name.
-        - **Important:** expire must be larger than the longest possible
-            run time of the wrapped function. If a call runs longer than
-            expire, its deadline is dropped mid-run and the next caller may
-            start one more call on top of those still running, breaking the
-            limit. Choose expire generously. A dropped deadline logs a
-            warning, and so does the release of a call that lost it.
         - temper never stops a running call, also not after its expire. A
             call that must end in time needs its own limit, e.g. the
             time_limit of a dramatiq actor below expire.
@@ -610,6 +601,17 @@ class TokeoDiskCacheLocksHandler:
             breach the limit temporarily as well.
         - All processes on one cache must run the same version: an older
             one reads the deadlines as an invalid counter and resets it.
+
+        ### Reminders
+
+        .. important::
+
+            expire must be larger than the longest possible run time of the
+            wrapped function. If a call runs longer than expire, its deadline
+            is dropped mid-run and the next caller may start one more call on
+            top of those still running, breaking the limit. Choose expire
+            generously. A dropped deadline logs a warning, and so does the
+            release of a call that lost it.
 
         """
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
@@ -758,7 +760,6 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
     ### Attributes
 
     - **locks** (TokeoDiskCacheLocksHandler): Handler for locks and rate limiting
-    - **_cache** (diskcache.Cache): Underlying diskcache instance
 
     """
 

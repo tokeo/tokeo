@@ -116,10 +116,6 @@ class Controller(ArgparseController):
     default behavior without a subcommand stays the one of cement and prints
     the help of the controller.
 
-    ### Attributes
-
-    - **Meta** (class): Configuration class for the controller
-
     """
 
     class Meta:

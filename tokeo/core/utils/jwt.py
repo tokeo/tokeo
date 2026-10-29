@@ -15,10 +15,10 @@ def token_expires_within(token, min_valid_seconds):
     """
     Return whether a JWT is unusable within a safety margin.
 
-    Decodes the token's payload and compares its ``exp`` claim against the
+    Decodes the token's payload and compares its ```exp``` claim against the
     current time plus a margin. A token is considered unusable (returns True)
-    when it is malformed, carries no ``exp``, is already expired, or expires
-    within ``min_valid_seconds``.
+    when it is malformed, carries no ```exp```, is already expired, or expires
+    within ```min_valid_seconds```.
 
     ### Args
 

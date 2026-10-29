@@ -38,6 +38,7 @@ def create_ssl_context(verify_hostname=True, verify_cert=True, ca=None):
     ### Reminders
 
     .. warning::
+
         verify_cert=False accepts any certificate and exposes the connection
         to man-in-the-middle attacks; use it only for local development.
 

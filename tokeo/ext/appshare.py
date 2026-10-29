@@ -28,10 +28,6 @@ class App:
     attribute and method access (app.foo, app.foo()) is forwarded to the
     underlying app object.
 
-    ### Attributes
-
-    - **_app** (Application): The actual Cement app object
-
     ### Notes
 
     : Only regular attribute and method access is proxied. Item access

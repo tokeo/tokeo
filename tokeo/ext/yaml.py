@@ -55,19 +55,6 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     structures. It enables loading and parsing YAML configuration files with
     proper handling of nested configuration sections.
 
-    ### Methods
-
-    - **merge**: Merges a dictionary into the current configuration with support
-        for deep merging
-    - All methods inherited from YamlConfigHandler, including:
-
-        - **get**: Get a config value
-        - **set**: Set a config value
-        - **get_sections**: Get list of sections
-        - **get_section_dict**: Get a section as a dictionary
-        - **add_section**: Add a new section
-        - **parse_file**: Parse a YAML config file
-
     ### Notes
 
     : The handler preserves nested dictionary structures during merges using
@@ -94,7 +81,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     })
     ```
 
-    ### See Also
+    ### References
 
     - Cement YamlConfigHandler: The parent class in the Cement framework
     - deep_merge: Utility function used to merge nested dictionaries

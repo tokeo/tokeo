@@ -11,7 +11,7 @@ interactive command-line interface.
 The shell and its lists build on the extensions ```tokeo.ext.tui.input``` and
 ```tokeo.ext.tui.output```; enable them together with this one.
 
-### Example:
+### Example
 
 ```python
 # Define a task in your configuration
@@ -331,6 +331,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         ### Reminders
 
         .. warning::
+
             Without host_keys the client uses AutoAddPolicy and accepts any
             host key on first contact, which leaves the connection open to
             man-in-the-middle attacks. Provide host_keys for production or
@@ -633,15 +634,6 @@ class TokeoAutomate(MetaMixin):
     ### Attributes
 
     - **app** (Application): The Cement application instance
-    - **_tasks** (dict): Cached dictionary of configured tasks
-    - **_imported_modules** (dict): Cache of imported task modules
-    - **_hosts** (dict): Cached dictionary of configured hosts
-    - **_hostgroups** (dict): Cached dictionary of configured host groups
-    - **_connections** (dict): Cached dictionary of configured connections
-    - **_hosts_cnt** (int): Counter for created host entries
-        (used as unique ID)
-    - **_connections_cnt** (int): Counter for created connections
-        (used as unique ID)
 
     """
 
@@ -1923,8 +1915,6 @@ class TokeoAutomateShell:
     ### Attributes
 
     - **app** (Application): The Cement application instance
-    - **_command_parser** (ArgumentParser): Command parser for shell commands
-    - **_shell_completion** (NestedCompleter): Command completion handler
 
     """
 

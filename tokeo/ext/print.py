@@ -155,11 +155,6 @@ class TokeoPrintOutputHandler(output.OutputHandler):
     built-in print() function, but with framework features like pre_render
     and post_render hooks.
 
-    ### Methods
-
-    - **render**: Formats and returns the text output
-    - **_print**: Internal method to format arguments for printing
-
     ### Notes
 
     : This handler is registered with the label 'print' and is used by the
@@ -282,10 +277,6 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
     It renders dictionaries as key-value pairs, one per line, which is useful
     for development and debugging.
 
-    ### Methods
-
-    - **render**: Formats and returns dictionary content as text
-
     ### Notes
 
     : This handler is registered with the label 'print_dict' and provides
@@ -378,11 +369,6 @@ class TokeoInspectOutputHandler(output.OutputHandler):
     inspection. It can display object values, types, methods, and attributes
     in a structured format, providing a comprehensive view of objects for
     debugging and exploration.
-
-    ### Methods
-
-    - **render**: Process inspection data and format output
-    - **_inspect**: Internal method for detailed object introspection
 
     ### Notes
 

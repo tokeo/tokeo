@@ -20,7 +20,7 @@ the function.
 - **max_age** (int): Messages older than this in milliseconds are not run
   (_config, no limit_)
 
-### Usage
+### Example
 
 1. **Run in the background**:
 

@@ -286,6 +286,7 @@ class TokeoNicegui(MetaMixin):
     ### Reminders
 
     .. warning::
+
         Set a non-empty ```storage_secret``` in production. Without it the
         signed session and per-user storage is not protected and tampering
         becomes possible. Leave it unset only for local development.
@@ -452,7 +453,7 @@ class TokeoNicegui(MetaMixin):
         ### Notes
 
         - Runs on the watchdog observer thread
-        - Stores the time of the change so `_watchdog_file_changes` can wait
+        - Stores the time of the change so ```_watchdog_file_changes``` can wait
           for the burst to finish before restarting
 
         """
@@ -466,8 +467,8 @@ class TokeoNicegui(MetaMixin):
         ### Notes
 
         - Runs as an asynchronous task in the FastAPI event loop
-        - Checks the flag every `hotload_interval` seconds
-        - Waits for `hotload_settle` seconds of quiet, so a burst of writes
+        - Checks the flag every ```hotload_interval``` seconds
+        - Waits for ```hotload_settle``` seconds of quiet, so a burst of writes
           collapses into a single restart
         - Triggers FastAPI shutdown, which restarts the app through the hooks
 

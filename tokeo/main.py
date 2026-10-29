@@ -74,7 +74,7 @@ class TokeoTest(TestApp, Tokeo):
     application class to provide a testing environment for Tokeo applications.
     It modifies various settings to be more suitable for automated testing.
 
-    ### Usage
+    ### Example
 
     ```python
     # Basic test setup
