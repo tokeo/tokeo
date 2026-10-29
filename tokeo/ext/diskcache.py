@@ -43,6 +43,7 @@ suitable for web applications, microservices, and other distributed systems.
 
 import sys
 import uuid
+import bisect
 import threading
 import weakref
 from os.path import basename
@@ -534,23 +535,24 @@ class TokeoDiskCacheLocksHandler:
         is kept in DiskCache, so the limit is shared by all processes and
         threads that use the same cache.
 
-        The decorator keeps a counter of free slots. Acquiring a slot
-        decrements the counter; finishing the call increments it again,
-        capped at count. When no slot is free, the call either waits and
+        The decorator keeps the sorted deadlines of the holders. Acquiring a
+        slot drops the expired deadlines and adds its own, now plus expire,
+        when fewer than count are left; finishing the call removes its own
+        deadline again. A holder that was killed keeps its slot only until
+        its own deadline. When no slot is free, the call either waits and
         retries or, if cb_on_locked is set, runs that callback instead of
         the wrapped function.
 
         ### Args
 
-        - **count** (int): Maximum number of concurrent calls allowed.
-            Defaults to 1.
+        - **count** (int): Maximum number of concurrent calls allowed, at
+            least 1. Defaults to 1.
         - **name** (str, optional): Custom cache key name for this temper
             instance.
         - **name_f** (str, optional): Format string to build the key name
             from the function arguments.
-        - **expire** (float, optional): Expiration time for the temper key
-            in seconds. Also acts as a safety net: a crashed holder frees
-            its slot once the key expires. Defaults to 3600.
+        - **expire** (float, optional): Seconds a call holds its slot at
+            most, also when it was killed. Defaults to 3600.
         - **sleep_func** (callable, optional): Sleep function used while
             waiting for a free slot. Defaults to time.sleep. If falsy and
             no cb_on_locked is set, a blocked call returns immediately
@@ -570,7 +572,8 @@ class TokeoDiskCacheLocksHandler:
 
         ### Raises
 
-        - **ValueError**: If expire is not a number above 0
+        - **ValueError**: If count is not a whole number above 0 or expire
+            is not a number above 0
 
         ### Example
 
@@ -587,21 +590,30 @@ class TokeoDiskCacheLocksHandler:
         - The temper state persists in the cache under the key derived
             from name, name_f or the function full name.
         - A slot is only released by a call that actually acquired one;
-            the cb_on_locked path never changes the counter.
+            the cb_on_locked path never changes the deadlines.
         - The release does not recreate a key that has vanished in the
             meantime, so purging the cache while no call holds a slot
             leaves it empty.
+        - The key lives as long as the latest deadline, so calls with a
+            different expire may share it by name.
         - **Important:** expire must be larger than the longest possible
             run time of the wrapped function. If a call runs longer than
-            expire, its key expires mid-run and the next caller treats the
-            key as uninitialized, resets the counter to count and may start
-            up to count additional calls on top of those still running,
-            breaking the limit. Choose expire generously.
+            expire, its deadline is dropped mid-run and the next caller may
+            start one more call on top of those still running, breaking the
+            limit. Choose expire generously. A dropped deadline logs a
+            warning, and so does the release of a call that lost it.
+        - temper never stops a running call, also not after its expire. A
+            call that must end in time needs its own limit, e.g. the
+            time_limit of a dramatiq actor below expire.
         - Purging the cache while calls are in flight is destructive: it
-            clears the very counter that enforces the limit and resets the
-            accounting, so it can breach the limit temporarily as well.
+            clears the very deadlines that enforce the limit, so it can
+            breach the limit temporarily as well.
+        - All processes on one cache must run the same version: an older
+            one reads the deadlines as an invalid counter and resets it.
 
         """
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise ValueError(f'count must be a whole number above 0, not {count!r}')
         _check_expire(expire)
 
         def decorator(func):
@@ -636,23 +648,42 @@ class TokeoDiskCacheLocksHandler:
                 while True:
                     # run in a transaction
                     with self._cache.transact(retry=True):
-                        # read free slots; a missing key means all are free
-                        value = self._cache.get(key, default=count)
-                        # treat any non-negative int as a valid slot count
-                        if type(value) is int and value >= 0:
-                            # use the cached value
-                            available = value
-                        else:
-                            # re-initialize on an invalid or missing value
-                            available = count
-
-                        # acquire a slot and run the function outside the lock
-                        if available > 0:
-                            self._cache.set(key, available - 1, expire=expire, tag=self._tag)
-                            break
+                        # the sorted deadlines of the holders, none without key
+                        value = self._cache.get(key)
+                        deadlines = value if type(value) is list else []
+                        # take the current timestamp
+                        now = time.time()
+                        try:
+                            # the expired deadlines are at the start of the list,
+                            # they might be from dead or crashed jobs that
+                            # couldn't drop their own deadline
+                            expired = bisect.bisect_right(deadlines, now)
+                        except TypeError:
+                            # the existing cache entry is invalid,
+                            # it's a list of anything else than valid deadlines
+                            deadlines, expired = [], len(deadlines)
+                        # drop the expired deadlines, they block temper otherwise
+                        del deadlines[:expired]
+                        # check for a free slot
+                        acquired = len(deadlines) < count
+                        if acquired:
+                            # add our own deadline to the sorted list of deadlines
+                            deadline = now + expire
+                            bisect.insort(deadlines, deadline)
+                        # if anything needs to change on the cache value, save it
+                        if acquired or expired:
+                            # the key lives as long as the latest deadline
+                            self._cache.set(key, deadlines, expire=deadlines[-1] - now, tag=self._tag)
 
                     # Attention! This must be run outside the transact block,
                     # otherwise this will HOLD the code with no end (DEADLOCK)
+
+                    if expired:
+                        self.app.log.warning(f'@temper {key} dropped {expired} expired slot(s)')
+
+                    # acquired a slot, run the function outside the lock
+                    if acquired:
+                        break
 
                     # no slot free: hand over to the callback outside lock
                     if cb_on_locked:
@@ -665,7 +696,7 @@ class TokeoDiskCacheLocksHandler:
                     # wait before the next attempt
                     sleep_func(sleep_time)
 
-                if available > 0:
+                if acquired:
                     try:
                         # call the wrapped function
                         result = func(*args, **kwargs)
@@ -673,13 +704,27 @@ class TokeoDiskCacheLocksHandler:
                         # run in a transaction
                         with self._cache.transact(retry=True):
                             # re-read; other processes may have changed it
-                            value = self._cache.get(key)
-                            # release only when the key still exists
-                            if type(value) is int:
-                                # raise by one but never above count
-                                value = 1 if value < 1 else (value + 1) if value < count else count
-                                # write into cache
-                                self._cache.set(key, value, expire=expire, tag=self._tag)
+                            deadlines = self._cache.get(key)
+                            try:
+                                # release only the own deadline
+                                deadlines.remove(deadline)
+                            except (AttributeError, ValueError):
+                                # gone by purge, expire or another value, no new key
+                                lost = True
+                            else:
+                                lost = False
+                                # take a new current timestamp
+                                now = time.time()
+                                # cleanup cache, drop the expired ones
+                                del deadlines[: bisect.bisect_right(deadlines, now)]
+                                if deadlines:
+                                    # the key lives as long as the latest deadline
+                                    self._cache.set(key, deadlines, expire=deadlines[-1] - now, tag=self._tag)
+                                else:
+                                    # without any existing deadline, drop the entry
+                                    self._cache.delete(key)
+                        if lost:
+                            self.app.log.warning(f'@temper {key} slot was lost before release')
                 else:
                     # call callback if set
                     result = cb_on_locked(**arguments) if cb_on_locked else None

@@ -12,15 +12,15 @@ When the concurrent limit is reached, the decorator will either:
 1. Block and sleep until a slot becomes available
 1. Call an alternative callback function if cb_on_locked is provided
 
-The decorator maintains a counter of available slots. Each call decrements
-the counter. When the function completes, the counter is incremented again.
+The decorator keeps the deadlines of the holders. Each call adds its own
+deadline, now plus expire, and removes it when the function completes.
 
 ### Args
 
-- **count** (int): Maximum number of concurrent calls allowed
+- **count** (int): Maximum number of concurrent calls allowed, at least 1
 - **name** (str, optional): Custom cache key name for this temper instance
 - **name_f** (str, optional): Format string to generate key name based on function arguments
-- **expire** (float, optional): Expiration time for the temper key in seconds, longer than the longest call. Defaults to 3600.
+- **expire** (float, optional): Seconds a call holds its slot at most, longer than the longest call. Defaults to 3600.
 - **sleep_func** (callable, optional): Sleep function on resource limit. Defaults to time.sleep.
 - **cb_on_locked** (callable, optional): Function to call on limit instead of waiting
 - **verbose** (bool, optional): Whether to log tempering information. Defaults to True.
@@ -43,8 +43,11 @@ def resource_intensive_operation(data):
 
 - The temper state persists in the cache based on the function
     name or custom name/name_f parameter
-- If a process crashes while holding a slot, the slot will be released
-    when the cache key expires, preventing permanent deadlock
+- If a process crashes while holding a slot, the slot is released at
+    its own deadline, preventing permanent deadlock
+- temper never stops a running call, also not after its expire; a call
+    that must end in time needs its own limit, e.g. the time_limit of a
+    dramatiq actor below expire
 - Unlike throttle, temper has a fixed delay when blocked
     (0.05 seconds by default)
 - The function will automatically restore slots when complete, ensuring

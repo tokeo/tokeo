@@ -238,8 +238,8 @@ def test_temper_acquire_and_release(tmp):
         assert job() == 'ran'
         # a second call must run too, proving the slot was restored
         assert job() == 'ran'
-        # the slot counter is back to count
-        assert app.cache.get('dc_single') == 1
+        # the last release removes the key
+        assert app.cache.get('dc_single') is None
 
 
 def test_temper_callback_when_no_slot(tmp):
@@ -284,8 +284,8 @@ def test_temper_releases_on_exception(tmp):
         with pytest.raises(ValueError):
             boom()
 
-        # the slot must be back to count despite the exception
-        assert app.cache.get('dc_boom') == 1
+        # the slot must be released despite the exception
+        assert app.cache.get('dc_boom') is None
 
         @app.cache.locks.temper(count=1, name='boom', verbose=False)
         def job():
@@ -524,3 +524,97 @@ def test_temper_lock_and_acquire_expire_defaults_to_3600(tmp):
             assert 3599 < _expires_in(app, 'dc_lock') <= 3600
         app.cache.locks.acquire('acquire')
         assert 3599 < _expires_in(app, 'dc_acquire') <= 3600
+
+
+# --------------------------------------------------------------------------------------
+# temper: the deadlines of the holders
+# --------------------------------------------------------------------------------------
+
+
+def test_temper_holds_its_slot_by_a_deadline(tmp):
+    """A call holds one deadline of now plus expire, the key lives as long."""
+    with DiskcacheTest(tmp.dir) as app:
+
+        @app.cache.locks.temper(count=2, name='deadline', expire=60, verbose=False)
+        def job():
+            return app.cache.get('dc_deadline'), _expires_in(app, 'dc_deadline')
+
+        started = time.time()
+        deadlines, expires_in = job()
+        assert len(deadlines) == 1
+        assert started + 60 <= deadlines[0] <= time.time() + 60
+        assert 59 < expires_in <= 60
+
+
+def test_temper_drops_an_expired_holder_while_others_run(tmp, monkeypatch):
+    """The deadline of a killed holder frees its slot, a running one stays."""
+    with DiskcacheTest(tmp.dir) as app:
+        logged = _warnings_of(app, monkeypatch)
+        now = time.time()
+        # count 2 is full: a killed holder and one still running
+        app.cache.set('dc_dead', [now - 1, now + 100], expire=100)
+
+        @app.cache.locks.temper(count=2, name='dead', cb_on_locked=lambda **kw: 'locked', verbose=False)
+        def job():
+            return len(app.cache.get('dc_dead'))
+
+        assert job() == 2
+        assert app.cache.get('dc_dead') == [now + 100]
+        assert logged == ['@temper dc_dead dropped 1 expired slot(s)']
+
+
+def test_temper_key_lives_as_long_as_the_latest_deadline(tmp):
+    """A call with a short expire keeps the longer deadline of another."""
+    with DiskcacheTest(tmp.dir) as app:
+        now = time.time()
+        # another call with expire 3600 holds a slot under the same name
+        app.cache.set('dc_shared', [now + 3600], expire=3600)
+
+        @app.cache.locks.temper(count=2, name='shared', expire=60, verbose=False)
+        def job():
+            return _expires_in(app, 'dc_shared')
+
+        assert 3599 < job() <= 3600
+        assert app.cache.get('dc_shared') == [now + 3600]
+        assert 3599 < _expires_in(app, 'dc_shared') <= 3600
+
+
+@pytest.mark.parametrize('loss', ['purge', 'foreign'])
+def test_temper_warns_when_its_slot_was_lost(tmp, monkeypatch, loss):
+    """A call whose deadline is gone on release warns and recreates no key."""
+    with DiskcacheTest(tmp.dir) as app:
+        logged = _warnings_of(app, monkeypatch)
+
+        @app.cache.locks.temper(name='lost', verbose=False)
+        def job():
+            if loss == 'purge':
+                app.cache.locks.purge()
+            else:
+                app.cache.set('dc_lost', ['foreign'])
+            return 'ran'
+
+        assert job() == 'ran'
+        assert app.cache.get('dc_lost') == (None if loss == 'purge' else ['foreign'])
+        assert logged == ['@temper dc_lost slot was lost before release']
+
+
+@pytest.mark.parametrize('value', [1, ['x', 'y']], ids=['counter', 'foreign'])
+def test_temper_takes_another_value_as_no_holder(tmp, value):
+    """A counter of an older version or a foreign list holds no slot."""
+    with DiskcacheTest(tmp.dir) as app:
+        app.cache.set('dc_other', value)
+
+        @app.cache.locks.temper(name='other', cb_on_locked=lambda **kw: 'locked', verbose=False)
+        def job():
+            return 'ran'
+
+        assert job() == 'ran'
+        assert app.cache.get('dc_other') is None
+
+
+@pytest.mark.parametrize('count', [0, -1, True, 1.5, '2'], ids=['zero', 'negative', 'bool', 'float', 'str'])
+def test_temper_count_must_be_a_whole_number_above_0(tmp, count):
+    """temper refuses a count that is no whole number above 0."""
+    with DiskcacheTest(tmp.dir) as app:
+        with pytest.raises(ValueError, match='count must be a whole number above 0'):
+            app.cache.locks.temper(count=count)
