@@ -524,7 +524,9 @@ def test_prefork_workers_apply_the_settings(tmp_path):
 def test_term_prefork_group_ends_open_dialogs_with_421(tmp_path):
     """SIGTERM ends the waiting dialogs of all processes of a group of 3 by 421."""
     port = _free_port()
-    proc = _spawn(tmp_path, {'services': [_tagged_service('mx1', port, pre_fork=3)]}, names=None)
+    # SO_REUSEPORT may hand all 6 dialogs to one process, it needs a slot for each
+    service = _tagged_service('mx1', port, pre_fork=3, settings={'max_processings': 6})
+    proc = _spawn(tmp_path, {'services': [service]}, names=None)
     try:
         _wait_banner(proc, port)
         socks = _open_dialogs(port, 6)
