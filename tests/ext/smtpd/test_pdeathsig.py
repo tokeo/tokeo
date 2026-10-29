@@ -6,8 +6,8 @@ Off Linux ```_set_pdeathsig``` does nothing; on Linux it arms
 its workers ends by itself when the master crashes.
 
 The crash scenario runs in a subprocess
-(```smtpd_tests_pdeathsig_probe.py```) and is observed from outside --
-markers on disk and the process group -- so the test runner itself never
+(```smtpd_tests_pdeathsig_probe.py```) and is observed from outside,
+by markers on disk and the process group, so the test runner itself never
 forks and never receives a signal.
 """
 

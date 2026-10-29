@@ -11,7 +11,7 @@ It exports two names:
 
 - **fromisoformat**: on Python < 3.11 the extracted parser below, on 3.11+ the
     builtin (faster, C-implemented, already wide enough). Import this for normal
-    use -- it is the right one for the running version.
+    use; it is the right one for the running version.
 - **fromisoformat_compat**: always the extracted parser, on every version. Import
     this in a test to compare the extracted parser against the builtin and prove
     they agree on 3.11+, so the parser used on 3.10 is held to the same standard.

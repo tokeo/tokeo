@@ -15,9 +15,9 @@ dispatches to these methods and turns any raised SMTP exception into a response.
     dispatcher runs it in a thread and never freezes the asyncio loop
 - Two import-time guards: ```@threaded``` on an ```async def``` is rejected, and
     ```@threaded``` on ```on_message_data_receiving_event``` (the per-line hot
-    path) is rejected -- both fail before any service starts
+    path) is rejected; both fail before any service starts
 - ```self.log``` on every handler: call ```self.log.warning(...)``` (or
-    debug/info/error/critical) from any event -- never awaited, identical in
+    debug/info/error/critical) from any event, never awaited, identical in
     ```def```, ```async def``` and ```@threaded def``` events; the server binds
     its logger at construction and bridges into ```on_logging_event```
 - No class-wide threading default on purpose; every method decides for itself
@@ -25,7 +25,7 @@ dispatches to these methods and turns any raised SMTP exception into a response.
 
 ### Notes
 
-: The threading model is two orthogonal axes -- placement (inline ```def``` /
+: The threading model is two orthogonal axes: placement (inline ```def``` /
     ```async def``` vs threaded ```@threaded def```) and, inline only, whether it
     may ```await```. Plain ```def``` is assumed fast; ```@threaded def``` may
     block; ```async def``` may ```await```
@@ -130,7 +130,7 @@ class SmtpdEvents:
     ### Notes
 
     : ```_no_thread``` lists event methods that must stay inline. Currently only
-        ```on_message_data_receiving_event```, which fires per data line -- a
+        ```on_message_data_receiving_event```, which fires per data line; a
         thread hop per line would be catastrophic on large messages
 
     : ```__init_subclass__``` enforces ```_no_thread``` at class definition time
@@ -271,7 +271,7 @@ class SmtpdEvents:
         ### Notes
 
         : If authentication is used, override this event and implement
-            your own user management -- otherwise all authentications are
+            your own user management, otherwise all authentications are
             blocked per default (deny with ```Smtpd535Exception```)
         : The credential check and its source (vault, DB, LDAP) live entirely in
             the handler; only a returned non-empty string grants the access and
@@ -327,7 +327,7 @@ class SmtpdEvents:
 
         ### Notes
 
-        : Must stay inline -- ```@threaded``` here is rejected at import. Keep it
+        : Must stay inline: ```@threaded``` here is rejected at import. Keep it
             light (e.g. an incremental size check or a teergrube via
             ```await asyncio.sleep``` in an async override)
 

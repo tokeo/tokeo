@@ -1,7 +1,7 @@
 """
 Filesystem paths backed by memory, for APIs that only accept a path.
 
-Some C-backed stdlib APIs -- notably ```ssl.SSLContext.load_cert_chain``` --
+Some C-backed stdlib APIs, notably ```ssl.SSLContext.load_cert_chain```,
 take only a filesystem path and offer no way to pass PEM data from memory, a
 gap open in CPython since 2012 (issue 16487). This helper bridges it: it writes
 bytes to an anonymous, RAM-backed file descriptor and hands back the kernel

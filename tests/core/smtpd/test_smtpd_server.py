@@ -789,7 +789,7 @@ async def _dialog_raw(events, settings, steps, has_server_greeting=True):
 
     ### Returns
 
-    - **tuple**: ```(greeting, replies, closed)``` -- the greeting on connect
+    - **tuple**: ```(greeting, replies, closed)```: the greeting on connect
         (or None), replies for the steps that expected one, and whether the
         server closed the connection at the end
 

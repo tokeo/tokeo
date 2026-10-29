@@ -1,7 +1,7 @@
 """
 Tokeo SMTPD Library.
 
-Note: Tokeo smtpd is based on MidiSmtpServer -- a faithful translation of
+Note: Tokeo smtpd is based on MidiSmtpServer, a faithful translation of
 midi-smtp-server (github.com/4commerce-technologies-AG/midi-smtp-server)
 from Ruby to Python on ```asyncio```, keeping its dialog, events, options
 and behavior. This is the single place stating that heritage.

@@ -22,7 +22,7 @@ lists, process topology with pre-forked workers and machine-wide limits.
 
 : Process topology of one invocation: a service without ```pre_fork``` runs
     in the main process loop; ```pre_fork: N``` (N >= 1) gives the service N
-    dedicated worker processes -- note that ```pre_fork: 1``` here means "an
+    dedicated worker processes; note that ```pre_fork: 1``` here means "an
     own process".
     With only pre-forked services the main process just supervises. A single
     service is optimized: ```pre_fork <= 1``` runs directly in the main
@@ -31,7 +31,7 @@ lists, process topology with pre-forked workers and machine-wide limits.
 
 : With a global cap set and any forked worker, the counters live in shared
     memory and the caps are exact across all processes OF THIS INVOCATION.
-    Per-service caps of a multi-worker group count per worker -- for a group
+    Per-service caps of a multi-worker group count per worker: for a group
     total of X over N workers configure X/N. Services started by separate
     invocations do not share limits
 
@@ -246,7 +246,7 @@ class SharedGlobalLimits(GlobalLimits):
     ### Notes
 
     : The wake event stays per process (an event cannot cross a fork), so
-        ```slot_wait``` re-checks the shared counters at a short interval --
+        ```slot_wait``` re-checks the shared counters at a short interval, so
         a slot released in another process is seen at most 50 ms later
 
     """

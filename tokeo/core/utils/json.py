@@ -22,7 +22,7 @@ class TokeoJsonEncoder:
         date.to_utc_timestring() to 'YYYY-MM-DD HH:MM:SS.MMMZ' format
     - ```date``` objects are converted to 'YYYY-MM-DD' format
     - A dataclass is unpacked one level via __dict__ so json recurses through its
-        fields -- not dataclasses.asdict, which deepcopies the whole graph and
+        fields, instead of dataclasses.asdict, which deepcopies the whole graph and
         dies on a field holding a live object (one json cannot copy or serialize)
 
     """
@@ -74,7 +74,7 @@ class TokeoJsonUnknownNameEncoder(TokeoJsonEncoder):
     """
     Encoder that renders an unknown object as its type name.
 
-    For a readable placeholder instead of ```null``` -- for an object that is an
+    For a readable placeholder instead of ```null```, for an object that is an
     attribution or a marker rather than data, where its type name says more than
     ```null``` does.
 

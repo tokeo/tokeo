@@ -1,7 +1,7 @@
 """
 Tokeo SMTPD Logger Module.
 
-The log severities handed to ```on_logging_event``` -- the levels of
+The log severities handed to ```on_logging_event```, the levels of
 Python's ```logging``` (```DEBUG/INFO/WARNING/ERROR/CRITICAL```). The enum
 values are Python's ```logging``` level integers, so a handler can pass
 ```severity.value``` straight to ```logging```/```app.log``` and levels compare

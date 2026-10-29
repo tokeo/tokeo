@@ -187,8 +187,8 @@ class SmtpdSession:
 
     ### Notes
 
-    : ```__slots__``` keeps the field set closed: a misspelled attribute --
-        read or write -- raises ```AttributeError``` instead of silently
+    : ```__slots__``` keeps the field set closed: a misspelled attribute,
+        read or write, raises ```AttributeError``` instead of silently
         creating a new key like a dict would, and access stays as fast as a
         string-keyed dict (writes faster)
 
@@ -368,8 +368,8 @@ class GlobalLimits:
 
         ### Notes
 
-        : The base implementation waits purely on the shared event -- correct
-            whenever the counters only change inside this event loop. An
+        : The base implementation waits purely on the shared event, which is
+            correct whenever the counters only change inside this event loop. An
             implementation whose counters are shared ACROSS PROCESSES (where no
             event can reach this loop) should override this with a short
             re-check interval, e.g. ```wait_for(self.slot_free.wait(), 0.05)```
@@ -384,7 +384,7 @@ def _tls_cert_names(cert_cn, cert_san, hosts, addresses):
 
     A configured ```cert_cn``` wins unchanged; without one the names derive
     from the configured hosts and addresses: hosts plus the address host
-    parts, deduplicated, ```'*'``` and empties dropped -- the CN becomes
+    parts, deduplicated, ```'*'``` and empties dropped; the CN becomes
     ```'localhost.local'``` when the first name is a loopback identifier,
     else the first name itself. With ```'*'``` the names and addresses of the
     local host take the place of the wildcard addresses.
@@ -592,7 +592,7 @@ class SmtpdServer:
 
         Called from synchronous code (```server.logger``` and the handler's
         bound ```self.log```, the TLS transport). It never executes the
-        handler event itself -- it hands the ```_emit``` coroutine to the
+        handler event itself; it hands the ```_emit``` coroutine to the
         event loop, so the execution model (sync / async / ```@threaded```)
         stays entirely with the precomputed dispatcher.
 
@@ -2105,7 +2105,7 @@ class SmtpdServer:
 
         A plain ```def``` runs inline, an
         ```async def``` is awaited and a ```@threaded def``` runs in a worker
-        thread. Exceptions propagate to the caller -- the dialog loop translates
+        thread. Exceptions propagate to the caller; the dialog loop translates
         them exactly like the rescue chain. The execution model per event is
         precomputed in ```emit_events```; hot call sites test membership
         first and skip the call entirely when the handler has no

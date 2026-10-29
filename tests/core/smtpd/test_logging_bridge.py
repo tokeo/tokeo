@@ -5,7 +5,7 @@ bound ``self.log``.
 ``on_logging_event`` is free to be a plain ``def``, an ``async def`` or a
 ``@threaded def``; the bridge hands the ``_emit`` coroutine to the event loop,
 so the execution model stays with the precomputed dispatcher. Every event, in
-any of its three forms, logs the same way: ``self.log.warning(...)`` -- never
+any of its three forms, logs the same way: ``self.log.warning(...)``, never
 awaited.
 """
 
@@ -34,7 +34,7 @@ class SyncLogging(SmtpdEvents):
 
 
 class AsyncLogging(SmtpdEvents):
-    """on_logging_event as async def -- allowed again (no guard)."""
+    """on_logging_event as async def is allowed again (no guard)."""
 
     def __init__(self, options=None):
         super().__init__(options)

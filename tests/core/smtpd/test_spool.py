@@ -6,8 +6,8 @@ Contract: ``data`` carries ONLY the headers (no separator line, injected
 header lines included); the file holds the complete de-dot-stuffed, chomped
 message, byte-identical to the RAM mode; ``bytesize`` runs live in both
 modes and equals the final file size. The file lives until
-``on_message_data_event`` ends -- taken over via ``spooler.keep(path)`` /
-``spooler.keep()`` -- and is kept with ``debug`` (including interrupted
+``on_message_data_event`` ends (taken over via ``spooler.keep(path)`` /
+``spooler.keep()``) and is kept with ``debug`` (including interrupted
 files). A message without a header/body separator never gets a spooler.
 """
 

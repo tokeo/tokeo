@@ -1,7 +1,7 @@
 """
 The per-connection session id: created once in ```serve_client``` as
 ```ctx.id``` (write-once), sized by the keyword-only ```session_id_bytes```
-of the server -- never by a service setting.
+of the server, never by a service setting.
 """
 
 import re

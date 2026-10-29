@@ -5,7 +5,7 @@ Started by test_pdeathsig.py so the parent-death signal is observed from
 outside a real master process instead of forking the test runner.
 
 ```<marker-dir> <count>```: forks ```count``` workers the way the smtpd
-extension does -- ```_set_pdeathsig``` right after the fork -- and the master
+extension does (```_set_pdeathsig``` right after the fork), and the master
 then only waits. Each worker writes a ```pid_<pid>``` marker on start and a
 ```stopped_<pid>``` marker when its SIGTERM arrives, here delivered by the
 parent-death signal after the master is killed.

@@ -1,7 +1,7 @@
 """
 Tokeo SMTPD Context Module.
 
-The per-connection ```ctx``` handed to every handler event -- a one-to-one
+The per-connection ```ctx``` handed to every handler event, a one-to-one
 translation of the ```session[:ctx]``` hash (```:server```,
 ```:envelope```, ```:message```) into three dataclasses with attribute access.
 The server fills each value directly at the point it becomes known, exactly as
@@ -12,7 +12,7 @@ the Ruby code assigns into the hash.
 : Conventions kept: string fields default to ```''```; ```proxy``` and
     ```message.spooler``` are ```None```; ```received```/```delivered```/
     ```bytesize``` start at ```-1```; ```encrypted```/```authenticated```
-    are a single field each -- empty while off, a UTC timestamp once on;
+    are a single field each: empty while off, a UTC timestamp once on;
     ```headers``` flips from ```False``` to ```True```; ```data``` is the
     raw message and is appended to directly
 : Python keyword clash: the Ruby ```ctx[:envelope][:from]``` / ```[:to]``` are
@@ -189,7 +189,7 @@ class MessageSpooler:
         ### Notes
 
         : ```keep``` does not flush. Called before the message completed it
-            only relocates the still growing file -- the server keeps
+            only relocates the still growing file; the server keeps
             writing through the open handle and flushes and closes it as
             usual, so the content is complete only after
             ```on_message_data_event```
@@ -239,7 +239,7 @@ class MessageCtx:
         Remove one trailing line break and settle the final ```bytesize```.
 
         With a spooler the chomp happens on the spool file (closed after);
-        otherwise on ```data``` -- exactly one CRLF, LF or CR, never more.
+        otherwise on ```data```, exactly one CRLF, LF or CR, never more.
 
         """
         if self.spooler:
@@ -271,7 +271,7 @@ class SmtpdContext:
         ```envelope```/```message``` are replaced on RSET and after each
         delivery
     : ```id``` uniquely identifies the connection in logs and dumps and is
-        write-once -- a second assignment raises ```AttributeError```
+        write-once: a second assignment raises ```AttributeError```
 
     """
 

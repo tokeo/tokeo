@@ -1,8 +1,8 @@
 """
 Small helpers that hand out a random id, with an optional prefix.
 
-Kept dependency-free so any consumer -- a tool, a governor, a project's own
-code -- can mint an id for a value that needs one (e.g. a code-originated tool
+Kept dependency-free so any consumer (a tool, a governor, a project's own
+code) can mint an id for a value that needs one (e.g. a code-originated tool
 call, where no provider supplies the id). The prefix lets the caller mark the
 id's origin (```'inj_'``` for an injected call); with no prefix the bare token
 is returned.
@@ -49,7 +49,7 @@ def get_uuid4(prefix=None):
     """
     Hand out a random uuid4 (hex, no dashes), optionally prefixed.
 
-    A uuid4 carries 122 random bits -- the conservative choice when an id must
+    A uuid4 carries 122 random bits, the conservative choice when an id must
     be unique well beyond a single turn. For a turn-local id ```get_token_hex```
     is shorter and enough.
 
