@@ -95,9 +95,9 @@ try:
 
             ### Notes
 
-            - The patterns use glob syntax (e.g., *.py for all Python files)
+            : The patterns use glob syntax (e.g., *.py for all Python files)
 
-            - The callback will be invoked without arguments whenever a matching
+            : The callback will be invoked without arguments whenever a matching
                 file system event is detected
 
             """
@@ -116,9 +116,9 @@ try:
 
             ### Notes
 
-            - Called automatically by watchdog on a matching file system event
+            : Called automatically by watchdog on a matching file system event
 
-            - Only invokes the callback if one was provided during initialization
+            : Only invokes the callback if one was provided during initialization
 
             """
             if self.callback and event.event_type in self.WATCH_EVENTS:
@@ -135,9 +135,9 @@ except ImportError:
 
         ### Notes
 
-        - Used when the watchdog package is not installed
+        : Used when the watchdog package is not installed
 
-        - Raises an error to indicate watchdog is required for file monitoring
+        : Raises an error to indicate watchdog is required for file monitoring
         """
 
         def __init__(self, patterns=None, ignore_patterns=None, ignore_directories=True, case_sensitive=False, callback=None):
@@ -403,9 +403,9 @@ class TokeoNicegui(MetaMixin):
 
         ### Notes
 
-        - Uses the handler's config_section as defined in Meta
+        : Uses the handler's config_section as defined in Meta
 
-        - Passes through any additional arguments to config.get()
+        : Passes through any additional arguments to config.get()
 
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
@@ -854,8 +854,9 @@ def tokeo_nicegui_extend_app(app):
 
     ### Notes
 
-    - This function is called during application setup
-    - It creates the TokeoNicegui instance and attaches it to the app
+    : This function is called during application setup
+
+    : It creates the TokeoNicegui instance and attaches it to the app
         as app.nicegui
 
     """
@@ -875,8 +876,9 @@ def tokeo_nicegui_shutdown(app):
 
     ### Notes
 
-    - Called during application shutdown to properly close connections
-    - Important for clean application termination without resource leaks
+    : Called during application shutdown to properly close connections
+
+    : Important for clean application termination without resource leaks
 
     """
     app.nicegui.shutdown()

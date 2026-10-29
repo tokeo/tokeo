@@ -500,9 +500,9 @@ def tokeo_grpc_extend_app(app):
 
     ### Notes
 
-    - This function is called during application setup
+    : This function is called during application setup
 
-    - It creates the TokeoGrpc instance and attaches it to the app as app.grpc
+    : It creates the TokeoGrpc instance and attaches it to the app as app.grpc
 
     """
     app.extend('grpc', TokeoGrpc(app))

@@ -218,11 +218,12 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
         ### Notes
 
-        - Quoting forces a string, exactly as in yaml: an env value of
+        : Quoting forces a string, exactly as in yaml: an env value of
             ```"true"``` (with quotes) stays the string ```true``` while ```true```
             becomes a bool; the yaml "Norway" rule also makes
             ```yes```/```no```/```on```/```off``` booleans
-        - Subclasses can transform individual leaves through ```_resolve_leaf```
+
+        : Subclasses can transform individual leaves through ```_resolve_leaf```
             (the vault handler uses this to decrypt secrets)
 
         """

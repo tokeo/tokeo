@@ -86,11 +86,11 @@ class TokeoPocketBaseHandler(MetaMixin):
 
     ### Notes
 
-    - The handler is registered as 'db' and is reached through app.db. It
+    : The handler is registered as 'db' and is reached through app.db. It
         is a thin convenience layer over the PocketBase SDK, not a wrapper
         around its full surface.
 
-    - Authentication: the handler connects anonymously, so the mapped CRUD
+    : Authentication: the handler connects anonymously, so the mapped CRUD
         calls run against whatever the PocketBase api rules permit for
         unauthenticated requests. Auth and user management happen at the
         application level - user records via plain CRUD on the auth
@@ -182,13 +182,15 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         ### Notes
 
-        - Merges the default configuration with any user-provided configuration
+        : Merges the default configuration with any user-provided configuration
             and initializes the PocketBase client, stored in the ```pb```
             attribute and used by all other methods
-        - A https url enables tls, verified against the system ca store by
+
+        : A https url enables tls, verified against the system ca store by
             default; the tls options build a custom ssl context that is
             passed to the underlying httpx client
-        - concurrent_connections caps concurrent http connections per process
+
+        : concurrent_connections caps concurrent http connections per process
             via httpx; it is not a request-rate limit and does not span
             processes, so apply any rate or cross-process throttling in your
             application (e.g. the diskcache throttle recipe)
@@ -294,10 +296,11 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         ### Notes
 
-        - The whole check-and-refresh runs under a lock, because the shared
+        : The whole check-and-refresh runs under a lock, because the shared
             client's auth_store is mutable global state with no locking; this
             prevents concurrent workers from racing on refresh or re-login
-        - A token with more than auth_token_min_valid_seconds of life left is
+
+        : A token with more than auth_token_min_valid_seconds of life left is
             used as is; one near expiry is refreshed on its collection, and a
             failed refresh falls through to a full re-login
 

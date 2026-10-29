@@ -212,11 +212,12 @@ class TokeoInvokeLocalContext(invoke.Context):
 
         ### Notes
 
-        - env vars are exported into the shell verbatim, without
+        : env vars are exported into the shell verbatim, without
             shell-quoting here. Escaping is delegated to the
             task's sanitize setting; with sanitize enabled the values pass
             through sanitize.keyword_dict(), otherwise they are exported as-is.
-        - a sudo password (sudo.password) is injected reactively when the
+
+        : a sudo password (sudo.password) is injected reactively when the
             configured prompt is seen in the last tail chars of stdout or
             stderr: sudo.mode 'eq' matches the literal sudo.match, 'regex'
             matches it as a pattern, 'env' sets a unique SUDO_PROMPT and matches
@@ -385,11 +386,12 @@ class TokeoInvokeRemoteContext(invoke.Context):
 
         ### Notes
 
-        - env vars are exported into the remote shell verbatim, without
+        : env vars are exported into the remote shell verbatim, without
             shell-quoting here (unlike invoke). Escaping is delegated to the
             task's sanitize setting; with sanitize enabled the values pass
             through sanitize.keyword_dict(), otherwise they are exported as-is.
-        - a sudo password (sudo.password) is injected reactively when the
+
+        : a sudo password (sudo.password) is injected reactively when the
             configured prompt is seen in the last tail chars of stdout or
             stderr: sudo.mode 'eq' matches the literal sudo.match, 'regex'
             matches it as a pattern, 'env' sets a unique SUDO_PROMPT and matches

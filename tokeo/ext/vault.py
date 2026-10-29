@@ -58,10 +58,11 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
 
     ### Notes
 
-    - Decryption is applied through the parent handler's ```_resolve_leaf```
+    : Decryption is applied through the parent handler's ```_resolve_leaf```
         hook, so it composes with environment overrides (an env override of
         the same value wins, since it is applied before the leaf hook)
-    - An env variable holding a ```!vault``` (or any other yaml tag) value is
+
+    : An env variable holding a ```!vault``` (or any other yaml tag) value is
         not decrypted but rejected by the parent handler with a
         ```TokeoYamlConfigError```; quote the value to inject it as plain text
 
@@ -433,9 +434,10 @@ def load(app):
 
     ### Notes
 
-    - The vault config handler subclasses the Tokeo YAML handler, so this
+    : The vault config handler subclasses the Tokeo YAML handler, so this
         extension replaces the YAML config handler when both are enabled
-    - Defines the ```tokeo_vault_register_handlers``` hook, so other extensions
+
+    : Defines the ```tokeo_vault_register_handlers``` hook, so other extensions
         or plugins can register their own vault handlers from the outside via
         ```app.config.register_handler```
 

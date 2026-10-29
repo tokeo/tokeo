@@ -356,21 +356,24 @@ class TokeoDramatiqController(Controller):
 
         ### Notes
 
-        - Worker configuration includes process count, thread count, shutdown
+        : Worker configuration includes process count, thread count, shutdown
             timeout, restart delay, and queue prefetch settings
-        - Each worker switch replaces its config value
-        - With --watch, the command monitors the given directory for changes
-            and reloads actors when files change
-        - In debug mode dramatiq logs on debug level, unless --skip-logging
 
-        - Worker processes log to the console; the call blocks until they
+        : Each worker switch replaces its config value
+
+        : With --watch, the command monitors the given directory for changes
+            and reloads actors when files change
+
+        : In debug mode dramatiq logs on debug level, unless --skip-logging
+
+        : Worker processes log to the console; the call blocks until they
             terminate (signal, error or shutdown via the management hooks)
 
-        - At service start the diskcache locks are purged best-effort: a
+        : At service start the diskcache locks are purged best-effort: a
             previous worker generation may have left stale acquires behind
             that would block actors after restart
 
-        - The worker processes start by forkserver, or by spawn if set or
+        : The worker processes start by forkserver, or by spawn if set or
             if forkserver is not available
 
         """

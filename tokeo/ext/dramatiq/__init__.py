@@ -93,10 +93,10 @@ def tokeo_dramatiq_pdoc_render_decorator(app, func, decorator, args, kwargs):
 
     ### Notes
 
-    - This function extracts queue_name parameters from decorators to
+    : This function extracts queue_name parameters from decorators to
         provide meaningful documentation
 
-    - It works with both the global dramatiq.actor and app.dramatiq.actor forms
+    : It works with both the global dramatiq.actor and app.dramatiq.actor forms
 
     """
     if decorator == '@dramatiq.actor' or decorator == '@app.dramatiq.actor':
@@ -124,9 +124,9 @@ def tokeo_dramatiq_extend_app(app):
 
     ### Notes
 
-    - This function is called during application setup
+    : This function is called during application setup
 
-    - It creates the TokeoDramatiq instance and attaches it to the app
+    : It creates the TokeoDramatiq instance and attaches it to the app
         as app.dramatiq
 
     ### Raises
@@ -152,9 +152,9 @@ def tokeo_dramatiq_shutdown(app):
 
     ### Notes
 
-    - Called during application shutdown to properly close connections
+    : Called during application shutdown to properly close connections
 
-    - Important for clean application termination without resource leaks
+    : Important for clean application termination without resource leaks
 
     """
     app.dramatiq.close()

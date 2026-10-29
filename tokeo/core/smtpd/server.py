@@ -2056,10 +2056,11 @@ class SmtpdServer:
 
         ### Notes
 
-        - Resolves per event *once* what ```_emit``` previously resolved on
+        : Resolves per event *once* what ```_emit``` previously resolved on
             every call (```getattr``` + ```iscoroutinefunction``` + threaded
             marker), cutting the per-event dispatch cost to a dict lookup
-        - Events the handler did not override keep NO entry when their base is
+
+        : Events the handler did not override keep NO entry when their base is
             a no-op, so call sites skip ```_emit``` (and its coroutine) entirely
             via ```in self.emit_events```; ```ON_AUTH_EVENT``` always keeps
             an entry because its base carries behaviour (the default deny

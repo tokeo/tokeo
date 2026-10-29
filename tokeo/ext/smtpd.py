@@ -201,12 +201,14 @@ def _set_pdeathsig(sig=signal.SIGTERM):
 
     ### Notes
 
-    - On Linux, asks the kernel (```prctl(PR_SET_PDEATHSIG, sig)```) to send
+    : On Linux, asks the kernel (```prctl(PR_SET_PDEATHSIG, sig)```) to send
         ```sig``` to this process when its parent dies, so an orphaned worker
         does not linger if the master crashes without forwarding a stop
-    - A no-op on non-Linux platforms and best-effort on error; the master's
+
+    : A no-op on non-Linux platforms and best-effort on error; the master's
         explicit signalling stays the primary shutdown path
-    - ```ctypes.CDLL(None)``` resolves ```prctl``` from the C library already
+
+    : ```ctypes.CDLL(None)``` resolves ```prctl``` from the C library already
         loaded into the running process, so no library filename is hardcoded
         (```libc.so``` is often a linker script and will not ```dlopen```)
 

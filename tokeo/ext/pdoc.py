@@ -133,9 +133,9 @@ try:
 
             ### Notes
 
-            - Called automatically by watchdog on a matching file system event
+            : Called automatically by watchdog on a matching file system event
 
-            - Read-only events are dropped, see the class docstring
+            : Read-only events are dropped, see the class docstring
 
             """
             if self.callback and event.event_type in self.WATCH_EVENTS:
@@ -152,9 +152,9 @@ except ImportError:
 
         ### Notes
 
-        - Used when the watchdog package is not installed
+        : Used when the watchdog package is not installed
 
-        - Raises an error to indicate watchdog is required for file monitoring
+        : Raises an error to indicate watchdog is required for file monitoring
         """
 
         def __init__(self, patterns=None, ignore_patterns=None, ignore_directories=True, case_sensitive=False, callback=None):
@@ -1562,11 +1562,13 @@ class TokeoPdoc(Handler):
 
         ### Notes
 
-        - Performs a full process replacement, so caches, ```sys.modules``` and
+        : Performs a full process replacement, so caches, ```sys.modules``` and
             the observer all start from scratch
-        - The listening socket does not survive the replacement: Python marks
+
+        : The listening socket does not survive the replacement: Python marks
             sockets non-inheritable, so the new process rebinds cleanly
-        - No-op unless the watch loop asked for it
+
+        : No-op unless the watch loop asked for it
 
         """
 

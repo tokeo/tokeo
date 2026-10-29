@@ -390,11 +390,13 @@ class TokeoDiskCacheLocksHandler:
 
         ### Notes
 
-        - The throttle state persists in the cache under the key derived
+        : The throttle state persists in the cache under the key derived
             from name, name_f or the function full name.
-        - When rate-limited, execution is delayed unless cb_on_locked is
+
+        : When rate-limited, execution is delayed unless cb_on_locked is
             provided.
-        - The token bucket allows bursts up to count calls at once.
+
+        : The token bucket allows bursts up to count calls at once.
 
         """
         if expire is None:
@@ -584,22 +586,28 @@ class TokeoDiskCacheLocksHandler:
 
         ### Notes
 
-        - The temper state persists in the cache under the key derived
+        : The temper state persists in the cache under the key derived
             from name, name_f or the function full name.
-        - A slot is only released by a call that actually acquired one;
+
+        : A slot is only released by a call that actually acquired one;
             the cb_on_locked path never changes the deadlines.
-        - The release does not recreate a key that has vanished in the
+
+        : The release does not recreate a key that has vanished in the
             meantime, so purging the cache while no call holds a slot
             leaves it empty.
-        - The key lives as long as the latest deadline, so calls with a
+
+        : The key lives as long as the latest deadline, so calls with a
             different expire may share it by name.
-        - temper never stops a running call, also not after its expire. A
+
+        : temper never stops a running call, also not after its expire. A
             call that must end in time needs its own limit, e.g. the
             time_limit of a dramatiq actor below expire.
-        - Purging the cache while calls are in flight is destructive: it
+
+        : Purging the cache while calls are in flight is destructive: it
             clears the very deadlines that enforce the limit, so it can
             breach the limit temporarily as well.
-        - All processes on one cache must run the same version: an older
+
+        : All processes on one cache must run the same version: an older
             one reads the deadlines as an invalid counter and resets it.
 
         ### Reminders

@@ -181,11 +181,12 @@ class TokeoCronAndFireTrigger(CronTrigger):
 
         ### Notes
 
-        - This method first determines the next fire time using the standard
+        : This method first determines the next fire time using the standard
             cron calculation, then adds the configured delay (if any) to the
             result; jitter is applied by the parent class and affects the time
             before the delay is added
-        - A delay greater than or equal to the cron interval pushes the fire
+
+        : A delay greater than or equal to the cron interval pushes the fire
             time past the next slot, so individual fires can be skipped; keep
             delay smaller than the schedule interval to fire on every slot
 

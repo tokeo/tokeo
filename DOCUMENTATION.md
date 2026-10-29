@@ -95,23 +95,30 @@ Document exceptions that may be raised:
 
 ### Notes
 
-Format the Notes section based on the number of items:
+Choose the format by the kind of the notes, not by their number:
 
-For multiple notes, use bullet points:
+Use the colon format for separate hints. Each note stands on its own and is
+shown as its own paragraph; a blank line separates the notes:
+
 ### Notes
 
-- First note item with details
-- Second note item with details
-- Third note item with details
-
-For a single note, use colon format with indentation:
-### Notes
-
-: Single note item with details that may span
+: First hint that stands on its own and may span
     multiple lines with consistent indentation
 
-Note the continuation line above: it is indented by 4 chars, like the
-continuation lines of the bullet notes (see Basic Structure 8).
+: Second hint, independent of the first
+
+Use bullet points for an enumeration, short points of the same kind that are
+read together, e.g. the parts of an output or the steps of a setup; the
+bullets follow each other without a blank line:
+
+### Notes
+
+- First point of the enumeration
+- Second point of the enumeration
+- Third point of the enumeration
+
+A colon note may hold an enumeration of its own, indented by 4 chars. In both
+formats continuation lines are indented by 4 chars (see Basic Structure 8).
 
 ### Lists
 

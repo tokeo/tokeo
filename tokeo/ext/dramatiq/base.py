@@ -95,12 +95,14 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
 
     ### Notes
 
-    - Implementation based on solution from the Dramatiq users group:
+    : Implementation based on solution from the Dramatiq users group:
         https://groups.io/g/dramatiq-users/topic/77913723
-    - Also accepts auth_identity/auth_password and merges them into the
+
+    : Also accepts auth_identity/auth_password and merges them into the
         connection url, since RabbitmqBroker cannot take a url and separate
         pika credentials at the same time
-    - For amqps urls it accepts tls_verify_hostname/tls_verify_cert/tls_ca to
+
+    : For amqps urls it accepts tls_verify_hostname/tls_verify_cert/tls_ca to
         customize the ssl context; a custom context forces the pika
         parameters path, since RabbitmqBroker cannot mix url and parameters
 
