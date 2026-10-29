@@ -119,6 +119,7 @@ class TokeoGrpc(MetaMixin):
 
     def __init__(self, app, *args, **kw):
         super(TokeoGrpc, self).__init__(*args, **kw)
+        #: The Cement application instance
         self.app = app
         self._server = None
         self._proto_add_servicer_to_server_module = ''

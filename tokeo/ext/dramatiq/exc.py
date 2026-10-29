@@ -39,9 +39,13 @@ class TokeoDramatiqConfigError(TokeoDramatiqError):
     """
 
     def __init__(self, source, name, value, expected):
+        #: Where the value comes from, ```config```, ```env``` or ```switch```
         self.source = source
+        #: The key, env or switch, e.g. ```rabbitmq.max_priority```
         self.name = name
+        #: The value that is not allowed
         self.value = value
+        #: What is allowed, e.g. ```true or false```
         self.expected = expected
         super().__init__(f'Invalid {SOURCE_LABELS.get(source, source)} {name}: Value {value!r} must be {expected}!')
 
@@ -63,8 +67,11 @@ class TokeoDramatiqConnectionError(TokeoDramatiqError, ConnectionClosed):
     """
 
     def __init__(self, address, cause, actor_name=None):
+        #: Host and port of rabbitmq, never the url
         self.address = address
+        #: The error of pika or dramatiq as text
         self.cause = _describe(cause)
+        #: The actor, when sending failed
         self.actor_name = actor_name
         action = f'send {actor_name} to' if actor_name else 'connect to'
         where = f'rabbitmq at {address}' if address else 'the broker'
@@ -89,7 +96,9 @@ class TokeoDramatiqRefusedError(TokeoDramatiqError):
     """
 
     def __init__(self, address, cause):
+        #: Host and port of rabbitmq, never the url
         self.address = address
+        #: The error of pika as text
         self.cause = _describe(cause)
         super().__init__(f'Rabbitmq at {address} refused the request ({self.cause})!')
 
@@ -109,7 +118,9 @@ class TokeoDramatiqQueueError(TokeoDramatiqError):
     """
 
     def __init__(self, queue, reason):
+        #: The queue name
         self.queue = queue
+        #: Why the state of the queue prevents the action
         self.reason = reason
         super().__init__(f'Queue {queue} {reason}!')
 

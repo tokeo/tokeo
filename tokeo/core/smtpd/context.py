@@ -114,9 +114,7 @@ class MessageSpooler:
     """
     Optional file spooling for one incoming message.
 
-    Owns the spool temp file while the message streams to disk: the file
-    descriptor, the writable handle, the file path and the line ending of
-    the last written chunk (used for the final chomp).
+    Owns the spool temp file while the message streams to disk.
 
     ### Args
 
@@ -132,12 +130,17 @@ class MessageSpooler:
 
     def __init__(self, dir=None, prefix=None, debug=False):
         # create spool temp file for dir + prefix
+        #: File descriptor and path of the spool file, the descriptor None once
+        #: closed
         self.fd, self.path = tempfile.mkstemp(dir=dir, prefix=prefix, suffix='.eml')
         # open file handle to write
+        #: Writable binary handle of the spool file, None once closed
         self.file = os.fdopen(self.fd, 'wb')
         # reset last line_break
+        #: Line ending of the last written chunk, used for the final chomp
         self.last_line_break = b''
         # safe flag for debugging control
+        #: Whether the spool file stays on disk when it is unlinked
         self.debug = debug
 
     def chomp(self, cur_bytesize):

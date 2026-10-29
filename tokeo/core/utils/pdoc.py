@@ -58,8 +58,12 @@ class DecoratedFunction:
     """
 
     def __init__(self, app, func, update_func_docstring=True, prepend_docstrings=None, append_docstrings=None):
+        #: The application instance
         self.app = app
+        #: The function object that is analyzed
         self.func = func
+        #: One ```dict(decorator, params, docstring)``` per known decorator of the
+        #: function
         self.decorators = []
         self._setup_decorators()
         if update_func_docstring:

@@ -155,8 +155,12 @@ class TokeoPocketBaseHandler(MetaMixin):
             tls_ca=None,
         )
 
+    #: (pocketbase.PocketBase) The PocketBase client, set on setup
+    pb = None
+
     def __init__(self, app, *args, **kw):
         super(TokeoPocketBaseHandler, self).__init__(*args, **kw)
+        #: The Cement application instance
         self.app = app
 
     def _setup(self, app):

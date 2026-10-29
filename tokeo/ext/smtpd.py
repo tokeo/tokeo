@@ -346,6 +346,9 @@ class TokeoSmtpd(MetaMixin):
             services=[],
         )
 
+    #: (Application) The Cement application instance, set on setup
+    app = None
+
     def __init__(self, app, *args, **kw):
         super(TokeoSmtpd, self).__init__(*args, **kw)
         self._setup(app)

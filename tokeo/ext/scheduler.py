@@ -252,6 +252,7 @@ class TokeoScheduler(MetaMixin):
 
     def __init__(self, app, *args, **kw):
         super(TokeoScheduler, self).__init__(*args, **kw)
+        #: The Cement application instance
         self.app = app
         self._command_parser = None
         self._scheduler = None

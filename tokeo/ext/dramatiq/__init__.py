@@ -47,7 +47,7 @@ def tokeo_dramatiq_pdoc_pre_render(app):
     from tokeo.core.utils.pdoc import pdoc_replace_decorator
 
     dramatiq.actor = pdoc_replace_decorator
-    if hasattr(app.dramatiq, 'actor'):
+    if getattr(app.dramatiq, 'actor', None) is not None:
         app.dramatiq.actor = pdoc_replace_decorator
 
 
@@ -65,7 +65,7 @@ def tokeo_dramatiq_pdoc_post_render(app):
 
     """
     dramatiq.actor = dramatiq_actor
-    if hasattr(app.dramatiq, 'actor'):
+    if getattr(app.dramatiq, 'actor', None) is not None:
         app.dramatiq.actor = tokeo_actor
 
 

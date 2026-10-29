@@ -52,6 +52,7 @@ class TokeoTuiOutput:
     def __init__(self, app, file=None, width=None):
         from rich.console import Console
 
+        #: The Cement application instance
         self.app = app
         # without a file rich writes to the current sys.stdout
         self._console = Console(file=file, width=width, highlight=False)

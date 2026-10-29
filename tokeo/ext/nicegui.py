@@ -329,6 +329,19 @@ class TokeoNicegui(MetaMixin):
             run_kwargs=None,
         )
 
+    #: (Application) The Cement application instance, set on setup
+    app = None
+
+    #: (module) The ```ui``` module of NiceGUI for the elements of a page, set on
+    #: setup
+    ui = None
+
+    #: (App) The FastAPI app of NiceGUI for routes and apis, set on setup
+    fastapi_app = None
+
+    #: (NiceguiElementHelper) Helper that creates any HTML element, set on setup
+    ux = None
+
     def _setup(self, app):
         """
         Set up the NiceGUI extension.

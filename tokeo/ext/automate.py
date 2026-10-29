@@ -575,29 +575,27 @@ class TokeoAutomateResult:
     - **host_id** (str): Identifier of the host where the task was executed
     - **result** (any): Raw result object from the execution
 
-    ### Attributes
-
-    - **task_id** (str): Identifier of the executed task
-    - **connection_id** (str): Identifier of the connection used
-    - **host_id** (str): Identifier of the host where the task was executed
-    - **stdout** (str): Standard output from the task execution
-    - **stderr** (str): Standard error output from the task execution
-    - **command** (str): The command that was executed
-    - **exited** (int): Exit code of the command (0 for success)
-    - **values** (any): Additional values returned by the task
-    - **exception** (str): Class name of the exception that aborted the task,
-        or None on success
-
     """
 
+    #: (any) Additional values returned by the task
+    values = None
+
     def __init__(self, task_id, connection_id, host_id, result):
+        #: Identifier of the executed task
         self.task_id = task_id
+        #: Identifier of the connection used
         self.connection_id = connection_id
+        #: Identifier of the host where the task was executed
         self.host_id = host_id
+        #: Standard output from the task execution
         self.stdout = getprop(result, 'stdout', fallback=None)
+        #: Standard error output from the task execution
         self.stderr = getprop(result, 'stderr', fallback=None)
+        #: The command that was executed
         self.command = getprop(result, 'command', fallback=None)
+        #: Exit code of the command (0 for success)
         self.exited = getprop(result, 'exited', fallback=0)
+        #: Class name of the exception that aborted the task, or None on success
         self.exception = getprop(result, 'exception', fallback=None)
         # in case that result looks like an invoke.runners.Result
         # try to get values from an additional values attribute
@@ -635,10 +633,6 @@ class TokeoAutomate(MetaMixin):
     ### Keyword Args
 
     - **kw**: Arbitrary keyword arguments passed to parent initializer
-
-    ### Attributes
-
-    - **app** (Application): The Cement application instance
 
     """
 
@@ -678,6 +672,7 @@ class TokeoAutomate(MetaMixin):
 
     def __init__(self, app, *args, **kw):
         super(TokeoAutomate, self).__init__(*args, **kw)
+        #: The Cement application instance
         self.app = app
         # copy from list of tasks with expanded entries
         self._tasks = None
@@ -1921,13 +1916,10 @@ class TokeoAutomateShell:
 
     - **app** (Application): The Cement application instance
 
-    ### Attributes
-
-    - **app** (Application): The Cement application instance
-
     """
 
     def __init__(self, app):
+        #: The Cement application instance
         self.app = app
         self._command_parser = None
         self._shell_completion = None

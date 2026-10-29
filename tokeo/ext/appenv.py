@@ -54,21 +54,6 @@ class TokeoAppEnv:
 
     - **app** (Application): The Cement application instance
 
-    ### Attributes
-
-    - **APP_LABEL** (str): The lowercase application label
-    - **APP_ENV_VAR_NAME** (str): The environment variable name for app environment
-    - **APP_ENV_VAR_VALUE** (str): The value of the environment variable
-    - **APP_ENV** (str): The detected environment (production, development, staging,
-        testing) or None if no environment could be detected
-    - **IS_PROD_MODE** (bool): True if running in production environment
-    - **IS_STAGE_MODE** (bool): True if running in staging environment
-    - **IS_DEV_MODE** (bool): True if running in development environment
-    - **IS_TEST_MODE** (bool): True if running in testing environment
-    - **APP_MAIN_DIR** (str): The main directory of the application
-    - **APP_DIR** (str): The base directory of the application
-    - **APP_CONFIG_DIR** (str): The configuration directory of the application
-
     ### Notes
 
     - Detects environment from environment variables or app name suffix
@@ -82,12 +67,19 @@ class TokeoAppEnv:
 
     """
 
+    #: (str|None) The detected environment (production, development, staging,
+    #: testing) or None if no environment could be detected
+    APP_ENV = None
+
     def __init__(self, app):
         # get the app label
+        #: The lowercase application label
         self.APP_LABEL = app._meta.label.strip().lower()
         # build the main ENV_VAR_NAME from app meta label
+        #: The environment variable name for app environment
         self.APP_ENV_VAR_NAME = self.APP_LABEL.upper() + '_ENV'
         # get the started ENV
+        #: The value of the environment variable
         self.APP_ENV_VAR_VALUE = os.environ.get(self.APP_ENV_VAR_NAME, default='').strip().lower()
         # check the started ENV
         if self.APP_ENV_VAR_VALUE in ['dev', 'development']:
@@ -113,15 +105,22 @@ class TokeoAppEnv:
         else:
             self.APP_ENV = None
         # identify MODES
+        #: True if running in production environment
         self.IS_PROD_MODE = self.APP_ENV == PRODUCTION
+        #: True if running in staging environment
         self.IS_STAGE_MODE = self.APP_ENV == STAGING
+        #: True if running in development environment
         self.IS_DEV_MODE = self.APP_ENV == DEVELOPMENT
+        #: True if running in testing environment
         self.IS_TEST_MODE = self.APP_ENV == TESTING
         # get the main dir from meta
+        #: The main directory of the application
         self.APP_MAIN_DIR = app._meta.main_dir
         # build the base app dir relatively from __main__
+        #: The base directory of the application
         self.APP_DIR = fs.abspath(os.path.join(self.APP_MAIN_DIR, '..'))
         # build the config dir
+        #: The configuration directory of the application
         self.APP_CONFIG_DIR = fs.abspath(os.path.join(self.APP_DIR, 'config', self.APP_LABEL))
         # add base configs
         app._meta.config_files = self.get_config_files(app_config_file_suffix=app._meta.config_file_suffix)

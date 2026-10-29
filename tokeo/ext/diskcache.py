@@ -154,13 +154,10 @@ class TokeoDiskCacheLocksHandler:
     - **tag** (str): Tag to identify locks in the cache
     - **key_prefix** (str): Prefix for lock keys
 
-    ### Attributes
-
-    - **app** (Application): The Cement application instance
-
     """
 
     def __init__(self, app, cache, tag, key_prefix):
+        #: The Cement application instance
         self.app = app
         self._cache = cache
         self._tag = tag
@@ -762,10 +759,6 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
     and advanced features through the locks attribute, which gives access to
     throttling and tempering decorators.
 
-    ### Attributes
-
-    - **locks** (TokeoDiskCacheLocksHandler): Handler for locks and rate limiting
-
     """
 
     class Meta:
@@ -790,6 +783,10 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
             # Prefix added to all lock keys for namespace isolation
             locks_key_prefix='dc_',
         )
+
+    #: (TokeoDiskCacheLocksHandler) Handler for locks and rate limiting, set on
+    #: setup
+    locks = None
 
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)

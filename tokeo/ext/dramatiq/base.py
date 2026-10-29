@@ -320,6 +320,22 @@ class TokeoDramatiq(MetaMixin):
             locks_key_prefix='dq_',
         )
 
+    #: (Application) The Cement application instance, set on setup
+    app = None
+
+    #: (callable) The actor decorator of tokeo, as ```dramatiq.actor```, set on
+    #: setup
+    actor = None
+
+    #: (TokeoDramatiqQueues) Queue state and maintenance, set on setup
+    queues = None
+
+    #: (TokeoDramatiqMonitor) Workers and queues of the app, set on setup
+    monitor = None
+
+    #: (ExtendedRabbitmqBroker) The registered broker, set on register
+    broker = None
+
     def _setup(self, app):
         """
         Cement post-setup hook: bind to app, merge config defaults, attach

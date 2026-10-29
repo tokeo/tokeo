@@ -207,6 +207,9 @@ class TokeoPdoc(Handler):
             watch_settle=1.5,
         )
 
+    #: (Application) The Cement application instance, set on setup
+    app = None
+
     def _setup(self, app):
         super()._setup(app)
         self.app = app

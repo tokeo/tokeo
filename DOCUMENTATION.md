@@ -37,12 +37,12 @@ When writing docstrings in this project, follow these Markdown formatting conven
    - ```### Output```: side effects (e.g., logging)
 6. The docstring of a class documents its constructor: the parameters of
    ```__init__``` go under ```### Args``` (and ```### Keyword Args```) of the
-   class, followed by ```### Attributes```, see Attributes. ```__init__``` has
-   no docstring of its own. The order in a class: Args, Keyword Args,
-   Attributes, Raises, Example, Notes, Reminders, References.
+   class. ```__init__``` has no docstring of its own. The order in a class:
+   Args, Keyword Args, Raises, Example, Notes, Reminders, References. Its
+   attributes are documented by ```#:```, see Attributes.
 7. Other section names are not used: no ```### Usage``` (use ```### Example```),
-   no ```### See Also``` (use ```### References```) and no ```### Methods```,
-   since pdoc lists the methods itself.
+   no ```### See Also``` (use ```### References```), no ```### Methods```,
+   since pdoc lists the methods itself, and no ```### Attributes``` (use ```#:```).
 8. Add a blank line between each major section
 9. If a section has no sensible content, do not show the section. Especially do not show when Args, Returns, or Raises is None.
 
@@ -77,9 +77,10 @@ Document exceptions that may be raised:
 
 ### Attributes
 
-1. Variables on module and class level, also those of ```Meta```, are documented
-   by a ```#:``` comment right above the assignment. pdoc shows the text at the
-   attribute:
+1. Values on module and class level, also those of ```Meta```, and instance
+   attributes (```self.x = ...``` in ```__init__```) are documented by a
+   ```#:``` comment right above the assignment. pdoc shows the text at the
+   value:
 
         #: Dict with initial settings
         config_defaults = dict(
@@ -87,15 +88,36 @@ Document exceptions that may be raised:
             timeout=60,
         )
 
-2. Instance attributes (```self.x = ...``` in ```__init__```) are listed under
-   ```### Attributes``` in the docstring of the class, since ```#:``` does not
-   reach them:
+        def __init__(self, app):
+            #: The Cement application instance
+            self.app = app
 
-        ### Attributes
+2. An instance attribute appears in the documentation only with its ```#:```;
+   without one it stays hidden, even with a public name. pdoc finds instance
+   attributes in ```__init__``` only; for one set elsewhere see (5).
+3. A private name (with a leading underscore) stays hidden. ```@public``` at
+   the start of its ```#:``` shows it, ```@private``` hides a public one; the
+   marker itself is not shown:
 
-        - **app** (Application): The Cement application instance
+        #: @public Strong refs to scheduled log tasks
+        self._pending_log_tasks = set()
 
-3. Private names (with a leading underscore) are documented nowhere.
+4. A type may lead the text in parentheses, as in Args. pdoc shows it as the
+   annotation of the value; it is optional:
+
+        #: (str) Identifier of the executed task
+        self.task_id = task_id
+
+5. An instance attribute that ```__init__``` does not set with one assignment,
+   because it is set in ```_setup``` or another method or only in the branches
+   of an ```if```, is declared on class level with ```None``` and documented
+   there. Code that asks whether such an attribute is set checks its value
+   (```getattr(obj, 'x', None) is not None```), not ```hasattr```, which always
+   finds the value of the class:
+
+        #: (TokeoDiskCacheLocksHandler) Handler for locks and rate limiting, set on
+        #: setup
+        locks = None
 
 ### Notes
 

@@ -54,7 +54,9 @@ class VaultRef:
     """
 
     def __init__(self, profile, ciphertext):
+        #: Name of the vault profile that decrypts the payload
         self.profile = profile
+        #: The encrypted value as written in the config
         self.ciphertext = ciphertext
 
     def __repr__(self):

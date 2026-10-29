@@ -55,6 +55,7 @@ class TokeoTuiInput:
     """
 
     def __init__(self, app):
+        #: The Cement application instance
         self.app = app
 
     def shell(self, command, prompt='> ', completer=None, history=None, **session):
