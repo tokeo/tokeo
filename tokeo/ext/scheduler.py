@@ -52,11 +52,39 @@ class TokeoCronAndFireTrigger(CronTrigger):
     for staggering task execution or preventing resource contention, and it
     can also be fired manually on demand.
 
+    ### Args
+
+    - **year** (str|int, optional): Year to run on (4-digit)
+    - **month** (str|int, optional): Month to run on (1-12)
+    - **day** (str|int, optional): Day of month to run on (1-31)
+    - **week** (str|int, optional): Week of the year to run on (1-53)
+    - **day_of_week** (str|int, optional): Weekday to run on
+        (0-6 or mon,tue,wed,thu,fri,sat,sun)
+    - **hour** (str|int, optional): Hour to run on (0-23)
+    - **minute** (str|int, optional): Minute to run on (0-59)
+    - **second** (str|int, optional): Second to run on (0-59)
+    - **start_date** (datetime|str, optional): Earliest date/time to run on
+    - **end_date** (datetime|str, optional): Latest date/time to run on
+    - **timezone** (datetime.tzinfo|str, optional): Timezone to use for
+        the date/time calculations
+    - **jitter** (int, optional): Advance or delay the job execution
+        by jitter seconds at most
+    - **delay** (int, optional): Additional seconds to delay after
+        the scheduled time
+
     ### Notes
 
     : The delay parameter adds a fixed delay after the cron-calculated trigger time,
         while jitter adds a random amount of time (up to the specified maximum).
         Used together, they provide flexible control over task execution timing.
+
+    : The cron parameters (year, month, etc.) support various formats including:
+
+        - Single values: '5', 5
+        - Ranges: '2-9', '0-23'
+        - Multiple values: '1,3,5'
+        - Step values: '*/2' (every 2 units)
+        - Names for day_of_week: 'mon,wed,fri'
 
     """
 
@@ -76,43 +104,6 @@ class TokeoCronAndFireTrigger(CronTrigger):
         jitter=None,
         delay=None,
     ):
-        """
-        Initialize the trigger with cron parameters and optional delay.
-
-        Creates a new trigger with the specified cron parameters and optional
-        delay configuration.
-
-        ### Args
-
-        - **year** (str|int, optional): Year to run on (4-digit)
-        - **month** (str|int, optional): Month to run on (1-12)
-        - **day** (str|int, optional): Day of month to run on (1-31)
-        - **week** (str|int, optional): Week of the year to run on (1-53)
-        - **day_of_week** (str|int, optional): Weekday to run on
-            (0-6 or mon,tue,wed,thu,fri,sat,sun)
-        - **hour** (str|int, optional): Hour to run on (0-23)
-        - **minute** (str|int, optional): Minute to run on (0-59)
-        - **second** (str|int, optional): Second to run on (0-59)
-        - **start_date** (datetime|str, optional): Earliest date/time to run on
-        - **end_date** (datetime|str, optional): Latest date/time to run on
-        - **timezone** (datetime.tzinfo|str, optional): Timezone to use for
-            the date/time calculations
-        - **jitter** (int, optional): Advance or delay the job execution
-            by jitter seconds at most
-        - **delay** (int, optional): Additional seconds to delay after
-            the scheduled time
-
-        ### Notes
-
-        : The cron parameters (year, month, etc.) support various formats including:
-
-            - Single values: '5', 5
-            - Ranges: '2-9', '0-23'
-            - Multiple values: '1,3,5'
-            - Step values: '*/2' (every 2 units)
-            - Names for day_of_week: 'mon,wed,fri'
-
-        """
         super().__init__(year, month, day, week, day_of_week, hour, minute, second, start_date, end_date, timezone, jitter)
         self.delay = delay
 
@@ -209,12 +200,25 @@ class TokeoScheduler(MetaMixin):
     management. It wraps the APScheduler library and extends it with additional
     features specific to the Tokeo framework.
 
+    ### Args
+
+    - **app**: The Tokeo application instance
+    - **args**: Variable length argument list passed to parent initializer
+
+    ### Keyword Args
+
+    - **kw**: Arbitrary keyword arguments passed to parent initializer
+
     ### Notes
 
     : The scheduler can operate in two modes: background (non-blocking) and
         interactive (with command shell). It provides fine-grained control over
         task execution, including support for jitter, delay, and concurrency
         limits. Tasks can be defined programmatically or via configuration.
+
+    : This constructor only initializes basic attributes. The actual scheduler
+        is created on-demand when needed, and tasks are loaded during
+        the startup process rather than at initialization time.
 
     """
 
@@ -247,28 +251,6 @@ class TokeoScheduler(MetaMixin):
         )
 
     def __init__(self, app, *args, **kw):
-        """
-        Initialize the scheduler.
-
-        Creates a new scheduler instance with the specified application context.
-        The actual scheduler initialization is deferred until startup is called.
-
-        ### Args
-
-        - **app**: The Tokeo application instance
-        - **args**: Variable length argument list passed to parent initializer
-
-        ### Keyword Args
-
-        - **kw**: Arbitrary keyword arguments passed to parent initializer
-
-        ### Notes
-
-        : This constructor only initializes basic attributes. The actual scheduler
-            is created on-demand when needed, and tasks are loaded during
-            the startup process rather than at initialization time.
-
-        """
         super(TokeoScheduler, self).__init__(*args, **kw)
         self.app = app
         self._command_parser = None

@@ -93,6 +93,32 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
     single-active-consumer flag and consumed with a prefetch of 1: only one
     worker process consumes it, one message at a time.
 
+    Accepts the standard RabbitmqBroker keyword arguments plus the auth and
+    tls options below. Credentials are merged into the url userinfo (see
+    overload_with_auth). For an amqps url the tls options build an ssl
+    context (see create_ssl_context); when one is needed the url is
+    decomposed and handed to the parent as pika parameters, since
+    RabbitmqBroker cannot take a url and pika parameters together.
+
+    ### Args
+
+    - **url** (str, optional): The amqp(s) connection url
+    - **auth_identity** (str, optional): Username/identity to force into
+        the url userinfo, overriding any user the url carries
+    - **auth_password** (str, optional): Password to force into the url
+        userinfo, overriding any password the url carries
+    - **tls_verify_hostname** (bool|str): Verify the certificate hostname;
+        a string pins the expected name, False skips the hostname check
+    - **tls_verify_cert** (bool): Verify the certificate chain; False
+        disables verification (CERT_NONE)
+    - **tls_ca** (str, optional): Path to a CA bundle to trust instead of
+        the system store
+
+    ### Keyword Args
+
+    - **kwargs**: Remaining RabbitmqBroker arguments (e.g. middleware,
+        confirm_delivery, max_priority, parameters)
+
     ### Notes
 
     : Implementation based on solution from the Dramatiq users group:
@@ -111,36 +137,6 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
     def __init__(
         self, *, url=None, auth_identity=None, auth_password=None, tls_verify_hostname=True, tls_verify_cert=True, tls_ca=None, **kwargs
     ):
-        """
-        Initialize the broker, applying credentials and tls to the connection.
-
-        Accepts the standard RabbitmqBroker keyword arguments plus the auth and
-        tls options below. Credentials are merged into the url userinfo (see
-        overload_with_auth). For an amqps url the tls options build an ssl
-        context (see create_ssl_context); when one is needed the url is
-        decomposed and handed to the parent as pika parameters, since
-        RabbitmqBroker cannot take a url and pika parameters together.
-
-        ### Args
-
-        - **url** (str, optional): The amqp(s) connection url
-        - **auth_identity** (str, optional): Username/identity to force into
-            the url userinfo, overriding any user the url carries
-        - **auth_password** (str, optional): Password to force into the url
-            userinfo, overriding any password the url carries
-        - **tls_verify_hostname** (bool|str): Verify the certificate hostname;
-            a string pins the expected name, False skips the hostname check
-        - **tls_verify_cert** (bool): Verify the certificate chain; False
-            disables verification (CERT_NONE)
-        - **tls_ca** (str, optional): Path to a CA bundle to trust instead of
-            the system store
-
-        ### Keyword Args
-
-        - **kwargs**: Remaining RabbitmqBroker arguments (e.g. middleware,
-            confirm_delivery, max_priority, parameters)
-
-        """
         url = url_overload_with_auth(url, auth_identity, auth_password)
         # tls is driven by the amqps scheme; the tls_* options only customize
         # it, so a plain amqp url ignores them

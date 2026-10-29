@@ -50,6 +50,10 @@ class TokeoAppEnv:
     Loads configuration files and provides environment flags for different
     runtime contexts.
 
+    ### Args
+
+    - **app** (Application): The Cement application instance
+
     ### Attributes
 
     - **APP_LABEL** (str): The lowercase application label
@@ -65,28 +69,20 @@ class TokeoAppEnv:
     - **APP_DIR** (str): The base directory of the application
     - **APP_CONFIG_DIR** (str): The configuration directory of the application
 
+    ### Notes
+
+    - Detects environment from environment variables or app name suffix
+    - Configures application paths and directories
+    - Includes environment-specific configuration files
+    - Handles the cement test app class in a specific manner. Replaces
+        the "_test" suffix to allow easily the usage for testing configuration
+        in the same place
+    - If no environment is detected (APP_ENV is None), only the base config
+        files are loaded and all IS_*_MODE flags are False
+
     """
 
     def __init__(self, app):
-        """
-        Initialize the environment manager.
-
-        ### Args
-
-        - **app** (Application): The Cement application instance
-
-        ### Notes
-
-        - Detects environment from environment variables or app name suffix
-        - Configures application paths and directories
-        - Includes environment-specific configuration files
-        - Handles the cement test app class in a specific manner. Replaces
-            the "_test" suffix to allow easily the usage for testing configuration
-            in the same place
-        - If no environment is detected (APP_ENV is None), only the base config
-            files are loaded and all IS_*_MODE flags are False
-
-        """
         # get the app label
         self.APP_LABEL = app._meta.label.strip().lower()
         # build the main ENV_VAR_NAME from app meta label

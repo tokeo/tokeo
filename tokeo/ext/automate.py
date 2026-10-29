@@ -101,6 +101,12 @@ class TokeoInvokeSudoResponder(invoke.watchers.Responder):
     Used for local sudo so the behavior matches the remote path, which
     injects the password a single time and never again.
 
+    ### Args
+
+    - **pattern** (str): Regular expression of the sudo prompt to answer
+    - **response** (str): Text sent once on the first match, the password
+        with a line break
+
     """
 
     def __init__(self, pattern, response):
@@ -124,20 +130,16 @@ class TokeoInvokeLocalContext(invoke.Context):
     task-configured protect/sanitize rules and the protected kwargs (pty, env,
     timeout, encoding) are applied via protect_kwargs_inplace before each run.
 
+    ### Args
+
+    - **config** (invoke.Config, optional): Config for the invoke base
+        context
+    - **task_ref** (dict): Task definition; its 'kwprotected' and
+        'kwargs' drive the protect/sanitize handling on each run
+
     """
 
     def __init__(self, config=None, task_ref=None):
-        """
-        Initialize the local context from a task reference.
-
-        ### Args
-
-        - **config** (invoke.Config, optional): Config for the invoke base
-            context
-        - **task_ref** (dict): Task definition; its 'kwprotected' and
-            'kwargs' drive the protect/sanitize handling on each run
-
-        """
         super().__init__(config=config)
         self.task_ref = task_ref
         self.task_kwprotected = task_ref['kwprotected']
@@ -268,6 +270,25 @@ class TokeoInvokeRemoteContext(invoke.Context):
 
     Replace handling as with fabric but without fabric dependency.
 
+    ### Args
+
+    - **host** (str): Target hostname or IP
+    - **user** (str): SSH username
+    - **port** (int): SSH port
+    - **config** (invoke.Config, optional): Config for the invoke base
+        context; also read for sudo.password
+    - **host_keys** (paramiko.HostKeys, optional): Known host keys; when
+        given, unknown hosts are rejected, otherwise auto-added
+    - **forward_agent** (bool, optional): Whether to forward the SSH agent
+    - **connect_kwargs** (dict, optional): Extra kwargs for paramiko's
+        connect() (e.g. password, key_filename)
+    - **task_ref** (dict): Task definition driving protect/sanitize
+
+    ### Notes
+
+    : Nothing connects here; _connect() opens the Paramiko session on the
+        first run().
+
     """
 
     def __init__(
@@ -281,29 +302,6 @@ class TokeoInvokeRemoteContext(invoke.Context):
         connect_kwargs=None,
         task_ref=None,
     ):
-        """
-        Initialize the remote context; the SSH connection is opened lazily.
-
-        ### Args
-
-        - **host** (str): Target hostname or IP
-        - **user** (str): SSH username
-        - **port** (int): SSH port
-        - **config** (invoke.Config, optional): Config for the invoke base
-            context; also read for sudo.password
-        - **host_keys** (paramiko.HostKeys, optional): Known host keys; when
-            given, unknown hosts are rejected, otherwise auto-added
-        - **forward_agent** (bool, optional): Whether to forward the SSH agent
-        - **connect_kwargs** (dict, optional): Extra kwargs for paramiko's
-            connect() (e.g. password, key_filename)
-        - **task_ref** (dict): Task definition driving protect/sanitize
-
-        ### Notes
-
-        : Nothing connects here; _connect() opens the Paramiko session on the
-            first run().
-
-        """
         super().__init__(config=config)
         self.host = host
         self.user = user
@@ -570,6 +568,13 @@ class TokeoAutomateResult:
     Stores the output and status of a task execution, including stdout,
     stderr, exit code, and any additional values returned by the task.
 
+    ### Args
+
+    - **task_id** (str): Identifier of the executed task
+    - **connection_id** (str): Identifier of the connection used
+    - **host_id** (str): Identifier of the host where the task was executed
+    - **result** (any): Raw result object from the execution
+
     ### Attributes
 
     - **task_id** (str): Identifier of the executed task
@@ -586,17 +591,6 @@ class TokeoAutomateResult:
     """
 
     def __init__(self, task_id, connection_id, host_id, result):
-        """
-        Initialize a task execution result.
-
-        ### Args
-
-        - **task_id** (str): Identifier of the executed task
-        - **connection_id** (str): Identifier of the connection used
-        - **host_id** (str): Identifier of the host where the task was executed
-        - **result** (any): Raw result object from the execution
-
-        """
         self.task_id = task_id
         self.connection_id = connection_id
         self.host_id = host_id
@@ -632,6 +626,15 @@ class TokeoAutomate(MetaMixin):
     Provides a framework for defining, configuring, and executing tasks across
     multiple hosts using SSH or local execution. Supports host definitions,
     host groups, connections, and task configuration.
+
+    ### Args
+
+    - **app** (Application): The Cement application instance
+    - **args**: Variable length argument list passed to parent initializer
+
+    ### Keyword Args
+
+    - **kw**: Arbitrary keyword arguments passed to parent initializer
 
     ### Attributes
 
@@ -1913,6 +1916,10 @@ class TokeoAutomateShell:
     Provides a command-line interface for listing, viewing, and running tasks
     with interactive features like command history, tab completion, and
     suggestions.
+
+    ### Args
+
+    - **app** (Application): The Cement application instance
 
     ### Attributes
 

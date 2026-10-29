@@ -247,6 +247,11 @@ class TokeoDramatiqMonitor:
     """
     Workers and queues of the app, available as ```app.dramatiq.monitor```.
 
+    ### Args
+
+    - **dramatiq** (TokeoDramatiq): The dramatiq extension of the app,
+        ```app.dramatiq```
+
     ### Notes
 
     : The monitor knows only the workers it heard of since its first call;

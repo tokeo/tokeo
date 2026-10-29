@@ -59,6 +59,15 @@ class TokeoGrpc(MetaMixin):
     based on configuration, providing a seamless integration between
     Tokeo applications and gRPC services.
 
+    ### Args
+
+    - **app** (Application): The Cement application instance
+    - **args**: Variable length argument list passed to parent initializer
+
+    ### Keyword Args
+
+    - **kw**: Arbitrary keyword arguments passed to parent initializer
+
     ### Notes
 
     - The server is lazily initialized when first accessed through
@@ -66,6 +75,7 @@ class TokeoGrpc(MetaMixin):
     - Server configuration is drawn from the application's 'grpc' config section
     - Provides methods for startup, shutdown, and serving (blocking mode)
     - Supports dynamic loading of servicer implementations
+
     """
 
     class Meta:

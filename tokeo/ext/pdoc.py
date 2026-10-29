@@ -88,12 +88,22 @@ try:
         - the callback receives the event, so the path that triggered the
           restart can be logged.
 
+        ### Args
+
+        - **patterns** (list): List of file patterns to watch for changes
+        - **ignore_patterns** (list): List of file patterns to ignore
+        - **ignore_directories** (bool): Whether to ignore directory events
+        - **case_sensitive** (bool): Whether patterns are case sensitive
+        - **callback** (callable): Function to call with the detected event
+
         ### Notes
 
         - Used for the ```--watch``` flag of ```pdoc render```
         - Monitors file changes based on configured patterns
         - Calls the provided callback with the event when changes are detected
         - Only available when the watchdog package is installed
+        - The patterns use glob syntax and are matched against the full
+            path, so a directory is excluded as ```*/__pycache__/*```
 
         """
 
@@ -101,23 +111,6 @@ try:
         WATCH_EVENTS = frozenset({'created', 'deleted', 'modified', 'moved'})
 
         def __init__(self, patterns=None, ignore_patterns=None, ignore_directories=False, case_sensitive=False, callback=None):
-            """
-            Initialize the watchdog event handler.
-
-            ### Args
-
-            - **patterns** (list): List of file patterns to watch for changes
-            - **ignore_patterns** (list): List of file patterns to ignore
-            - **ignore_directories** (bool): Whether to ignore directory events
-            - **case_sensitive** (bool): Whether patterns are case sensitive
-            - **callback** (callable): Function to call with the detected event
-
-            ### Notes
-
-            - The patterns use glob syntax and are matched against the full
-                path, so a directory is excluded as ```*/__pycache__/*```
-
-            """
             super().__init__(
                 patterns=patterns, ignore_patterns=ignore_patterns, ignore_directories=ignore_directories, case_sensitive=case_sensitive
             )
@@ -150,22 +143,19 @@ except ImportError:
         This class provides a placeholder implementation that raises an error
         when instantiated, indicating that the watchdog library is missing.
 
+        ### Raises
+
+        - **TokeoPdocError**: Always raised to indicate watchdog is missing
+
         ### Notes
 
         : Used when the watchdog package is not installed
 
         : Raises an error to indicate watchdog is required for file monitoring
+
         """
 
         def __init__(self, patterns=None, ignore_patterns=None, ignore_directories=True, case_sensitive=False, callback=None):
-            """
-            Raise an error indicating watchdog is not available.
-
-            ### Raises
-
-            - **TokeoPdocError**: Always raised to indicate watchdog is missing
-
-            """
             raise TokeoPdocError('Watchdog library is missing to observe file changes')
 
         def on_any_event(self, event):

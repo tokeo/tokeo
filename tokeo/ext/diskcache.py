@@ -147,6 +147,13 @@ class TokeoDiskCacheLocksHandler:
     All operations are distributed and work across multiple processes,
     making them suitable for web applications and microservices.
 
+    ### Args
+
+    - **app** (Application): The Cement application instance
+    - **cache** (diskcache.Cache): The diskcache.Cache instance to use
+    - **tag** (str): Tag to identify locks in the cache
+    - **key_prefix** (str): Prefix for lock keys
+
     ### Attributes
 
     - **app** (Application): The Cement application instance
@@ -154,17 +161,6 @@ class TokeoDiskCacheLocksHandler:
     """
 
     def __init__(self, app, cache, tag, key_prefix):
-        """
-        Initialize the locks handler.
-
-        ### Args
-
-        - **app** (Application): The Cement application instance
-        - **cache** (diskcache.Cache): The diskcache.Cache instance to use
-        - **tag** (str): Tag to identify locks in the cache
-        - **key_prefix** (str): Prefix for lock keys
-
-        """
         self.app = app
         self._cache = cache
         self._tag = tag

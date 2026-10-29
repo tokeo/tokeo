@@ -84,6 +84,15 @@ class TokeoPocketBaseHandler(MetaMixin):
     collections. For anything outside that surface, collection() hands
     back the raw SDK collection object.
 
+    ### Args
+
+    - **app**: The Tokeo application instance
+    - **args**: Variable length argument list passed to parent initializer
+
+    ### Keyword Args
+
+    - **kw**: Arbitrary keyword arguments passed to parent initializer
+
     ### Notes
 
     : The handler is registered as 'db' and is reached through app.db. It
@@ -96,6 +105,10 @@ class TokeoPocketBaseHandler(MetaMixin):
         application level - user records via plain CRUD on the auth
         collection, login/token flows via collection().auth_with_password()
         and friends. There is intentionally no handler-level login.
+
+    : This constructor only stores the application reference. The actual
+        PocketBase client initialization is deferred until the _setup method
+        is called by the framework to ensure proper configuration loading.
 
     """
 
@@ -143,28 +156,6 @@ class TokeoPocketBaseHandler(MetaMixin):
         )
 
     def __init__(self, app, *args, **kw):
-        """
-        Initialize the PocketBase handler.
-
-        Sets up the handler and prepares it for use with the Tokeo application.
-        The actual PocketBase client initialization happens in the _setup method.
-
-        ### Args
-
-        - **app**: The Tokeo application instance
-        - **args**: Variable length argument list passed to parent initializer
-
-        ### Keyword Args
-
-        - **kw**: Arbitrary keyword arguments passed to parent initializer
-
-        ### Notes
-
-        : This constructor only stores the application reference. The actual
-            PocketBase client initialization is deferred until the _setup method
-            is called by the framework to ensure proper configuration loading.
-
-        """
         super(TokeoPocketBaseHandler, self).__init__(*args, **kw)
         self.app = app
 

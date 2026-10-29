@@ -118,6 +118,14 @@ class MessageSpooler:
     descriptor, the writable handle, the file path and the line ending of
     the last written chunk (used for the final chomp).
 
+    ### Args
+
+    - **dir** (str, optional): Directory of the spool file, None for the
+        temp directory of the system
+    - **prefix** (str, optional): Start of the name of the spool file
+    - **debug** (bool, optional): Keep the spool file on disk when it is
+        unlinked. Defaults to False.
+
     """
 
     __slots__ = ('fd', 'file', 'path', 'last_line_break', 'debug')

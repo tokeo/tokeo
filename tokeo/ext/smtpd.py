@@ -109,6 +109,12 @@ class TokeoSmtpdEvents(SmtpdEvents):
     (config, log, dramatiq, caches, ...) from any event via ```self.app```.
     The configured ```events_handler``` of a service subclasses this.
 
+    ### Args
+
+    - **app** (Application): The Cement application instance
+    - **options** (dict, optional): The service's ```options``` block, handed
+        through unevaluated by the extension for the handler to read
+
     """
 
     def __init__(self, app, options=None):
@@ -243,6 +249,13 @@ class SharedGlobalLimits(GlobalLimits):
     the same shared-memory counters and the caps are exact machine-wide for
     the invocation.
 
+    ### Args
+
+    - **max_processings** (int|None): global concurrent-processing cap
+        (None/0 = unlimited)
+    - **max_connections** (int|None): global open-connection cap
+        (None/0 = unlimited)
+
     ### Notes
 
     : The wake event stays per process (an event cannot cross a fork), so
@@ -304,6 +317,15 @@ class TokeoSmtpd(MetaMixin):
     Reads the ```smtpd``` config section, builds one ```SmtpdServer``` per
     service and runs the process topology of one invocation (see the module
     notes). Available as ```app.smtpd```.
+
+    ### Args
+
+    - **app** (Application): The Cement application instance
+    - **args**: Variable length argument list passed to parent initializer
+
+    ### Keyword Args
+
+    - **kw**: Arbitrary keyword arguments passed to parent initializer
 
     """
 

@@ -35,7 +35,11 @@ When writing docstrings in this project, follow these Markdown formatting conven
    - ```### Reminders```: warnings and important conditions as admonition blocks
    - ```### References```: list with links or external content
    - ```### Output```: side effects (e.g., logging)
-6. The docstring of a class has ```### Attributes``` in addition, see Attributes.
+6. The docstring of a class documents its constructor: the parameters of
+   ```__init__``` go under ```### Args``` (and ```### Keyword Args```) of the
+   class, followed by ```### Attributes```, see Attributes. ```__init__``` has
+   no docstring of its own. The order in a class: Args, Keyword Args,
+   Attributes, Raises, Example, Notes, Reminders, References.
 7. Other section names are not used: no ```### Usage``` (use ```### Example```),
    no ```### See Also``` (use ```### References```) and no ```### Methods```,
    since pdoc lists the methods itself.

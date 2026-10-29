@@ -34,6 +34,11 @@ class TokeoDramatiqQueues:
     All methods return plain dicts or lists of dicts. Without names they work
     on all queues of the actors of the app.
 
+    ### Args
+
+    - **dramatiq** (TokeoDramatiq): The dramatiq extension of the app,
+        ```app.dramatiq```
+
     ### Notes
 
     : One connection to rabbitmq is opened on first use and kept for the

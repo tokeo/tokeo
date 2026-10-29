@@ -69,12 +69,23 @@ try:
         events detected by watchdog. When file changes are detected that match
         the configured patterns, it triggers the reload callback.
 
+        ### Args
+
+        - **patterns** (list): List of file patterns to watch for changes
+        - **ignore_patterns** (list): List of file patterns to ignore
+        - **ignore_directories** (bool): Whether to ignore directory events
+        - **case_sensitive** (bool): Whether patterns are case sensitive
+        - **callback** (callable): Function to call when changes are detected
+
         ### Notes
 
         - Used for hot-reloading functionality during development
         - Monitors file changes based on configured patterns
         - Calls the provided callback function when changes are detected
         - Only available when the watchdog package is installed
+        - The patterns use glob syntax (e.g., *.py for all Python files)
+        - The callback will be invoked without arguments whenever a matching
+            file system event is detected
 
         """
 
@@ -82,25 +93,6 @@ try:
         WATCH_EVENTS = frozenset({'created', 'deleted', 'modified', 'moved'})
 
         def __init__(self, patterns=None, ignore_patterns=None, ignore_directories=False, case_sensitive=False, callback=None):
-            """
-            Initialize the watchdog event handler.
-
-            ### Args
-
-            - **patterns** (list): List of file patterns to watch for changes
-            - **ignore_patterns** (list): List of file patterns to ignore
-            - **ignore_directories** (bool): Whether to ignore directory events
-            - **case_sensitive** (bool): Whether patterns are case sensitive
-            - **callback** (callable): Function to call when changes are detected
-
-            ### Notes
-
-            : The patterns use glob syntax (e.g., *.py for all Python files)
-
-            : The callback will be invoked without arguments whenever a matching
-                file system event is detected
-
-            """
             super().__init__(
                 patterns=patterns, ignore_patterns=ignore_patterns, ignore_directories=ignore_directories, case_sensitive=case_sensitive
             )
@@ -133,30 +125,27 @@ except ImportError:
         This class provides a placeholder implementation that raises an error
         when instantiated, indicating that the watchdog library is missing.
 
+        ### Args
+
+        - **patterns** (list): List of file patterns to watch for changes
+        - **ignore_patterns** (list): List of file patterns to ignore
+        - **ignore_directories** (bool): Whether to ignore directory events
+        - **case_sensitive** (bool): Whether patterns are case sensitive
+        - **callback** (callable): Function to call when changes are detected
+
+        ### Raises
+
+        - **TokeoNiceguiError**: Always raised to indicate watchdog is missing
+
         ### Notes
 
         : Used when the watchdog package is not installed
 
         : Raises an error to indicate watchdog is required for file monitoring
+
         """
 
         def __init__(self, patterns=None, ignore_patterns=None, ignore_directories=True, case_sensitive=False, callback=None):
-            """
-            Raise an error indicating watchdog is not available.
-
-            ### Args
-
-            - **patterns** (list): List of file patterns to watch for changes
-            - **ignore_patterns** (list): List of file patterns to ignore
-            - **ignore_directories** (bool): Whether to ignore directory events
-            - **case_sensitive** (bool): Whether patterns are case sensitive
-            - **callback** (callable): Function to call when changes are detected
-
-            ### Raises
-
-            - **TokeoNiceguiError**: Always raised to indicate watchdog is missing
-
-            """
             raise TokeoNiceguiError('Watchdog library is missing to observe file changes')
 
         def on_any_event(self, event):

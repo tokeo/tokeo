@@ -44,24 +44,20 @@ class DecoratedFunction:
     allowing extraction of decorator information and updating function docstrings
     with decorator-specific documentation.
 
+    ### Args
+
+    - **app** (object): The application instance
+    - **func** (object): The function object to analyze
+    - **update_func_docstring** (bool, optional): Whether to update the
+        function's docstring with decorator docs. Defaults to True.
+    - **prepend_docstrings** (str, optional): Text to prepend to each
+        decorator's docstring
+    - **append_docstrings** (str, optional): Text to append to each
+        decorator's docstring
+
     """
 
     def __init__(self, app, func, update_func_docstring=True, prepend_docstrings=None, append_docstrings=None):
-        """
-        Initialize a DecoratedFunction instance.
-
-        ### Args
-
-        - **app** (object): The application instance
-        - **func** (object): The function object to analyze
-        - **update_func_docstring** (bool, optional): Whether to update the
-            function's docstring with decorator docs. Defaults to True.
-        - **prepend_docstrings** (str, optional): Text to prepend to each
-            decorator's docstring
-        - **append_docstrings** (str, optional): Text to append to each
-            decorator's docstring
-
-        """
         self.app = app
         self.func = func
         self.decorators = []
