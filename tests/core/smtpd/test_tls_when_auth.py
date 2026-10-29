@@ -41,7 +41,7 @@ def _ehlo_auth_and_authcmd(settings):
 
 
 def test_when_auth_on_plain_hides_auth_but_offers_starttls():
-    """On plaintext AUTH is hidden and refused by 530, STARTTLS offered."""
+    """On plaintext AUTH is hidden and refused by 538, STARTTLS offered."""
     advertised, starttls, reply = _ehlo_auth_and_authcmd(
         {
             'auth_mode': 'AUTH_OPTIONAL',
@@ -50,7 +50,7 @@ def test_when_auth_on_plain_hides_auth_but_offers_starttls():
     )
     assert advertised is False
     assert starttls is True  # the upgrade path is advertised
-    assert reply.startswith('530')  # ... and plaintext AUTH is refused
+    assert reply.startswith('538')  # ... and plaintext AUTH is refused
 
 
 def test_when_auth_after_starttls_offers_and_accepts_auth():

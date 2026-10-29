@@ -16,7 +16,7 @@ import base64
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, CMD_RSET, CMD_QUIT, SmtpdSession
-from tokeo.core.smtpd.exc import Smtpd503Exception, Smtpd535Exception
+from tokeo.core.smtpd.exc import Smtpd535Exception
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_tests_helper import run_line
 
@@ -71,16 +71,15 @@ def shared():
 def test_10_ehlo(shared):
     """EHLO lists the extensions with AUTH and STARTTLS and stores the name."""
     result = shared.line('EHLO Process line unit test')
-    assert result == (
-        '250-Process line test - Greeting\r\n' '250-8BITMIME\r\n250-SMTPUTF8\r\n' '250-AUTH LOGIN PLAIN\r\n250-STARTTLS\r\n250 OK'
-    )
+    assert result == ('250-Process line test - Greeting\r\n' '250-8BITMIME\r\n250-SMTPUTF8\r\n' '250-AUTH LOGIN PLAIN\r\n250 STARTTLS')
     assert shared.session.ctx.server.helo == 'Process line unit test'
 
 
-def test_11_ehlo_bad_sequence(shared):
-    """A second EHLO raises 503."""
-    with pytest.raises(Smtpd503Exception):
-        shared.line('EHLO Process line unit test')
+def test_11_ehlo_again_resets_like_rset(shared):
+    """A second EHLO answers again, resets like RSET and keeps the name."""
+    result = shared.line('EHLO Process line unit test')
+    assert result.endswith('250 STARTTLS')
+    assert shared.session.ctx.server.helo == 'Process line unit test'
 
 
 def test_20_auth_login_simulate_fail(shared):

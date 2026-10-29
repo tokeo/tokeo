@@ -97,3 +97,34 @@ def test_io_buffer_max_size_must_be_a_positive_integer(value):
     """io_buffer_max_size refuses anything but a positive integer."""
     with pytest.raises(ValueError, match='io_buffer_max_size'):
         SmtpdServer(SmtpdEvents(), {'io_buffer_max_size': value})
+
+
+def test_a_host_name_resolves_to_its_addresses():
+    """A host name resolves by DNS to its addresses, each once."""
+    ips = _resolve_host('localhost')
+    assert '127.0.0.1' in ips
+    assert len(ips) == len(set(ips))
+
+
+def test_wildcard_names_survive_a_failing_lookup_of_the_local_host(monkeypatch):
+    """A failing lookup of the local host keeps the other certificate names."""
+
+    def fail(*args, **kwargs):
+        raise OSError('no lookup')
+
+    monkeypatch.setattr(socket, 'getaddrinfo', fail)
+    cn, sans = _tls_cert_names(None, None, ['*'], [('0.0.0.0', 2525)])
+    assert cn == 'localhost.local'
+    assert {'localhost', '127.0.0.1', '::1'} <= set(sans)
+
+
+def test_reverse_lookup_gives_none_without_an_ip_or_a_name(monkeypatch):
+    """The reverse lookup gives None for an empty ip and an ip without name."""
+    srv = SmtpdServer(SmtpdEvents())
+
+    def unknown(ip):
+        raise socket.herror('unknown host')
+
+    monkeypatch.setattr(socket, 'gethostbyaddr', unknown)
+    assert asyncio.run(srv._reverse_lookup('')) is None
+    assert asyncio.run(srv._reverse_lookup('192.0.2.1')) is None

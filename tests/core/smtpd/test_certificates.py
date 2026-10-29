@@ -305,3 +305,21 @@ def test_generated_test_certificate_has_an_ec_p256_key():
     pem = next(msg for msg in lines if msg.startswith('SSL: generated test certificate')).split('\n', 1)[1]
     key = x509.load_pem_x509_certificate(pem.encode()).public_key()
     assert isinstance(key, ec.EllipticCurvePublicKey) and key.curve.name == 'secp256r1'
+
+
+def test_missing_certificate_or_key_file_stops_the_setup(certs, tmp_path):
+    """A certificate or key path without a file raises FileNotFoundError."""
+    with pytest.raises(FileNotFoundError, match='certificate'):
+        TlsTransport(cert_path=str(tmp_path / 'missing.pem'))
+    with pytest.raises(FileNotFoundError, match='private key'):
+        TlsTransport(cert_path=certs['simple_cert'], key_path=str(tmp_path / 'missing.key'))
+
+
+def test_a_failing_logger_does_not_break_the_setup():
+    """A logger that raises is ignored, the self-signed certificate still loads."""
+
+    def broken(severity, msg):
+        raise RuntimeError('logger down')
+
+    tls = TlsTransport(cert_cn='localhost', logger=broken)
+    assert tls.context is not None

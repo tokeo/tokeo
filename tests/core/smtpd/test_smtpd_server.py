@@ -53,7 +53,8 @@ def test_full_delivery_and_events():
         ],
     )
     assert greeting[0].startswith('220')
-    assert r[0][0].startswith('250-') and r[0][-1] == '250 OK'
+    # an EHLO without extensions is a single line (RFC 5321 4.1.1.1)
+    assert len(r[0]) == 1 and r[0][0].startswith('250 ')
     assert r[1] == ['250 OK'] and r[2] == ['250 OK']
     assert r[3][0].startswith('354')
     assert r[4][0].startswith('250')
@@ -77,7 +78,7 @@ def test_ehlo_advertises_extensions_when_enabled():
     _, r = dialog(RecordingEvents(), settings, [b'EHLO me\r\n'])
     text = '\n'.join(r[0])
     assert '8BITMIME' in text and 'SMTPUTF8' in text and 'PIPELINING' in text
-    assert r[0][-1] == '250 OK'
+    assert r[0][-1] == '250 PIPELINING'
 
 
 # ---- reference-faithful behaviour -------------------------------------------
@@ -332,6 +333,12 @@ def test_crlf_strict_rejects_bare_lf():
     assert r[0][0].startswith('500')
 
 
+def test_crlf_strict_rejects_a_cr_within_a_command():
+    """CRLF_STRICT answers a command with a further CR by 500."""
+    _, r = dialog(RecordingEvents(), {'crlf_mode': 'CRLF_STRICT'}, [b'EHLO me\r\n', b'NOOP a\rb\r\n'])
+    assert r[1][0].startswith('500')
+
+
 DATA_ENVELOPE = [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n']
 
 
@@ -502,6 +509,36 @@ def test_read_line_times_out_on_partial_buffered_line():
     asyncio.run(go())
 
 
+def test_read_line_ends_a_session_past_its_deadline():
+    """A read past io_session_timeout raises at once, also on a buffered line."""
+    from tokeo.core.smtpd.exc import SmtpdIOSessionTimeoutException
+    from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
+
+    async def go():
+        srv = SmtpdServer(CaptureSmtpdEvents())
+        reader = asyncio.StreamReader()
+        reader.feed_data(b'NOOP\r\n')
+        with pytest.raises(SmtpdIOSessionTimeoutException):
+            await srv._read_line(reader, srv.io_cmd_timeout, time.monotonic() - 1)
+
+    asyncio.run(go())
+
+
+def test_read_line_refuses_a_buffered_line_over_io_buffer_max_size():
+    """A buffered line over io_buffer_max_size is refused by any reader."""
+    from tokeo.core.smtpd.exc import SmtpdIOBufferOverrunException
+    from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
+
+    async def go():
+        srv = SmtpdServer(CaptureSmtpdEvents(), settings={'io_buffer_max_size': 50})
+        reader = asyncio.StreamReader()
+        reader.feed_data(b'NOOP ' + b'x' * 100 + b'\r\n')
+        with pytest.raises(SmtpdIOBufferOverrunException):
+            await srv._read_line(reader, srv.io_cmd_timeout, time.monotonic() + srv.io_session_timeout)
+
+    asyncio.run(go())
+
+
 # ---- internationalization ---------------------------------------------------
 
 
@@ -634,6 +671,31 @@ def test_max_connections_refuses_with_421():
 
     async def go():
         server, port, task = await start_server(RecordingEvents(), {'max_connections': 1, 'max_processings': 1})
+        try:
+            r1, w1 = await asyncio.open_connection('127.0.0.1', port)
+            b1 = await read_reply(r1)
+            r2, w2 = await asyncio.open_connection('127.0.0.1', port)
+            b2 = await read_reply(r2)
+            w1.close()
+            w2.close()
+            return b1, b2
+        finally:
+            await stop_server(server, task)
+
+    b1, b2 = asyncio.run(go())
+    assert b1[0].startswith('220')
+    assert b2[0].startswith('421')
+
+
+def test_global_max_connections_refuses_with_421():
+    """A connection over the max_connections of the global limits gets 421."""
+    from tokeo.core.smtpd.server import GlobalLimits
+
+    async def go():
+        srv = SmtpdServer(RecordingEvents(), settings={}, global_limits=GlobalLimits(max_connections=1))
+        server = await asyncio.start_server(srv._on_connection, '127.0.0.1', 0)
+        port = server.sockets[0].getsockname()[1]
+        task = asyncio.create_task(server.serve_forever())
         try:
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
             b1 = await read_reply(r1)
@@ -857,7 +919,7 @@ def test_proxy_tcp4_fills_ctx_and_fires_event():
 
     replies = asyncio.run(go())
     assert replies[0][0].startswith('220')
-    assert replies[1][-1] == '250 OK'
+    assert replies[1][-1].startswith('250 ')
     assert ev.proxy_seen is not None
     assert ev.proxy_seen['proto'] == 'TCP4'
     assert ev.proxy_seen['source_ip'] == '1.2.3.4' and ev.proxy_seen['source_port'] == 1111
@@ -880,7 +942,7 @@ def test_proxy_unknown_is_accepted():
 
     _, replies, _ = asyncio.run(go())
     assert replies[0][0].startswith('220')
-    assert replies[1][-1] == '250 OK'
+    assert replies[1][-1].startswith('250 ')
     assert ev.proxy_seen['proto'] == 'UNKNOWN' and ev.proxy_seen['source_ip'] is None
 
 
@@ -1222,6 +1284,27 @@ def test_lifecycle_state_flags():
     assert serving is False
     assert req_before is False and req_after is True
     assert after is True
+
+
+def test_serve_blocks_until_stop_and_join_returns_then():
+    """serve() serves until stop(), join() returns once all is stopped."""
+
+    async def go():
+        srv = SmtpdServer(RecordingEvents(), settings={})
+        task = asyncio.create_task(srv.serve([{'host': '127.0.0.1', 'port': 0}]))
+        await wait_until_async(lambda: srv._servers)
+        port = srv._servers[0].sockets[0].getsockname()[1]
+        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        greeting = await read_reply(reader)
+        writer.close()
+        await srv.stop(wait_seconds_before_close=0.1)
+        await asyncio.wait_for(srv.join(poll_seconds=0.01), 2)
+        await asyncio.wait_for(task, 2)
+        return greeting, srv.stopped()
+
+    greeting, stopped = asyncio.run(go())
+    assert greeting[0].startswith('220')
+    assert stopped is True
 
 
 # ---- AUTH (PLAIN / LOGIN) -----------------------------------------------------
@@ -1805,4 +1888,4 @@ def test_starttls_flushes_injected_plaintext():
     tls_reply, ehlo = asyncio.run(go())
     assert tls_reply[0] == '220 Ready to start TLS'
     # the injected QUIT was flushed: the session is alive and EHLO works
-    assert ehlo[-1] == '250 OK'
+    assert ehlo[-1].startswith('250 ')

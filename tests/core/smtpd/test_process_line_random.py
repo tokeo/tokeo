@@ -29,10 +29,10 @@ def _session():
 
 
 def test_helo():
-    """HELO answers "250 OK" with the greeting and stores the name."""
+    """HELO answers 250 with the greeting and stores the name."""
     session = _session()
     result = run_line(_SMTPD, session, 'HELO Process line unit test')
-    assert result == '250 OK Process line test - Greeting'
+    assert result == '250 Process line test - Greeting'
     assert session.ctx.server.helo == 'Process line unit test'
 
 
@@ -41,7 +41,7 @@ def test_helo_no_case_strip():
     session = _session()
     helo_str = '  Process line unit test   '
     result = run_line(_SMTPD, session, f'hElO {helo_str}')
-    assert result == '250 OK Process line test - Greeting'
+    assert result == '250 Process line test - Greeting'
     assert session.ctx.server.helo == helo_str.strip()
 
 
@@ -50,7 +50,5 @@ def test_ehlo_no_case_strip():
     session = _session()
     helo_str = '  Process line unit test   '
     result = run_line(_SMTPD, session, f'eHlO {helo_str}')
-    assert result == (
-        '250-Process line test - Greeting\r\n' '250-8BITMIME\r\n250-SMTPUTF8\r\n250-PIPELINING\r\n' '250-AUTH LOGIN PLAIN\r\n250 OK'
-    )
+    assert result == ('250-Process line test - Greeting\r\n' '250-8BITMIME\r\n250-SMTPUTF8\r\n250-PIPELINING\r\n' '250 AUTH LOGIN PLAIN')
     assert session.ctx.server.helo == helo_str.strip()

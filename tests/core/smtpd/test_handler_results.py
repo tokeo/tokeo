@@ -67,9 +67,9 @@ def test_none_responses_are_empty_texts():
     """A None helo_response or local_response is answered as an empty text."""
     greeting, r = dialog(NoResponseEvents(), {}, [b'HELO a\r\n', b'RSET\r\n', b'QUIT\r\n'])
     assert greeting == ['220 ']
-    assert r[0] == ['250 OK']
+    assert r[0] == ['250']
     greeting, r = dialog(NoResponseEvents(), {}, [b'EHLO a\r\n'])
-    assert r[0] == ['250-', '250 OK']
+    assert r[0] == ['250 ']
 
 
 class ProxyEvents(SmtpdEvents):

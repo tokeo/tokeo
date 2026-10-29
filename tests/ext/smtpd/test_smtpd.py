@@ -220,6 +220,44 @@ def test_build_server_leaves_out_logger_severity():
     assert server.events_handler._logger_protected is app.log
 
 
+def test_services_need_a_configured_service():
+    """Without a configured service the services raise TokeoSmtpdError."""
+    with SmtpdTest() as app:
+        with pytest.raises(TokeoSmtpdError, match='no services configured'):
+            app.smtpd.services()
+
+
+def test_services_pick_the_named_ones_in_their_order():
+    """Named services come back in the order of the names."""
+    config = dict(smtpd=dict(services=[_service('mx-a', 2525), _service('mx-b', 2526)]))
+    with SmtpdTest(config_defaults=config) as app:
+        assert [svc['name'] for svc in app.smtpd.services(['mx-b', 'mx-a'])] == ['mx-b', 'mx-a']
+
+
+@pytest.mark.parametrize(
+    'argv, reason',
+    [
+        (['smtpd', 'serve'], 'give service names or --all$'),
+        (['smtpd', 'serve', 'mx-a', '--all'], 'not both'),
+    ],
+    ids=['none', 'both'],
+)
+def test_serve_command_needs_names_or_all(argv, reason):
+    """The serve command takes service names or --all, exactly one of both."""
+    config = dict(smtpd=dict(services=[_service('mx-a', 2525)]))
+    with SmtpdTest(argv=argv, config_defaults=config) as app:
+        with pytest.raises(TokeoSmtpdError, match=reason):
+            app.run()
+
+
+def test_list_command_prints_the_services(capsys):
+    """The list command prints the configured services."""
+    config = dict(smtpd=dict(services=[_service('mx-a', 2525)]))
+    with SmtpdTest(argv=['smtpd', 'list'], config_defaults=config) as app:
+        app.run()
+    assert 'mx-a' in capsys.readouterr().out
+
+
 # ---- process tests: real termination behaviour ---------------------------------
 
 
@@ -324,6 +362,20 @@ def test_term_single_service_in_main_process(tmp_path):
         assert proc.wait(timeout=8) == 0
         assert wait_process_group_ended(proc.pid)
         _assert_port_free(port)
+    finally:
+        proc.kill()
+
+
+def test_term_single_service_with_global_limits(tmp_path):
+    """A single service with global limits serves unforked and ends by SIGTERM."""
+    port = _free_port()
+    proc = _spawn(tmp_path, {'max_processings': 2, 'services': [_service('mx1', port)]}, names=None)
+    try:
+        _wait_banner(proc, port)
+        _ehlo_ok(port)
+        proc.send_signal(signal.SIGTERM)
+        assert proc.wait(timeout=8) == 0
+        assert wait_process_group_ended(proc.pid)
     finally:
         proc.kill()
 

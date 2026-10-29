@@ -58,6 +58,17 @@ def test_set_pdeathsig_is_noop_off_linux(monkeypatch):
     assert _set_pdeathsig(signal.SIGTERM) is False
 
 
+def test_set_pdeathsig_returns_false_without_prctl(monkeypatch):
+    """A libc without a usable prctl makes _set_pdeathsig return False."""
+    monkeypatch.setattr(sys, 'platform', 'linux')
+
+    def no_libc(*args, **kwargs):
+        raise OSError('no libc')
+
+    monkeypatch.setattr(ctypes, 'CDLL', no_libc)
+    assert _set_pdeathsig(signal.SIGTERM) is False
+
+
 # --------------------------------------------------------------------------
 # Linux-specialised: PR_SET_PDEATHSIG
 # --------------------------------------------------------------------------

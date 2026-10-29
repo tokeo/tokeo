@@ -313,3 +313,14 @@ def test_generated_test_certificate_is_logged_as_pem():
     pem = [msg for severity, msg in lines if msg.startswith('SSL: generated test certificate\n')]
     assert pem and '-----BEGIN CERTIFICATE-----' in pem[0]
     assert all(severity is Severity.DEBUG for severity, _ in lines)
+
+
+def test_a_handler_without_on_logging_event_logs_nothing():
+    """A handler without on_logging_event gets no entry, logging is skipped."""
+
+    class Bare:
+        pass
+
+    server = SmtpdServer(Bare())
+    assert SmtpdEvent.ON_LOGGING_EVENT not in server.emit_events
+    server.logger.warning('nobody listens')

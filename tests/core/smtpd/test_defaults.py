@@ -183,3 +183,28 @@ def test_defaults_pipelining_extension():
 def test_defaults_internationalization_extensions():
     """internationalization_extensions defaults to False."""
     assert _smtpd().internationalization_extensions is False
+
+
+@pytest.mark.parametrize(
+    'settings, name',
+    [
+        ({'max_processings': 0}, 'max_processings'),
+        ({'max_processings': '4'}, 'max_processings'),
+        ({'max_connections': 0}, 'max_connections'),
+        ({'max_connections': 2, 'max_processings': 4}, 'max_connections'),
+    ],
+)
+def test_limits_that_do_not_fit_are_rejected(settings, name):
+    """A limit that is no positive integer, or too low, stops the setup."""
+    with pytest.raises(ValueError, match=name):
+        _smtpd(settings=settings)
+
+
+def test_keyword_style_settings_merge_into_the_settings():
+    """Keyword settings apply, tls_mode sets encrypt_mode, the settings win."""
+    smtpd = _smtpd(
+        settings={'io_cmd_timeout': 20}, io_cmd_timeout=10, io_session_timeout=60, tls_mode='TLS_OPTIONAL', tls_cert_cn='localhost'
+    )
+    assert smtpd.encrypt_mode is EncryptMode.TLS_OPTIONAL
+    assert smtpd.io_cmd_timeout == 20
+    assert smtpd.io_session_timeout == 60
