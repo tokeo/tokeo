@@ -48,9 +48,9 @@ class TokeoNiceguiError(TokeoError):
     ### Notes
 
     - Used for NiceGUI-specific error conditions like configuration issues,
-      file watching problems, or missing dependencies
+        file watching problems, or missing dependencies
     - Inherits from the base TokeoError class to maintain error handling
-      consistency across the framework
+        consistency across the framework
 
     """
 
@@ -98,7 +98,7 @@ try:
             - The patterns use glob syntax (e.g., *.py for all Python files)
 
             - The callback will be invoked without arguments whenever a matching
-              file system event is detected
+                file system event is detected
 
             """
             super().__init__(
@@ -248,9 +248,9 @@ class NiceguiElementHelper:
         ### Notes
 
         - The returned function creates either an Element or a TextElement
-          depending on whether text content is provided
+            depending on whether text content is provided
         - Usage example: app.nicegui.ux.article("My content") creates
-          a <article> element
+            a <article> element
 
         """
 
@@ -278,7 +278,7 @@ class TokeoNicegui(MetaMixin):
     ### Notes
 
     - Provides direct access to NiceGUI components via ```ui``` and
-      ```fastapi_app``` attributes
+        ```fastapi_app``` attributes
     - Manages file monitoring for hot-reloading during development
     - Handles application configuration and startup/shutdown lifecycle
     - Exposes a custom element helper ```ux``` for creating arbitrary HTML elements
@@ -454,7 +454,7 @@ class TokeoNicegui(MetaMixin):
 
         - Runs on the watchdog observer thread
         - Stores the time of the change so ```_watchdog_file_changes``` can wait
-          for the burst to finish before restarting
+            for the burst to finish before restarting
 
         """
         self._watchdog_hotload_requested = True
@@ -469,7 +469,7 @@ class TokeoNicegui(MetaMixin):
         - Runs as an asynchronous task in the FastAPI event loop
         - Checks the flag every ```hotload_interval``` seconds
         - Waits for ```hotload_settle``` seconds of quiet, so a burst of writes
-          collapses into a single restart
+            collapses into a single restart
         - Triggers FastAPI shutdown, which restarts the app through the hooks
 
         """
@@ -813,7 +813,7 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
     ### Notes
 
     - Handles FastAPI route decorators (@app.nicegui.fastapi_app.get,
-      @app.nicegui.fastapi_app.post)
+        @app.nicegui.fastapi_app.post)
     - Handles NiceGUI page decorators (@app.nicegui.ui.page, @ui.page)
     - Extracts parameters values for better documentation
 
@@ -856,7 +856,7 @@ def tokeo_nicegui_extend_app(app):
 
     - This function is called during application setup
     - It creates the TokeoNicegui instance and attaches it to the app
-      as app.nicegui
+        as app.nicegui
 
     """
     app.extend('nicegui', TokeoNicegui(app))

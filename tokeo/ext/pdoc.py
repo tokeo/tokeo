@@ -115,7 +115,7 @@ try:
             ### Notes
 
             - The patterns use glob syntax and are matched against the full
-              path, so a directory is excluded as ```*/__pycache__/*```
+                path, so a directory is excluded as ```*/__pycache__/*```
 
             """
             super().__init__(
@@ -1563,9 +1563,9 @@ class TokeoPdoc(Handler):
         ### Notes
 
         - Performs a full process replacement, so caches, ```sys.modules``` and
-          the observer all start from scratch
+            the observer all start from scratch
         - The listening socket does not survive the replacement: Python marks
-          sockets non-inheritable, so the new process rebinds cleanly
+            sockets non-inheritable, so the new process rebinds cleanly
         - No-op unless the watch loop asked for it
 
         """

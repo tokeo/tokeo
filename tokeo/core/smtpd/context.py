@@ -10,15 +10,15 @@ the Ruby code assigns into the hash.
 ### Notes
 
 : Conventions kept: string fields default to ```''```; ```proxy``` and
-  ```message.spooler``` are ```None```; ```received```/```delivered```/
-  ```bytesize``` start at ```-1```; ```encrypted```/```authenticated```
-  are a single field each -- empty while off, a UTC timestamp once on;
-  ```headers``` flips from ```False``` to ```True```; ```data``` is the
-  raw message and is appended to directly
+    ```message.spooler``` are ```None```; ```received```/```delivered```/
+    ```bytesize``` start at ```-1```; ```encrypted```/```authenticated```
+    are a single field each -- empty while off, a UTC timestamp once on;
+    ```headers``` flips from ```False``` to ```True```; ```data``` is the
+    raw message and is appended to directly
 : Python keyword clash: the Ruby ```ctx[:envelope][:from]``` / ```[:to]``` are
-  ```ctx.envelope.mail_from``` / ```ctx.envelope.rcpt_tos``` (```from``` and
-  ```to``` are reserved words); every other name is unchanged. The body is
-  ```bytes``` (not str) to stay byte-exact for signatures like DKIM.
+    ```ctx.envelope.mail_from``` / ```ctx.envelope.rcpt_tos``` (```from``` and
+    ```to``` are reserved words); every other name is unchanged. The body is
+    ```bytes``` (not str) to stay byte-exact for signatures like DKIM.
 
 """
 
@@ -91,8 +91,8 @@ class EnvelopeCtx:
     ### Notes
 
     : ```mail_from```/```rcpt_tos``` are the Ruby ```from```/```to```;
-      ```mail_from``` is ```''``` when empty, ```rcpt_tos``` accumulates
-      address by address
+        ```mail_from``` is ```''``` when empty, ```rcpt_tos``` accumulates
+        address by address
 
     """
 
@@ -189,10 +189,10 @@ class MessageSpooler:
         ### Notes
 
         : ```keep``` does not flush. Called before the message completed it
-          only relocates the still growing file -- the server keeps
-          writing through the open handle and flushes and closes it as
-          usual, so the content is complete only after
-          ```on_message_data_event```
+            only relocates the still growing file -- the server keeps
+            writing through the open handle and flushes and closes it as
+            usual, so the content is complete only after
+            ```on_message_data_event```
 
         """
         if self.path:
@@ -268,10 +268,10 @@ class SmtpdContext:
     ### Notes
 
     : One instance per connection; ```server``` lives for the whole connection,
-      ```envelope```/```message``` are replaced on RSET and after each
-      delivery
+        ```envelope```/```message``` are replaced on RSET and after each
+        delivery
     : ```id``` uniquely identifies the connection in logs and dumps and is
-      write-once -- a second assignment raises ```AttributeError```
+        write-once -- a second assignment raises ```AttributeError```
 
     """
 

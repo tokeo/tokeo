@@ -225,7 +225,7 @@ class DecoratedFunction:
         ### Notes
 
         : This method appends unique decorator docstrings to the function's
-          existing docstring, avoiding duplicates from the same decorator type.
+            existing docstring, avoiding duplicates from the same decorator type.
 
         """
         # do insert same decorator's docstring twice

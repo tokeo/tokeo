@@ -31,10 +31,10 @@ class App:
     ### Notes
 
     : Only regular attribute and method access is proxied. Item access
-      (app[...]) and implicitly invoked dunder methods (e.g. __enter__,
-      __exit__, __call__) are not forwarded, since python resolves those
-      on the type rather than through __getattr__. The proxy targets an
-      already running app, so its lifecycle is deliberately out of scope.
+        (app[...]) and implicitly invoked dunder methods (e.g. __enter__,
+        __exit__, __call__) are not forwarded, since python resolves those
+        on the type rather than through __getattr__. The proxy targets an
+        already running app, so its lifecycle is deliberately out of scope.
 
     """
 
@@ -96,7 +96,7 @@ def load(app_to_share):
     ### Notes
 
     : This function is called automatically by the Cement framework when
-      the appshare extension is loaded, making the app globally accessible.
+        the appshare extension is loaded, making the app globally accessible.
 
     """
     app._app = app_to_share

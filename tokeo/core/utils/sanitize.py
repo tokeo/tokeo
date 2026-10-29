@@ -94,8 +94,8 @@ def keyword_dict(d):
     ### Notes
 
     : Keys that are not already safe keywords are dropped on purpose, so the
-      result only ever contains keyword-safe keys; callers that need every
-      key preserved must sanitize the keys themselves before calling
+        result only ever contains keyword-safe keys; callers that need every
+        key preserved must sanitize the keys themselves before calling
 
     """
     if d is None:

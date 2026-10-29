@@ -41,7 +41,7 @@ def tokeo_dramatiq_pdoc_pre_render(app):
     ### Notes
 
     : This function replaces the complex Dramatiq actor decorator
-      with a simpler version that pdoc can handle
+        with a simpler version that pdoc can handle
 
     """
     from tokeo.core.utils.pdoc import pdoc_replace_decorator

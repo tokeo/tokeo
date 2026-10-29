@@ -213,15 +213,15 @@ class TokeoInvokeLocalContext(invoke.Context):
         ### Notes
 
         - env vars are exported into the shell verbatim, without
-          shell-quoting here. Escaping is delegated to the
-          task's sanitize setting; with sanitize enabled the values pass
-          through sanitize.keyword_dict(), otherwise they are exported as-is.
+            shell-quoting here. Escaping is delegated to the
+            task's sanitize setting; with sanitize enabled the values pass
+            through sanitize.keyword_dict(), otherwise they are exported as-is.
         - a sudo password (sudo.password) is injected reactively when the
-          configured prompt is seen in the last tail chars of stdout or
-          stderr: sudo.mode 'eq' matches the literal sudo.match, 'regex'
-          matches it as a pattern, 'env' sets a unique SUDO_PROMPT and matches
-          that. Injection happens at most once. If sudo is None the support
-          is disabled completely.
+            configured prompt is seen in the last tail chars of stdout or
+            stderr: sudo.mode 'eq' matches the literal sudo.match, 'regex'
+            matches it as a pattern, 'env' sets a unique SUDO_PROMPT and matches
+            that. Injection happens at most once. If sudo is None the support
+            is disabled completely.
 
         """
         # take care of kwargs
@@ -300,7 +300,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         ### Notes
 
         : Nothing connects here; _connect() opens the Paramiko session on the
-          first run().
+            first run().
 
         """
         super().__init__(config=config)
@@ -325,8 +325,8 @@ class TokeoInvokeRemoteContext(invoke.Context):
         ### Notes
 
         : Creates the Paramiko client on first use. With host_keys set,
-          unknown hosts are rejected (RejectPolicy); without, any host is
-          accepted (AutoAddPolicy).
+            unknown hosts are rejected (RejectPolicy); without, any host is
+            accepted (AutoAddPolicy).
 
         ### Reminders
 
@@ -386,15 +386,15 @@ class TokeoInvokeRemoteContext(invoke.Context):
         ### Notes
 
         - env vars are exported into the remote shell verbatim, without
-          shell-quoting here (unlike invoke). Escaping is delegated to the
-          task's sanitize setting; with sanitize enabled the values pass
-          through sanitize.keyword_dict(), otherwise they are exported as-is.
+            shell-quoting here (unlike invoke). Escaping is delegated to the
+            task's sanitize setting; with sanitize enabled the values pass
+            through sanitize.keyword_dict(), otherwise they are exported as-is.
         - a sudo password (sudo.password) is injected reactively when the
-          configured prompt is seen in the last tail chars of stdout or
-          stderr: sudo.mode 'eq' matches the literal sudo.match, 'regex'
-          matches it as a pattern, 'env' sets a unique SUDO_PROMPT and matches
-          that. Injection happens at most once. If sudo is None the support
-          is disabled completely.
+            configured prompt is seen in the last tail chars of stdout or
+            stderr: sudo.mode 'eq' matches the literal sudo.match, 'regex'
+            matches it as a pattern, 'env' sets a unique SUDO_PROMPT and matches
+            that. Injection happens at most once. If sudo is None the support
+            is disabled completely.
 
         """
         self._connect()
@@ -885,7 +885,7 @@ class TokeoAutomate(MetaMixin):
         ### Notes
 
         : Only specific fields can be overruled: id, name, host, port, user,
-          password, sudo, identity, host_key, shell and encoding.
+            password, sudo, identity, host_key, shell and encoding.
 
         """
         # use the counter also as running id
@@ -925,8 +925,8 @@ class TokeoAutomate(MetaMixin):
         ### Notes
 
         : Fields set in this dictionary will never be overwritten by later merges.
-          For example, if password should be set by connection, the password field
-          should not exist here.
+            For example, if password should be set by connection, the password field
+            should not exist here.
 
         """
         # use the counter also as running id
@@ -1613,12 +1613,12 @@ class TokeoAutomate(MetaMixin):
         ### Notes
 
         : Tasks can be specified in the format "task_id:host_id" to run a specific
-          task on a specific host.
+            task on a specific host.
 
         : Errors raised while preparing a task (e.g. unknown task id) are
-          logged and surfaced via the returned all_exited_code (and the
-          results entry when return_results is set); they do not propagate
-          to the caller.
+            logged and surfaced via the returned all_exited_code (and the
+            results entry when return_results is set); they do not propagate
+            to the caller.
 
         """
         # test tasks_ids
@@ -1761,13 +1761,13 @@ class TokeoAutomate(MetaMixin):
         ### Notes
 
         : Tasks can be specified in the format "task_id:host_id" to run a specific
-          task on a specific host. All tasks are submitted to the thread pool at
-          once, and results are collected as they complete.
+            task on a specific host. All tasks are submitted to the thread pool at
+            once, and results are collected as they complete.
 
         : Errors raised while preparing a task (e.g. unknown task id) are
-          logged and surfaced via the returned all_exited_code (and the
-          results entry when return_results is set); they do not propagate
-          to the caller.
+            logged and surfaced via the returned all_exited_code (and the
+            results entry when return_results is set); they do not propagate
+            to the caller.
 
         """
         # test tasks_ids

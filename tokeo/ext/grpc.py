@@ -195,10 +195,10 @@ class TokeoGrpc(MetaMixin):
                 tls_enabled is set or as a plain insecure port otherwise
 
         : TLS is fully opt-in. With tls_enabled false the server never imports
-          or calls any TLS code. With it true, a custom tls_certificate /
-          tls_key pair is used when both are given, otherwise an in-memory
-          self signed cert (valid for tls_valid_days) is generated and never
-          written to disk
+            or calls any TLS code. With it true, a custom tls_certificate /
+            tls_key pair is used when both are given, otherwise an in-memory
+            self signed cert (valid for tls_valid_days) is generated and never
+            written to disk
 
         """
         if self._server is None:
@@ -252,12 +252,12 @@ class TokeoGrpc(MetaMixin):
         ### Notes
 
         : The custom cert files (and the client ca, if any) are the only
-          things read from disk; the auto cert path keeps everything in
-          memory
+            things read from disk; the auto cert path keeps everything in
+            memory
 
         : mTLS is opt-in via tls_client_ca; tls_require_client_cert decides
-          whether a client cert is mandatory, otherwise validation is left
-          to the interceptors
+            whether a client cert is mandatory, otherwise validation is left
+            to the interceptors
 
         """
         cert = self._config('tls_certificate')
@@ -305,14 +305,14 @@ class TokeoGrpc(MetaMixin):
         ### Notes
 
         : The cryptography package is imported lazily here, so it stays out
-          of the non-tls and custom-cert code paths entirely
+            of the non-tls and custom-cert code paths entirely
 
         : The host from the url plus every tls_sans entry become SANs, each
-          added as an ip address when it parses as one, otherwise as a dns
-          name; client validation uses these SANs, not the CN
+            added as an ip address when it parses as one, otherwise as a dns
+            name; client validation uses these SANs, not the CN
 
         : tls_cn only sets the (cosmetic) subject common name; when unset the
-          url host is used
+            url host is used
 
         """
         # lazy import: cryptography is only needed for the auto cert path
@@ -413,7 +413,7 @@ class TokeoGrpc(MetaMixin):
         : Uses a grace period of 0 seconds for immediate shutdown
 
         : Called automatically when handling Ctrl+C in serve() method or
-          can be called directly to stop the server programmatically
+            can be called directly to stop the server programmatically
 
         """
         self.server.stop(0)

@@ -58,8 +58,8 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     ### Notes
 
     : The handler preserves nested dictionary structures during merges using
-      a deep merge algorithm, which allows for more complex configuration
-      structures than the standard Cement config handlers support.
+        a deep merge algorithm, which allows for more complex configuration
+        structures than the standard Cement config handlers support.
 
     ### Example
 
@@ -95,7 +95,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         ### Notes
 
         : This class defines metadata required by the Cement framework
-          for proper handler registration and operation.
+            for proper handler registration and operation.
 
         """
 
@@ -285,15 +285,15 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         ### Notes
 
         : For nested dictionaries, a deep merge is performed, allowing for
-          preserving existing nested values while adding or updating specific
-          keys. This is particularly useful for complex configuration structures.
+            preserving existing nested values while adding or updating specific
+            keys. This is particularly useful for complex configuration structures.
 
         : Merged values are stored by reference and nested dicts are deep
-          merged in place, so a later merge of the same key can mutate a
-          dict the caller passed earlier (including a shared class-level
-          config_defaults). This is intended: the configuration is mutable
-          by design. A caller that needs its source kept isolated should
-          pass a copy, e.g. app.config.merge(copy.deepcopy(my_config))
+            merged in place, so a later merge of the same key can mutate a
+            dict the caller passed earlier (including a shared class-level
+            config_defaults). This is intended: the configuration is mutable
+            by design. A caller that needs its source kept isolated should
+            pass a copy, e.g. app.config.merge(copy.deepcopy(my_config))
 
         """
         # Skip processing if dict_obj is None
@@ -384,7 +384,7 @@ def load(app):
         1. Sets it as the default configuration handler
 
     : After loading this extension, all configuration operations will use
-      this handler for loading, parsing and merging configuration data.
+        this handler for loading, parsing and merging configuration data.
 
     """
     app.handler.register(TokeoYamlConfigHandler)

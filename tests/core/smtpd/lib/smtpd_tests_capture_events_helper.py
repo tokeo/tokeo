@@ -20,9 +20,9 @@ class CaptureSmtpdEvents(SmtpdEvents):
     ### Notes
 
     : ```on_auth_event``` grants 'supervisor' for administrator/password and
-      denies everything else with ```Smtpd535Exception```
+        denies everything else with ```Smtpd535Exception```
     : ```on_message_data_event``` stores the delivered message (bytes), its
-      delivered timestamp and its byte size
+        delivered timestamp and its byte size
 
     """
 

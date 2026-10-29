@@ -13,10 +13,10 @@ answer 500 only while ```encrypt_mode```/```auth_mode``` are FORBIDDEN.
 ### Notes
 
 : Ruby's non-blocking chunk reader is replaced by asyncio's stream reader:
-  ```readuntil``` with a timeout gives the same line semantics; a buffered
-  next line is ```io_buffer_line_lf```.
+    ```readuntil``` with a timeout gives the same line semantics; a buffered
+    next line is ```io_buffer_line_lf```.
 : Command lines are handled as ```str```; the DATA body stays raw ```bytes```
-  (byte-exact for DKIM), appended as ```ctx.message.data += line + line_break```.
+    (byte-exact for DKIM), appended as ```ctx.message.data += line + line_break```.
 
 """
 
@@ -157,7 +157,7 @@ def tls_immediate_supported():
     ### Notes
 
     : Immediate TLS needs a ```start_tls``` that keeps the ClientHello the
-      server read already (gh-142352), older versions lose it
+        server read already (gh-142352), older versions lose it
 
     """
     version = sys.version_info[:3]
@@ -188,9 +188,9 @@ class SmtpdSession:
     ### Notes
 
     : ```__slots__``` keeps the field set closed: a misspelled attribute --
-      read or write -- raises ```AttributeError``` instead of silently
-      creating a new key like a dict would, and access stays as fast as a
-      string-keyed dict (writes faster)
+        read or write -- raises ```AttributeError``` instead of silently
+        creating a new key like a dict would, and access stays as fast as a
+        string-keyed dict (writes faster)
 
     """
 
@@ -369,10 +369,10 @@ class GlobalLimits:
         ### Notes
 
         : The base implementation waits purely on the shared event -- correct
-          whenever the counters only change inside this event loop. An
-          implementation whose counters are shared ACROSS PROCESSES (where no
-          event can reach this loop) should override this with a short
-          re-check interval, e.g. ```wait_for(self.slot_free.wait(), 0.05)```
+            whenever the counters only change inside this event loop. An
+            implementation whose counters are shared ACROSS PROCESSES (where no
+            event can reach this loop) should override this with a short
+            re-check interval, e.g. ```wait_for(self.slot_free.wait(), 0.05)```
 
         """
         await self.slot_free.wait()
@@ -746,8 +746,8 @@ class SmtpdServer:
         ### Notes
 
         : Stop accepting first, then either drain within the time budget
-          or force the remaining sessions down by cancelling their tasks,
-          each after a last attempt to send 421
+            or force the remaining sessions down by cancelling their tasks,
+            each after a last attempt to send 421
 
         """
         # always stop accepting new connections first
@@ -875,9 +875,9 @@ class SmtpdServer:
         ### Notes
 
         : On an unencrypted channel ```TLS_WHEN_AUTH``` and ```TLS_REQUIRED```
-          refuse AUTH command (530) and EHLO does not advertise it. After
-          STARTTLS or without TLS enforcement, the advertising just follows
-          ```auth_mode``` setting.
+            refuse AUTH command (530) and EHLO does not advertise it. After
+            STARTTLS or without TLS enforcement, the advertising just follows
+            ```auth_mode``` setting.
 
         """
         # False if we don't want to support AUTH

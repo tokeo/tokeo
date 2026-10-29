@@ -14,9 +14,9 @@ When writing docstrings in this project, follow these Markdown formatting conven
 5. Use consistent capitalization and punctuation
 6. Break the lines by a maximum of 84 characters per line
 7. If a line needs to be broken, indent the following lines by 4 chars like python code
-8. Exception to (7): continuation lines of a single colon-style note (the ```:```
-   format, see Notes) align under the note text, two spaces in, under the first
-   character after ```: ```, instead of the four-character code indent
+8. Continuation lines of a note follow (7) in both formats, the colon-style
+   ```:``` and the bullet ```-``` (see Notes): they are indented by 4 chars, so
+   both formats line up
 
 ### Section Headers
 
@@ -108,10 +108,10 @@ For a single note, use colon format with indentation:
 ### Notes
 
 : Single note item with details that may span
-  multiple lines with consistent indentation
+    multiple lines with consistent indentation
 
-Note the continuation line above: it aligns under the note text (two spaces),
-which is the indentation exception called out in Basic Structure (8).
+Note the continuation line above: it is indented by 4 chars, like the
+continuation lines of the bullet notes (see Basic Structure 8).
 
 ### Lists
 

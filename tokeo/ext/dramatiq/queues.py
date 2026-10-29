@@ -37,11 +37,11 @@ class TokeoDramatiqQueues:
     ### Notes
 
     : One connection to rabbitmq is opened on first use and kept for the
-      following calls; a connection closed by rabbitmq in the meantime is
-      opened again on the next call
+        following calls; a connection closed by rabbitmq in the meantime is
+        opened again on the next call
 
     : A failed connection raises ```TokeoDramatiqConnectionError```, a
-      request refused by rabbitmq ```TokeoDramatiqRefusedError```
+        request refused by rabbitmq ```TokeoDramatiqRefusedError```
 
     """
 
@@ -249,7 +249,7 @@ class TokeoDramatiqQueues:
         ### Notes
 
         : Retries and traceback get reset; a message is acked in the XQ only
-          after rabbitmq confirmed it in the queue
+            after rabbitmq confirmed it in the queue
 
         """
         return self._call(self._requeue_dead, q_name(name), limit)
