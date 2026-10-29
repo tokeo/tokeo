@@ -197,18 +197,21 @@ class SmtpdSession:
     __slots__ = ('cmd_sequence', 'ctx', 'auth_challenge', 'processing', 'data_error', 'session_deadline')
 
     def __init__(self):
-        #: Current position in the SMTP command sequence (```CmdSequence```)
+        #: @private Current position in the SMTP command sequence
+        #: (```CmdSequence```)
         self.cmd_sequence = CMD_HELO
-        #: The per-connection ```SmtpdContext``` (built on connection start)
+        #: @private The per-connection ```SmtpdContext``` (built on connection
+        #: start)
         self.ctx = None
-        #: Pending AUTH LOGIN challenge state
+        #: @private Pending AUTH LOGIN challenge state
         self.auth_challenge = {}
-        #: True while this connection holds a processing slot
+        #: @private True while this connection holds a processing slot
         self.processing = False
-        #: First exception within DATA, sent as output on the end of DATA
+        #: @private First exception within DATA, sent as output on the end of
+        #: DATA
         self.data_error = None
-        #: Monotonic time the session must end by (io_session_timeout), set on
-        #: the greeting
+        #: @private Monotonic time the session must end by (io_session_timeout),
+        #: set on the greeting
         self.session_deadline = None
 
 
@@ -341,8 +344,9 @@ class GlobalLimits:
         self.max_connections = int(max_connections) if max_connections else None
         self.active = 0
         self.active_processings = 0
-        #: shared wake event: a slot released on ANY service wakes every waiter
-        #: (each server with global_limits waits on this instead of a local one)
+        #: @private Shared wake event: a slot released on any service wakes
+        #: every waiter (each server with global_limits waits on this instead
+        #: of a local one)
         self.slot_free = asyncio.Event()
         self.slot_free.set()
 
