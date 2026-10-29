@@ -369,8 +369,19 @@ def test_box_closes():
 
 
 def _render_page(tmp_path, monkeypatch, package_name, files):
-    """Render a package of the files and return the html of each file."""
-    # an own package name per test, an imported package stays in sys.modules
+    """
+    Render a package of the files and return the html of each file.
+
+    Goes through ```app.pdoc.render()``` rather than calling Jinja directly,
+    so template resolution, the custom globals and the asset copy are all
+    part of what is being tested.
+
+    Each call needs a fresh package name, and pdoc's cache is dropped: an
+    already imported module stays in ```sys.modules```, and
+    ```Module.from_name``` is cached too, so a second render in the same
+    process would document the previous test's source. That is why
+    ```--watch``` replaces the process instead of re-rendering in place.
+    """
     import pdoc.doc
 
     package = tmp_path / package_name
@@ -928,34 +939,8 @@ class Beta:
 
 
 def _render_sidebar(tmp_path, monkeypatch, source, package_name='sample'):
-    """
-    Render one module through the real pipeline, return its sidebar HTML.
-
-    Goes through `app.pdoc.render()` rather than calling Jinja directly, so
-    template resolution, the custom globals and the asset copy are all part
-    of what is being tested.
-
-    Each call uses a fresh package name and drops pdoc's cache: an already
-    imported module stays in `sys.modules`, and `Module.from_name` is cached
-    too, so a second render in the same process would document the previous
-    test's source. (That is exactly why `--watch` replaces the process
-    instead of re-rendering in place.)
-    """
-    import pdoc.doc
-
-    package = tmp_path / package_name
-    package.mkdir()
-    _write(package / '__init__.py', '"""Sample."""\n')
-    _write(package / 'main.py', source)
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.syspath_prepend(str(tmp_path))
-    pdoc.doc.Module.from_name.cache_clear()
-
-    with PdocTest(tmp_path, modules=[package_name], show_config=False) as booted:
-        booted.run()
-        booted.pdoc.render()
-
-    html = (tmp_path / 'html' / package_name / 'main.html').read_text()
+    """Render one module by ```_render_page```, return its sidebar HTML."""
+    html = _render_page(tmp_path, monkeypatch, package_name, {'main': source})['main']
     match = re.search(r'>Classes</h3>(.*?)(?=<h3|</nav>)', html, re.S)
     assert match, 'the sidebar has no Classes section'
     return match.group(1)
