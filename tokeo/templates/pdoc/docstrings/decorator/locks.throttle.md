@@ -1,4 +1,4 @@
-The *.locks.throttle decorator is a Resource-limiting decorator to
+The *.locks.throttle decorator is a resource-limiting decorator to
 control concurrent access to a function.
 
 This decorator implements a token bucket algorithm to limit how often
@@ -44,8 +44,10 @@ def limited_api_call(resource_id):
 
 ### Notes
 
-- The throttle state persists in the cache based on the function name
+: The throttle state persists in the cache based on the function name
     or custom name/name_f parameter
-- When rate-limited, execution will be delayed unless cb_on_locked
+
+: When rate-limited, execution will be delayed unless cb_on_locked
     is provided
-- Token bucket algorithm allows for bursts up to 'count' calls at once
+
+: Token bucket algorithm allows for bursts up to 'count' calls at once

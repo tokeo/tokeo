@@ -44,8 +44,10 @@ class TokeoTuiOutput:
     ### Args
 
     - **app** (Application): The Cement application instance
-    - **file** (file, optional): Where to write, the current stdout without
-    - **width** (int, optional): The width, the terminal width without
+    - **file** (file, optional): Where to write. Defaults to the current
+        ```sys.stdout```.
+    - **width** (int, optional): The width of the output. Defaults to the width
+        of the terminal.
 
     """
 

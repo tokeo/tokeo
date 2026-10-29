@@ -14,7 +14,8 @@ Three layers, in increasing order of effort:
 
 ## 1. Config only
 
-Set in the `[pdoc]` section of the app config, e.g. `config/<app>/base.d/pdoc.yaml`:
+Set in the ```[pdoc]``` section of the app config, e.g.
+```config/<app>/base.d/pdoc.yaml```:
 
 ```yaml
 pdoc:
@@ -26,17 +27,17 @@ pdoc:
   ancestors_max_depth: 2               # class hierarchy levels in the docs
 ```
 
-These win over the tokeo defaults. Without `brand` the sidebar falls back to
+These win over the tokeo defaults. Without ```brand``` the sidebar falls back to
 the app label, so the app name alone is often enough.
 
-See `config/pdoc.yaml` in the tokeo scaffold for every key with its default.
+See ```config/pdoc.yaml``` in the tokeo scaffold for every key with its default.
 
 ---
 
 ## 2. Theme CSS
 
-`assets/tokeo.theme.css` is plain, non-minified CSS, loaded at runtime. Edit
-and reload — no build step.
+```assets/tokeo.theme.css``` is plain, non-minified CSS, loaded at runtime. Edit
+and reload, without a build step.
 
 ### Brand colours
 
@@ -56,20 +57,20 @@ everything at once:
 }
 ```
 
-The same tokens back the `brand-*` Tailwind utilities (`text-brand-primary`,
-`bg-brand-accent`, …), so template classes follow along automatically.
+The same tokens back the ```brand-*``` Tailwind utilities (```text-brand-primary```,
+```bg-brand-accent```, …), so template classes follow along automatically.
 
 ### Component classes
 
 | Class | Applies to |
 |---|---|
-| `.tk-header` | The brand box at the top of the sidebar |
-| `.tk-doc` | Any rendered markdown block (headings, lists, tables, code) |
-| `.tk-member-doc` | The indented documentation under a class member |
-| `.tk-sig` | Function and method signatures |
-| `.tk-chev` | The expand chevron in the sidebar |
-| `.admonition`, `.admonition-title` | `!!! note` / `.. note::` boxes |
-| `.pdoc-copy` | The copy button on code blocks |
+| ```.tk-header``` | The brand box at the top of the sidebar |
+| ```.tk-doc``` | Any rendered markdown block (headings, lists, tables, code) |
+| ```.tk-member-doc``` | The indented documentation under a class member |
+| ```.tk-sig``` | Function and method signatures |
+| ```.tk-chev``` | The expand chevron in the sidebar |
+| ```.admonition```, ```.admonition-title``` | ```!!! note``` / ```.. note::``` boxes |
+| ```.pdoc-copy``` | The copy button on code blocks |
 
 Override or extend with ordinary CSS:
 
@@ -80,9 +81,9 @@ Override or extend with ordinary CSS:
 
 ### Fonts
 
-`@font-face` blocks near the top of the file point at `assets/fonts/`. To swap
-a font, replace the woff2 files and adjust the `src:` URLs, or override
-`--font-sans` / `--font-mono` in `:root`.
+```@font-face``` blocks near the top of the file point at ```assets/fonts/```. To
+swap a font, replace the woff2 files and adjust the ```src:``` URLs, or override
+```--font-sans``` / ```--font-mono``` in ```:root```.
 
 ---
 
@@ -90,7 +91,7 @@ a font, replace the woff2 files and adjust the `src:` URLs, or override
 
 ### How overriding works
 
-List your own template package **before** tokeo's:
+List your own template package before tokeo's:
 
 ```yaml
 pdoc:
@@ -99,8 +100,8 @@ pdoc:
     - tokeo.templates.pdoc.html    # fallback
 ```
 
-The resulting search path is `[your packages…, tokeo, pdoc defaults]`. Supply
-**only the files you want to change**; tokeo provides the rest, and pdoc's own
+The resulting search path is ```[your packages…, tokeo, pdoc defaults]```. Supply
+only the files you want to change; tokeo provides the rest, and pdoc's own
 templates stay behind both so they never leak into the layout.
 
 The same mechanism exists for the decorator snippets:
@@ -116,21 +117,21 @@ pdoc:
 
 | File | Contents |
 |---|---|
-| `frame.html.jinja2` | `<!doctype>`, `<html lang>`, `<head>` skeleton, `<body>` |
-| `head.html` | Highlighting, mermaid, copy button, extra CSS/JS |
-| `module.html.jinja2` | Module page: sidebar plus content |
-| `index.html.jinja2` | Landing page listing the root packages |
-| `config.html.jinja2` | The yaml config page |
-| `assets/tokeo.theme.css` | Editable theme (see above) |
-| `assets/tailwind.min.css` | Pre-built framework (see below) |
+| ```frame.html.jinja2``` | ```<!doctype>```, ```<html lang>```, ```<head>``` skeleton, ```<body>``` |
+| ```head.html``` | Highlighting, mermaid, copy button, extra CSS/JS |
+| ```module.html.jinja2``` | Module page: sidebar plus content |
+| ```index.html.jinja2``` | Landing page listing the root packages |
+| ```config.html.jinja2``` | The yaml config page |
+| ```assets/tokeo.theme.css``` | Editable theme (see above) |
+| ```assets/tailwind.min.css``` | Pre-built framework (see below) |
 
-`assets/` is copied into the output directory on every render, with later
-template directories overwriting earlier ones — so an asset of the same name
+```assets/``` is copied into the output directory on every render, with later
+template directories overwriting earlier ones, so an asset of the same name
 in your own package replaces tokeo's.
 
 ### Frame blocks
 
-The page templates extend `frame.html.jinja2` and fill these blocks:
+The page templates extend ```frame.html.jinja2``` and fill these blocks:
 
 ```jinja
 {% extends "frame.html.jinja2" %}
@@ -142,8 +143,8 @@ The page templates extend `frame.html.jinja2` and fill these blocks:
 {% block body %}…{% endblock %}     {# the whole page #}
 ```
 
-tokeo ships its own frame because pdoc hardcodes `<html lang="en">` outside of
-any block. Replacing only `head.html` while keeping tokeo's frame, module and
+tokeo ships its own frame because pdoc hardcodes ```<html lang="en">``` outside of
+any block. Replacing only ```head.html``` while keeping tokeo's frame, module and
 index templates is the common case:
 
 ```
@@ -153,28 +154,29 @@ spiral/templates/pdoc/html/
 
 ### Template globals
 
-Available in every template, on top of pdoc's own (`module`, `submodules`, …):
+Available in every template, on top of pdoc's own
+(```module```, ```submodules```, …):
 
 | Global | Type | Meaning |
 |---|---|---|
-| `app` | object | The cement app instance |
-| `app_name` | str | App label |
-| `doc_title` | str | Configured `title` |
-| `brand` | str | Configured `brand`, empty when unset |
-| `html_lang` | str | Configured `html_lang` |
-| `has_config` | bool | Whether a config page will be written |
-| `tokeo_version`, `pdoc_version` | str | For the footer credit |
-| `decorators(func)` | callable | Decorator metadata for a function |
-| `ancestors(cls, depth)` | callable | MRO above a class, capped |
-| `ancestors_max_depth` | int | Configured cap |
-| `subclasses(cls)` | callable | Loaded direct subclasses, sorted |
-| `own_init(cls)` | callable | The class's own `__init__`, or None |
-| `is_namespace(mod)` | callable | True for PEP 420 namespace packages |
-| `is_enum(cls)` | callable | True for `enum.Enum` subclasses |
-| `all_modules` | set | Names of every documented module |
-| `configdict`, `configsettings`, `configenvs` | — | Config page data |
-| `redact_data(data)` | callable | Replaces every value, keeps the structure |
-| `math`, `mermaid` | bool | Both False: pdoc's own includes target markup this layout does not use; `head.html` wires up mermaid itself |
+| ```app``` | object | The cement app instance |
+| ```app_name``` | str | App label |
+| ```doc_title``` | str | Configured ```title``` |
+| ```brand``` | str | Configured ```brand```, empty when unset |
+| ```html_lang``` | str | Configured ```html_lang``` |
+| ```has_config``` | bool | Whether a config page will be written |
+| ```tokeo_version```, ```pdoc_version``` | str | For the footer credit |
+| ```decorators(func)``` | callable | Decorator metadata for a function |
+| ```ancestors(cls, depth)``` | callable | MRO above a class, capped |
+| ```ancestors_max_depth``` | int | Configured cap |
+| ```subclasses(cls)``` | callable | Loaded direct subclasses, sorted |
+| ```own_init(cls)``` | callable | The class's own ```__init__```, or None |
+| ```is_namespace(mod)``` | callable | True for PEP 420 namespace packages |
+| ```is_enum(cls)``` | callable | True for ```enum.Enum``` subclasses |
+| ```all_modules``` | set | Names of every documented module |
+| ```configdict```, ```configsettings```, ```configenvs``` | - | Config page data |
+| ```redact_data(data)``` | callable | Replaces every value, keeps the structure |
+| ```math```, ```mermaid``` | bool | Both False: pdoc's own includes target markup this layout does not use; ```head.html``` wires up mermaid itself |
 
 ### Adding your own page
 
@@ -195,13 +197,13 @@ def spiral_pdoc_extra_page(app):
 app.hook.register('tokeo_pdoc_post_render', spiral_pdoc_extra_page)
 ```
 
-Put `extra.html.jinja2` in your template package and let it extend
-`frame.html.jinja2`. Link to it from an overridden `module.html.jinja2` or
-`index.html.jinja2`.
+Put ```extra.html.jinja2``` in your template package and let it extend
+```frame.html.jinja2```. Link to it from an overridden ```module.html.jinja2``` or
+```index.html.jinja2```.
 
-Two hooks bracket the render: `tokeo_pdoc_pre_render` runs before the module
+Two hooks bracket the render: ```tokeo_pdoc_pre_render``` runs before the module
 walk (dramatiq uses it to swap its actor decorator for a documentable stub),
-`tokeo_pdoc_post_render` after everything is written.
+```tokeo_pdoc_post_render``` after everything is written.
 
 ### Documenting your own decorators
 
@@ -219,68 +221,70 @@ def my_pdoc_render_decorator(app, func, decorator, args, kwargs):
 app.hook.register('tokeo_pdoc_render_decorator', my_pdoc_render_decorator)
 ```
 
-The snippet lives at `templates/pdoc/docstrings/decorator/my.thing.md`. It is
+The snippet lives at ```templates/pdoc/docstrings/decorator/my.thing.md```. It is
 written once and appended to every function carrying that decorator.
 
-A decorator without parameters to show needs no handler. When no handler knows
-a decorator, its snippet is looked up by its name without the `@`, e.g.
-`decorator/timelimit.md` for `@timelimit`. Other names for the same snippet go
-into `decorator/aliases.yaml`, e.g. `ex: argparse.expose`. The `aliases.yaml`
-files of all docstrings directories are merged entry by entry, and on the same
-name the earlier directory wins.
+A decorator without parameters to show needs no handler. When no handler knows a
+decorator, its snippet is looked up by its name without the ```@```, e.g.
+```decorator/timelimit.md``` for ```@timelimit```. Other names for the same snippet
+go into ```decorator/aliases.yaml```, e.g. ```ex: argparse.expose```. The
+```aliases.yaml``` files of all docstrings directories are merged entry by entry,
+and on the same name the earlier directory wins.
 
 ---
 
 ## 4. Rebuilding Tailwind
 
-`assets/tailwind.min.css` is a fixed, pre-built file (~630 KB, ≈72 KB gzipped,
+```assets/tailwind.min.css``` is a fixed, pre-built file (~630 KB, ≈72 KB gzipped,
 browser-cached). Treat it like a CDN drop-in and never hand-edit it.
 
 Besides the classes the templates use, it reserves a broad set of common
-utilities, so most name-based tweaks work **without** a rebuild.
+utilities, so most name-based tweaks work without a rebuild.
 
 ### Available without a rebuild
 
-- **layout**: display, position, float, `sr-only`
-- **flex & grid**: `flex-row/col/wrap`, `items-/justify-/self-/content-*`,
-  `grid-cols-1…12`, `col-span-1…12`, `grid-rows-1…6`, `order-*`
-- **spacing**: `m/p{,x,y,t,r,b,l}` and `gap`, scale 0…40 (48/56/64 for m/p),
-  plus `auto` and `px`; `space-{x,y}-*`
-- **sizing**: `w`/`h` full scale plus `full/screen/min/max/fit` and common
-  fractions; `min-w`, `min-h`, `max-w` (incl. `xs…7xl`, `prose`, `screen-*`),
-  `max-h`
-- **typography**: `text-xs…9xl`, `font-thin…black`, `font-sans/serif/mono`,
-  `leading-*`, `tracking-*`, alignment, `underline`, case, `truncate`,
-  `break-*`, `whitespace-*`, `align-*`, `list-*`, `italic`
-- **colours**: the full default palette (slate…rose, 50–950) plus `brand-*`,
-  for `text-`/`bg-`/`border-`, base and the variants
-  `hover: focus: active: group-hover: disabled: dark:`
-- **borders**: `border{,-0,-2,-4,-8}`, per side, styles, all `rounded-*`
-- **effects**: `shadow-*`, `opacity-*`, `transition*`, `duration-*`, `ease-*`,
-  `scale-*`, small `translate-*`
-- **misc**: offsets 0–4, `z-*`, `overflow-*`, `cursor-*`, `select-*`,
-  `object-*`
-- **responsive** `sm: md: lg: xl: 2xl:` for layout/spacing/sizing/typography/grid
-- **structural** `first: last: odd: even:` for rows and lists
+- layout: display, position, float, ```sr-only```
+- flex & grid: ```flex-row/col/wrap```, ```items-/justify-/self-/content-*```,
+  ```grid-cols-1…12```, ```col-span-1…12```, ```grid-rows-1…6```, ```order-*```
+- spacing: ```m/p{,x,y,t,r,b,l}``` and ```gap```, scale 0…40 (48/56/64 for m/p),
+  plus ```auto``` and ```px```; ```space-{x,y}-*```
+- sizing: ```w```/```h``` full scale plus ```full/screen/min/max/fit``` and
+  common fractions; ```min-w```, ```min-h```, ```max-w``` (incl. ```xs…7xl```,
+  ```prose```, ```screen-*```), ```max-h```
+- typography: ```text-xs…9xl```, ```font-thin…black```,
+  ```font-sans/serif/mono```, ```leading-*```, ```tracking-*```, alignment,
+  ```underline```, case, ```truncate```, ```break-*```, ```whitespace-*```,
+  ```align-*```, ```list-*```, ```italic```
+- colours: the full default palette (slate…rose, 50–950) plus ```brand-*```,
+  for ```text-```/```bg-```/```border-```, base and the variants
+  ```hover: focus: active: group-hover: disabled: dark:```
+- borders: ```border{,-0,-2,-4,-8}```, per side, styles, all ```rounded-*```
+- effects: ```shadow-*```, ```opacity-*```, ```transition*```, ```duration-*```,
+  ```ease-*```, ```scale-*```, small ```translate-*```
+- misc: offsets 0–4, ```z-*```, ```overflow-*```, ```cursor-*```,
+  ```select-*```, ```object-*```
+- responsive ```sm: md: lg: xl: 2xl:```
+  for layout/spacing/sizing/typography/grid
+- structural ```first: last: odd: even:``` for rows and lists
 
 ### Needs a rebuild
 
-- **Arbitrary values in brackets**: `mt-[7px]`, `text-[13px]`, `w-[42%]`,
-  `bg-[#123456]`, `grid-cols-[1fr_auto]`. Only the bracket values already used
-  in the shipped templates are baked in.
-- **Values outside the reserved scales**: `m-52`, `p-72`, an unlisted shade.
-- **Exotic families**: `ring-*`, `outline-*`, `blur-*` and other filters,
-  `backdrop-*`, `animate-*`, `aspect-*`, `columns-*`, `place-*`, `accent-*`,
-  `caret-*`, gradients (`from-/via-/to-`).
+- Arbitrary values in brackets: ```mt-[7px]```, ```text-[13px]```,
+  ```w-[42%]```, ```bg-[#123456]```, ```grid-cols-[1fr_auto]```. Only the bracket
+  values already used in the shipped templates are baked in.
+- Values outside the reserved scales: ```m-52```, ```p-72```, an unlisted shade.
+- Exotic families: ```ring-*```, ```outline-*```, ```blur-*``` and other
+  filters, ```backdrop-*```, ```animate-*```, ```aspect-*```, ```columns-*```,
+  ```place-*```, ```accent-*```, ```caret-*```, gradients (```from-/via-/to-```).
 
-In practice, prefer a reserved class name or plain CSS in `tokeo.theme.css`.
+In practice, prefer a reserved class name or plain CSS in ```tokeo.theme.css```.
 
 ### Build setup
 
 The build tooling is development-only and not part of the installable package.
-Create a `pdoc-theme/` folder next to your package with these two files.
+Create a ```pdoc-theme/``` folder next to your package with these two files.
 
-**`pdoc-theme/package.json`**
+#### ```pdoc-theme/package.json```
 
 ```json
 {
@@ -300,18 +304,18 @@ Create a `pdoc-theme/` folder next to your package with these two files.
 }
 ```
 
-Adjust the two output paths if your package is not called `tokeo`.
+Adjust the two output paths if your package is not called ```tokeo```.
 
-**`pdoc-theme/tailwind.min.src.css`**
+#### ```pdoc-theme/tailwind.min.src.css```
 
-The `@source` globs must point at the real template files — if they do not
-match, only the `@source inline(...)` reserve ends up in the output and every
+The ```@source``` globs must point at the real template files; if they do not
+match, only the ```@source inline(...)``` reserve ends up in the output and every
 bracket value used in the templates silently stops working. Verify after a
-rebuild that a known bracket class such as `.pl-\[2\.4rem\]` is still present.
+rebuild that a known bracket class such as ```.pl-\[2\.4rem\]``` is still present.
 
 ```css
 /* ============================================================================
- * tailwind.min.src.css — source for the pre-built tailwind.min.css.
+ * tailwind.min.src.css: source for the pre-built tailwind.min.css.
  * Besides the classes actually used in the templates, it reserves a broad set
  * of common utilities so name-based tweaks in tokeo.theme.css / templates work
  * WITHOUT rebuilding. Regenerate with:
@@ -433,7 +437,7 @@ rebuild that a known bracket class such as `.pl-\[2\.4rem\]` is still present.
 @source inline("{first:,last:,odd:,even:}{border,border-0,border-t,border-b}");
 ```
 
-Extend the `@source inline(...)` reserve there to make a class permanently
+Extend the ```@source inline(...)``` reserve there to make a class permanently
 available without a rebuild.
 
 ### Build commands
@@ -447,8 +451,8 @@ npm run watch:framework      # rebuild on template changes
 
 ### Refreshing the bundled fonts
 
-The woff2 files under `assets/fonts/` come from the Fontsource packages (latin
-subset, variable weight axis). Run from `pdoc-theme/` after `npm install`:
+The woff2 files under ```assets/fonts/``` come from the Fontsource packages (latin
+subset, variable weight axis). Run from ```pdoc-theme/``` after ```npm install```:
 
 ```bash
 cp node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2 \
@@ -459,17 +463,17 @@ cp node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-latin
    ../tokeo/templates/pdoc/html/assets/fonts/SourceCodePro-latin-wght-normal.woff2
 ```
 
-Keep the `*-OFL.txt` licence files next to the fonts — both are SIL Open Font
+Keep the ```*-OFL.txt``` licence files next to the fonts; both are SIL Open Font
 License 1.1.
 
 ---
 
 ## Working on the theme
 
-`pdoc render --serve --watch` re-renders whenever a watched file changes. Note
-that the template directories are **not** watched by default, since
-`watch_includes` covers `*.py, *.yaml, *.yml, *.md`. While editing templates,
-add the suffixes and the directory:
+```pdoc render --serve --watch``` re-renders whenever a watched file changes. Note
+that the template directories are not watched by default, since
+```watch_includes``` covers ```*.py, *.yaml, *.yml, *.md```. While editing
+templates, add the suffixes and the directory:
 
 ```yaml
 pdoc:
@@ -477,7 +481,7 @@ pdoc:
 ```
 
 Watching the template directory itself additionally requires a line in
-`_watch_dirs()`; without it only module and config changes trigger a rebuild.
+```_watch_dirs()```; without it only module and config changes trigger a rebuild.
 
 The theme is an original Tailwind (MIT) composition against the tokeo brand
 tokens. No upstream pdoc or pdoc3 CSS is used.

@@ -1,4 +1,4 @@
-The *.locks.temper decorator is a Resource-limiting decorator to
+The *.locks.temper decorator is a resource-limiting decorator to
 control concurrent access to a function.
 
 This decorator implements a semaphore-like mechanism that limits the
@@ -46,14 +46,18 @@ def resource_intensive_operation(data):
 
 ### Notes
 
-- The temper state persists in the cache based on the function
+: The temper state persists in the cache based on the function
     name or custom name/name_f parameter
-- If a process crashes while holding a slot, the slot is released at
+
+: If a process crashes while holding a slot, the slot is released at
     its own deadline, preventing permanent deadlock
-- ```temper``` never stops a running call, also not after its expire; a call
+
+: ```temper``` never stops a running call, also not after its expire; a call
     that must end in time needs its own limit below expire, e.g.
     ```@timelimit``` or the time_limit of a dramatiq actor
-- Unlike throttle, temper has a fixed delay when blocked
+
+: Unlike throttle, temper has a fixed delay when blocked
     (0.05 seconds by default)
-- The function will automatically restore slots when complete, ensuring
+
+: The function will automatically restore slots when complete, ensuring
     resources become available again
