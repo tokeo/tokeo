@@ -59,7 +59,8 @@ import shlex
 from cement.core.meta import MetaMixin
 from cement import ex
 from tokeo.core.exc import TokeoError
-from tokeo.core.utils.base import hasprops, getprop, default_when_blank
+from tokeo.core.utils.base import filled_str_or_default
+from tokeo.core.utils.props import hasprops, getprop
 from tokeo.core.utils.json import json_dump, TokeoJsonUnknownNoneEncoder
 from tokeo.core.utils import sanitize
 from tokeo.ext.argparse import Controller
@@ -1334,7 +1335,7 @@ class TokeoAutomate(MetaMixin):
                 func=func,
                 module=module,
                 id=key,
-                name=default_when_blank(_config_task.get('name'), key),
+                name=filled_str_or_default(_config_task.get('name'), key),
                 kwargs=kwargs,
                 kwprotected=kwprotected,
             )

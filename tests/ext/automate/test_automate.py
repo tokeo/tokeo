@@ -9,7 +9,7 @@ import copy
 import invoke
 import pytest
 from cement.utils.misc import init_defaults
-from tokeo.core.utils.base import hasprops, anyprop, getprop
+from tokeo.core.utils.props import hasprops, anyprop, getprop
 from tokeo.ext.automate import TokeoAutomateError, TokeoAutomateResult
 from tests.ext.automate.automate_tests_helper import (
     AutomateTest,

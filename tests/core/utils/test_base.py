@@ -1,40 +1,57 @@
 """
-Tests for tokeo.core.utils.base: ```as_int_or_auto``` lets a config key or an
-argument take a number or ```'auto'```; the tests pin the accepted forms, the
-lower bound and the errors.
+Tests for tokeo.core.utils.base: the functions hand back a value, or a default
+when it is missing, empty or blank; the string forms refuse other types by a
+TypeError.
 """
 
 import pytest
 
-from tokeo.core.utils.base import as_int_or_auto
+from tokeo.core.utils.base import (
+    value_or_default,
+    filled_str_or_default,
+    first_value_or_default,
+    first_filled_str_or_default,
+)
 
 
-@pytest.mark.parametrize('value', ['auto', 'AUTO', ' Auto '])
-def test_as_int_or_auto_keyword(value):
-    """ "auto" in any case and with blanks comes back as "auto"."""
-    assert as_int_or_auto(value) == 'auto'
+@pytest.mark.parametrize('value', [None, '', '  ', [], {}, (), set()])
+def test_value_or_default_takes_the_default_for_empty(value):
+    """None, a blank string and an empty container give the default."""
+    assert value_or_default(value, 'x') == 'x'
 
 
-@pytest.mark.parametrize('value, expected', [(1, 1), (10, 10), ('10', 10), (' 7 ', 7)])
-def test_as_int_or_auto_number(value, expected):
-    """An int or a numeric string comes back as int."""
-    result = as_int_or_auto(value)
-    assert result == expected
-    assert type(result) is int
+@pytest.mark.parametrize('value', ['a', [0], {'a': 1}, 0, False])
+def test_value_or_default_keeps_a_filled_value(value):
+    """A filled string or container and any other value come back."""
+    assert value_or_default(value, 'x') is value
 
 
-def test_as_int_or_auto_min_value():
-    """0 passes with min_value=0, else values below 1 raise ValueError."""
-    assert as_int_or_auto(0, min_value=0) == 0
-    assert as_int_or_auto('0', min_value=0) == 0
-    with pytest.raises(ValueError, match='integer >= 1'):
-        as_int_or_auto(0)
-    with pytest.raises(ValueError, match='integer >= 0'):
-        as_int_or_auto(-1, min_value=0)
+@pytest.mark.parametrize('value, expected', [(None, 'x'), ('', 'x'), (' \t', 'x'), ('a', 'a'), (' a ', ' a ')])
+def test_filled_str_or_default(value, expected):
+    """None and a blank string give the default, a filled one comes back."""
+    assert filled_str_or_default(value, 'x') == expected
 
 
-@pytest.mark.parametrize('value', [None, True, False, 2.0, 2.5, '', 'x', '2.5', 'automatic', [1]])
-def test_as_int_or_auto_rejects(value):
-    """None, bools, floats and other strings raise ValueError."""
-    with pytest.raises(ValueError, match='must be "auto" or an integer'):
-        as_int_or_auto(value)
+def test_filled_str_or_default_refuses_other_types():
+    """A value that is no string raises a TypeError."""
+    with pytest.raises(TypeError, match='filled_str_or_default expects a string'):
+        filled_str_or_default(1, 'x')
+
+
+def test_first_value_or_default():
+    """The first value that is not None comes back, else the default."""
+    assert first_value_or_default([None, 0, 1], 'x') == 0
+    assert first_value_or_default((None, None), 'x') == 'x'
+    assert first_value_or_default([]) is None
+    with pytest.raises(TypeError, match='first_value_or_default expects a list or tuple'):
+        first_value_or_default('ab')
+
+
+def test_first_filled_str_or_default():
+    """The first filled string comes back, else the default."""
+    assert first_filled_str_or_default([None, ' ', 'a', 'b'], 'x') == 'a'
+    assert first_filled_str_or_default(('', None), 'x') == 'x'
+    with pytest.raises(TypeError, match='first_filled_str_or_default expects a list or tuple'):
+        first_filled_str_or_default('ab')
+    with pytest.raises(TypeError, match='first_filled_str_or_default expects strings'):
+        first_filled_str_or_default([None, 1])

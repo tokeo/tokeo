@@ -20,7 +20,7 @@ from dramatiq.common import q_name
 import pika
 from tokeo.core.utils.url import overload_with_auth as url_overload_with_auth
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
-from tokeo.core.utils.base import as_int_or_auto
+from tokeo.core.utils.validate import as_int_or_auto
 from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError, TokeoDramatiqConnectionError
 
 

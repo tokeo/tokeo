@@ -1,6 +1,6 @@
 import re
 import shlex
-from .base import hasprop
+from .props import hasprop
 
 
 def keyword(s):
