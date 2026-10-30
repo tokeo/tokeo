@@ -1489,6 +1489,13 @@ class SmtpdServer:
                 if session.cmd_sequence is not CMD_HELO:
                     self.process_reset_session(session)
                 cmd_data = re.sub(r'^(HELO|EHLO)\ ?', '', line, flags=self._RE_CMD_FLAGS)
+                # with TLS_REQUIRED only EHLO, which offers STARTTLS is allowed
+                if (
+                    self.encrypt_mode is EncryptMode.TLS_REQUIRED
+                    and not ctx.server.encrypted
+                    and re.match(r'^HELO', line, self._RE_CMD_FLAGS)
+                ):
+                    raise Tls530Exception
                 if SmtpdEvent.ON_HELO_EVENT in self.emit_events:
                     await self._emit(SmtpdEvent.ON_HELO_EVENT, ctx, cmd_data)
                 elif cmd_data == '':
