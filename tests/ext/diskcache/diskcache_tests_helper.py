@@ -67,7 +67,7 @@ class Connections:
                 self.closed = True
                 super().close()
 
-        monkeypatch.setattr('diskcache.core.sqlite3.connect', lambda *args, **kw: connect(*args, factory=Connection, **kw))
+        monkeypatch.setattr('tokeo.core.diskcache.core.sqlite3.connect', lambda *args, **kw: connect(*args, factory=Connection, **kw))
 
     @property
     def unclosed(self):

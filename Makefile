@@ -60,7 +60,7 @@ dev:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	pip install --upgrade pip
 	pip install -e tokeo-base -e .
-	pip install -e tokeo-smtpd -e .[dev]
+	pip install -e tokeo-smtpd -e tokeo-diskcache -e .[dev]
 
 prod:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
@@ -89,7 +89,7 @@ endif
 
 # check for test with coverage reports
 ifdef cov
-cov_report=--cov=tokeo --cov=tokeo-base/tokeo --cov=tokeo-smtpd/tokeo --cov-report=term --cov-report=html:coverage-report
+cov_report=--cov=tokeo --cov=tokeo-base/tokeo --cov=tokeo-smtpd/tokeo --cov=tokeo-diskcache/tokeo --cov-report=term --cov-report=html:coverage-report
 else
 cov_report=
 endif
@@ -120,13 +120,14 @@ test:
 
 # check for files
 ifndef sources
-sources=tokeo tokeo-base tokeo-smtpd docs tests
+sources=tokeo tokeo-base tokeo-smtpd tokeo-diskcache docs tests
 endif
 
 fmt:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	# align with https://google.github.io/styleguide/pyguide.html
-	pyink --pyink-use-majority-quotes --line-length 139 --target-version py311 --include "\.py" --exclude="/(\.git|__pycache__)/" $(sources)
+	# tokeo-diskcache keeps the format of diskcache to compare it with upstream
+	pyink --pyink-use-majority-quotes --line-length 139 --target-version py311 --include "\.py" --exclude="/(\.git|__pycache__|tokeo-diskcache)/" $(sources)
 
 lint:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
@@ -149,7 +150,7 @@ version:
 	rm -f pyproject.toml.bak tokeo-base/pyproject.toml.bak tokeo-smtpd/pyproject.toml.bak
 
 # the packages to build, tokeo last as it depends on the others
-packages=tokeo-base tokeo-smtpd .
+packages=tokeo-base tokeo-smtpd tokeo-diskcache .
 
 sdist: clean version
 	for package in $(packages); do python -m build --sdist --outdir dist $$package || exit 1; done

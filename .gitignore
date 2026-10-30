@@ -33,6 +33,9 @@
 !/tokeo-smtpd/
 !/tokeo-smtpd/**
 
+!/tokeo-diskcache/
+!/tokeo-diskcache/**
+
 !/public/
 !/public/**
 

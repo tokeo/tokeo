@@ -55,7 +55,7 @@ from contextlib import contextmanager
 import ast
 import inspect
 import functools
-import diskcache
+from tokeo.core import diskcache
 import time
 import re
 
@@ -462,10 +462,10 @@ class TokeoDiskCacheLocksHandler:
                     with self._cache.transact(retry=True):
                         # read the current bucket state from cache
                         values = self._cache.get(key)
-                        # accept only a valid (number, number) bucket tuple;
-                        # time_func may return int or float, so check both
+                        # accept only a valid (number, number) bucket, the cache
+                        # hands it back as list; time_func may return int or float
                         if (
-                            type(values) is tuple
+                            type(values) in (tuple, list)
                             and len(values) == 2
                             and isinstance(values[0], (int, float))
                             and isinstance(values[1], (int, float))

@@ -1,8 +1,9 @@
 """
 Tests for the packages of the repository: tokeo, tokeo-base and tokeo-smtpd
-carry the same version, set by ```make version```, and tokeo-base and
-tokeo-smtpd import only what their own package provides, so each one works
-without the rest of tokeo.
+carry the same version, set by ```make version```, tokeo-diskcache the version
+of DiskCache it is taken from. tokeo-base, tokeo-smtpd and tokeo-diskcache
+import only what their own package provides, so each one works without the
+rest of tokeo, and tokeo-diskcache never imports pickle.
 """
 
 import os
@@ -19,7 +20,11 @@ from tests.utils import ROOT
 ALLOWED = {
     'tokeo-base': ('tokeo.core.exc', 'tokeo.core.utils'),
     'tokeo-smtpd': ('tokeo.core.exc', 'tokeo.core.utils', 'tokeo.core.smtpd', 'cryptography'),
+    'tokeo-diskcache': ('tokeo.core.diskcache',),
 }
+
+# the modules that can run code while they load data
+UNSAFE = ('pickle', 'pickletools', 'marshal', 'shelve')
 
 
 def _pyproject(package):
@@ -68,8 +73,20 @@ def test_all_packages_pin_each_other_by_the_version_of_tokeo():
     assert _pyproject('tokeo-smtpd')['project']['dependencies'] == [f'tokeo-base=={version}']
 
 
+def test_tokeo_pins_tokeo_diskcache_by_its_own_version():
+    """tokeo dev requires tokeo-diskcache in the version of its pyproject."""
+    version = _pyproject('tokeo-diskcache')['project']['version']
+    assert f'tokeo-diskcache=={version}' in _pyproject('.')['project']['optional-dependencies']['dev']
+
+
 @pytest.mark.parametrize('package', sorted(ALLOWED))
 def test_a_package_imports_only_its_own_parts(package):
     """Besides the standard library a package imports only the allowed modules."""
     found = [f'{os.path.relpath(path, ROOT)}: {module}' for path, module in _imports(package) if not _allowed(module, ALLOWED[package])]
+    assert found == []
+
+
+def test_tokeo_diskcache_never_imports_pickle():
+    """No module of tokeo-diskcache imports pickle or another unsafe loader."""
+    found = [f'{os.path.relpath(path, ROOT)}: {module}' for path, module in _imports('tokeo-diskcache') if module.split('.')[0] in UNSAFE]
     assert found == []
