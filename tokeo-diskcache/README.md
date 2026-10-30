@@ -1,5 +1,7 @@
 # Tokeo DiskCache
 
+> Tokeo DiskCache exists because of issue [#357](https://github.com/grantjenks/python-diskcache/issues/357) of DiskCache, which reports CVE-2025-69872: pickled data in the cache directory can run code in the application that reads it. The maintainer considers the risk documented and manageable with the cache directory as trusted storage, sees no reason to rush a breaking change of the serialization and commits to no fix or timeline. We cannot see this position change, and we do not want to leave such a possibility in our projects at all. So Tokeo DiskCache takes only the parts Tokeo needs and offers the same function completely without pickle for security reasons.
+
 The disk and file backed cache of [DiskCache](https://github.com/grantjenks/python-diskcache) 5.6.3 for [Tokeo](https://github.com/tokeo/tokeo), without pickle. Values are stored as JSON, pickled data is never loaded, so a cache directory written by someone else cannot run code in your application (CVE-2025-69872).
 
 <br/>
