@@ -323,3 +323,9 @@ def test_a_failing_logger_does_not_break_the_setup():
 
     tls = TlsTransport(cert_cn='localhost', logger=broken)
     assert tls.context is not None
+
+
+def test_a_transport_without_a_logger_loads_its_certificate():
+    """Without a logger the self-signed certificate loads as well."""
+    tls = TlsTransport(cert_cn='localhost')
+    assert tls.context is not None

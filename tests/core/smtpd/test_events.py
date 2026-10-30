@@ -44,3 +44,25 @@ def test_authenticated_and_encrypted_follow_the_context():
     ctx.server.encrypted = utc_now()
     assert SmtpdEvents.authenticated(ctx) is True
     assert SmtpdEvents.encrypted(ctx) is True
+
+
+@pytest.mark.parametrize(
+    'name, args, expected',
+    [
+        ('on_proxy_event', ({},), None),
+        ('on_helo_event', ('me',), None),
+        ('on_mail_from_event', ('<a@x>',), True),
+        ('on_rcpt_to_event', ('<b@y>',), True),
+        ('on_message_data_start_event', (), None),
+        ('on_message_data_receiving_event', (), None),
+        ('on_message_data_headers_event', (), None),
+        ('on_message_data_event', (), None),
+        ('on_vrfy_event', ('postmaster',), None),
+        ('on_expn_event', ('team',), None),
+        ('on_help_event', ('',), None),
+        ('on_process_line_unknown_event', ('FOO',), None),
+    ],
+)
+def test_the_defaults_accept_and_leave_the_answer_to_the_server(name, args, expected):
+    """The defaults accept every address and leave other answers to the server."""
+    assert getattr(SmtpdEvents(), name)(SmtpdContext(id='x'), *args) is expected
