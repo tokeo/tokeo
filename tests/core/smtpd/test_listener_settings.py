@@ -128,3 +128,11 @@ def test_reverse_lookup_gives_none_without_an_ip_or_a_name(monkeypatch):
     monkeypatch.setattr(socket, 'gethostbyaddr', unknown)
     assert asyncio.run(srv._reverse_lookup('')) is None
     assert asyncio.run(srv._reverse_lookup('192.0.2.1')) is None
+
+
+def test_resolved_addresses_appear_once(monkeypatch):
+    """Addresses the lookup returns twice appear once, for name and wildcard."""
+    info = [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('127.0.0.1', 0))]
+    monkeypatch.setattr(socket, 'getaddrinfo', lambda *args, **kwargs: info * 2)
+    assert _resolve_host('mx.example') == ['127.0.0.1']
+    assert _resolve_host('*') == ['127.0.0.1']

@@ -43,6 +43,13 @@ def test_rset_before_helo_answers_250_and_still_needs_the_greeting():
     assert r[3] == ['250 OK']
 
 
+def test_helo_without_tls_on_tls_required_answers_530():
+    """With TLS_REQUIRED a plaintext HELO answers 530, EHLO offers STARTTLS."""
+    _, r = dialog(RecordingEvents(), {**TLS_SETTINGS, 'encrypt_mode': 'TLS_REQUIRED'}, [b'HELO me\r\n', b'EHLO me\r\n'])
+    assert r[0][0].startswith('530')
+    assert r[1][-1] == '250 STARTTLS'
+
+
 def test_rset_without_tls_on_tls_required_answers_530():
     """With TLS_REQUIRED a RSET on the plaintext channel answers 530."""
     _, r = dialog(RecordingEvents(), {**TLS_SETTINGS, 'encrypt_mode': 'TLS_REQUIRED'}, [b'EHLO me\r\n', b'RSET\r\n'])
@@ -120,7 +127,7 @@ def test_vrfy_expn_and_help_without_a_handler():
 
 
 class ReplyEvents(RecordingEvents):
-    """Answers VRFY by a reply line, leaves EXPN to the server, answers HELP."""
+    """Answers VRFY, EXPN of the team and HELP, leaves other EXPN to the server."""
 
     def __init__(self, options=None):
         super().__init__(options)
@@ -132,48 +139,68 @@ class ReplyEvents(RecordingEvents):
 
     def on_expn_event(self, ctx, expn_data):
         self.args.append(expn_data)
-        return None
+        return '250 <team@example.com>' if expn_data == 'team' else None
 
     def on_help_event(self, ctx, help_data):
         self.args.append(help_data)
         return '214 See the documentation'
 
 
+def test_vrfy_and_expn_without_an_argument_answer_501():
+    """VRFY and EXPN need a string to look up, HELP takes none."""
+    ev = ReplyEvents()
+    _, r = dialog(ev, {}, [b'VRFY\r\n', b'EXPN \r\n', b'HELP\r\n'])
+    assert r[0][0].startswith('501')
+    assert r[1][0].startswith('501')
+    assert r[2] == ['214 See the documentation']
+    assert ev.args == ['']
+
+
 def test_vrfy_expn_and_help_take_the_reply_of_the_handler():
     """A reply line of the handler answers, None keeps the answer of the server."""
     ev = ReplyEvents()
-    _, r = dialog(ev, {}, [b'EHLO me\r\n', b'VRFY postmaster\r\n', b'EXPN list\r\n', b'HELP\r\n'])
+    commands = [b'EHLO me\r\n', b'VRFY postmaster\r\n', b'EXPN team\r\n', b'EXPN list\r\n', b'HELP\r\n']
+    _, r = dialog(ev, {}, commands)
     assert r[1] == ['250 <postmaster@example.com>']
-    assert r[2] == ['502 Command not implemented']
-    assert r[3] == ['214 See the documentation']
-    assert ev.args == ['postmaster', 'list', '']
+    assert r[2] == ['250 <team@example.com>']
+    assert r[3] == ['502 Command not implemented']
+    assert r[4] == ['214 See the documentation']
+    assert ev.args == ['postmaster', 'team', 'list', '']
 
 
 class FaultyReplyEvents(RecordingEvents):
-    """Answers VRFY by a wrong result, EXPN by a fault, HELP by a reject."""
+    """Answers by the argument: a wrong result, an error or a reject."""
 
-    def on_vrfy_event(self, ctx, vrfy_data):
-        return 42
-
-    def on_expn_event(self, ctx, expn_data):
-        raise ValueError('broken')
-
-    def on_help_event(self, ctx, help_data):
+    def _answer(self, data):
+        if data == 'result':
+            return 42
+        if data == 'error':
+            raise ValueError('broken')
         raise Smtpd550Exception
 
+    def on_vrfy_event(self, ctx, vrfy_data):
+        return self._answer(vrfy_data)
 
-def test_vrfy_expn_and_help_answer_a_fault_of_the_handler():
+    def on_expn_event(self, ctx, expn_data):
+        return self._answer(expn_data)
+
+    def on_help_event(self, ctx, help_data):
+        return self._answer(help_data)
+
+
+@pytest.mark.parametrize('verb', [b'VRFY', b'EXPN', b'HELP'])
+def test_vrfy_expn_and_help_answer_a_fault_of_the_handler(verb):
     """Another result or an exception answers 451, an SmtpdException its code."""
-    _, r = dialog(FaultyReplyEvents(), {}, [b'EHLO me\r\n', b'VRFY x\r\n', b'EXPN x\r\n', b'HELP\r\n'])
-    assert r[1][0].startswith('451')
-    assert r[2][0].startswith('451')
-    assert r[3][0].startswith('550')
+    commands = [b'EHLO me\r\n'] + [verb + b' ' + data + b'\r\n' for data in (b'result', b'error', b'reject')]
+    _, r = dialog(FaultyReplyEvents(), {}, commands)
+    assert [reply[0][:3] for reply in r[1:]] == ['451', '451', '550']
 
 
-def test_vrfy_without_tls_on_tls_required_answers_530():
-    """With TLS_REQUIRED a VRFY on the plaintext channel answers 530."""
-    _, r = dialog(RecordingEvents(), {**TLS_SETTINGS, 'encrypt_mode': 'TLS_REQUIRED'}, [b'EHLO me\r\n', b'VRFY x\r\n'])
-    assert r[1][0].startswith('530')
+def test_vrfy_expn_and_help_without_tls_on_tls_required_answer_530():
+    """With TLS_REQUIRED VRFY, EXPN and HELP on the plaintext channel answer 530."""
+    commands = [b'EHLO me\r\n', b'VRFY x\r\n', b'EXPN x\r\n', b'HELP\r\n']
+    _, r = dialog(RecordingEvents(), {**TLS_SETTINGS, 'encrypt_mode': 'TLS_REQUIRED'}, commands)
+    assert [reply[0][:3] for reply in r[1:]] == ['530', '530', '530']
 
 
 # ---- STARTTLS and AUTH -------------------------------------------------------

@@ -509,6 +509,20 @@ def test_read_line_times_out_on_partial_buffered_line():
     asyncio.run(go())
 
 
+def test_wait_line_after_a_shutdown_reads_nothing():
+    """After a shutdown the wait for a line ends at once with nothing read."""
+    from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
+
+    async def go():
+        srv = SmtpdServer(CaptureSmtpdEvents())
+        srv.shutdown()
+        reader = asyncio.StreamReader()
+        reader.feed_data(b'NOOP\r\n')
+        return await srv._wait_line(reader, 1)
+
+    assert asyncio.run(go()) == b''
+
+
 def test_read_line_ends_a_session_past_its_deadline():
     """A read past io_session_timeout raises at once, also on a buffered line."""
     from tokeo.core.smtpd.exc import SmtpdIOSessionTimeoutException
@@ -1305,6 +1319,71 @@ def test_serve_blocks_until_stop_and_join_returns_then():
     greeting, stopped = asyncio.run(go())
     assert greeting[0].startswith('220')
     assert stopped is True
+
+
+def test_a_cancelled_connection_without_shutdown_gets_no_421():
+    """A session cancelled without a shutdown ends without a reply."""
+
+    async def go():
+        srv = SmtpdServer(RecordingEvents(), settings={})
+        await srv.start([{'host': '127.0.0.1', 'port': 0}])
+        port = srv._servers[0].sockets[0].getsockname()[1]
+        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        await read_reply(reader)
+        await wait_until_async(lambda: srv._sessions)
+        for task in list(srv._sessions):
+            task.cancel()
+        rest = await reader.read()
+        writer.close()
+        await srv.stop(wait_seconds_before_close=0.1)
+        return rest
+
+    assert asyncio.run(go()) == b''
+
+
+def test_shutdown_before_start_only_marks_the_request():
+    """A shutdown before start() marks the request and sends nothing."""
+    srv = SmtpdServer(RecordingEvents(), settings={})
+    srv.shutdown()
+    assert srv.shutdown_requested() is True
+
+
+def test_stop_without_start_and_with_a_slow_session_ends_stopped():
+    """stop() needs no serve task and does not wait for a session forever."""
+
+    class SlowEnd(RecordingEvents):
+
+        async def on_disconnect_event(self, ctx):
+            await asyncio.sleep(1)
+
+    async def go():
+        srv = SmtpdServer(SlowEnd(), settings={})
+        server = await asyncio.start_server(srv._on_connection, '127.0.0.1', 0)
+        srv._servers.append(server)
+        port = server.sockets[0].getsockname()[1]
+        reader, writer = await asyncio.open_connection('127.0.0.1', port)
+        await read_reply(reader)
+        await srv.stop(gracefully=False)
+        writer.close()
+        return srv._stopped
+
+    assert asyncio.run(go()) is True
+
+
+def test_join_waits_until_the_server_has_stopped():
+    """join() returns only after stop() has ended the serving."""
+
+    async def go():
+        srv = SmtpdServer(RecordingEvents(), settings={})
+        await srv.start([{'host': '127.0.0.1', 'port': 0}])
+        joined = asyncio.create_task(srv.join(poll_seconds=0.01))
+        await asyncio.sleep(0.05)
+        early = joined.done()
+        await srv.stop(wait_seconds_before_close=0.1)
+        await asyncio.wait_for(joined, 2)
+        return early
+
+    assert asyncio.run(go()) is False
 
 
 # ---- AUTH (PLAIN / LOGIN) -----------------------------------------------------
