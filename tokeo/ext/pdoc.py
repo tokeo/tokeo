@@ -370,7 +370,7 @@ class TokeoPdoc(Handler):
         function carries no (known) decorators.
         """
         try:
-            from tokeo.core.utils.pdoc import DecoratedFunction
+            from tokeo.core.pdoc import DecoratedFunction
 
             decorated = DecoratedFunction(
                 self.app,

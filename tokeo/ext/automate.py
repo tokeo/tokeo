@@ -64,7 +64,7 @@ from tokeo.core.utils.props import hasprops, getprop
 from tokeo.core.utils.json import json_dump, TokeoJsonUnknownNoneEncoder
 from tokeo.core.utils import sanitize
 from tokeo.ext.argparse import Controller
-from tokeo.core.utils.cement.extensions import required as extensions_required
+from tokeo.core.cement.extensions import required as extensions_required
 
 
 class TokeoAutomateError(TokeoError):

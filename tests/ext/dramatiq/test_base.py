@@ -341,7 +341,7 @@ def test_actor_send_without_rabbitmq(tmp, monkeypatch):
 
 def test_pdoc_hooks_restore_the_tokeo_actor(tmp):
     """The pdoc hooks swap the actor decorator and restore it after."""
-    from tokeo.core.utils.pdoc import pdoc_replace_decorator
+    from tokeo.core.pdoc import pdoc_replace_decorator
     from tokeo.ext.dramatiq import tokeo_actor, tokeo_dramatiq_pdoc_pre_render, tokeo_dramatiq_pdoc_post_render
 
     original = dramatiq.actor

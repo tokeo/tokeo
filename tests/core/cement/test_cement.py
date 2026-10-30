@@ -1,5 +1,5 @@
 """
-Tests for tokeo.core.utils.cement: the controller helpers subcmdmeta,
+Tests for tokeo.core.cement: the controller helpers subcmdmeta,
 defaultmeta and log_info_help inside a command and in the default of a
 controller, and the check of the extensions an extension requires.
 """
@@ -10,8 +10,8 @@ from cement import Controller, ex
 from tokeo.main import TokeoTest
 from tokeo.controllers.base import BaseController
 from tokeo.core.exc import TokeoError
-from tokeo.core.utils.cement.controllers import subcmdmeta, defaultmeta, log_info_help
-from tokeo.core.utils.cement.extensions import required as extensions_required
+from tokeo.core.cement.controllers import subcmdmeta, defaultmeta, log_info_help
+from tokeo.core.cement.extensions import required as extensions_required
 
 
 class HelpersController(Controller):

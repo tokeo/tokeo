@@ -1,3 +1,11 @@
+"""
+Tokeo Pdoc Helpers.
+
+Helpers of the pdoc extension ```tokeo.ext.pdoc```: a placeholder decorator
+for the docs render and ```DecoratedFunction```, which shows the decorators of
+a function in its docstring. Both work only within a tokeo app.
+"""
+
 from functools import wraps
 import re
 import ast

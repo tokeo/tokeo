@@ -39,7 +39,7 @@ from apscheduler.triggers.cron import CronTrigger
 from argparse import ArgumentParser
 import shlex
 from datetime import datetime, timezone, timedelta
-from tokeo.core.utils.cement.extensions import required as extensions_required
+from tokeo.core.cement.extensions import required as extensions_required
 
 
 class TokeoCronAndFireTrigger(CronTrigger):

@@ -27,7 +27,7 @@ from tokeo.ext.dramatiq.base import (  # noqa: F401
     TokeoDramatiq,
 )
 from tokeo.ext.dramatiq.controller import TokeoDramatiqController
-from tokeo.core.utils.cement.extensions import required as extensions_required
+from tokeo.core.cement.extensions import required as extensions_required
 
 
 def tokeo_dramatiq_pdoc_pre_render(app):
@@ -44,7 +44,7 @@ def tokeo_dramatiq_pdoc_pre_render(app):
         with a simpler version that pdoc can handle
 
     """
-    from tokeo.core.utils.pdoc import pdoc_replace_decorator
+    from tokeo.core.pdoc import pdoc_replace_decorator
 
     dramatiq.actor = pdoc_replace_decorator
     if getattr(app.dramatiq, 'actor', None) is not None:
