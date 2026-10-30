@@ -318,6 +318,8 @@ class TokeoDramatiq(MetaMixin):
             locks_tag='dramatiq_locks',
             # Prefix for dramatiq lock keys
             locks_key_prefix='dq_',
+            # Seconds between two checks of a waiting lock or temper call
+            locks_sleep_time=0.1,
         )
 
     #: (Application) The Cement application instance, set on setup
@@ -356,6 +358,7 @@ class TokeoDramatiq(MetaMixin):
                 self._locks = self.app.cache.locks_handler(
                     self._config('locks_tag'),
                     self._config('locks_key_prefix'),
+                    self._config('locks_sleep_time'),
                 )
             except AttributeError as e:
                 self.app.log.debug(f'dramatiq locks unavailable on cache_handler: {e}')
@@ -528,7 +531,9 @@ class TokeoDramatiq(MetaMixin):
 
         This property provides access to the distributed locks handler from the
         diskcache extension, which can be used to apply rate limiting and
-        concurrency control to Dramatiq actors.
+        concurrency control to Dramatiq actors. A waiting ```lock``` or
+        ```temper``` call checks every ```locks_sleep_time``` seconds of the
+        dramatiq config, not of the diskcache config.
 
         ### Returns
 

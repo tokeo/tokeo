@@ -81,11 +81,16 @@ class TokeoDiskCacheLockError(TokeoError):
 _missing = object()
 
 
+def _check_seconds(name, value):
+    """Return value, raise a ValueError unless it is a number of seconds above 0."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        raise ValueError(f'{name} must be a number of seconds above 0, not {value!r}')
+    return value
+
+
 def _check_expire(expire):
     """Return expire, raise a ValueError unless it is a number above 0."""
-    if isinstance(expire, bool) or not isinstance(expire, (int, float)) or expire <= 0:
-        raise ValueError(f'expire must be a number of seconds above 0, not {expire!r}')
-    return expire
+    return _check_seconds('expire', expire)
 
 
 class _ThreadConnection:
@@ -153,15 +158,33 @@ class TokeoDiskCacheLocksHandler:
     - **cache** (diskcache.Cache): The diskcache.Cache instance to use
     - **tag** (str): Tag to identify locks in the cache
     - **key_prefix** (str): Prefix for lock keys
+    - **sleep_time** (float, optional): Seconds a waiting ```lock``` or
+        ```temper``` call sleeps between two checks of the cache. Defaults
+        to 0.1.
+
+    ### Raises
+
+    - **ValueError**: If sleep_time is not a number above 0
+
+    ### Notes
+
+    : A check only reads and costs about 10 us. With 0.1 seconds 1000 waiting
+        calls make 10,000 checks per second. A smaller value hands a freed
+        lock on sooner when few calls wait, at the cost of more checks; many
+        waiting calls hand it on quickly anyway.
+
+    : ```throttle``` does not use sleep_time, it waits exactly until its
+        next token.
 
     """
 
-    def __init__(self, app, cache, tag, key_prefix):
+    def __init__(self, app, cache, tag, key_prefix, sleep_time=0.1):
         #: The Cement application instance
         self.app = app
         self._cache = cache
         self._tag = tag
         self._key_prefix = key_prefix
+        self._sleep_time = _check_seconds('sleep_time', sleep_time)
 
     # --------------------------------------------------------------------------------------
 
@@ -254,7 +277,7 @@ class TokeoDiskCacheLocksHandler:
         return lock.locked()
 
     @contextmanager
-    def lock(self, key, expire=3600):
+    def lock(self, key, expire=3600, sleep_time=None):
         """
         Context manager for acquiring and releasing a lock.
 
@@ -267,6 +290,9 @@ class TokeoDiskCacheLocksHandler:
         - **expire** (float, optional): Seconds after which the lock expires,
             also when its holder died within the block. Must be longer than
             the block runs. Defaults to 3600.
+        - **sleep_time** (float, optional): Seconds to wait between two checks
+            while the lock is held by another. Defaults to the config
+            ```locks_sleep_time```, 0.1.
 
         ### Yields
 
@@ -296,8 +322,9 @@ class TokeoDiskCacheLocksHandler:
         key = self._key_prefix + key
         # the own token tells on release whether the lock is still ours
         token = uuid.uuid4().hex
+        sleep_time = self._sleep_time if sleep_time is None else sleep_time
         while not self._cache.add(key, token, expire=expire, tag=self._tag, retry=True):
-            time.sleep(0.001)
+            time.sleep(sleep_time)
         try:
             yield
         finally:
@@ -513,7 +540,7 @@ class TokeoDiskCacheLocksHandler:
         name_f=None,
         expire=3600,
         sleep_func=time.sleep,
-        sleep_time=0.05,
+        sleep_time=None,
         cb_on_locked=None,
         verbose=True,
     ):
@@ -551,7 +578,7 @@ class TokeoDiskCacheLocksHandler:
             no cb_on_locked is set, a blocked call returns immediately
             without running the wrapped function.
         - **sleep_time** (float, optional): Seconds to wait between retries
-            while blocked. Defaults to 0.05.
+            while blocked. Defaults to the config ```locks_sleep_time```, 0.1.
         - **cb_on_locked** (callable, optional): Function to call when no
             slot is free, instead of waiting. It receives the unpacked
             function arguments and never consumes a slot.
@@ -619,6 +646,7 @@ class TokeoDiskCacheLocksHandler:
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
             raise ValueError(f'count must be a whole number above 0, not {count!r}')
         _check_expire(expire)
+        sleep_time = self._sleep_time if sleep_time is None else sleep_time
 
         def decorator(func):
             # create the full name of the @decorated function
@@ -782,6 +810,8 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
             locks_tag='diskcache_locks',
             # Prefix added to all lock keys for namespace isolation
             locks_key_prefix='dc_',
+            # Seconds between two checks of a waiting lock or temper call
+            locks_sleep_time=0.1,
         )
 
     #: (TokeoDiskCacheLocksHandler) Handler for locks and rate limiting, set on
@@ -847,7 +877,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
-    def locks_handler(self, tag, locks_key_prefix):
+    def locks_handler(self, tag, locks_key_prefix, sleep_time=None):
         """
         Create a new locks handler instance.
 
@@ -858,13 +888,17 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         - **tag** (str): Tag to identify locks in the cache
         - **locks_key_prefix** (str): Prefix for lock keys
+        - **sleep_time** (float, optional): Seconds between two checks of a
+            waiting ```lock``` or ```temper``` call. Defaults to the config
+            ```locks_sleep_time```.
 
         ### Returns
 
         - **TokeoDiskCacheLocksHandler**: The locks handler instance
 
         """
-        return TokeoDiskCacheLocksHandler(self.app, self._cache, tag, locks_key_prefix)
+        sleep_time = self._config('locks_sleep_time') if sleep_time is None else sleep_time
+        return TokeoDiskCacheLocksHandler(self.app, self._cache, tag, locks_key_prefix, sleep_time)
 
     def get(self, key, default=None, **kw):
         """

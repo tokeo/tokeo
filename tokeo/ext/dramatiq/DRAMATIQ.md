@@ -462,6 +462,7 @@ with a ```TokeoDramatiqConfigError``` that names the key.
 <tr><td>broker</td><td>'rabbitmq'</td><td>the broker, only rabbitmq</td></tr>
 <tr><td>locks_tag</td><td>'dramatiq_locks'</td><td>diskcache tag of the locks</td></tr>
 <tr><td>locks_key_prefix</td><td>'dq_'</td><td>prefix of the lock keys</td></tr>
+<tr><td>locks_sleep_time</td><td>0.1</td><td>seconds between two checks of a waiting lock or temper call</td></tr>
 </tbody>
 </table>
 
@@ -637,6 +638,10 @@ The locks live in the diskcache directory, so they count across all worker
 processes of one machine (or of machines sharing that directory).
 ```serve``` purges stale locks on start, ```dramatiq locks --purge``` does it by
 hand.
+
+A call that waits for a lock or a free slot of ```temper``` checks the cache
+every ```locks_sleep_time``` seconds (section 7), ```sleep_time``` of the call
+overrides it.
 
 ## 11. Errors
 

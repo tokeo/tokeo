@@ -272,6 +272,18 @@ def test_register_dead_message_ttl_config_wins_over_env(tmp, monkeypatch):
         assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == 60000
 
 
+# ---- locks --------------------------------------------------------------------
+
+
+def test_locks_sleep_time_is_an_own_setting_of_dramatiq(tmp):
+    """The dramatiq locks wait 0.1 seconds or locks_sleep_time of dramatiq."""
+    with DramatiqTest(tmp) as app:
+        assert app.dramatiq.locks._sleep_time == 0.1
+    with DramatiqTest(tmp, locks_sleep_time=0.3) as app:
+        assert app.dramatiq.locks._sleep_time == 0.3
+        assert app.cache.locks._sleep_time == 0.1
+
+
 # ---- actor send wrapper -------------------------------------------------------
 
 

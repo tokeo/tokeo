@@ -32,7 +32,7 @@ def max_overlap(intervals):
 
 
 class DiskcacheTest(TokeoTest):
-    """A test app with the diskcache in the given directory."""
+    """A test app with the diskcache in the given directory and further settings."""
 
     class Meta:
         extensions = [
@@ -40,11 +40,11 @@ class DiskcacheTest(TokeoTest):
             'tokeo.ext.diskcache',
         ]
 
-    def __init__(self, directory, **kw):
+    def __init__(self, directory, settings=None, **kw):
         # pin the diskcache to a fixed directory so that threads and separate
         # processes coordinate through the very same cache database
         config = init_defaults('diskcache')
-        config['diskcache']['directory'] = directory
+        config['diskcache'].update(settings or {}, directory=directory)
         super().__init__(config_defaults=config, **kw)
 
 

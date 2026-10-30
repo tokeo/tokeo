@@ -222,6 +222,62 @@ def test_locks_lock_failing_acquire_keeps_the_lock_of_another(tmp, monkeypatch):
         assert app.cache.locks.locked('busy') is True
 
 
+def _sleeps_of_a_waiting_lock(app, monkeypatch, **kw):
+    # the seconds a lock waits per check while another holds it
+    slept = []
+    app.cache.locks.acquire('busy')
+
+    def sleep(seconds):
+        slept.append(seconds)
+        app.cache.locks.release('busy')
+
+    monkeypatch.setattr('tokeo.ext.diskcache.time.sleep', sleep)
+    with app.cache.locks.lock('busy', **kw):
+        pass
+    return slept
+
+
+def test_locks_lock_waits_by_locks_sleep_time(tmp, monkeypatch):
+    """A waiting lock sleeps 0.1 seconds, unless the config or call set it."""
+    with DiskcacheTest(tmp.dir) as app:
+        assert _sleeps_of_a_waiting_lock(app, monkeypatch) == [0.1]
+        assert _sleeps_of_a_waiting_lock(app, monkeypatch, sleep_time=0.01) == [0.01]
+    with DiskcacheTest(tmp.dir, settings={'locks_sleep_time': 0.2}) as app:
+        assert _sleeps_of_a_waiting_lock(app, monkeypatch) == [0.2]
+
+
+def test_temper_waits_by_locks_sleep_time(tmp):
+    """A blocked temper call sleeps locks_sleep_time of the config by default."""
+    slept = []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        raise RuntimeError('stop waiting')
+
+    with DiskcacheTest(tmp.dir, settings={'locks_sleep_time': 0.2}) as app:
+
+        @app.cache.locks.temper(count=1, name='busy', sleep_func=sleep, verbose=False)
+        def inner():
+            pass
+
+        @app.cache.locks.temper(count=1, name='busy', verbose=False)
+        def outer():
+            # the slot is taken by outer, inner has to wait
+            with pytest.raises(RuntimeError):
+                inner()
+
+        outer()
+    assert slept == [0.2]
+
+
+@pytest.mark.parametrize('sleep_time', [0, -1, True, '0.05'], ids=['zero', 'negative', 'bool', 'str'])
+def test_locks_sleep_time_must_be_a_number_above_0(tmp, sleep_time):
+    """A locks_sleep_time not above 0 stops the setup of the cache."""
+    with pytest.raises(ValueError, match='sleep_time must be a number of seconds above 0'):
+        with DiskcacheTest(tmp.dir, settings={'locks_sleep_time': sleep_time}):
+            pass
+
+
 # --------------------------------------------------------------------------------------
 # temper: five essential points
 # --------------------------------------------------------------------------------------
