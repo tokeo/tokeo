@@ -1,4 +1,4 @@
-.PHONY: help clean venv outdated dev prod doc test fmt lint docker sdist wheel dist dist-upload
+.PHONY: help clean venv outdated dev prod doc test fmt lint docker version sdist wheel dist dist-upload
 
 help:
 	@echo
@@ -17,9 +17,10 @@ help:
 	@echo "  fmt (source=module) = run formatter"
 	@echo "  lint (source=module) = run linter"
 	@echo "  docker - create docker image"
-	@echo "  sdist - create source tgz"
-	@echo "  wheel - create installation wheel"
-	@echo "  dist - create sdist and wheel"
+	@echo "  version - set the version of tokeo into tokeo-base and tokeo-smtpd"
+	@echo "  sdist - create source tgz of all packages"
+	@echo "  wheel - create installation wheel of all packages"
+	@echo "  dist - create sdist and wheel of all packages"
 	@echo "  dist-upload - upload dist/* via twine"
 	@echo
 
@@ -30,7 +31,7 @@ clean:
 	rm -rf .pytest_cache .coverage coverage-report
 	rm -rf html
 	rm -rf tmp
-	rm -rf build/
+	rm -rf build/ tokeo-*/build/
 
 venv:
 	@if [ "0${VIRTUAL_ENV}" != "0" ]; then echo "Please deactivate venv before continue!"; exit 1; fi
@@ -58,13 +59,13 @@ outdated:
 dev:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	pip install --upgrade pip
-	pip install -e .
-	pip install -e .[dev]
+	pip install -e tokeo-base -e .
+	pip install -e tokeo-smtpd -e .[dev]
 
 prod:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	pip install --upgrade pip
-	pip install -e .
+	pip install -e tokeo-base -e .
 
 doc:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
@@ -88,7 +89,7 @@ endif
 
 # check for test with coverage reports
 ifdef cov
-cov_report=--cov=tokeo --cov-report=term --cov-report=html:coverage-report
+cov_report=--cov=tokeo --cov=tokeo-base/tokeo --cov=tokeo-smtpd/tokeo --cov-report=term --cov-report=html:coverage-report
 else
 cov_report=
 endif
@@ -119,7 +120,7 @@ test:
 
 # check for files
 ifndef sources
-sources=tokeo docs tests
+sources=tokeo tokeo-base tokeo-smtpd docs tests
 endif
 
 fmt:
@@ -138,14 +139,26 @@ docker: clean
 	cp .gitignore .dockerignore
 	docker build -t tokeocli/tokeo:latest .
 
-sdist: clean
-	python -m build --sdist
+# the version of tokeo is the version of all packages
+tokeo_version=$(shell python -c "from tokeo.core.version import get_version; print(get_version())")
 
-wheel: clean
-	python -m build --wheel
+version:
+	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
+	sed -i.bak -E 's/^version = ".*"/version = "$(tokeo_version)"/' tokeo-base/pyproject.toml tokeo-smtpd/pyproject.toml
+	sed -i.bak -E 's/"(tokeo-base|tokeo-smtpd)==[^"]*"/"\1==$(tokeo_version)"/' pyproject.toml tokeo-smtpd/pyproject.toml
+	rm -f pyproject.toml.bak tokeo-base/pyproject.toml.bak tokeo-smtpd/pyproject.toml.bak
 
-dist: clean
-	python -m build
+# the packages to build, tokeo last as it depends on the others
+packages=tokeo-base tokeo-smtpd .
+
+sdist: clean version
+	for package in $(packages); do python -m build --sdist --outdir dist $$package || exit 1; done
+
+wheel: clean version
+	for package in $(packages); do python -m build --wheel --outdir dist $$package || exit 1; done
+
+dist: clean version
+	for package in $(packages); do python -m build --outdir dist $$package || exit 1; done
 
 dist-upload:
 	twine upload dist/*

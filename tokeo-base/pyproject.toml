@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=83.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tokeo-base"
+# set by make version from tokeo.core.version
+version = "2.1.0"
+description = "Tokeo Base - the exceptions and the small dependency-free helpers of tokeo."
+readme = "README.md"
+authors = [
+    {name = "Tom Freudenberg", email = "th.freudenberg@gmail.com"}
+]
+license = "Apache-2.0"
+license-files = ["LICENSE.txt", "NOTICE.md"]
+urls = {"Homepage" = "https://github.com/tokeo/tokeo"}
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools]
+packages = {find = {namespaces = true, include = ["tokeo", "tokeo.*"]}}
+include-package-data = true
+
+[tool.setuptools.package-data]
+"tokeo" = ["**/*.md"]

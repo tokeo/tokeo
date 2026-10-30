@@ -77,6 +77,9 @@ pip install tokeo
 # Or add the optional governed AI runtime
 pip install tokeo tokeo-fundi
 
+# Or add the SMTP server library for the smtpd extension
+pip install tokeo tokeo-smtpd
+
 # Verify installation
 tokeo --help
 ```

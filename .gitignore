@@ -27,6 +27,12 @@
 !/tokeo/
 !/tokeo/**
 
+!/tokeo-base/
+!/tokeo-base/**
+
+!/tokeo-smtpd/
+!/tokeo-smtpd/**
+
 !/public/
 !/public/**
 
@@ -84,6 +90,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 /build/
+/tokeo-*/build/
 /develop-eggs/
 /dist/
 /downloads/

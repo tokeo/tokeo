@@ -11,7 +11,7 @@ RUN apk add --update --no-cache \
     git \
     && ln -s /usr/share/zoneinfo/UTC /etc/localtime \
     && pip install --upgrade pip \
-    && pip install --no-cache-dir -e .
+    && pip install --no-cache-dir -e tokeo-base -e .
 
 WORKDIR /app
 ENTRYPOINT ["tokeo"]
