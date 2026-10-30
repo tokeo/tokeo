@@ -590,7 +590,7 @@ only):
 {
   "type": "tokeo.dramatiq.heartbeat", "version": 1, "state": "running",
   "interval": 5, "sent_at": 1761100800000,
-  "app": {"label": "myapp", "version": "2.1.0"},
+  "app": {"label": "myapp", "version": "2.2.0"},
   "worker": {"host": "worker-01", "pid": 4711, "started_at": 1761097200000,
              "threads": 8, "queues": null, "queue_prefetch": 16,
              "delay_queue_prefetch": 8000, "details": true},

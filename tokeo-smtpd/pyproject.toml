@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tokeo-smtpd"
 # set by make version from tokeo.core.version
-version = "2.1.0"
+version = "2.2.0"
 description = "Tokeo SMTPD - an asyncio SMTP server library with events, TLS, AUTH, PROXY and limits."
 readme = "README.md"
 authors = [
@@ -16,7 +16,7 @@ license-files = ["LICENSE.txt", "NOTICE.md"]
 urls = {"Homepage" = "https://github.com/tokeo/tokeo"}
 requires-python = ">=3.11"
 dependencies = [
-    "tokeo-base==2.1.0",
+    "tokeo-base==2.2.0",
 ]
 
 [tool.setuptools]
