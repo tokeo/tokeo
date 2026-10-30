@@ -2,7 +2,6 @@
 
 The exceptions and the small dependency-free helpers of [Tokeo](https://github.com/tokeo/tokeo) like validations, dates, sorting, sanitizing, urls, tls, module loading, time limits and others.
 
-
 <br/>
 
 ## Getting Started
