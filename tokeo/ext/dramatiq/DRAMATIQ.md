@@ -635,7 +635,8 @@ def export(customer_id):
 ```
 
 The locks live in the diskcache directory, so they count across all worker
-processes of one machine (or of machines sharing that directory).
+processes of one machine. The directory must be local: SQLite does not lock
+reliably over a network file system.
 ```serve``` purges stale locks on start, ```dramatiq locks --purge``` does it by
 hand.
 
