@@ -41,6 +41,23 @@ from tokeo.core.vaults.enc import EncVault
 from tokeo.core.vaults.scrypt import ScryptVault
 
 
+class VaultLoader(yaml.FullLoader):
+    """
+    The yaml loader of the vault config handler, it knows the !vault: tag.
+
+    ### Notes
+
+    : The tag is known to this loader only, not to ```yaml.FullLoader```,
+        so another ```yaml.full_load``` of the process loads no ```VaultRef```
+
+    """
+
+    pass
+
+
+VaultLoader.add_multi_constructor('!vault:', VaultRef.from_yaml)
+
+
 class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
     """
     Vault-aware YAML configuration handler for Tokeo applications.
@@ -104,6 +121,30 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
         self._handlers = {}
         self.register_handler('enc', EncVault())
         self.register_handler('scrypt', ScryptVault())
+
+    def _parse_file(self, file_path):
+        """
+        Parse a yaml config file, its !vault: values load as VaultRef.
+
+        ### Args
+
+        - **file_path** (str): The path of the yaml config file
+
+        ### Returns
+
+        - **bool**: True, the file was parsed
+
+        ### Notes
+
+        : Reads the file like the yaml handler of cement, only by the
+            ```VaultLoader``` instead of ```yaml.full_load```
+
+        """
+        with open(file_path) as f:
+            content = f.read()
+        if content:
+            self.merge(yaml.load(content, Loader=VaultLoader))
+        return True
 
     def register_handler(self, name, handler):
         """
@@ -451,11 +492,6 @@ def load(app):
         ```app.config.register_handler```
 
     """
-    # register the !vault tag before any config is parsed, so a tagged scalar
-    # loads as an opaque VaultRef; cement parses with yaml.full_load, so the
-    # constructor goes on the FullLoader. the built-in handlers are registered
-    # on the config handler in its _setup
-    yaml.add_multi_constructor('!vault:', VaultRef.from_yaml, Loader=yaml.FullLoader)
     # open extension point: an extension or plugin can register its own vault
     # handler from the outside by hooking 'tokeo_vault_register_handlers'; it
     # runs at post_setup, once every extension has been loaded

@@ -14,18 +14,11 @@ from tokeo.core.vaults import Vault, TokeoVaultError
 from tests.ext.vault.vault_tests_helper import (
     MASTER_ENV,
     VaultTest,
-    isolate_yaml_tags,
     set_secrets,
     write_config,
     fernet_token,
     scrypt_token,
 )
-
-
-@pytest.fixture(autouse=True)
-def yaml_tags(monkeypatch):
-    """The !vault tag on yaml.FullLoader for the test only."""
-    isolate_yaml_tags(monkeypatch)
 
 
 @pytest.fixture

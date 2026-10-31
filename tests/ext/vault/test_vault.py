@@ -12,25 +12,18 @@ import yaml
 from cryptography.fernet import Fernet
 
 from tokeo.ext.yaml import TokeoYamlConfigError
-from tokeo.ext.vault import TokeoVaultConfigHandler
+from tokeo.ext.vault import TokeoVaultConfigHandler, VaultLoader
 from tokeo.core.vaults import Vault, VaultRef, TokeoVaultError
 from tokeo.core.vaults.enc import EncVault
 from tokeo.core.vaults.scrypt import ScryptVault
 from tests.ext.vault.vault_tests_helper import (
     MASTER_ENV,
     VaultTest,
-    isolate_yaml_tags,
     set_secrets,
     write_config,
     fernet_token,
     scrypt_token,
 )
-
-
-@pytest.fixture(autouse=True)
-def yaml_tags(monkeypatch):
-    """The !vault tag on yaml.FullLoader for the test only."""
-    isolate_yaml_tags(monkeypatch)
 
 
 @pytest.fixture
@@ -63,12 +56,18 @@ def test_load_makes_the_vault_handler_the_config_handler():
         assert app._meta.config_handler == 'tokeo.vault'
 
 
-def test_load_registers_the_vault_tag_on_the_full_loader():
-    """After loading, yaml.full_load turns !vault:master x into a VaultRef."""
-    with VaultTest():
-        ref = yaml.full_load('a: !vault:master gAAA')['a']
+def test_vault_loader_turns_the_vault_tag_into_a_vaultref():
+    """The VaultLoader turns !vault:master x into a VaultRef."""
+    ref = yaml.load('a: !vault:master gAAA', Loader=VaultLoader)['a']
     assert isinstance(ref, VaultRef)
     assert (ref.profile, ref.ciphertext) == ('master', 'gAAA')
+
+
+def test_load_leaves_the_full_loader_without_the_vault_tag():
+    """With the extension loaded yaml.full_load still refuses the !vault tag."""
+    with VaultTest():
+        with pytest.raises(yaml.constructor.ConstructorError, match='!vault:master'):
+            yaml.full_load('a: !vault:master gAAA')
 
 
 def test_load_of_a_config_file_keeps_the_secret_a_vaultref(key, tmp_path):
@@ -78,6 +77,16 @@ def test_load_of_a_config_file_keeps_the_secret_a_vaultref(key, tmp_path):
         stored = RawConfigParser.get(app.config, 'db', 'password')
         assert isinstance(stored, VaultRef)
         assert stored.profile == 'master'
+
+
+def test_parse_file_of_a_further_file_loads_its_secret_and_skips_an_empty_one(key, tmp_path):
+    """parse_file reads !vault of a further file, an empty file changes nothing."""
+    (tmp_path / 'more.yaml').write_text(f'mail:\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
+    (tmp_path / 'empty.yaml').write_text('')
+    with VaultTest(write_config(tmp_path)) as app:
+        assert app.config.parse_file(str(tmp_path / 'more.yaml')) is True
+        assert app.config.parse_file(str(tmp_path / 'empty.yaml')) is True
+        assert app.config.get('mail', 'password') == 's3cret'
 
 
 def test_load_does_not_need_the_key(tmp_path, monkeypatch):

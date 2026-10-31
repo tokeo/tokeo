@@ -8,7 +8,6 @@ import os
 import base64
 import hashlib
 
-import yaml
 from cryptography.fernet import Fernet
 from tokeo.main import TokeoTest
 
@@ -46,12 +45,6 @@ class VaultTest(TokeoTest):
 
     def __init__(self, config_file=None, **kw):
         super().__init__(config_files=[config_file] if config_file else [], **kw)
-
-
-def isolate_yaml_tags(monkeypatch):
-    # give yaml.FullLoader a copy of its multi constructors, so the !vault tag
-    # the extension registers globally is gone again after the test
-    monkeypatch.setattr(yaml.FullLoader, 'yaml_multi_constructors', dict(yaml.FullLoader.yaml_multi_constructors))
 
 
 def set_secrets(monkeypatch):
