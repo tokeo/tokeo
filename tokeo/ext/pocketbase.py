@@ -99,12 +99,15 @@ class TokeoPocketBaseHandler(MetaMixin):
         is a thin convenience layer over the PocketBase SDK, not a wrapper
         around its full surface.
 
-    : Authentication: the handler connects anonymously, so the mapped CRUD
-        calls run against whatever the PocketBase api rules permit for
-        unauthenticated requests. Auth and user management happen at the
-        application level - user records via plain CRUD on the auth
-        collection, login/token flows via collection().auth_with_password()
-        and friends. There is intentionally no handler-level login.
+    : Authentication: without auth_identity the handler connects
+        anonymously, so the mapped CRUD calls run against whatever the
+        PocketBase api rules permit for unauthenticated requests. With
+        auth_identity and auth_password it logs in that service identity on
+        first use and refreshes its token, see ensure_auth.
+
+    : The handler holds one client with one auth store for the service
+        identity; never log in other users on ```app.db.pb```, take an own
+        ```pocketbase.PocketBase``` client per user instead
 
     : This constructor only stores the application reference. The actual
         PocketBase client initialization is deferred until the _setup method
@@ -329,9 +332,10 @@ class TokeoPocketBaseHandler(MetaMixin):
         Close the PocketBase connection.
 
         Lifecycle hook required by the database handler contract and wired
-        to the pre_close hook via pocketbase_close(). The handler holds no
-        session or pooled connection to tear down, but it clears any stored
-        auth token so the identity does not outlive the handler.
+        to the pre_close hook via pocketbase_close(). It clears any stored
+        auth token so the identity does not outlive the handler, and closes
+        the connection pool of the http client; the handler is not usable
+        afterwards.
 
         """
         # destroy the token so a logged-in identity does not linger
@@ -339,6 +343,8 @@ class TokeoPocketBaseHandler(MetaMixin):
             with self._auth_lock:
                 self.pb.auth_store.clear()
                 self._auth_collection = None
+        # free the pooled connections of the http client
+        self.pb.http_client.close()
 
     def collection(self, collection_id_or_name):
         """
@@ -379,7 +385,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         # return a general collection
         return self.pb.collection(collection_id_or_name)
 
-    def get_one(self, collection_id_or_name, id_, sort=None, cache=True, q=None):
+    def get_one(self, collection_id_or_name, id_, sort=None, q=None):
         """
         Retrieve a single record from a collection by ID.
 
@@ -394,7 +400,6 @@ class TokeoPocketBaseHandler(MetaMixin):
             SDK (format: ```field,-field```). Has no practical effect when
             fetching a single record by id; kept for SDK passthrough and
             symmetry with get_list
-        - **cache** (bool): Whether to use cached results if available
         - **q** (dict): Additional query parameters to pass to PocketBase, a
             key here wins over the arguments
 
@@ -411,23 +416,19 @@ class TokeoPocketBaseHandler(MetaMixin):
         ```python
         # Get a single user record
         user = app.db.get_one('users', 'abc123xyz')
-
-        # Disable caching for fresh data
-        latest_post = app.db.get_one('posts', post_id, cache=False)
         ```
 
         """
         # update immutable default arguments
         q = dict() if q is None else q
         # check query options
-        cache_opt = dict() if cache else dict(cache='no-cache')
         sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
         # run database query for one element by id
         self.ensure_auth()
         # q wins over the arguments, a key in both is no error
-        return self.collection(collection_id_or_name).get_one(id_, {**cache_opt, **sort_opt, **q})
+        return self.collection(collection_id_or_name).get_one(id_, {**sort_opt, **q})
 
-    def get_list(self, collection_id_or_name, page=1, perPage=20, filter='', sort=None, cache=True, q=None):
+    def get_list(self, collection_id_or_name, page=1, perPage=20, filter='', sort=None, q=None):
         """
         Retrieve a paginated list of records from a collection.
 
@@ -441,7 +442,6 @@ class TokeoPocketBaseHandler(MetaMixin):
         - **perPage** (int): Number of records per page (default: 20)
         - **filter** (str): Filter expression to apply (PocketBase filter syntax)
         - **sort** (str, optional): Sort expression (format: ```field,-field```)
-        - **cache** (bool): Whether to use cached results if available
         - **q** (dict): Additional query parameters to pass to PocketBase, a
             key here wins over the arguments
 
@@ -495,12 +495,11 @@ class TokeoPocketBaseHandler(MetaMixin):
         # update immutable default arguments
         q = dict() if q is None else q
         # check query options
-        cache_opt = dict() if cache else dict(cache='no-cache')
         sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
         # run database query for multiple elements
         self.ensure_auth()
         # q wins over the arguments, a key in both is no error
-        return self.collection(collection_id_or_name).get_list(page, perPage, {'filter': filter, **cache_opt, **sort_opt, **q})
+        return self.collection(collection_id_or_name).get_list(page, perPage, {'filter': filter, **sort_opt, **q})
 
     def create(self, collection_id_or_name, create_fields=None, q=None):
         """

@@ -321,13 +321,6 @@ def test_get_one_anonymous_sends_no_authorization(server):
     assert 'Authorization' not in server.requests[0].headers
 
 
-def test_get_one_without_cache_sends_no_cache(server):
-    """cache=False adds cache=no-cache to the query."""
-    with PocketbaseTest() as app:
-        app.db.get_one('posts', 'abc', cache=False)
-    assert _params(server.requests[0]) == dict(cache='no-cache')
-
-
 @pytest.mark.parametrize('sort, params', [('-created', dict(sort='-created')), ('', {}), (None, {})], ids=['set', 'empty', 'none'])
 def test_get_one_sends_sort_only_when_set(server, sort, params):
     """A sort is passed on as query, an empty or no sort is left out."""
@@ -337,17 +330,17 @@ def test_get_one_sends_sort_only_when_set(server, sort, params):
 
 
 def test_get_one_adds_q_to_the_query(server):
-    """q expand and fields arrive as query next to cache and sort."""
+    """q expand and fields arrive as query next to sort."""
     with PocketbaseTest() as app:
-        app.db.get_one('posts', 'abc', sort='title', cache=False, q=dict(expand='author', fields='id,title'))
-    assert _params(server.requests[0]) == dict(cache='no-cache', sort='title', expand='author', fields='id,title')
+        app.db.get_one('posts', 'abc', sort='title', q=dict(expand='author', fields='id,title'))
+    assert _params(server.requests[0]) == dict(sort='title', expand='author', fields='id,title')
 
 
 def test_get_one_q_wins_over_the_arguments(server):
     """A key of q that is also an argument is no error, the q value wins."""
     with PocketbaseTest() as app:
-        app.db.get_one('posts', 'abc', sort='title', cache=False, q=dict(sort='-created', cache='x'))
-    assert _params(server.requests[0]) == dict(cache='x', sort='-created')
+        app.db.get_one('posts', 'abc', sort='title', q=dict(sort='-created'))
+    assert _params(server.requests[0]) == dict(sort='-created')
 
 
 def test_get_one_missing_record_raises_the_sdk_error(server):
@@ -372,12 +365,11 @@ def test_get_list_sends_the_default_query(server):
 
 
 def test_get_list_sends_all_options(server):
-    """page, perPage, filter, sort, cache=False and q all arrive as query."""
+    """page, perPage, filter, sort and q all arrive as query."""
     with PocketbaseTest() as app:
-        app.db.get_list('posts', page=2, perPage=50, filter='views > 3', sort='-created,title', cache=False, q=dict(expand='author'))
+        app.db.get_list('posts', page=2, perPage=50, filter='views > 3', sort='-created,title', q=dict(expand='author'))
     assert _params(server.requests[0]) == dict(
         filter='views > 3',
-        cache='no-cache',
         sort='-created,title',
         expand='author',
         page='2',
@@ -669,23 +661,22 @@ def test_ensure_auth_concurrent_calls_log_in_once(server):
 # close
 
 
-def test_close_clears_the_service_login(server):
-    """close drops the token, the next call logs in again."""
+def test_close_clears_the_service_login_and_closes_the_client(server):
+    """close drops the token and closes the connection pool of the client."""
     with PocketbaseTest(SERVICE) as app:
         app.db.get_one('posts', 'abc')
         app.db.close()
         assert (app.db.pb.auth_store.token, app.db._auth_collection) == ('', None)
-        app.db.get_one('posts', 'abc')
-    assert server.calls.count(USERS_LOGIN) == 2
+        assert app.db.pb.http_client.is_closed
 
 
 def test_close_of_the_app_clears_the_token(server):
-    """Closing the app runs close of the handler, no token is left."""
+    """Closing the app runs close of the handler, no token or connection is left."""
     with PocketbaseTest(SERVICE) as app:
         app.db.get_one('posts', 'abc')
         db = app.db
         assert db.pb.auth_store.token
-    assert db.pb.auth_store.token == ''
+    assert db.pb.auth_store.token == '' and db.pb.http_client.is_closed
 
 
 def test_close_anonymous_sends_nothing(server):
