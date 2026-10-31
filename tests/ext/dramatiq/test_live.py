@@ -162,13 +162,15 @@ def test_monitor_hears_a_worker(tmp, rando):
 
         try:
             worker.start()
-            actor.send(2)
-            assert wait_until(lambda: mine(0.5) and mine(0)[0]['heartbeat']['running'], 15)
-            (running,) = mine(0)
-            worker.stop()
+            # stopped once on every path, a second stop logs a CRITICAL
+            try:
+                actor.send(2)
+                assert wait_until(lambda: mine(0.5) and mine(0)[0]['heartbeat']['running'], 15)
+                (running,) = mine(0)
+            finally:
+                worker.stop()
             (stopped,) = mine(1)
         finally:
-            worker.stop()
             app.dramatiq.queues.delete(name, force=True)
     (task,) = running['heartbeat']['running']
     assert running['state'] == 'ok' and task['actor'] == f'task_{rando}' and task['args'] == '((2,), {})'
