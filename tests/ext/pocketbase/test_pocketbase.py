@@ -41,7 +41,7 @@ SUPERUSERS_LOGIN = ('POST', '/api/collections/_superusers/auth-with-password')
 SUPERUSERS_REFRESH = ('POST', '/api/collections/_superusers/auth-refresh')
 
 # the paths of the auth and records api of PocketBase the fake answers
-_ROUTE = re.compile(r'^/api/collections/([^/]+)/(auth-with-password|auth-refresh|records)(?:/([^/]+))?$')
+_ROUTE = re.compile(r'^/api/collections/([^/]+)/(auth-with-password|auth-refresh|impersonate|records)(?:/([^/]+))?$')
 
 
 class PocketbaseTest(TokeoTest):
@@ -116,6 +116,10 @@ class _FakePocketBase:
             return self._login(collection, json.loads(request.content))
         if action == 'auth-refresh':
             return self._refresh(collection, request.headers.get('Authorization', ''))
+        if action == 'impersonate':
+            if self.tokens.get(request.headers.get('Authorization', '')) != '_superusers':
+                return _error(403, 'Only superusers can perform this action.')
+            return self._issue(collection, id_)
         return self._records(request, collection, id_)
 
     def _issue(self, collection, identity):
@@ -217,11 +221,22 @@ def test_setup_fills_the_missing_settings_with_the_defaults(server):
             auth_identity=None,
             auth_password=None,
             auth_token_min_valid_seconds=5,
+            auth_check_seconds=60,
+            realtime_read_timeout=330,
+            realtime_max_pending=1000,
+            realtime_auth_check=60,
+            realtime_max_delay=30,
             max_connections=None,
             tls_verify_cert=True,
             tls_verify_hostname=True,
             tls_ca=None,
         )
+
+
+def test_setup_gives_the_realtime_options_of_the_config(server):
+    """The realtime_* settings become the options of a channel, as numbers."""
+    with PocketbaseTest(dict(realtime_read_timeout='90', realtime_max_pending='50')) as app:
+        assert app.db.realtime_options == dict(read_timeout=90.0, max_pending=50, auth_check=60.0, max_delay=30.0)
 
 
 def test_setup_sends_no_request(server):
@@ -674,6 +689,107 @@ def test_ensure_auth_concurrent_calls_log_in_once(server):
             titles = list(pool.map(lambda _: call(), range(8)))
     assert titles == ['Hello'] * 8
     assert server.calls.count(USERS_LOGIN) == 1
+
+
+def test_ensure_auth_confirms_the_login_on_the_server_after_auth_check_seconds(server):
+    """With auth_check_seconds 0 each request asks the server by a refresh first."""
+    with PocketbaseTest(dict(SERVICE, auth_check_seconds=0)) as app:
+        app.db.get_one('posts', 'abc')
+        app.db.get_one('posts', 'abc')
+    get = ('GET', '/api/collections/posts/records/abc')
+    assert server.calls == [USERS_LOGIN, get, USERS_REFRESH, get]
+
+
+def test_ensure_auth_login_refused_on_the_server_logs_in_anew(server):
+    """A token revoked on the server, e.g. by a new password, logs in anew."""
+    with PocketbaseTest(dict(SERVICE, auth_check_seconds=0)) as app:
+        app.db.get_one('posts', 'abc')
+        server.tokens.clear()
+        del server.requests[:]
+        app.db.get_one('posts', 'abc')
+        token = app.db.pb.token
+    assert server.calls == [USERS_REFRESH, USERS_LOGIN, ('GET', '/api/collections/posts/records/abc')]
+    assert server.requests[2].headers['Authorization'] == token
+
+
+def test_ensure_auth_changed_password_raises_instead_of_a_guest_request(server):
+    """A revoked token and a changed password raise, nothing goes as guest."""
+    with PocketbaseTest(dict(SERVICE, auth_check_seconds=0)) as app:
+        app.db.get_one('posts', 'abc')
+        server.tokens.clear()
+        server.accounts.clear()
+        del server.requests[:]
+        with pytest.raises(TokeoPocketBaseAuthError):
+            app.db.get_one('posts', 'abc')
+    assert server.calls == [USERS_REFRESH, USERS_LOGIN]
+
+
+# impersonate
+
+# a service identity of the _superusers, which may impersonate
+SUPERUSER = dict(auth_identity='admin@example.com', auth_password='secret')
+
+
+def test_impersonate_gives_a_client_of_its_own_acting_as_the_record(server):
+    """The client carries the token of the record, the service keeps its own."""
+    server.accounts = {('_superusers', 'admin@example.com'): 'secret'}
+    with PocketbaseTest(SUPERUSER) as app:
+        client = app.db.impersonate('users', 'u1', duration=600)
+        client.collection('posts').get_list()
+        assert (client.auth_record.email, client.http_client is app.db.pb.http_client) == ('u1', False)
+        assert server.requests[-1].headers['Authorization'] == client.token != app.db.pb.token
+        assert _body(server.requests[-2]) == dict(duration=600)
+        client.close()
+
+
+def test_impersonate_renews_a_login_refused_on_the_server_by_a_new_impersonation(server):
+    """A revoked token of the record is impersonated anew for the request."""
+    server.accounts = {('_superusers', 'admin@example.com'): 'secret'}
+    with PocketbaseTest(dict(SUPERUSER, auth_check_seconds=0)) as app:
+        client = app.db.impersonate('users', 'u1')
+        old = client.token
+        del server.tokens[old]
+        client.collection('posts').get_list()
+        assert (client.logins, server.requests[-1].headers['Authorization']) == (2, client.token)
+        assert client.token != old
+        client.close()
+    assert ('POST', '/api/collections/users/impersonate/u1') in server.calls[-3:]
+
+
+def test_impersonate_by_a_service_without_superuser_raises(server):
+    """A service of users may not impersonate, it raises with status 403."""
+    with PocketbaseTest(SERVICE) as app:
+        with pytest.raises(TokeoPocketBaseAuthError) as caught:
+            app.db.impersonate('users', 'u1')
+    assert caught.value.status == 403
+
+
+# nicegui
+
+
+@pytest.mark.parametrize(
+    'extensions',
+    [['tokeo.ext.pocketbase', 'tokeo.ext.nicegui'], ['tokeo.ext.nicegui', 'tokeo.ext.pocketbase']],
+    ids=['pocketbase_first', 'nicegui_first'],
+)
+def test_nicegui_gets_the_live_data_as_pb_whatever_the_order(server, extensions):
+    """With nicegui, loaded before or after pocketbase, app.nicegui.pb is there."""
+    from tokeo.ext.pocketbase.live import NiceguiPocketBase
+
+    class BothTest(PocketbaseTest):
+
+        class Meta:
+            pass
+
+    BothTest.Meta.extensions = ['tokeo.ext.print', *extensions]
+    with BothTest() as app:
+        assert isinstance(app.nicegui.pb, NiceguiPocketBase) and app.nicegui.pb.app is app
+
+
+def test_without_nicegui_the_live_data_stays_out(server):
+    """Without nicegui its hook is not defined, pocketbase sets up alone."""
+    with PocketbaseTest() as app:
+        assert not app.hook.defined('tokeo_nicegui_extend') and not hasattr(app, 'nicegui')
 
 
 # close

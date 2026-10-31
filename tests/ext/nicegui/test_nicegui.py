@@ -415,6 +415,31 @@ def test_api_of_the_route_handler_answers():
         NiceguiSimulation(app).run(visit)
 
 
+# extend
+
+
+class NiceguiExtendTest(NiceguiTest):
+    """A test app that adds the part my to app.nicegui by the extend hook."""
+
+    class Meta:
+        hooks = [('tokeo_nicegui_extend', lambda app: app.nicegui.extend('my', ('part', app.nicegui.ux)))]
+
+
+def test_extend_adds_a_part_and_refuses_a_taken_name():
+    """extend adds demo, a taken name like ux raises."""
+    with NiceguiTest() as app:
+        app.nicegui.extend('demo', 1)
+        assert app.nicegui.demo == 1
+        with pytest.raises(TokeoNiceguiError, match='app.nicegui.ux exists already'):
+            app.nicegui.extend('ux', 2)
+
+
+def test_extend_hook_runs_once_nicegui_is_set_up():
+    """A function of tokeo_nicegui_extend adds its part to the ready app.nicegui."""
+    with NiceguiExtendTest() as app:
+        assert app.nicegui.my == ('part', app.nicegui.ux)
+
+
 # ux
 
 

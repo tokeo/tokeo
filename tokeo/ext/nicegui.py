@@ -17,6 +17,9 @@ polling mechanism.
 - Integrates FastAPI for headless REST endpoints and custom OpenAPI docs
 - Hot-reloads during development via Watchdog file watching
 - Exposes a helper for arbitrary HTML elements via ```app.nicegui.ux```
+- Lets other extensions add their parts to ```app.nicegui``` by the hook
+  ```tokeo_nicegui_extend```, e.g. the pocketbase extension its live data as
+  ```app.nicegui.pb```
 - Ships sensible configuration defaults for most use cases
 - Manages the full server lifecycle through Tokeo application hooks
 
@@ -357,6 +360,30 @@ class TokeoNicegui(MetaMixin):
 
     #: (NiceguiElementHelper) Helper that creates any HTML element, set on setup
     ux = None
+
+    def extend(self, name, obj):
+        """
+        Add a part of another extension to ```app.nicegui```.
+
+        ### Args
+
+        - **name** (str): The name of the part, e.g. ```pb``` for
+            ```app.nicegui.pb```
+        - **obj** (Any): The part
+
+        ### Raises
+
+        - **TokeoNiceguiError**: If the name is taken already
+
+        ### Notes
+
+        : Called by a function of the hook ```tokeo_nicegui_extend```, which
+            runs only when the nicegui extension is loaded
+
+        """
+        if hasattr(self, name):
+            raise TokeoNiceguiError(f'app.nicegui.{name} exists already, another extension took the name')
+        setattr(self, name, obj)
 
     def _setup(self, app):
         """
@@ -869,6 +896,42 @@ def tokeo_nicegui_extend_app(app):
     app.nicegui._setup(app)
 
 
+def tokeo_nicegui_extend_by_others(app):
+    """
+    Let other extensions add their parts to app.nicegui.
+
+    Runs the hook ```tokeo_nicegui_extend``` at the end of the setup, after
+    every extension set itself up; a function of the hook adds its part by
+    ```app.nicegui.extend(name, obj)```.
+
+    ### Args
+
+    - **app** (Application): The Cement application instance
+
+    ### Example
+
+    ```python
+    def myext_extend_nicegui(app):
+        app.nicegui.extend('my', MyNiceguiPart(app))
+
+    def myext_setup(app):
+        # in post_setup the hook is defined, if nicegui is loaded
+        app.hook.register('tokeo_nicegui_extend', myext_extend_nicegui)
+
+    def load(app):
+        app.hook.register('post_setup', myext_setup)
+    ```
+
+    ### Notes
+
+    : Without the nicegui extension the hook is not defined, Cement ignores
+        a function hooked to it; so an extension never needs nicegui itself
+
+    """
+    for res in app.hook.run('tokeo_nicegui_extend', app):
+        pass
+
+
 def tokeo_nicegui_shutdown(app):
     """
     Handle application shutdown for NiceGUI.
@@ -928,10 +991,15 @@ def load(app):
     - Registers the TokeoNiceguiController for CLI commands
     - Sets up hooks for application lifecycle integration
     - Integrates with pdoc for documentation generation
+    - Defines the hook ```tokeo_nicegui_extend```, run late in post_setup, so
+        other extensions add their parts to ```app.nicegui``` whatever
+        their order of loading
 
     """
     app.handler.register(TokeoNiceguiController)
+    app.hook.define('tokeo_nicegui_extend')
     app.hook.register('post_setup', tokeo_nicegui_extend_app)
+    app.hook.register('post_setup', tokeo_nicegui_extend_by_others, weight=100)
     app.hook.register('pre_close', tokeo_nicegui_shutdown)
     app.hook.register('post_close', tokeo_nicegui_hotload)
     app.hook.register('tokeo_pdoc_render_decorator', tokeo_nicegui_pdoc_render_decorator)

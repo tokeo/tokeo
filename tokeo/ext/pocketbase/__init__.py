@@ -8,7 +8,7 @@ and realtime subscriptions.
 
 The extension exposes a Cement-style database handler, reachable as app.db
 throughout your Tokeo application, that maps the usual CRUD methods onto
-PocketBase collections. It runs on the driver of tokeo-pb
+PocketBase collections. It runs on the driver of tokeo-pocketbase
 (```tokeo.core.pocketbase```), whose client is reached as app.db.pb for
 anything beyond that surface.
 
@@ -19,9 +19,13 @@ anything beyond that surface.
 - Advanced querying, filtering, and sorting on lists
 - User and auth collections handled like any other via CRUD
 - Optional lazy service-account login (auto-refreshed, thread-safe) via the
-  auth_identity/auth_password settings, before every request of the client
+  auth_identity/auth_password settings, before every request of the client,
+  confirmed on the server every auth_check_seconds
+- Clients that act as a user by impersonate(), their login kept the same way
+- With the nicegui extension the realtime data for pages as
+  ```app.nicegui.pb.live```, see ```tokeo.ext.pocketbase.live```
 - The records of a collection by collection(), and the driver client by
-  app.db.pb for filters, batches, impersonation and health
+  app.db.pb for filters, batches, realtime and health
 
 ### Example
 
@@ -53,11 +57,10 @@ anything beyond that surface.
 
 """
 
-import threading
 import httpx
 from cement.core.meta import MetaMixin
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
-from tokeo.core.pocketbase import PocketBase, TokeoPocketBaseError, TokeoPocketBaseAuthError
+from tokeo.core.pocketbase import AuthKeeper, PocketBase, TokeoPocketBaseError, TokeoPocketBaseAuthError  # noqa: F401
 
 # collections tried in order on the first login: a regular auth collection
 # first, then the superuser collection as a fallback; the one that succeeds
@@ -86,7 +89,7 @@ class TokeoPocketBaseHandler(MetaMixin):
     ### Notes
 
     : The handler is registered as 'db' and is reached through app.db. It
-        is a thin convenience layer over the driver of tokeo-pb.
+        is a thin convenience layer over the driver of tokeo-pocketbase.
 
     : Authentication: without auth_identity the handler connects
         anonymously, so the mapped CRUD calls run against whatever the
@@ -96,7 +99,7 @@ class TokeoPocketBaseHandler(MetaMixin):
 
     : The handler holds one client with one login for the service
         identity; never log in other users on ```app.db.pb```, take a client
-        of their own instead, e.g. by ```app.db.pb.impersonate(...)``` of a
+        of their own instead, e.g. by ```app.db.impersonate(...)``` of a
         superuser login
 
     : This constructor only stores the application reference. The actual
@@ -135,6 +138,20 @@ class TokeoPocketBaseHandler(MetaMixin):
             # refresh the token once fewer than this many seconds of validity
             # remain
             auth_token_min_valid_seconds=60,
+            # ask the server again after this many seconds whether the login
+            # still holds; PocketBase takes a refused token as a guest
+            auth_check_seconds=60,
+            # realtime channels, e.g. of app.nicegui.pb.live: seconds without
+            # data until a connection counts as lost, keep it 30 above the
+            # idle timeout of the server (300 unless changed by a hook)
+            realtime_read_timeout=330,
+            # events that may wait for slow callbacks before a channel hangs
+            # up, so PocketBase never holds events for it
+            realtime_max_pending=1000,
+            # seconds between two confirmations of the login of a channel
+            realtime_auth_check=60,
+            # the longest delay in seconds before a channel connects again
+            realtime_max_delay=30,
             # cap on concurrent http connections per process (httpx
             # max_connections); unset uses the httpx default and excess
             # requests wait for a free connection
@@ -150,6 +167,10 @@ class TokeoPocketBaseHandler(MetaMixin):
 
     #: (tokeo.core.pocketbase.PocketBase) The PocketBase client, set on setup
     pb = None
+
+    #: (dict) The options of realtime channels from the config, e.g.
+    #: ```Realtime(app.db.pb, **app.db.realtime_options)```, set on setup
+    realtime_options = None
 
     def __init__(self, app, *args, **kw):
         super(TokeoPocketBaseHandler, self).__init__(*args, **kw)
@@ -210,12 +231,19 @@ class TokeoPocketBaseHandler(MetaMixin):
         # self._config on every call
         self._auth_identity = self._config('auth_identity')
         self._auth_min_valid = self._config('auth_token_min_valid_seconds')
-        # guards lazy login and token refresh against concurrent access, since
-        # the login of the shared client has no locking of its own
-        self._auth_lock = threading.Lock()
+        self._auth_check = float(self._config('auth_check_seconds'))
+        # keeps the login of the service identity under its lock, since the
+        # login of the shared client has no locking of its own
+        self._auth_keeper = AuthKeeper(self.pb, self._login, min_valid_seconds=self._auth_min_valid, check_seconds=self._auth_check)
         # the collection a successful login used; reused for refresh and
         # re-login, set on the first successful authentication
         self._auth_collection = None
+        self.realtime_options = dict(
+            read_timeout=float(self._config('realtime_read_timeout')),
+            max_pending=int(self._config('realtime_max_pending')),
+            auth_check=float(self._config('realtime_auth_check')),
+            max_delay=float(self._config('realtime_max_delay')),
+        )
 
     def _config(self, key, **kwargs):
         """
@@ -276,10 +304,11 @@ class TokeoPocketBaseHandler(MetaMixin):
         Ensure a valid auth token before a request, when credentials are set.
 
         Called by the client before each of its requests, also those of
-        collection(), batches and send. When auth_identity and auth_password
-        are configured this lazily logs in on first use and, on later calls,
-        refreshes the token before it expires. With no credentials
-        configured the handler stays anonymous and this is a no-op.
+        collection(), batches, send and realtime channels. When
+        auth_identity and auth_password are configured this lazily logs in on
+        first use and, on later calls, refreshes the token before it expires
+        and confirms the login on the server. With no credentials configured
+        the handler stays anonymous and this is a no-op.
 
         ### Raises
 
@@ -287,31 +316,70 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         ### Notes
 
-        : The whole check-and-refresh runs under a lock, because the login of
-            the shared client is mutable state with no locking; this prevents
-            concurrent workers from racing on refresh or re-login
+        : An ```AuthKeeper``` runs the whole check under its lock, because the
+            login of the shared client is mutable state with no locking; this
+            prevents concurrent workers from racing on refresh or re-login
 
         : A token with more than auth_token_min_valid_seconds of life left is
-            used as is; one near expiry is refreshed on its collection, and a
-            failed refresh falls through to a full re-login
+            used as is for auth_check_seconds; then, or near expiry, a refresh
+            confirms it on the server, and a refused refresh falls through to
+            a full re-login. So a changed password or a deleted service
+            identity raises within auth_check_seconds instead of running on
+            as a guest
 
         """
         # nothing to do unless a service identity is configured
         if not self._auth_identity:
             return
-        with self._auth_lock:
-            # a token with more than the minimum valid window left is good
-            if self.pb.token_valid(self._auth_min_valid):
-                return
-            # a still-valid token near expiry can be refreshed on its collection
-            if self._auth_collection and self.pb.token_valid(0):
-                try:
-                    self.pb.auth_refresh()
-                    return
-                except TokeoPocketBaseError:
-                    # refresh rejected (e.g. revoked): fall back to a full login
-                    pass
-            self._login()
+        self._auth_keeper()
+
+    def impersonate(self, collection, record_id, duration=0):
+        """
+        Get a client that acts as a record, by the login of the service.
+
+        ### Args
+
+        - **collection** (str): The auth collection of the record, e.g.
+            ```users```
+        - **record_id** (str): The id of the record to act as
+        - **duration** (int): The seconds a token is valid, 0 takes the
+            default of the collection
+
+        ### Returns
+
+        - **PocketBase**: A client of its own with the login of the record,
+            kept by an ```AuthKeeper```: confirmed on the server every
+            auth_check_seconds and renewed by a new impersonation
+
+        ### Raises
+
+        - **TokeoPocketBaseAuthError**: If the service identity is no
+            superuser or the record is unknown
+
+        ### Example
+
+        ```python
+        anna = app.db.impersonate('users', anna_id)
+        mine = anna.collection('orders').get_full_list()
+        anna.close()
+        ```
+
+        ### Notes
+
+        : The rules of PocketBase apply to the record: lists, records and
+            realtime events of the client hold only what the record may see
+
+        : Close the client after use
+
+        """
+        client = self.pb.impersonate(collection, record_id, duration)
+        client.before_request = AuthKeeper(
+            client,
+            lambda: self.pb.impersonate(collection, record_id, duration, client=client),
+            min_valid_seconds=self._auth_min_valid,
+            check_seconds=self._auth_check,
+        )
+        return client
 
     def close(self):
         """
@@ -326,7 +394,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         """
         # destroy the token so a logged-in identity does not linger, and free
         # the pooled connections of the http client
-        with self._auth_lock:
+        with self._auth_keeper.lock:
             self.pb.close()
             self._auth_collection = None
 
@@ -600,6 +668,26 @@ def pocketbase_extend_app(app):
     """
     app.extend('db', TokeoPocketBaseHandler(app))
     app.db._setup(app)
+    # nicegui defines its hook only when it is loaded, else this is ignored
+    app.hook.register('tokeo_nicegui_extend', pocketbase_extend_nicegui)
+
+
+def pocketbase_extend_nicegui(app):
+    """
+    Add the live data of PocketBase to nicegui as app.nicegui.pb.
+
+    Runs by the hook ```tokeo_nicegui_extend``` of the nicegui extension,
+    only when it is loaded.
+
+    ### Args
+
+    - **app**: The Tokeo application instance
+
+    """
+    # nicegui is loaded when this runs; the live module needs it
+    from tokeo.ext.pocketbase.live import NiceguiPocketBase
+
+    app.nicegui.extend('pb', NiceguiPocketBase(app))
 
 
 def pocketbase_close(app):
