@@ -46,6 +46,7 @@ import re
 import secrets
 import yaml
 import copy
+import contextlib
 from threading import Thread
 from concurrent import futures as concurrent_futures
 import importlib
@@ -61,6 +62,7 @@ from cement import ex
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.base import filled_str_or_default
 from tokeo.core.utils.props import hasprops, getprop
+from tokeo.core.utils.validate import is_filled_str, is_list, is_number_gt
 from tokeo.core.utils.json import json_dump, TokeoJsonUnknownNoneEncoder
 from tokeo.core.utils import sanitize
 from tokeo.ext.argparse import Controller
@@ -846,7 +848,7 @@ class TokeoAutomate(MetaMixin):
             - user:password@host:port
 
         """
-        if not isinstance(host_str, str) or str.strip(host_str) == '':
+        if not is_filled_str(host_str):
             raise TokeoAutomateError('At least a host must be specified to get host_dict from string')
         # use the counter also as running id
         self._hosts_cnt += 1
@@ -1154,7 +1156,7 @@ class TokeoAutomate(MetaMixin):
             # get params for host
             _config_hostgroup = _config_hostgroups[key]
             # check split for host and user
-            if not isinstance(_config_hostgroup, list) and not isinstance(_config_hostgroup, tuple):
+            if not is_list(_config_hostgroup):
                 raise TokeoAutomateError(f'To create the hostgroup "{key}" there must be a list of hosts')
             # expand hosts to host_dicts
             hosts_list = []
@@ -1273,7 +1275,7 @@ class TokeoAutomate(MetaMixin):
         _defaults = _config_tasks.pop('_defaults', {})
         # test for a default module
         _default_module = _defaults.get('module', None)
-        if _default_module is not None and (not isinstance(_default_module, str) or str.strip(_default_module) == ''):
+        if _default_module is not None and not is_filled_str(_default_module):
             raise TokeoAutomateError('A default module for tasks must be defined by a string')
         # get some global config settings for all tasks
         _default_task_protect = _defaults.get('protect', 'strict')
@@ -1288,7 +1290,9 @@ class TokeoAutomate(MetaMixin):
             # get params for task
             _config_task = _config_tasks[key]
             # check for minimal configs
-            if 'module' not in _config_task or _config_task['module'] is None or str.strip(_config_task['module']) == '':
+            if _config_task.get('module') is not None and not isinstance(_config_task['module'], str):
+                raise TokeoAutomateError(f'The module of the task "{key}" for automate must be a string')
+            if not is_filled_str(_config_task.get('module')):
                 if _default_module is None:
                     raise TokeoAutomateError(f'The task "{key}" for automate must have a module defined to exist')
                 else:
@@ -1443,16 +1447,21 @@ class TokeoAutomate(MetaMixin):
                 if 'password' in _host and _host['password'] or 'password' in connection:
                     connect_kwargs['password'] = _host['password'] if 'password' in _host and _host['password'] else connection['password']
                 # setup and attach the connection
-                if 'lookup_keys' in connection and isinstance(connection['lookup_keys'], bool) and connection['lookup_keys']:
+                if connection.get('lookup_keys') is True:
                     connect_kwargs['look_for_keys'] = True
-                if 'allow_agent' in connection and isinstance(connection['allow_agent'], bool) and connection['allow_agent']:
+                if connection.get('allow_agent') is True:
                     connect_kwargs['allow_agent'] = True
-                    if 'forward_agent' in connection and isinstance(connection['forward_agent'], bool) and connection['forward_agent']:
+                    if connection.get('forward_agent') is True:
                         connect_args['forward_agent'] = True
-                if 'connect_timeout' in connection and (
-                    isinstance(connection['connect_timeout'], int) or isinstance(connection['connect_timeout'], str)
-                ):
-                    connect_kwargs['timeout'] = int(connection['connect_timeout'])
+                timeout = connection.get('connect_timeout')
+                if timeout is not None:
+                    # a timeout given as string, e.g. by an env override
+                    if isinstance(timeout, str):
+                        with contextlib.suppress(ValueError):
+                            timeout = float(timeout)
+                    if not is_number_gt(timeout, 0):
+                        raise TokeoAutomateError(f'connect_timeout must be a number of seconds greater than 0, not {timeout!r}')
+                    connect_kwargs['timeout'] = timeout
                 if 'identity' in connection and connection['identity'] is not None:
                     connect_kwargs['key_filename'] = connection['identity']
                 # check for key information
@@ -1625,7 +1634,7 @@ class TokeoAutomate(MetaMixin):
         # test tasks_ids
         if isinstance(task_ids, str):
             task_ids = tuple((task_ids,))
-        if not isinstance(task_ids, (list, tuple)):
+        if not is_list(task_ids):
             raise TokeoAutomateError('run_sequential must be called with one or many task ids')
 
         # check overrulers for hosts
@@ -1774,7 +1783,7 @@ class TokeoAutomate(MetaMixin):
         # test tasks_ids
         if isinstance(task_ids, str):
             task_ids = tuple((task_ids,))
-        if not isinstance(task_ids, (list, tuple)):
+        if not is_list(task_ids):
             raise TokeoAutomateError('run_threaded must be called with one or many task ids')
 
         # check overrulers for hosts

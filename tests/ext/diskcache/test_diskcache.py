@@ -271,9 +271,9 @@ def test_temper_waits_by_locks_sleep_time(tmp):
 
 
 @pytest.mark.parametrize('sleep_time', [0, -1, True, '0.05'], ids=['zero', 'negative', 'bool', 'str'])
-def test_locks_sleep_time_must_be_a_number_above_0(tmp, sleep_time):
-    """A locks_sleep_time not above 0 stops the setup of the cache."""
-    with pytest.raises(ValueError, match='sleep_time must be a number of seconds above 0'):
+def test_locks_sleep_time_must_be_a_number_greater_than_0(tmp, sleep_time):
+    """A locks_sleep_time not greater than 0 stops the setup of the cache."""
+    with pytest.raises(ValueError, match='sleep_time must be a number of seconds greater than 0'):
         with DiskcacheTest(tmp.dir, settings={'locks_sleep_time': sleep_time}):
             pass
 
@@ -520,7 +520,7 @@ def test_throttle_process_rate_cap(tmp):
 
 
 # --------------------------------------------------------------------------------------
-# expire: a default for every key, only numbers above 0
+# expire: a default for every key, only numbers greater than 0
 # --------------------------------------------------------------------------------------
 
 
@@ -531,18 +531,18 @@ def _expires_in(app, key):
 
 
 @pytest.mark.parametrize('expire', [None, 0, -1, True, '60'], ids=['none', 'zero', 'negative', 'bool', 'str'])
-def test_expire_must_be_a_number_above_0(tmp, expire):
-    """temper, throttle, lock and acquire refuse an expire not above 0."""
+def test_expire_must_be_a_number_greater_than_0(tmp, expire):
+    """temper, throttle, lock and acquire refuse an expire not greater than 0."""
     with DiskcacheTest(tmp.dir) as app:
-        with pytest.raises(ValueError, match='expire must be a number of seconds above 0'):
+        with pytest.raises(ValueError, match='expire must be a number of seconds greater than 0'):
             app.cache.locks.temper(expire=expire)
         if expire is not None:
-            with pytest.raises(ValueError, match='expire must be a number of seconds above 0'):
+            with pytest.raises(ValueError, match='expire must be a number of seconds greater than 0'):
                 app.cache.locks.throttle(expire=expire)
-        with pytest.raises(ValueError, match='expire must be a number of seconds above 0'):
+        with pytest.raises(ValueError, match='expire must be a number of seconds greater than 0'):
             with app.cache.locks.lock('bad', expire=expire):
                 pass
-        with pytest.raises(ValueError, match='expire must be a number of seconds above 0'):
+        with pytest.raises(ValueError, match='expire must be a number of seconds greater than 0'):
             app.cache.locks.acquire('bad', expire=expire)
         assert app.cache.locks.locked('bad') is False
 
@@ -553,6 +553,22 @@ def test_throttle_expire_must_not_be_below_per_seconds(tmp):
         with pytest.raises(ValueError, match='expire must not be below per_seconds 60'):
             app.cache.locks.throttle(count=10, per_seconds=60, expire=5)
         assert app.cache.locks.throttle(count=10, per_seconds=60, expire=60)
+
+
+@pytest.mark.parametrize('count', [0, -1, True, 1.5, '2'], ids=['zero', 'negative', 'bool', 'float', 'str'])
+def test_throttle_count_must_be_an_integer_greater_than_0(tmp, count):
+    """throttle refuses a count that is no integer greater than 0."""
+    with DiskcacheTest(tmp.dir) as app:
+        with pytest.raises(ValueError, match='count must be an integer greater than 0'):
+            app.cache.locks.throttle(count=count)
+
+
+@pytest.mark.parametrize('per_seconds', [0, -1, True, '60', float('inf')], ids=['zero', 'negative', 'bool', 'str', 'inf'])
+def test_throttle_per_seconds_must_be_a_number_greater_than_0(tmp, per_seconds):
+    """throttle refuses a per_seconds that is no number greater than 0."""
+    with DiskcacheTest(tmp.dir) as app:
+        with pytest.raises(ValueError, match='per_seconds must be a number of seconds greater than 0'):
+            app.cache.locks.throttle(per_seconds=per_seconds)
 
 
 def test_throttle_expire_defaults_to_per_seconds_plus_10(tmp):
@@ -668,9 +684,17 @@ def test_temper_takes_another_value_as_no_holder(tmp, value):
         assert app.cache.get('dc_other') is None
 
 
-@pytest.mark.parametrize('count', [0, -1, True, 1.5, '2'], ids=['zero', 'negative', 'bool', 'float', 'str'])
-def test_temper_count_must_be_a_whole_number_above_0(tmp, count):
-    """temper refuses a count that is no whole number above 0."""
+@pytest.mark.parametrize('sleep_time', [0, -1, True, '0.1', float('inf')], ids=['zero', 'negative', 'bool', 'str', 'inf'])
+def test_temper_sleep_time_must_be_a_number_greater_than_0(tmp, sleep_time):
+    """temper refuses an own sleep_time that is no number greater than 0."""
     with DiskcacheTest(tmp.dir) as app:
-        with pytest.raises(ValueError, match='count must be a whole number above 0'):
+        with pytest.raises(ValueError, match='sleep_time must be a number of seconds greater than 0'):
+            app.cache.locks.temper(sleep_time=sleep_time)
+
+
+@pytest.mark.parametrize('count', [0, -1, True, 1.5, '2'], ids=['zero', 'negative', 'bool', 'float', 'str'])
+def test_temper_count_must_be_an_integer_greater_than_0(tmp, count):
+    """temper refuses a count that is no integer greater than 0."""
+    with DiskcacheTest(tmp.dir) as app:
+        with pytest.raises(ValueError, match='count must be an integer greater than 0'):
             app.cache.locks.temper(count=count)

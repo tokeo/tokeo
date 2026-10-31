@@ -158,7 +158,13 @@ def test_defaults_trusted_relay_auth_ids():
     assert _smtpd().trusted_relay_auth_ids == []
 
 
-@pytest.mark.parametrize('value', [None, 'relay', ('relay',), ['relay', 1], ['relay', ''], [' relay'], ['relay '], ['  ']])
+@pytest.mark.parametrize('value', [['relay'], ('relay', 'backup'), []])
+def test_trusted_relay_auth_ids_takes_a_list_or_a_tuple_of_ids(value):
+    """trusted_relay_auth_ids takes a list or a tuple of stripped ids."""
+    assert _smtpd(settings={'trusted_relay_auth_ids': value}).trusted_relay_auth_ids == value
+
+
+@pytest.mark.parametrize('value', [None, 'relay', ['relay', 1], ['relay', ''], [' relay'], ['relay '], ['  ']])
 def test_trusted_relay_auth_ids_not_a_list_of_ids_is_rejected(value):
     """trusted_relay_auth_ids accepts only a list of stripped non-empty ids."""
     with pytest.raises(ValueError, match='trusted_relay_auth_ids'):
@@ -190,7 +196,9 @@ def test_defaults_internationalization_extensions():
     [
         ({'max_processings': 0}, 'max_processings'),
         ({'max_processings': '4'}, 'max_processings'),
+        ({'max_processings': True}, 'max_processings'),
         ({'max_connections': 0}, 'max_connections'),
+        ({'max_connections': True}, 'max_connections'),
         ({'max_connections': 2, 'max_processings': 4}, 'max_connections'),
     ],
 )

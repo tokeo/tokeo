@@ -35,6 +35,7 @@ from enum import Enum, auto
 
 from tokeo.core.utils.date import utc_now
 from tokeo.core.utils.dict import deep_merge
+from tokeo.core.utils.validate import is_int_gt, is_number_ge, is_number_between, is_filled_str, is_list_of
 from .context import SmtpdContext, ServerCtx, EnvelopeCtx, MessageCtx, MessageSpooler
 from .tls import TlsTransport, EncryptMode
 from .logger import Severity, ForwardingLogger
@@ -521,23 +522,20 @@ class SmtpdServer:
             raise ValueError('Line breaks in DATA (crlf_data_mode) must be CRLF_DATA_STRICT or CRLF_DATA_STRICT_CLOSE with CRLF_STRICT!')
         if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not tls_immediate_supported():
             raise ValueError('Immediate TLS (encrypt_mode TLS_IMMEDIATE) requires Python 3.13.13+ or 3.14.4+!')
-        if not (type(self.io_cmd_timeout) in (int, float) and self.io_cmd_timeout >= 1):
+        if not is_number_ge(self.io_cmd_timeout, 1):
             raise ValueError('Timeout for a command line (io_cmd_timeout) must be at least 1 second!')
-        if not (type(self.io_proxy_cmd_timeout) in (int, float) and self.io_proxy_cmd_timeout >= 1):
+        if not is_number_ge(self.io_proxy_cmd_timeout, 1):
             raise ValueError('Timeout for the PROXY header (io_proxy_cmd_timeout) must be at least 1 second!')
-        if not (type(self.io_session_timeout) in (int, float) and 1 <= self.io_session_timeout <= 86400):
+        if not is_number_between(self.io_session_timeout, 1, 86400):
             raise ValueError('Timeout of a session (io_session_timeout) must be between 1 and 86400 seconds!')
-        if not (type(self.io_buffer_max_size) is int and self.io_buffer_max_size > 0):
+        if not is_int_gt(self.io_buffer_max_size, 0):
             raise ValueError('Maximum size of a line (io_buffer_max_size) must be a positive integer!')
-        if not (
-            isinstance(self.trusted_relay_auth_ids, list)
-            and all(isinstance(i, str) and i != '' and i == i.strip() for i in self.trusted_relay_auth_ids)
-        ):
+        if not is_list_of(self.trusted_relay_auth_ids, lambda i: is_filled_str(i) and i == i.strip()):
             raise ValueError('Trusted relays (trusted_relay_auth_ids) must be a list of stripped non-empty authorization ids!')
-        if not (isinstance(self.max_processings, int) and self.max_processings > 0):
+        if not is_int_gt(self.max_processings, 0):
             raise ValueError('Number of simultaneous processings (max_processings) must be a positive integer!')
         if self.max_connections is not None:
-            if not (isinstance(self.max_connections, int) and self.max_connections > 0):
+            if not is_int_gt(self.max_connections, 0):
                 raise ValueError('Number of concurrent connections (max_connections) must be nil or a positive integer!')
             if self.max_connections < self.max_processings:
                 raise ValueError(

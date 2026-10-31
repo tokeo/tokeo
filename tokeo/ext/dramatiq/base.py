@@ -20,7 +20,7 @@ from dramatiq.common import q_name
 import pika
 from tokeo.core.utils.url import overload_with_auth as url_overload_with_auth
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
-from tokeo.core.utils.validate import as_int_or_auto
+from tokeo.core.utils.validate import is_bool, as_int_or_auto
 from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError, TokeoDramatiqConnectionError
 
 
@@ -430,7 +430,7 @@ class TokeoDramatiq(MetaMixin):
         time_limit = _number('config', 'time_limit', self._config('time_limit'))
         max_age = _number('config', 'max_age', self._config('max_age'), allow_none=True)
         notify_shutdown = self._config('notify_shutdown')
-        if not isinstance(notify_shutdown, bool):
+        if not is_bool(notify_shutdown):
             raise TokeoDramatiqConfigError('config', 'notify_shutdown', notify_shutdown, 'true or false')
         max_retries = _number('config', 'max_retries', self._config('max_retries'), min_value=0)
         min_backoff = _number('config', 'min_backoff', self._config('min_backoff'))
@@ -454,7 +454,7 @@ class TokeoDramatiq(MetaMixin):
         # credentials may override any userinfo carried by the url
         # cement does not merge nested defaults, so complete the block here
         rabbitmq_config = {**self._meta.config_defaults['rabbitmq'], **self._config('rabbitmq')}
-        if not isinstance(rabbitmq_config['confirm_delivery'], bool):
+        if not is_bool(rabbitmq_config['confirm_delivery']):
             raise TokeoDramatiqConfigError('config', 'rabbitmq.confirm_delivery', rabbitmq_config['confirm_delivery'], 'true or false')
         max_priority = _number('config', 'rabbitmq.max_priority', rabbitmq_config['max_priority'], max_value=255, allow_none=True)
         dead_message_ttl = _number('config', 'rabbitmq.dead_message_ttl', rabbitmq_config['dead_message_ttl'], allow_none=True)
@@ -484,7 +484,7 @@ class TokeoDramatiq(MetaMixin):
     def _heartbeat(self):
         """Build the heartbeat middleware, None without monitoring."""
         monitoring = self._config('monitoring')
-        if not isinstance(monitoring, bool):
+        if not is_bool(monitoring):
             raise TokeoDramatiqConfigError('config', 'monitoring', monitoring, 'true or false')
         interval = _number('config', 'monitoring_interval', self._config('monitoring_interval'))
         details = _details(self._config('monitoring_with_details'), self.app.debug)

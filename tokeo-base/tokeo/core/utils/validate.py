@@ -59,6 +59,22 @@ def is_basetype(obj):
     return isinstance(obj, basetypes)
 
 
+def is_bool(value):
+    """
+    Tell whether the value is True or False, not 1, 0 or a string.
+
+    ### Args
+
+    - **value** (any): The value to check
+
+    ### Returns
+
+    - **bool**: True for a bool
+
+    """
+    return isinstance(value, bool)
+
+
 def is_int(value):
     """
     Tell whether the value is an int, not a bool.

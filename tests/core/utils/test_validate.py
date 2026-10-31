@@ -11,6 +11,7 @@ from tokeo.core.utils.validate import (
     as_int_or_auto,
     as_list,
     is_basetype,
+    is_bool,
     is_int,
     is_int_gt,
     is_int_ge,
@@ -46,6 +47,14 @@ NO_NUMBERS = [True, False, None, '1', '0.05', [1], {}, float('inf'), float('-inf
 def test_no_number_passes_a_number_check(check, value):
     """bool, None, strings, containers, inf and nan fail every number check."""
     assert check(value) is False
+
+
+@pytest.mark.parametrize('value', [1, 0, 'true', 'false', None, []])
+def test_is_bool_takes_true_and_false_only(value):
+    """is_bool is True for True and False, not for 1, 0, a string or None."""
+    assert is_bool(True) is True
+    assert is_bool(False) is True
+    assert is_bool(value) is False
 
 
 def test_is_int_takes_int_only():

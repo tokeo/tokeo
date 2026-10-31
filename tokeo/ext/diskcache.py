@@ -49,6 +49,7 @@ import weakref
 from os.path import basename
 from tokeo.ext.argparse import Controller
 from tokeo.core.exc import TokeoError
+from tokeo.core.utils.validate import is_int_gt, is_number, is_number_gt, is_filled_str
 from cement import ex
 from cement.core import cache
 from contextlib import contextmanager
@@ -80,17 +81,9 @@ class TokeoDiskCacheLockError(TokeoError):
 # the default of a missing key, a lock of diskcache holds None
 _missing = object()
 
-
-def _check_seconds(name, value):
-    """Return value, raise a ValueError unless it is a number of seconds above 0."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
-        raise ValueError(f'{name} must be a number of seconds above 0, not {value!r}')
-    return value
-
-
-def _check_expire(expire):
-    """Return expire, raise a ValueError unless it is a number above 0."""
-    return _check_seconds('expire', expire)
+# the messages of the checks, formatted with the name and the value
+_ERR_SECONDS_GT_0 = '{} must be a number of seconds greater than 0, not {!r}'
+_ERR_INT_GT_0 = '{} must be an integer greater than 0, not {!r}'
 
 
 class _ThreadConnection:
@@ -164,7 +157,7 @@ class TokeoDiskCacheLocksHandler:
 
     ### Raises
 
-    - **ValueError**: If sleep_time is not a number above 0
+    - **ValueError**: If sleep_time is not a number greater than 0
 
     ### Notes
 
@@ -184,7 +177,9 @@ class TokeoDiskCacheLocksHandler:
         self._cache = cache
         self._tag = tag
         self._key_prefix = key_prefix
-        self._sleep_time = _check_seconds('sleep_time', sleep_time)
+        if not is_number_gt(sleep_time, 0):
+            raise ValueError(_ERR_SECONDS_GT_0.format('sleep_time', sleep_time))
+        self._sleep_time = sleep_time
 
     # --------------------------------------------------------------------------------------
 
@@ -240,10 +235,11 @@ class TokeoDiskCacheLocksHandler:
 
         ### Raises
 
-        - **ValueError**: If expire is not a number above 0
+        - **ValueError**: If expire is not a number greater than 0
 
         """
-        _check_expire(expire)
+        if not is_number_gt(expire, 0):
+            raise ValueError(_ERR_SECONDS_GT_0.format('expire', expire))
         lock = diskcache.Lock(self._cache, self._key_prefix + key, expire=expire, tag=self._tag)
         lock.acquire()
         return True
@@ -300,7 +296,7 @@ class TokeoDiskCacheLocksHandler:
 
         ### Raises
 
-        - **ValueError**: If expire is not a number above 0
+        - **ValueError**: If expire is not a number greater than 0
 
         ### Example
 
@@ -318,7 +314,8 @@ class TokeoDiskCacheLocksHandler:
             lock of another holder in place
 
         """
-        _check_expire(expire)
+        if not is_number_gt(expire, 0):
+            raise ValueError(_ERR_SECONDS_GT_0.format('expire', expire))
         key = self._key_prefix + key
         # the own token tells on release whether the lock is still ours
         token = uuid.uuid4().hex
@@ -397,8 +394,9 @@ class TokeoDiskCacheLocksHandler:
 
         ### Raises
 
-        - **ValueError**: If expire is not a number above 0 or below
-            per_seconds
+        - **ValueError**: If count is not an integer greater than 0,
+            per_seconds not a number greater than 0, or expire not a number
+            greater than 0 or below per_seconds
 
         ### Example
 
@@ -420,10 +418,16 @@ class TokeoDiskCacheLocksHandler:
         : The token bucket allows bursts up to count calls at once.
 
         """
+        if not is_int_gt(count, 0):
+            raise ValueError(_ERR_INT_GT_0.format('count', count))
+        if not is_number_gt(per_seconds, 0):
+            raise ValueError(_ERR_SECONDS_GT_0.format('per_seconds', per_seconds))
         if expire is None:
             # the bucket is full again after per_seconds, plus a margin
             expire = per_seconds + 10
-        elif _check_expire(expire) < per_seconds:
+        elif not is_number_gt(expire, 0):
+            raise ValueError(_ERR_SECONDS_GT_0.format('expire', expire))
+        elif expire < per_seconds:
             raise ValueError(f'expire must not be below per_seconds {per_seconds}, not {expire!r}')
 
         def decorator(func):
@@ -442,10 +446,10 @@ class TokeoDiskCacheLocksHandler:
                     **kwargs,
                 )
                 # create key from @decorated function name or formatted string
-                if isinstance(name, str) and name != '':
+                if is_filled_str(name):
                     # just use the name
                     key = self._key_prefix + name
-                elif isinstance(name_f, str) and name_f != '':
+                elif is_filled_str(name_f):
                     # expand the string in name_f with dict from args
                     key = self._key_prefix + name_f.format(**arguments)
                 else:
@@ -464,12 +468,7 @@ class TokeoDiskCacheLocksHandler:
                         values = self._cache.get(key)
                         # accept only a valid (number, number) bucket, the cache
                         # hands it back as list; time_func may return int or float
-                        if (
-                            type(values) in (tuple, list)
-                            and len(values) == 2
-                            and isinstance(values[0], (int, float))
-                            and isinstance(values[1], (int, float))
-                        ):
+                        if type(values) in (tuple, list) and len(values) == 2 and is_number(values[0]) and is_number(values[1]):
                             # unpack the cached bucket state
                             last, tally = values
                             # drop only truly broken states; an empty bucket
@@ -592,8 +591,8 @@ class TokeoDiskCacheLocksHandler:
 
         ### Raises
 
-        - **ValueError**: If count is not a whole number above 0 or expire
-            is not a number above 0
+        - **ValueError**: If count is not an integer greater than 0, expire
+            or sleep_time not a number greater than 0
 
         ### Example
 
@@ -643,10 +642,14 @@ class TokeoDiskCacheLocksHandler:
             release of a call that lost it.
 
         """
-        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-            raise ValueError(f'count must be a whole number above 0, not {count!r}')
-        _check_expire(expire)
-        sleep_time = self._sleep_time if sleep_time is None else sleep_time
+        if not is_int_gt(count, 0):
+            raise ValueError(_ERR_INT_GT_0.format('count', count))
+        if not is_number_gt(expire, 0):
+            raise ValueError(_ERR_SECONDS_GT_0.format('expire', expire))
+        if sleep_time is None:
+            sleep_time = self._sleep_time
+        elif not is_number_gt(sleep_time, 0):
+            raise ValueError(_ERR_SECONDS_GT_0.format('sleep_time', sleep_time))
 
         def decorator(func):
             # create the full name of the @decorated function
@@ -662,10 +665,10 @@ class TokeoDiskCacheLocksHandler:
                     **kwargs,
                 )
                 # create key from @decorated function name or formatted string
-                if isinstance(name, str) and name != '':
+                if is_filled_str(name):
                     # just use the name
                     key = self._key_prefix + name
-                elif isinstance(name_f, str) and name_f != '':
+                elif is_filled_str(name_f):
                     # expand the string in name_f with dict from args
                     key = self._key_prefix + name_f.format(**arguments)
                 else:

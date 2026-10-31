@@ -80,6 +80,40 @@ def test_tasks_task1_runs_locally(monkeypatch):
         app.inspect(result, divider='*')
 
 
+def _connect_timeout(connect_timeout):
+    # the timeout a task hands to the ssh client of a remote host, no server
+    # is contacted to build the connection
+    test_defaults = init_defaults('automate')
+    test_defaults['automate']['tasks'] = dict(
+        task1=dict(module='tests.ext.automate.automate_tests_helper', connection=dict(hosts='10.0.0.1', connect_timeout=connect_timeout)),
+    )
+    with AutomateTest(config_defaults=test_defaults) as app:
+        (run,) = app.automate._run_connections(app.automate.tasks['task1'])
+        return run['context'].connect_kwargs.get('timeout')
+
+
+@pytest.mark.parametrize('value, expected', [(30, 30), (2.5, 2.5), ('5.5', 5.5), (None, None)])
+def test_connect_timeout_takes_numbers_and_numeric_strings(value, expected):
+    """connect_timeout takes seconds as number or as text, null sets none."""
+    assert _connect_timeout(value) == expected
+
+
+@pytest.mark.parametrize('value', [True, 0, -1, 'x'])
+def test_connect_timeout_that_is_no_number_greater_than_0_raises(value):
+    """A connect_timeout that is no number of seconds greater than 0 raises."""
+    with pytest.raises(TokeoAutomateError, match='connect_timeout must be a number of seconds greater than 0'):
+        _connect_timeout(value)
+
+
+def test_task_module_that_is_no_string_raises():
+    """A module of a task that is no string raises instead of a TypeError."""
+    test_defaults = init_defaults('automate')
+    test_defaults['automate']['tasks'] = dict(task1=dict(module=42))
+    with AutomateTest(config_defaults=test_defaults) as app:
+        with pytest.raises(TokeoAutomateError, match='module of the task "task1"'):
+            app.automate.tasks
+
+
 def test_tasks_local_default_resolves_without_local_host():
     """Without a host "local" a task runs on the bare local host."""
     test_defaults = init_defaults('automate')

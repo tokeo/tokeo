@@ -19,6 +19,7 @@ from tokeo.core.utils.json import json_dump
 from dramatiq import cli
 from tokeo.ext.argparse import Controller
 from tokeo.ext.dramatiq.base import _number
+from tokeo.core.utils.validate import is_bool
 from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError
 
 
@@ -391,7 +392,7 @@ class TokeoDramatiqController(Controller):
         use_spawn = self.app.pargs.use_spawn
         if use_spawn is None:
             use_spawn = self.app.dramatiq.config('use_spawn')
-            if not isinstance(use_spawn, bool):
+            if not is_bool(use_spawn):
                 raise TokeoDramatiqConfigError('config', 'use_spawn', use_spawn, 'true or false')
         # build a synthetic sys.argv that dramatiq's own argparser will
         # consume: cli.make_argument_parser().parse_args() reads from
