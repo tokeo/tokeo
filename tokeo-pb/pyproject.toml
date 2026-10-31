@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=83.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tokeo-pb"
+# set by make version from tokeo.core.version
+version = "2.2.0"
+description = "Tokeo PB - a driver for the REST API of PocketBase 0.40 and later, built on httpx."
+readme = "README.md"
+authors = [
+    {name = "Tom Freudenberg", email = "th.freudenberg@gmail.com"}
+]
+license = "Apache-2.0"
+license-files = ["LICENSE.txt", "NOTICE.md"]
+urls = {"Homepage" = "https://github.com/tokeo/tokeo"}
+requires-python = ">=3.11"
+dependencies = [
+    "tokeo-base==2.2.0",
+    "httpx>=0.28.1",
+]
+
+[tool.setuptools]
+packages = {find = {namespaces = true, include = ["tokeo", "tokeo.*"]}}
+include-package-data = true
+
+[tool.setuptools.package-data]
+"tokeo" = ["**/*.md"]

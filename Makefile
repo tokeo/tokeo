@@ -17,7 +17,7 @@ help:
 	@echo "  fmt (source=module) = run formatter"
 	@echo "  lint (source=module) = run linter"
 	@echo "  docker - create docker image"
-	@echo "  version - set the version of tokeo into tokeo-base and tokeo-smtpd"
+	@echo "  version - set the version of tokeo into tokeo-base, tokeo-smtpd and tokeo-pb"
 	@echo "  sdist - create source tgz of all packages"
 	@echo "  wheel - create installation wheel of all packages"
 	@echo "  dist - create sdist and wheel of all packages"
@@ -60,7 +60,7 @@ dev:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
 	pip install --upgrade pip
 	pip install -e tokeo-base -e .
-	pip install -e tokeo-smtpd -e tokeo-diskcache -e .[dev]
+	pip install -e tokeo-smtpd -e tokeo-pb -e tokeo-diskcache -e .[dev]
 
 prod:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
@@ -89,7 +89,7 @@ endif
 
 # check for test with coverage reports
 ifdef cov
-cov_report=--cov=tokeo --cov=tokeo-base/tokeo --cov=tokeo-smtpd/tokeo --cov=tokeo-diskcache/tokeo --cov-report=term --cov-report=html:coverage-report
+cov_report=--cov=tokeo --cov=tokeo-base/tokeo --cov=tokeo-smtpd/tokeo --cov=tokeo-pb/tokeo --cov=tokeo-diskcache/tokeo --cov-report=term --cov-report=html:coverage-report
 else
 cov_report=
 endif
@@ -120,7 +120,7 @@ test:
 
 # check for files
 ifndef sources
-sources=tokeo tokeo-base tokeo-smtpd tokeo-diskcache docs tests
+sources=tokeo tokeo-base tokeo-smtpd tokeo-pb tokeo-diskcache docs tests
 endif
 
 fmt:
@@ -145,12 +145,12 @@ tokeo_version=$(shell python -c "from tokeo.core.version import get_version; pri
 
 version:
 	@if [ "0${VIRTUAL_ENV}"${no_venv} = "0" ]; then echo "No venv activated! Add no_venv=1 to enforce make."; exit 1; fi
-	sed -i.bak -E 's/^version = ".*"/version = "$(tokeo_version)"/' tokeo-base/pyproject.toml tokeo-smtpd/pyproject.toml
-	sed -i.bak -E 's/"(tokeo-base|tokeo-smtpd)==[^"]*"/"\1==$(tokeo_version)"/' pyproject.toml tokeo-smtpd/pyproject.toml
-	rm -f pyproject.toml.bak tokeo-base/pyproject.toml.bak tokeo-smtpd/pyproject.toml.bak
+	sed -i.bak -E 's/^version = ".*"/version = "$(tokeo_version)"/' tokeo-base/pyproject.toml tokeo-smtpd/pyproject.toml tokeo-pb/pyproject.toml
+	sed -i.bak -E 's/"(tokeo-base|tokeo-smtpd|tokeo-pb)==[^"]*"/"\1==$(tokeo_version)"/' pyproject.toml tokeo-smtpd/pyproject.toml tokeo-pb/pyproject.toml
+	rm -f pyproject.toml.bak tokeo-base/pyproject.toml.bak tokeo-smtpd/pyproject.toml.bak tokeo-pb/pyproject.toml.bak
 
 # the packages to build, tokeo last as it depends on the others
-packages=tokeo-base tokeo-smtpd tokeo-diskcache .
+packages=tokeo-base tokeo-smtpd tokeo-pb tokeo-diskcache .
 
 sdist: clean version
 	for package in $(packages); do python -m build --sdist --outdir dist $$package || exit 1; done

@@ -80,6 +80,9 @@ pip install tokeo tokeo-fundi
 # Or add the SMTP server library for the smtpd extension
 pip install tokeo tokeo-smtpd
 
+# Or add the PocketBase driver for the pocketbase extension
+pip install tokeo tokeo-pb
+
 # Verify installation
 tokeo --help
 ```
