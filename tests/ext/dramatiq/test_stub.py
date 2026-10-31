@@ -26,7 +26,7 @@ from dramatiq.brokers.stub import StubBroker
 from dramatiq.middleware import CurrentMessage, Shutdown, TimeLimitExceeded
 from tokeo.ext.dramatiq import TokeoActor
 from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
-from tests.utils import wait_until
+from tests.utils import isolated, wait_until
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqMiddlewareTest
 
 
@@ -184,6 +184,8 @@ def test_retries_follow_message_actor_and_config(tmp, start_worker, actor_option
 # ---- time limit, age limit and shutdown notice -------------------------------
 
 
+# dramatiq ends the thread of its limit checks only with the worker process
+@isolated
 def test_time_limit_from_config_stops_a_long_actor(tmp, start_worker):
     """time_limit 100 ms of the config raises TimeLimitExceeded in the actor."""
     with DramatiqMiddlewareTest(tmp, time_limit=100, max_retries=0) as app:

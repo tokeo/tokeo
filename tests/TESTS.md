@@ -115,24 +115,31 @@ with the same base. Keeping it small lets each subject be read on its own.
 
 | File | Holds |
 |---|---|
-| ```conftest.py``` | the hook that puts the temporary files into ```tmp/tests/```, the fixtures ```tmp``` and ```rando``` |
-| ```utils/__init__.py``` | ```ROOT```, ```stresstest```, ```wait_until```, ```wait_until_async```, ```wait_process_group_ended``` |
+| ```conftest.py``` | the hook that puts the temporary files into ```tmp/tests/```, the hook that runs a test marked ```isolated``` in a pytest of its own, the fixtures ```tmp```, ```rando```, ```key``` and ```disable_stdin_capture``` |
+| ```utils/__init__.py``` | ```ROOT```, ```stresstest```, ```isolated```, ```wait_until```, ```wait_until_async```, ```wait_process_group_ended```, ```use_disabled_stdin_capture``` |
 | ```utils/tui.py``` | ```Terminal```, runs a program in a pseudo terminal |
 | ```utils/nicegui.py``` | ```NiceguiSimulation```, runs an app with nicegui in its user simulation |
+| ```utils/isolation.py``` | ```IsolatedPytest```, runs a test in a pytest of its own, in a fresh process |
 
-The functions are imported from ```tests.utils```, each class by the full
-path of its module, it is not exported by ```tests.utils```:
+The functions and markers are imported from ```tests.utils```, each class
+by the full path of its module, it is not exported by ```tests.utils```:
 
 ```python
 from tests.utils import wait_until
 from tests.utils.tui import Terminal
 from tests.utils.nicegui import NiceguiSimulation
+from tests.utils.isolation import IsolatedPytest
 ```
 
 - ```tmp``` is a cement ```fs.Tmp``` inside ```tmp_path```, with
   ```tmp.dir``` and ```tmp.file```, for a test app that takes one
 - ```rando``` is a random string of 12 characters, for names that must not
   meet those of another run, e.g. a queue on a live server
+- ```key``` is a random string of 32 characters, for a name or key of full
+  length
+- ```disable_stdin_capture``` gives the test an empty stdin, for code that
+  reads stdin while pytest captures it, e.g. ```Connection.run()``` of
+  fabric; ```use_disabled_stdin_capture()``` does the same for one step
 - ```ROOT``` is the root of the project, the working directory of every
   program a test starts
 
@@ -440,6 +447,21 @@ def test_tasks_task1_runs_locally(monkeypatch):
         ...
 ```
 
+The shared base has both for stdin: the fixture ```disable_stdin_capture```
+for the whole test and ```use_disabled_stdin_capture()``` of
+```tests.utils``` for one step:
+
+```python
+def test_tasks_task1_runs_locally(disable_stdin_capture):
+    ...
+
+
+def test_tasks_task1_runs_locally():
+    with AutomateTest() as app:
+        with use_disabled_stdin_capture():
+            ran = task['func'](app, connection, **task['kwargs'])
+```
+
 ## Waiting
 
 A test waits for a condition, not for a fixed time.
@@ -571,6 +593,36 @@ make test STRESSTESTS=1 STRESS_SEED=1234 files=tests/core/utils/test_outbox.py
 
 Only ```rnd``` draws, never the functions of the module ```random```
 itself, else a repeated run takes other values.
+
+## Tests in a fresh process
+
+All tests share one pytest process, and with it its threads, modules and
+state. A test that needs a process without them is marked ```isolated```,
+e.g. a test that forks: Python warns on ```fork()``` while other threads
+run, and the C library of grpc keeps its threads for the life of the
+process once a test built a server.
+
+```python
+from tests.utils import isolated
+
+
+@isolated
+def test_shared_limits_count_across_processes():
+    ...
+```
+
+The hook in ```conftest.py``` runs such a test by ```IsolatedPytest``` in a
+pytest of its own, started anew by ```python -m pytest <test>```; inside it
+the test runs as usual.
+
+- A failure shows the output of the fresh pytest, a skip is passed on as
+  skip and its warnings as one warning
+- Its temporary files stay in ```tmp/tests/isolated/<test>/```
+- The fixtures of the test are set up in both processes, only the fresh one
+  runs the test
+- Coverage measures the fresh pytest too, by ```patch = ["subprocess"]``` of
+  ```pyproject.toml```
+- Each one costs a start of pytest, so mark only a test that needs it
 
 ## A complete example
 

@@ -37,7 +37,7 @@ from tokeo.ext.smtpd import (
     _resolve_events_handler,
     _plan,
 )
-from tests.utils import ROOT, wait_until, wait_process_group_ended
+from tests.utils import ROOT, isolated, wait_until, wait_process_group_ended
 from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
 needs_pdeathsig = pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the parent-death signal is Linux-only')
@@ -115,6 +115,7 @@ def test_plan_multi_services_rules():
 # ---- unit: shared limits --------------------------------------------------------
 
 
+@isolated
 def test_shared_limits_count_across_processes():
     """SharedGlobalLimits counts admits from a forked process."""
     limits = SharedGlobalLimits(max_processings=5, max_connections=7)

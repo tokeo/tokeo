@@ -1,20 +1,23 @@
 """
 The helpers for all tests of the app.
 
-General tools every test may import: the root of the project, the marker of
-the stress tests and waiting for a condition. They hold no asserts, the
-test asserts on what they return. The classes live in modules of their own
-and are imported by their full path: ```tests.utils.tui``` runs a program in
-a pseudo terminal, ```tests.utils.nicegui``` runs an app in the user
-simulation of nicegui.
+General tools every test may import: the root of the project, the markers
+of the stress tests and of the tests in a fresh process, waiting for a
+condition and an empty stdin for a step. They hold no asserts, the test
+asserts on what they return. The classes live in modules of their own and
+are imported by their full path: ```tests.utils.tui``` runs a program in a
+pseudo terminal, ```tests.utils.nicegui``` runs an app in the user
+simulation of nicegui, ```tests.utils.isolation``` runs a test in a pytest
+of its own.
 
 ### Example
 
 ```python
-from tests.utils import ROOT, stresstest, wait_until, wait_until_async
-from tests.utils import wait_process_group_ended
+from tests.utils import ROOT, stresstest, isolated, wait_until, wait_until_async
+from tests.utils import wait_process_group_ended, use_disabled_stdin_capture
 from tests.utils.tui import Terminal
 from tests.utils.nicegui import NiceguiSimulation
+from tests.utils.isolation import IsolatedPytest
 ```
 
 The stress tests run only with ```make test STRESSTESTS=1```, marked by
@@ -29,6 +32,15 @@ def test_worker_stress_hands_every_message_on_once():
     ...
 ```
 
+A test that needs a process without the state of the running pytest, e.g.
+one that forks, is marked by ```isolated```:
+
+```python
+@isolated
+def test_counts_in_a_fork():
+    ...
+```
+
 ### Notes
 
 - Only code that is truly general and needed again and again goes here,
@@ -39,6 +51,8 @@ def test_worker_stress_hands_every_message_on_once():
 import os
 import time
 import asyncio
+from io import StringIO
+from contextlib import contextmanager
 import pytest
 
 #: The root of the project, the working directory of every program a test
@@ -49,6 +63,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 #: ```make test STRESSTESTS=1```. Set it on all tests of a file by
 #: ```pytestmark = stresstest``` or on one test by ```@stresstest```.
 stresstest = pytest.mark.skipif(os.environ.get('STRESSTESTS', '0') != '1', reason='set STRESSTESTS=1 to run the stress tests')
+
+#: The marker of the tests that run in a pytest of their own, in a fresh
+#: process, by ```IsolatedPytest``` of ```tests.utils.isolation```. Set it on
+#: one test by ```@isolated```.
+isolated = pytest.mark.isolated
 
 
 def wait_until(check, timeout=5.0, interval=0.02):
@@ -158,3 +177,28 @@ async def wait_until_async(check, timeout=5.0, interval=0.02):
     while not (result := check()) and time.monotonic() < deadline:
         await asyncio.sleep(interval)
     return result
+
+
+@contextmanager
+def use_disabled_stdin_capture():
+    """
+    Give a step of a test an empty stdin, like the fixture disable_stdin_capture.
+
+    ### Returns
+
+    - **MonkeyPatch**: The monkeypatch of the step, undone at its end
+
+    ### Example
+
+    ```python
+    def test_remote_run_reads_no_stdin():
+        with use_disabled_stdin_capture():
+            # Connection.run() of fabric reads stdin, pytest captures it
+            result = connection.run('hostname', hide=True)
+        assert result.ok
+    ```
+
+    """
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr('sys.stdin', StringIO(''))
+        yield monkeypatch
