@@ -425,11 +425,6 @@ def test_tls_custom_cert_needs_cert_and_key(start_grpc, certs, given):
         app.grpc.startup()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=pytest.fail.Exception,
-    reason='a failed tls setup keeps a half built server without port and service (grpc.py:230-241)',
-)
 def test_tls_failed_setup_fails_again_on_the_next_startup(start_grpc, certs):
     """After a failed tls setup a second startup raises again."""
     app, _ = start_grpc({'tls_enabled': True, 'tls_certificate': certs.server_cert_file}, startup=False)

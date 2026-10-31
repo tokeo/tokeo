@@ -226,18 +226,20 @@ class TokeoGrpc(MetaMixin):
             grpc_servicer_module = importlib.import_module(self._grpc_servicer_module)
             grpc_servicer_method = getattr(grpc_servicer_module, self._grpc_servicer_method)
             # create the server
-            self._server = grpc.server(
+            server = grpc.server(
                 futures.ThreadPoolExecutor(max_workers=self._config('max_worker')),
                 interceptors=interceptors,
             )
             # bind the listen port; tls is opt-in and only that branch pulls
             # in any tls machinery, so a plain server never touches tls code
             if self._config('tls_enabled'):
-                self._server.add_secure_port(self._config('url'), self._tls_server_credentials())
+                server.add_secure_port(self._config('url'), self._tls_server_credentials())
             else:
-                self._server.add_insecure_port(self._config('url'))
+                server.add_insecure_port(self._config('url'))
             # append services
-            proto_add_servicer_to_server_method(grpc_servicer_method(), self._server)
+            proto_add_servicer_to_server_method(grpc_servicer_method(), server)
+            # keep the server only once it is complete, a failed build is retried
+            self._server = server
 
         return self._server
 
