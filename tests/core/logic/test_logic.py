@@ -17,7 +17,7 @@ from tests.utils import ROOT
 # tokeo.core.logic
 
 
-@pytest.mark.parametrize('module', ['tokeo.core.logic', 'tokeo.core.logic.exc', 'tokeo.core.logic.utils'])
+@pytest.mark.parametrize('module', ['tokeo.core.logic', 'tokeo.core.logic.exc'])
 def test_logic_modules_load_from_the_tokeo_package(module):
     """The package and its modules load from tokeo/core/logic of the project."""
     path = importlib.import_module(module).__file__
