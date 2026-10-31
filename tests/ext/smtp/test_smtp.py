@@ -9,7 +9,7 @@ import base64
 from unittest import mock
 
 import pytest
-from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, SUBJECT, TEXT, HTML_WITH_IMAGE
+from tests.ext.smtp.smtp_tests_helper import SmtpTest, SmtpTemplateTest, make_cert, SUBJECT, TEXT, HTML_WITH_IMAGE
 
 
 def test_qp_message(tmp):
@@ -264,3 +264,16 @@ def test_send_by_template_mail_params_wins_over_data():
                 app.mail.send_by_template('mails/welcome', dict(user='tom', mail_params='x'), subject='Hi')
     assert rendered[0] == dict(user='tom', mail_params=dict(subject='Hi'))
     assert send.call_args.kwargs == dict(body=dict(text='body', html='body'), subject='Hi')
+
+
+def test_send_by_template_escapes_only_the_html(tmp_path):
+    """The html body escapes the values, subject and plain text keep them."""
+    for part in ('title', 'plain', 'html'):
+        (tmp_path / f'order.{part}.jinja2').write_text('{{ name }}')
+    name = "O'Neil & <b>Söhne</b>"
+    with SmtpTemplateTest() as app:
+        app.add_template_dir(str(tmp_path))
+        with mock.patch.object(app.mail, 'send') as send:
+            app.mail.send_by_template('order', dict(name=name))
+    html = 'O&#39;Neil &amp; &lt;b&gt;Söhne&lt;/b&gt;'
+    assert send.call_args.kwargs == dict(body=dict(text=name, html=html), subject=name)

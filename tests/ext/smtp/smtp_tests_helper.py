@@ -41,6 +41,20 @@ class SmtpTest(TokeoTest):
         super().__init__(config_defaults=dict(smtp=section))
 
 
+class SmtpTemplateTest(SmtpTest):
+    """A test app with tokeo.ext.smtp and tokeo.ext.jinja2, for mail templates."""
+
+    class Meta:
+
+        extensions = [
+            'tokeo.ext.yaml',
+            'tokeo.ext.appenv',
+            'tokeo.ext.print',
+            'tokeo.ext.jinja2',
+            'tokeo.ext.smtp',
+        ]
+
+
 def make_cert(*names):
     """
     Create a self-signed certificate valid as its own CA.

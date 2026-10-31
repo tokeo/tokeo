@@ -702,6 +702,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             The mail_params context variable is provided to templates
             containing the email parameters.
 
+        : The HTML body escapes its values, the subject and the plain text
+            take them as they are, no client reads them as HTML
+
         """
 
         # Helper function to check if a template exists and cache the result
@@ -746,14 +749,14 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # Check if we need to render the subject from template
         if 'subject' not in params:
             if _template_exists(f'{template}.title.jinja2'):
-                params['subject'] = self.app.render(data, f'{template}.title.jinja2', out=None)
+                params['subject'] = self.app.render(data, f'{template}.title.jinja2', out=None, autoescape=False)
 
         # Build the email body from templates
         body = dict()
 
-        # Plain text template
+        # Plain text template, a text is not read as html, so not escaped
         if _template_exists(f'{template}.plain.jinja2'):
-            body['text'] = self.app.render({**data, 'mail_params': params}, f'{template}.plain.jinja2', out=None)
+            body['text'] = self.app.render({**data, 'mail_params': params}, f'{template}.plain.jinja2', out=None, autoescape=False)
         if _template_exists(f'{template}.html.jinja2'):
             body['html'] = self.app.render({**data, 'mail_params': params}, f'{template}.html.jinja2', out=None)
         # send the message

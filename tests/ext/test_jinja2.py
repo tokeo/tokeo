@@ -3,7 +3,8 @@ Tests for tokeo.ext.jinja2: the extension makes its handlers the output and
 template handlers of the app, sets trim_blocks and keep_trailing_newline of
 the Jinja2 environment from the jinja2 config section and adds the
 directories of jinja2.template_dirs to the template dirs of the app.
-Templates render from strings and from those directories.
+Templates render from strings and from those directories; app.render
+escapes the values for HTML unless autoescape=False is given.
 """
 
 import pytest
@@ -101,6 +102,28 @@ def test_output_handler_takes_the_config_of_jinja2(tmp_path):
         assert app.render({'x': 1}, 'block.jinja2', out=None) == '\nyes\n\nend\n'
 
 
+def test_output_handler_escapes_the_values_for_html(tmp_path):
+    """app.render escapes the values, those of an included template too."""
+    templates = _templates(tmp_path / 'templates', page='{{ v }} {% include "part.jinja2" %}', part='{{ v }}')
+    with Jinja2Test({'template_dirs': templates}) as app:
+        escaped = '&lt;a href=&#39;x&#39;&gt;&amp;'
+        assert app.render({'v': "<a href='x'>&"}, 'page.jinja2', out=None) == f'{escaped} {escaped}'
+
+
+def test_output_handler_without_autoescape_keeps_the_values(tmp_path):
+    """autoescape=False renders the values as they are, e.g. for a text."""
+    templates = _templates(tmp_path / 'templates', text='{{ v }}')
+    with Jinja2Test({'template_dirs': templates}) as app:
+        assert app.render({'v': "O'Neil & <Söhne>"}, 'text.jinja2', out=None, autoescape=False) == "O'Neil & <Söhne>"
+
+
+def test_output_handler_safe_keeps_one_value(tmp_path):
+    """|safe renders one value as it is, the others stay escaped."""
+    templates = _templates(tmp_path / 'templates', page='{{ html|safe }}{{ v }}')
+    with Jinja2Test({'template_dirs': templates}) as app:
+        assert app.render({'html': '<b>ok</b>', 'v': '<b>'}, 'page.jinja2', out=None) == '<b>ok</b>&lt;b&gt;'
+
+
 def test_output_handler_missing_template_raises():
     """A template in none of the template dirs raises FrameworkError."""
     with Jinja2Test() as app:
@@ -178,6 +201,19 @@ def test_template_handler_render_drops_the_trailing_newline_when_configured():
     """With keep_trailing_newline off 'end\\n' renders as 'end'."""
     with Jinja2Test({'keep_trailing_newline': False}) as app:
         assert app.template.render('end\n', {}) == 'end'
+
+
+def test_template_handler_render_keeps_the_values_by_default():
+    """The template handler keeps the values, as generate needs it for code."""
+    with Jinja2Test() as app:
+        assert app.template.render("x = '{{ v }}'", {'v': 'a&b'}) == "x = 'a&b'"
+
+
+def test_template_handler_render_with_autoescape_keeps_the_env():
+    """autoescape=True escapes bytes content too, the env stays unescaped."""
+    with Jinja2Test({'trim_blocks': False}) as app:
+        assert app.template.render(b'{% if x %}\n{{ v }}{% endif %}', {'x': 1, 'v': '<b>'}, autoescape=True) == '\n&lt;b&gt;'
+        assert app.template.env.autoescape is False
 
 
 def test_template_handler_render_invalid_template_raises():

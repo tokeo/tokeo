@@ -9,6 +9,8 @@ configuration options and improved template handling.
 
 - Configures the Jinja2 environment (trim_blocks, keep_trailing_newline)
     from the 'jinja2' config section
+- Escapes the values for HTML when ```app.render``` renders a template,
+    ```autoescape=False``` renders them as they are, e.g. for text
 - Resolves and registers template directories from configuration
 - Registers as the application's default output and template handler,
     unless the application chose its own
@@ -52,6 +54,7 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
     - Automatically configured when the extension is loaded
     - Renders text from a Jinja2 template; the output format is whatever the
         template produces
+    - Escapes the values for HTML unless ```autoescape=False``` is given
     - Cement resolves the template handler by the label of the output
         handler, so the label 'tokeo.jinja2' binds tokeo's template handler
 
@@ -63,6 +66,43 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
         """
 
         label = 'tokeo.jinja2'
+
+    def render(self, data, template=None, autoescape=True, **kw):
+        """
+        Render the data by a template, its values escaped for HTML.
+
+        ### Args
+
+        - **data** (dict): The data for the template
+        - **template** (str): The path of the template below the template
+            dirs, e.g. ```emails/order.html.jinja2```
+
+        ### Keyword Args
+
+        - **autoescape** (bool): Escape the values for HTML, False renders
+            them as they are, e.g. for a text or a subject
+
+        ### Returns
+
+        - **str**: The rendered text
+
+        ### Example
+
+        ```python
+        # a value with <a href=...> shows as text, not as a link
+        html = app.render(data, 'order.html.jinja2', out=None)
+        # a text keeps & and ' of the values as they are
+        text = app.render(data, 'order.plain.jinja2', out=None, autoescape=False)
+        ```
+
+        ### Notes
+
+        : ```app.render``` passes ```autoescape``` on to this handler; in
+            the template ```{{ value|safe }}``` renders one value as it is
+
+        """
+        content, _type, _path = self.templater.load(template)
+        return self.templater.render(content, data, autoescape=autoescape)
 
 
 class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
@@ -126,6 +166,37 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
             if not is_bool(value):
                 raise TokeoJinja2Error(f'{key} must be true or false, not {value!r}')
             setattr(self.env, key, value)
+
+    def render(self, content, data, *args, autoescape=False, **kw):
+        """
+        Render the content as template with the data.
+
+        ### Args
+
+        - **content** (str|bytes): The template
+        - **data** (dict): The data for the template
+
+        ### Keyword Args
+
+        - **autoescape** (bool): Escape the values for HTML
+
+        ### Returns
+
+        - **str**: The rendered text
+
+        ### Notes
+
+        : Renders the values as they are by default, as ```copy()``` of
+            ```tokeo generate``` needs it for code; ```app.render``` escapes
+            them by the output handler
+
+        """
+        if not autoescape:
+            return super().render(content, data, *args, **kw)
+        if not isinstance(content, str):
+            content = content.decode('utf-8')
+        # an overlay, so a render as text at the same time keeps the environment
+        return self.env.overlay(autoescape=True).from_string(content).render(**data)
 
     def _config(self, key, **kwargs):
         """
