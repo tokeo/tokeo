@@ -250,3 +250,17 @@ def test_date_and_message_id():
     assert given['Date'] == 'Mon, 01 Jan 2024 00:00:00 +0000'
     assert given['Message-Id'] == '<given@example.com>'
     assert absent['Date'] is None and absent['Message-Id'] is None
+
+
+# ---- send_by_template --------------------------------------------------------
+
+
+def test_send_by_template_mail_params_wins_over_data():
+    """A key mail_params in data is no error, the mail params win."""
+    rendered = []
+    with SmtpTest() as app:
+        with mock.patch.object(app.template, 'load'), mock.patch.object(app.mail, 'send') as send:
+            with mock.patch.object(app, 'render', side_effect=lambda data, *a, **kw: rendered.append(data) or 'body'):
+                app.mail.send_by_template('mails/welcome', dict(user='tom', mail_params='x'), subject='Hi')
+    assert rendered[0] == dict(user='tom', mail_params=dict(subject='Hi'))
+    assert send.call_args.kwargs == dict(body=dict(text='body', html='body'), subject='Hi')
