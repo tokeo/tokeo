@@ -1217,7 +1217,12 @@ class TokeoPdoc(Handler):
         preprocesses two RST directives before conversion:
 
         - ```.. include:: ./FILE.md``` inlines an external markdown guide,
-          resolved relative to the module's own directory.
+          resolved relative to the module's own directory; the includes of an
+          included guide resolve relative to that guide, up to 3 levels deep,
+          a deeper or circular include shows nothing.
+          With the option ```:code: <language>``` on the next line the file
+          is shown as it is in a code block of that language, e.g. a file
+          ```hook.js.md``` that holds code only.
         - ```.. note::``` / ```.. warning::``` / ```.. tip::``` (and the other
           admonition kinds) are rewritten to Python-Markdown's ```!!! kind```
           form so they render to the same ```<div class="admonition kind">```.
@@ -1282,18 +1287,30 @@ class TokeoPdoc(Handler):
                 flags=re.MULTILINE,
             )
 
-        def resolve_includes(text, module_dir):
+        def resolve_includes(text, module_dir, depth=0):
             def repl(m):
-                rel = m.group(2).strip()
-                if module_dir:
-                    path = os.path.normpath(os.path.join(module_dir, rel))
-                    if os.path.isfile(path):
-                        with open(path, 'r', encoding='utf-8') as f:
-                            return f.read()
-                return ''
+                indent, rel, options = m.group(1), m.group(2).strip(), m.group(3)
+                # past 3 levels nothing more is included, so a circle ends
+                if not module_dir or depth >= 3:
+                    return ''
+                path = os.path.normpath(os.path.join(module_dir, rel))
+                if not os.path.isfile(path):
+                    return ''
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                language = re.search(r':code:[ \t]*(\S*)', options)
+                if language is None:
+                    # a guide may include guides itself, relative to its own dir
+                    return resolve_includes(content, os.path.dirname(path), depth + 1)
+                # the file as it is, in a fence longer than any backticks inside
+                fence = '`' * max(3, max((len(run) for run in re.findall(r'`+', content)), default=0) + 1)
+                lines = [f'{indent}{fence}{language.group(1)}']
+                lines += [f'{indent}{line}' if line else '' for line in content.rstrip('\n').split('\n')]
+                lines.append(f'{indent}{fence}')
+                return '\n'.join(lines)
 
             return re.sub(
-                r'^([ \t]*)\.\.[ \t]+include::[ \t]+(\S+)[ \t]*$',
+                r'^([ \t]*)\.\.[ \t]+include::[ \t]+(\S+)[ \t]*$((?:\n\1[ \t]+:[\w-]+:.*$)*)',
                 repl,
                 text,
                 flags=re.MULTILINE,

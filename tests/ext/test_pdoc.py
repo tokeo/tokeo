@@ -1090,6 +1090,73 @@ def test_markdown_keeps_switches_and_makes_ellipses(app, monkeypatch):
     assert '--watch without --serve only renders&hellip;' in html
 
 
+@pytest.fixture
+def to_html(app, monkeypatch, tmp_path):
+    """The markdown filter of pdoc, includes resolved relative to tmp_path."""
+    import pdoc.render
+
+    # the filter is replaced in the env of pdoc, the later tests get it back
+    monkeypatch.setitem(pdoc.render.env.filters, 'to_html', pdoc.render.env.filters['to_html'])
+    app.pdoc._install_markdown_filter()
+    app.pdoc._md_state['module_dir'] = str(tmp_path)
+    return pdoc.render.env.filters['to_html']
+
+
+def test_markdown_include_inlines_the_guide(to_html, tmp_path):
+    """.. include:: ./GUIDE.md shows the markdown of the guide."""
+    _write(tmp_path / 'GUIDE.md', '## Guide\n\nRead **this**.\n')
+    html = to_html('Intro\n\n.. include:: ./GUIDE.md\n')
+    assert '<h2>Guide</h2>' in html and '<strong>this</strong>' in html and 'include::' not in html
+
+
+def test_markdown_include_of_a_guide_resolves_its_own_includes(to_html, tmp_path):
+    """A guide in docs/ includes PART.md of docs/, relative to itself."""
+    _write(tmp_path / 'docs' / 'GUIDE.md', 'Guide\n\n.. include:: ./PART.md\n')
+    _write(tmp_path / 'docs' / 'PART.md', 'The *part*.\n')
+    html = to_html('.. include:: ./docs/GUIDE.md\n')
+    assert '<em>part</em>' in html and 'include::' not in html
+
+
+def test_markdown_include_with_code_shows_the_file_in_a_code_block(to_html, tmp_path):
+    """:code: javascript shows hook.js.md as it is, in a javascript block."""
+    _write(tmp_path / 'hook.js.md', '// code only\nhook((e) => {\n    e.next()\n})\n')
+    html = to_html('The hook:\n\n.. include:: ./hook.js.md\n   :code: javascript\n\nAfter it.\n')
+    assert 'class="language-javascript"' in html
+    assert '// code only\nhook((e) =&gt; {\n    e.next()\n})' in html
+    assert '<p>After it.</p>' in html and ':code:' not in html
+
+
+def test_markdown_include_with_code_keeps_backticks_of_the_code(to_html, tmp_path):
+    """Code holding a fence of three backticks stays whole in a longer fence."""
+    _write(tmp_path / 'doc.py.md', 'text = """\n```bash\nls\n```\n"""\n')
+    html = to_html('.. include:: ./doc.py.md\n   :code: python\n')
+    assert 'class="language-python"' in html and '```bash\nls\n```' in html
+
+
+def test_markdown_include_of_a_missing_file_shows_nothing(to_html):
+    """A guide that is not there leaves no directive behind."""
+    html = to_html('Before\n\n.. include:: ./MISSING.md\n\nAfter\n')
+    assert 'include::' not in html and '<p>Before</p>' in html and '<p>After</p>' in html
+
+
+def test_markdown_include_of_itself_stops_after_3_levels(to_html, tmp_path):
+    """A guide that includes itself shows 3 times and leaves no directive behind."""
+    _write(tmp_path / 'LOOP.md', 'loop\n\n.. include:: ./LOOP.md\n')
+    html = to_html('.. include:: ./LOOP.md\n')
+    assert html.count('<p>loop</p>') == 3 and 'include::' not in html
+
+
+def test_markdown_include_of_code_counts_as_a_level(to_html, tmp_path):
+    """Code on the 3rd level is shown, code on the 4th is not."""
+    _write(tmp_path / 'ONE.md', 'one\n\n.. include:: ./TWO.md\n')
+    _write(tmp_path / 'TWO.md', 'two\n\n.. include:: ./code.sh.md\n   :code: bash\n\n.. include:: ./THREE.md\n')
+    _write(tmp_path / 'THREE.md', 'three\n\n.. include:: ./deep.sh.md\n   :code: bash\n')
+    _write(tmp_path / 'code.sh.md', 'echo third\n')
+    _write(tmp_path / 'deep.sh.md', 'echo fourth\n')
+    html = to_html('.. include:: ./ONE.md\n')
+    assert 'echo third' in html and '<p>three</p>' in html and 'echo fourth' not in html
+
+
 # --------------------------------------------------------------------------------------
 # serve
 # --------------------------------------------------------------------------------------
