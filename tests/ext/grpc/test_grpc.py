@@ -27,6 +27,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cement.core.exc import CaughtSignal
 from tokeo.ext.grpc import TokeoGrpcError
 from tokeo.core.utils.modules import TokeoModulesLoadError
+from tests.utils import wait_until
 from tests.ext.grpc.grpc_tests_helper import GrpcTest, SERVICE, ADD_SERVICER, SERVICER, INTERCEPTORS
 
 
@@ -39,9 +40,10 @@ def _free_port():
 
 
 def _stop(app):
-    # stop the server of the app, if it was built, and wait until it stopped
+    # shut the server of the app down, if it was built, and wait until it stopped
     if app.grpc._server is not None:
-        app.grpc._server.stop(0).wait(5)
+        app.grpc.shutdown()
+        app.grpc._server.wait_for_termination(5)
 
 
 def _call(port, method='Say', request=b'hi', credentials=None, metadata=None):
@@ -247,6 +249,16 @@ def test_shutdown_stops_the_server(start_grpc):
     app.grpc.shutdown()
     app.grpc.server.wait_for_termination(5)
     assert _refused(port) == grpc.StatusCode.UNAVAILABLE
+
+
+def test_shutdown_ends_the_threads_of_the_pool(start_grpc):
+    """The pool thread that served a call ends after shutdown, none stays."""
+    app, port = start_grpc()
+    assert _call(port) == b'echo hi'
+    threads = list(app.grpc._executor._threads)
+    assert threads and all(thread.is_alive() for thread in threads)
+    app.grpc.shutdown()
+    assert wait_until(lambda: not any(thread.is_alive() for thread in threads))
 
 
 # interceptors

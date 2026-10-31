@@ -122,6 +122,8 @@ class TokeoGrpc(MetaMixin):
         #: The Cement application instance
         self.app = app
         self._server = None
+        # the thread pool of the server, freed again by shutdown
+        self._executor = None
         # the module:attr settings, resolved when the server is built
         self._proto_add_servicer_to_server = None
         self._grpc_servicer = None
@@ -208,10 +210,8 @@ class TokeoGrpc(MetaMixin):
             proto_add_servicer_to_server = resolve_object(self._proto_add_servicer_to_server)
             grpc_servicer = resolve_object(self._grpc_servicer)
             # create the server
-            server = grpc.server(
-                futures.ThreadPoolExecutor(max_workers=self._config('max_worker')),
-                interceptors=interceptors,
-            )
+            self._executor = futures.ThreadPoolExecutor(max_workers=self._config('max_worker'))
+            server = grpc.server(self._executor, interceptors=interceptors)
             # bind the listen port; tls is opt-in and only that branch pulls
             # in any tls machinery, so a plain server never touches tls code
             tls_enabled = self._config('tls_enabled')
@@ -413,8 +413,12 @@ class TokeoGrpc(MetaMixin):
         : Called automatically when handling Ctrl+C in serve() method or
             can be called directly to stop the server programmatically
 
+        : Frees the thread pool of the server too, grpc leaves it running;
+            its threads end once their work is done
+
         """
         self.server.stop(0)
+        self._executor.shutdown(wait=False)
 
     def serve(self):
         """
