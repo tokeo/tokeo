@@ -11,13 +11,14 @@ A profile for this handler:
 
 ```yaml
 vault:
-  human:
-    type: scrypt
-    env: VAULT_PASSPHRASE
-    salt: MmEZBlUsC/NETOEsIHEg+w==
-    cost: 16384
-    block_size: 8
-    parallelization: 1
+  profiles:
+    human:
+      type: scrypt
+      env: VAULT_PASSPHRASE
+      salt: MmEZBlUsC/NETOEsIHEg+w==
+      cost: 16384
+      block_size: 8
+      parallelization: 1
 ```
 
 The cost parameters are optional; ```cost``` (scrypt's N, a power of two),

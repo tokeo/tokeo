@@ -179,15 +179,8 @@ def test_get_profile_without_a_type_fails(tmp_path, profile):
             app.config.get_profile('bad')
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        'vault.py:159 resolves every leaf of vault.profiles, so a !vault value there recurses into '
-        'get_profile until RecursionError, which vault.py:160 reports as "unknown vault profile"'
-    ),
-)
 def test_get_profile_stays_readable_beside_a_secret_in_another_profile(key, tmp_path):
-    """master stays readable while another profile holds a valid !vault value."""
+    """master stays readable while another profile holds a !vault value."""
     path = tmp_path / 'app.yaml'
     path.write_text(
         f'vault:\n  profiles:\n    master:\n      type: enc\n      env: {MASTER_ENV}\n'
@@ -195,6 +188,25 @@ def test_get_profile_stays_readable_beside_a_secret_in_another_profile(key, tmp_
     )
     with VaultTest(str(path)) as app:
         assert app.config.get_profile('master') == {'type': 'enc', 'env': MASTER_ENV}
+
+
+def test_get_profile_with_a_secret_in_it_fails(key, tmp_path):
+    """A profile that holds a !vault value raises TokeoVaultError naming it."""
+    path = tmp_path / 'app.yaml'
+    path.write_text(
+        f'vault:\n  profiles:\n    master:\n      type: enc\n      env: {MASTER_ENV}\n'
+        f'    other:\n      type: enc\n      env: !vault:master {fernet_token(key, MASTER_ENV)}\n'
+    )
+    with VaultTest(str(path)) as app:
+        with pytest.raises(TokeoVaultError, match="vault profile 'other' must not hold a !vault value"):
+            app.config.get_profile('other')
+
+
+def test_get_profile_takes_env_overrides_of_its_fields(tmp_path, monkeypatch):
+    """An env override of a profile field applies to get_profile."""
+    monkeypatch.setenv('TOKEO_TEST_VAULT_PROFILES_MASTER_ENV', 'OTHER_ENV')
+    with VaultTest(write_config(tmp_path)) as app:
+        assert app.config.get_profile('master') == {'type': 'enc', 'env': 'OTHER_ENV'}
 
 
 # resolve

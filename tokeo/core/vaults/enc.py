@@ -11,9 +11,10 @@ A profile for this handler:
 
 ```yaml
 vault:
-  master:
-    type: enc
-    env: VAULT_MASTER1
+  profiles:
+    master:
+      type: enc
+      env: VAULT_MASTER1
 ```
 
 """

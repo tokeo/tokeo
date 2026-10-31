@@ -13,9 +13,10 @@ A profile lives in the ```vault``` config section and binds a handler by its
 
 ```yaml
 vault:
-  master:
-    type: enc
-    env: VAULT_MASTER1
+  profiles:
+    master:
+      type: enc
+      env: VAULT_MASTER1
 
 pocketbase:
   auth_password: !vault:master gAAAAAB...
@@ -27,6 +28,7 @@ handler; no consumer code needs to change to read encrypted values.
 """
 
 import sys
+from configparser import RawConfigParser
 from os.path import basename
 import yaml
 from cement import Controller, ex
@@ -153,15 +155,22 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
         ### Raises
 
         - **TokeoVaultError**: If the profile is unknown or has no ```type```
+            or holds a ```!vault``` value
 
         """
         try:
-            profile = self.get('vault', 'profiles')[name]
+            # read raw, without decrypting: a !vault value in a profile would
+            # need a profile again and recurse
+            profile = RawConfigParser.get(self, 'vault', 'profiles')[name]
         except Exception:
             raise TokeoVaultError(f'unknown vault profile {name!r}')
         if not isinstance(profile, dict) or 'type' not in profile:
             raise TokeoVaultError(f'vault profile {name!r} is missing a type')
-        return profile
+        # a profile names its key material, it never holds a secret itself
+        if any(isinstance(value, VaultRef) for value in profile.values()):
+            raise TokeoVaultError(f'vault profile {name!r} must not hold a !vault value')
+        # env overrides of the profile fields still apply
+        return self._resolve_value(profile, ['vault', 'profiles', name])
 
     def resolve(self, value):
         """

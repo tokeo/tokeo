@@ -11,9 +11,10 @@ A profile lives in the ```vault``` config section and binds a handler:
 
 ```yaml
 vault:
-  master:
-    type: enc
-    env: VAULT_MASTER1
+  profiles:
+    master:
+      type: enc
+      env: VAULT_MASTER1
 ```
 
 The ```type``` selects a registered handler (for example the built-in ```enc```

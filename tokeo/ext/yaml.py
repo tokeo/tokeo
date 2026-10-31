@@ -159,6 +159,11 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         - The original value when nothing changes, otherwise a rebuilt copy
             with environment overrides applied
 
+        ### Notes
+
+        : Subclasses may call it to apply the environment overrides to a
+            value they read raw, e.g. the vault handler for a profile
+
         """
         if isinstance(value, dict):
             changed = False
