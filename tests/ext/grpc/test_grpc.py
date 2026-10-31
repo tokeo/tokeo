@@ -453,41 +453,28 @@ def _client(certs, pair=None):
     return grpc.ssl_channel_credentials(root_certificates=certs.ca, private_key=key, certificate_chain=chain)
 
 
-def test_tls_client_ca_alone_serves_a_client_without_cert(start_grpc, certs):
-    """With tls_client_ca alone a client without cert is served."""
-    _, port = start_grpc(_custom_tls(certs, tls_client_ca=certs.ca_file))
-    assert _call(port, method='Peer', credentials=_client(certs)) == b''
-
-
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason='require_client_auth=False makes grpc not request a client cert at all, interceptors never see one (grpc.py:292-296)',
-)
-def test_tls_client_ca_alone_hands_a_client_cert_on(start_grpc, certs):
-    """With tls_client_ca alone the service sees the name of a client cert."""
+def test_tls_client_ca_hands_the_client_cert_on(start_grpc, certs):
+    """With tls_client_ca the service sees the name of the client cert."""
     _, port = start_grpc(_custom_tls(certs, tls_client_ca=certs.ca_file))
     assert _call(port, method='Peer', credentials=_client(certs, certs.client)) == b'client.tokeo.test'
 
 
-def test_tls_client_ca_required_client_cert(start_grpc, certs):
-    """A required client cert: none is refused, one of the ca is served."""
-    _, port = start_grpc(_custom_tls(certs, tls_client_ca=certs.ca_file, tls_require_client_cert=True))
+def test_tls_client_ca_requires_a_client_cert(start_grpc, certs):
+    """With tls_client_ca a client without cert is refused, one of the ca served."""
+    _, port = start_grpc(_custom_tls(certs, tls_client_ca=certs.ca_file))
     assert _refused(port, credentials=_client(certs)) == grpc.StatusCode.UNAVAILABLE
     assert _call(port, credentials=_client(certs, certs.client)) == b'echo hi'
 
 
 def test_tls_client_ca_refuses_a_cert_of_another_ca(start_grpc, certs):
-    """A required client cert of a foreign ca is refused with UNAVAILABLE."""
-    _, port = start_grpc(_custom_tls(certs, tls_client_ca=certs.ca_file, tls_require_client_cert=True))
+    """A client cert of a foreign ca is refused with UNAVAILABLE."""
+    _, port = start_grpc(_custom_tls(certs, tls_client_ca=certs.ca_file))
     assert _refused(port, credentials=_client(certs, certs.stranger)) == grpc.StatusCode.UNAVAILABLE
 
 
 def test_tls_client_ca_with_the_auto_cert(start_grpc, certs, monkeypatch):
-    """A required client cert works with the auto cert as server cert too."""
-    app, port = start_grpc(
-        {'tls_enabled': True, 'tls_key_size': 256, 'tls_client_ca': certs.ca_file, 'tls_require_client_cert': True}, startup=False
-    )
+    """A client ca works with the auto cert as server cert too."""
+    app, port = start_grpc({'tls_enabled': True, 'tls_key_size': 256, 'tls_client_ca': certs.ca_file}, startup=False)
     made = _record_auto_cert(app, monkeypatch)
     app.grpc.startup()
     key, chain = certs.client

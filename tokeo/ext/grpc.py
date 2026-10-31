@@ -111,10 +111,9 @@ class TokeoGrpc(MetaMixin):
             # auto cert key: 'rsa' (size in bits) or 'ec' (size = curve 256/384/521)
             tls_key_type='ec',
             tls_key_size=521,
-            # client ca to allow client validation by client certificates
+            # client ca: when set, only clients with a valid cert of this ca
+            # pass the tls handshake, the interceptors still decide each call
             tls_client_ca=None,
-            # require a valid client cert, else forward validation to interceptors
-            tls_require_client_cert=False,
         )
 
     def __init__(self, app, *args, **kw):
@@ -249,8 +248,8 @@ class TokeoGrpc(MetaMixin):
         Two modes are selected by configuration: a custom certificate when
         both tls_certificate and tls_key point to PEM files, otherwise an
         auto generated in-memory self signed certificate. When tls_client_ca
-        is set, mutual TLS is enabled on top and clients may get verified
-        against that ca.
+        is set, mutual TLS is enabled on top and every client must present a
+        valid cert of that ca.
 
         ### Returns
 
@@ -266,9 +265,10 @@ class TokeoGrpc(MetaMixin):
             things read from disk; the auto cert path keeps everything in
             memory
 
-        : mTLS is opt-in via tls_client_ca; tls_require_client_cert decides
-            whether a client cert is mandatory, otherwise validation is left
-            to the interceptors
+        : mTLS is opt-in via tls_client_ca and then requires a client cert;
+            grpc knows no optional client cert, without a ca it asks for none.
+            The interceptors decide each call in both cases, with mTLS they
+            also get the identity of the client cert
 
         """
         cert = self._config('tls_certificate')
@@ -284,7 +284,7 @@ class TokeoGrpc(MetaMixin):
         else:
             # auto cert: generate a self signed certificate in memory
             key_pem, cert_pem = self._generate_self_signed_cert()
-        # optional mtls: when a client ca is set, verify client certs too
+        # optional mtls: a client ca requires a valid client cert of it
         ca = self._config('tls_client_ca')
         if ca:
             with open(ca, 'rb') as f:
@@ -292,7 +292,7 @@ class TokeoGrpc(MetaMixin):
             return grpc.ssl_server_credentials(
                 [(key_pem, cert_pem)],
                 root_certificates=ca_pem,
-                require_client_auth=bool(self._config('tls_require_client_cert')),
+                require_client_auth=True,
             )
         return grpc.ssl_server_credentials([(key_pem, cert_pem)])
 
