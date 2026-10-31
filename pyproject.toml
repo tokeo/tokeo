@@ -59,7 +59,7 @@ dev = [
     "fastapi",
     "starlette>=1.3.1",
     "pydantic[email]>=2.4.0",
-    "pocketbase>=0.15.0",
+    "tokeo-pb==2.2.0",
     "invoke>=2.2.1",
     "paramiko>=5.0.0",
     "cryptography>=50.0.0",

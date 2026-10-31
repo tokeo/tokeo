@@ -8,8 +8,9 @@ and realtime subscriptions.
 
 The extension exposes a Cement-style database handler, reachable as app.db
 throughout your Tokeo application, that maps the usual CRUD methods onto
-PocketBase collections. Operations beyond that surface (such as auth flows)
-are reached through the raw SDK via the collection() escape hatch.
+PocketBase collections. It runs on the driver of tokeo-pb
+(```tokeo.core.pocketbase```), whose client is reached as app.db.pb for
+anything beyond that surface.
 
 ### Features
 
@@ -18,9 +19,9 @@ are reached through the raw SDK via the collection() escape hatch.
 - Advanced querying, filtering, and sorting on lists
 - User and auth collections handled like any other via CRUD
 - Optional lazy service-account login (auto-refreshed, thread-safe) via the
-  auth_identity/auth_password settings
-- Direct SDK access through the collection() escape hatch for anything
-  beyond the CRUD surface (auth flows, file fields, schema, etc.)
+  auth_identity/auth_password settings, before every request of the client
+- The records of a collection by collection(), and the driver client by
+  app.db.pb for filters, batches, impersonation and health
 
 ### Example
 
@@ -30,7 +31,7 @@ are reached through the raw SDK via the collection() escape hatch.
         'products',
         filter='price > 100',
         sort='-created,name',
-        perPage=50
+        per_page=50
     )
 
     # Create a new record
@@ -52,22 +53,11 @@ are reached through the raw SDK via the collection() escape hatch.
 
 """
 
-from cement.core.meta import MetaMixin
-from tokeo.core.exc import TokeoError
-from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
-import pocketbase
-from tokeo.core.utils.jwt import token_expires_within as jwt_token_expires_within
-import httpx
 import threading
-
-
-class TokeoPocketBaseError(TokeoError):
-    """Generic error raised by the Tokeo PocketBase handler."""
-
-
-class TokeoPocketBaseAuthError(TokeoPocketBaseError):
-    """Raised when authenticating the configured service identity fails."""
-
+import httpx
+from cement.core.meta import MetaMixin
+from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
+from tokeo.core.pocketbase import PocketBase, TokeoPocketBaseError, TokeoPocketBaseAuthError
 
 # collections tried in order on the first login: a regular auth collection
 # first, then the superuser collection as a fallback; the one that succeeds
@@ -82,7 +72,7 @@ class TokeoPocketBaseHandler(MetaMixin):
     A Cement-style database handler that maps the usual CRUD methods
     (get_one, get_list, create, update, delete) onto PocketBase
     collections. For anything outside that surface, collection() hands
-    back the raw SDK collection object.
+    back the records of a collection and app.db.pb the driver client.
 
     ### Args
 
@@ -96,8 +86,7 @@ class TokeoPocketBaseHandler(MetaMixin):
     ### Notes
 
     : The handler is registered as 'db' and is reached through app.db. It
-        is a thin convenience layer over the PocketBase SDK, not a wrapper
-        around its full surface.
+        is a thin convenience layer over the driver of tokeo-pb.
 
     : Authentication: without auth_identity the handler connects
         anonymously, so the mapped CRUD calls run against whatever the
@@ -105,9 +94,10 @@ class TokeoPocketBaseHandler(MetaMixin):
         auth_identity and auth_password it logs in that service identity on
         first use and refreshes its token, see ensure_auth.
 
-    : The handler holds one client with one auth store for the service
-        identity; never log in other users on ```app.db.pb```, take an own
-        ```pocketbase.PocketBase``` client per user instead
+    : The handler holds one client with one login for the service
+        identity; never log in other users on ```app.db.pb```, take a client
+        of their own instead, e.g. by ```app.db.pb.impersonate(...)``` of a
+        superuser login
 
     : This constructor only stores the application reference. The actual
         PocketBase client initialization is deferred until the _setup method
@@ -145,10 +135,10 @@ class TokeoPocketBaseHandler(MetaMixin):
             # refresh the token once fewer than this many seconds of validity
             # remain
             auth_token_min_valid_seconds=60,
-            # cap on concurrent http connections per process (passed to httpx
-            # as max_connections); unset uses the httpx default and excess
+            # cap on concurrent http connections per process (httpx
+            # max_connections); unset uses the httpx default and excess
             # requests wait for a free connection
-            concurrent_connections=None,
+            max_connections=None,
             # verify the certificate chain (https only); False disables it
             tls_verify_cert=True,
             # verify the certificate hostname (https only, bool); False skips
@@ -158,7 +148,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             tls_ca=None,
         )
 
-    #: (pocketbase.PocketBase) The PocketBase client, set on setup
+    #: (tokeo.core.pocketbase.PocketBase) The PocketBase client, set on setup
     pb = None
 
     def __init__(self, app, *args, **kw):
@@ -188,7 +178,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             default; the tls options build a custom ssl context that is
             passed to the underlying httpx client
 
-        : ```concurrent_connections``` caps concurrent http connections per process
+        : ```max_connections``` caps concurrent http connections per process
             via httpx; it is not a request-rate limit and does not span
             processes, so apply any rate or cross-process throttling in your
             application (e.g. the diskcache throttle recipe)
@@ -205,24 +195,23 @@ class TokeoPocketBaseHandler(MetaMixin):
                 self._config('tls_verify_cert'),
                 self._config('tls_ca'),
             )
-        # build the httpx client kwargs the sdk forwards: a custom tls context
-        # (custom ca or relaxed verification) and an optional concurrency cap
+        # build the httpx client kwargs: a custom tls context (custom ca or
+        # relaxed verification) and an optional concurrency cap
         client_kwargs = {}
         if context is not None:
             client_kwargs['verify'] = context
-        concurrent_connections = self._config('concurrent_connections')
-        if concurrent_connections:
-            client_kwargs['limits'] = httpx.Limits(max_connections=concurrent_connections)
-        # connect anonymously by design: this handler is a thin CRUD mapping and
-        # runs against whatever the PocketBase api rules allow for unauthenticated
-        # requests until a service identity is configured
-        self.pb = pocketbase.PocketBase(url, **client_kwargs)
+        max_connections = self._config('max_connections')
+        if max_connections:
+            client_kwargs['limits'] = httpx.Limits(max_connections=max_connections)
+        # anonymous until a service identity is configured; ensure_auth runs
+        # before each request of the client, also of collection() and batches
+        self.pb = PocketBase(url, before_request=self.ensure_auth, **client_kwargs)
         # cache the auth config once: the per-request guard must not hit
         # self._config on every call
         self._auth_identity = self._config('auth_identity')
         self._auth_min_valid = self._config('auth_token_min_valid_seconds')
         # guards lazy login and token refresh against concurrent access, since
-        # the shared client's auth_store has no locking of its own
+        # the login of the shared client has no locking of its own
         self._auth_lock = threading.Lock()
         # the collection a successful login used; reused for refresh and
         # re-login, set on the first successful authentication
@@ -275,7 +264,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         last_error = None
         for name in candidates:
             try:
-                self.pb.collection(name).auth_with_password(self._auth_identity, self._config('auth_password'))
+                self.pb.auth_with_password(name, self._auth_identity, self._config('auth_password'))
                 self._auth_collection = name
                 return
             except Exception as error:
@@ -286,11 +275,11 @@ class TokeoPocketBaseHandler(MetaMixin):
         """
         Ensure a valid auth token before a request, when credentials are set.
 
-        Called at the start of every CRUD method. When auth_identity and
-        auth_password are configured this lazily logs in on first use and,
-        on later calls, refreshes the token before it expires. With no
-        credentials configured the handler stays anonymous and this is a
-        no-op.
+        Called by the client before each of its requests, also those of
+        collection(), batches and send. When auth_identity and auth_password
+        are configured this lazily logs in on first use and, on later calls,
+        refreshes the token before it expires. With no credentials
+        configured the handler stays anonymous and this is a no-op.
 
         ### Raises
 
@@ -298,9 +287,9 @@ class TokeoPocketBaseHandler(MetaMixin):
 
         ### Notes
 
-        : The whole check-and-refresh runs under a lock, because the shared
-            client's auth_store is mutable global state with no locking; this
-            prevents concurrent workers from racing on refresh or re-login
+        : The whole check-and-refresh runs under a lock, because the login of
+            the shared client is mutable state with no locking; this prevents
+            concurrent workers from racing on refresh or re-login
 
         : A token with more than auth_token_min_valid_seconds of life left is
             used as is; one near expiry is refreshed on its collection, and a
@@ -311,18 +300,15 @@ class TokeoPocketBaseHandler(MetaMixin):
         if not self._auth_identity:
             return
         with self._auth_lock:
-            token = self.pb.auth_store.token
             # a token with more than the minimum valid window left is good
-            if token and not jwt_token_expires_within(token, self._auth_min_valid):
+            if self.pb.token_valid(self._auth_min_valid):
                 return
-            # a still-valid token near expiry can be refreshed on its collection;
-            # the own check, auth_store.is_valid of the sdk raises KeyError on a
-            # token without exp
-            if token and self._auth_collection and not jwt_token_expires_within(token, 0):
+            # a still-valid token near expiry can be refreshed on its collection
+            if self._auth_collection and self.pb.token_valid(0):
                 try:
-                    self.pb.collection(self._auth_collection).auth_refresh()
+                    self.pb.auth_refresh()
                     return
-                except Exception:
+                except TokeoPocketBaseError:
                     # refresh rejected (e.g. revoked): fall back to a full login
                     pass
             self._login()
@@ -338,315 +324,260 @@ class TokeoPocketBaseHandler(MetaMixin):
         afterwards.
 
         """
-        # destroy the token so a logged-in identity does not linger
-        if self._auth_collection:
-            with self._auth_lock:
-                self.pb.auth_store.clear()
-                self._auth_collection = None
-        # free the pooled connections of the http client
-        self.pb.http_client.close()
+        # destroy the token so a logged-in identity does not linger, and free
+        # the pooled connections of the http client
+        with self._auth_lock:
+            self.pb.close()
+            self._auth_collection = None
 
-    def collection(self, collection_id_or_name):
+    def collection(self, collection):
         """
-        Get a reference to a PocketBase collection.
-
-        Retrieves a collection object that can be used to perform operations
-        directly with the PocketBase SDK. This provides access to all
-        native SDK functionality not specifically wrapped by the handler's methods.
+        Get the records of a PocketBase collection.
 
         ### Args
 
-        - **collection_id_or_name** (str): The ID or name of the collection
+        - **collection** (str): The name or id of the collection
 
         ### Returns
 
-        - **Collection**: A PocketBase collection object, provides direct SDK access
+        - **Collection**: The record methods of the collection
 
         ### Example
 
         ```python
-        # Get direct access to a collection
-        users_collection = app.db.collection('users')
-
-        # Use native SDK methods
-        user = users_collection.auth_with_password('email@example.com', 'password')
-
-        # Access collection schema information
-        schema = users_collection.get_schema()
+        posts = app.db.collection('posts')
+        everything = posts.get_full_list(sort='title')
         ```
 
         ### Notes
 
-        : While most common operations are available through the handler's
-            higher-level methods, this method provides access to the underlying
-            SDK for more specialized or advanced use cases.
+        : The handler methods below are short forms of these methods,
+            ```app.db.get_one('posts', rid)``` is
+            ```app.db.collection('posts').get_one(rid)```
 
         """
-        # return a general collection
-        return self.pb.collection(collection_id_or_name)
+        return self.pb.collection(collection)
 
-    def get_one(self, collection_id_or_name, id_, sort=None, q=None):
+    def get_one(self, collection, record_id, expand=None, fields=None, query=None):
         """
-        Retrieve a single record from a collection by ID.
-
-        Fetches a record by its unique ID from the specified collection,
-        with options for caching, sorting, and additional query parameters.
+        Get one record by its id.
 
         ### Args
 
-        - **collection_id_or_name** (str): The ID or name of the collection
-        - **id_** (str): The ID of the record to retrieve
-        - **sort** (str, optional): Sort expression passed through to the
-            SDK (format: ```field,-field```). Has no practical effect when
-            fetching a single record by id; kept for SDK passthrough and
-            symmetry with get_list
-        - **q** (dict): Additional query parameters to pass to PocketBase, a
-            key here wins over the arguments
+        - **collection** (str): The name or id of the collection
+        - **record_id** (str): The id of the record
+        - **expand** (str): The relations to expand, e.g. ```owner```
+        - **fields** (str): The fields to return, e.g. ```id,title```
+        - **query** (dict): Further query parameters, a key here wins
 
         ### Returns
 
-        - **Record**: The requested record data with all its fields
+        - **Record**: The record
 
         ### Raises
 
-        - **Exception**: If record retrieval fails (e.g., record not found)
+        - **TokeoPocketBaseError**: If the request fails, status 404 for a
+            record not found
 
         ### Example
 
         ```python
-        # Get a single user record
-        user = app.db.get_one('users', 'abc123xyz')
+        order = app.db.get_one('orders', order_id, expand='customer')
+        print(order.title, order.expand.customer.email)
         ```
 
         """
-        # update immutable default arguments
-        q = dict() if q is None else q
-        # check query options
-        sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
-        # run database query for one element by id
-        self.ensure_auth()
-        # q wins over the arguments, a key in both is no error
-        return self.collection(collection_id_or_name).get_one(id_, {**sort_opt, **q})
+        return self.collection(collection).get_one(record_id, expand, fields, query)
 
-    def get_list(self, collection_id_or_name, page=1, perPage=20, filter='', sort=None, q=None):
+    def get_list(self, collection, page=1, per_page=30, filter=None, sort=None, expand=None, fields=None, skip_total=False, query=None):
         """
-        Retrieve a paginated list of records from a collection.
-
-        Fetches multiple records from the specified collection with support for
-        pagination, filtering, sorting, and additional query parameters.
+        Get a page of records.
 
         ### Args
 
-        - **collection_id_or_name** (str): The ID or name of the collection
-        - **page** (int): The page number to retrieve (1-based)
-        - **perPage** (int): Number of records per page (default: 20)
-        - **filter** (str): Filter expression to apply (PocketBase filter syntax)
-        - **sort** (str, optional): Sort expression (format: ```field,-field```)
-        - **q** (dict): Additional query parameters to pass to PocketBase, a
-            key here wins over the arguments
+        - **collection** (str): The name or id of the collection
+        - **page** (int): The page, from 1
+        - **per_page** (int): The records per page
+        - **filter** (str): The filter in the syntax of PocketBase
+        - **sort** (str): The sort order, e.g. ```-created,title```
+        - **expand** (str): The relations to expand
+        - **fields** (str): The fields to return
+        - **skip_total** (bool): Skip counting all records, faster
+        - **query** (dict): Further query parameters, a key here wins
 
         ### Returns
 
-        - **ResultList**: Paginated result object with the following attributes:
-
-            - **items**: List of record objects
-            - **page**: Current page number
-            - **perPage**: Number of items per page
-            - **totalItems**: Total number of items across all pages
-            - **totalPages**: Total number of pages
+        - **ListResult**: The records in ```items``` and ```page```,
+            ```per_page```, ```total_items``` and ```total_pages```; the totals
+            are -1 with skip_total
 
         ### Raises
 
-        - **Exception**: If the query fails
+        - **TokeoPocketBaseError**: If the request fails
 
         ### Example
 
         ```python
-        # Get a basic list of users
-        users = app.db.get_list('users', page=1, perPage=50)
-
-        # Get filtered and sorted list
-        posts = app.db.get_list(
-            'posts',
-            filter='created >= "2023-01-01" && status = "published"',
-            sort='-created,title',
-            perPage=100
-        )
-
-        # Access the results
-        print(f"Showing {len(posts.items)} of {posts.totalItems} posts")
-        for post in posts.items:
-            print(f"Post: {post.title} by {post.author}")
-
-        # Check if there are more pages
-        if posts.page < posts.totalPages:
-            # Get next page
-            next_page = app.db.get_list('posts', page=posts.page+1)
+        paid = app.db.pb.filter('status = {:s}', {'s': 'paid'})
+        orders = app.db.get_list('orders', per_page=50, filter=paid)
+        print(f'{len(orders.items)} of {orders.total_items} orders')
         ```
 
         ### Notes
 
-        : The filter parameter uses PocketBase's filter syntax, which is similar to
-            JavaScript expressions. You can use logical operators (&&, ||),
-            comparison operators (=, !=, >, <, >=, <=), and
-            various filter functions.
+        : Build a filter from outside values only by
+            ```app.db.pb.filter(expr, params)```, it quotes and escapes them
 
         """
-        # update immutable default arguments
-        q = dict() if q is None else q
-        # check query options
-        sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
-        # run database query for multiple elements
-        self.ensure_auth()
-        # q wins over the arguments, a key in both is no error
-        return self.collection(collection_id_or_name).get_list(page, perPage, {'filter': filter, **sort_opt, **q})
+        return self.collection(collection).get_list(page, per_page, filter, sort, expand, fields, skip_total, query)
 
-    def create(self, collection_id_or_name, create_fields=None, q=None):
+    def get_full_list(self, collection, per_page=500, filter=None, sort=None, expand=None, fields=None, query=None):
         """
-        Create a new record in a collection.
-
-        Creates a new record with the specified fields in the given collection.
+        Get all records that match, page by page.
 
         ### Args
 
-        - **collection_id_or_name** (str): The ID or name of the collection
-        - **create_fields** (dict): The fields for the new record
-        - **q** (dict): Additional query parameters to pass to PocketBase
+        - **collection** (str): The name or id of the collection
+        - **per_page** (int): The records per request
+        - **filter** (str): The filter in the syntax of PocketBase
+        - **sort** (str): The sort order
+        - **expand** (str): The relations to expand
+        - **fields** (str): The fields to return
+        - **query** (dict): Further query parameters, a key here wins
 
         ### Returns
 
-        - **Record**: The newly created record with all its fields
+        - **list**: All records that match
 
         ### Raises
 
-        - **Exception**: If record creation fails
+        - **TokeoPocketBaseError**: If a request fails
+
+        """
+        return self.collection(collection).get_full_list(per_page, filter, sort, expand, fields, query)
+
+    def get_first(self, collection, filter, sort=None, expand=None, fields=None, query=None):
+        """
+        Get the first record that matches a filter.
+
+        ### Args
+
+        - **collection** (str): The name or id of the collection
+        - **filter** (str): The filter in the syntax of PocketBase
+        - **sort** (str): The sort order
+        - **expand** (str): The relations to expand
+        - **fields** (str): The fields to return
+        - **query** (dict): Further query parameters, a key here wins
+
+        ### Returns
+
+        - **Record**: The first record
+
+        ### Raises
+
+        - **TokeoPocketBaseError**: If the request fails, status 404 if no
+            record matches
+
+        """
+        return self.collection(collection).get_first(filter, sort, expand, fields, query)
+
+    def create(self, collection, data=None, files=None, expand=None, fields=None, query=None):
+        """
+        Create a record.
+
+        ### Args
+
+        - **collection** (str): The name or id of the collection
+        - **data** (dict): The fields of the record
+        - **files** (list): Files to upload, as ```(field, (filename,
+            content, content_type))``` tuples
+        - **expand** (str): The relations to expand in the answer
+        - **fields** (str): The fields to return
+        - **query** (dict): Further query parameters, a key here wins
+
+        ### Returns
+
+        - **Record**: The new record
+
+        ### Raises
+
+        - **TokeoPocketBaseError**: If the creation fails, the invalid fields
+            in ```data```
 
         ### Example
 
         ```python
-        # Create a basic record
-        new_product = app.db.create('products', {
-            'name': 'Premium Widget',
-            'price': 99.99,
-            'description': 'High-quality widget with premium features',
-            'in_stock': True
-        })
-
-        # Use the returned record
-        print(f"Created record with ID: {new_product.id}")
+        product = app.db.create('products', {'name': 'Widget', 'price': 99.99})
+        print(product.id)
         ```
 
         ### Notes
 
-        : When creating users or other records with passwords, be sure to include
-            both the ```password``` and ```passwordConfirm``` fields with identical
-            values as required by PocketBase.
+        : A record of an auth collection needs ```password``` and
+            ```passwordConfirm``` with the same value
 
         """
-        # update immutable default arguments
-        create_fields = dict() if create_fields is None else create_fields
-        q = dict() if q is None else q
-        # run database create
-        self.ensure_auth()
-        return self.collection(collection_id_or_name).create(body_params=create_fields, query_params=q)
+        return self.collection(collection).create(data, files, expand, fields, query)
 
-    def update(self, collection_id_or_name, id_, update_fields=None, q=None):
+    def update(self, collection, record_id, data=None, files=None, expand=None, fields=None, query=None):
         """
-        Update an existing record in a collection.
-
-        Updates an existing record with new field values. Only specified fields
-        will be updated; others remain unchanged.
+        Change fields of a record.
 
         ### Args
 
-        - **collection_id_or_name** (str): The ID or name of the collection
-        - **id_** (str): The ID of the record to update
-        - **update_fields** (dict): The fields to update
-        - **q** (dict): Additional query parameters to pass to PocketBase
+        - **collection** (str): The name or id of the collection
+        - **record_id** (str): The id of the record
+        - **data** (dict): The fields to change, the others stay
+        - **files** (list): Files to upload, as ```(field, (filename,
+            content, content_type))``` tuples; a field ```name+``` appends
+        - **expand** (str): The relations to expand in the answer
+        - **fields** (str): The fields to return
+        - **query** (dict): Further query parameters, a key here wins
 
         ### Returns
 
-        - **Record**: The updated record with all its fields
+        - **Record**: The changed record
 
         ### Raises
 
-        - **Exception**: If record update fails (e.g., record not found)
+        - **TokeoPocketBaseError**: If the change fails, status 404 for a
+            record not found
 
         ### Example
 
         ```python
-        # Update basic fields
-        updated_product = app.db.update('products', 'record123', {
-            'price': 129.99,
-            'in_stock': False,
-            'discount': 0.15
-        })
-
-        # Partial update of a user record
-        app.db.update('users', user_id, {
-            'is_verified': True
-        })
+        app.db.update('orders', order_id, {'status': 'processing'})
         ```
 
-        ### Notes
-
-        : Updates are partial by default, meaning only the fields specified in
-            update_fields will be modified. To remove a field value, set it to null
-            explicitly in the update_fields dictionary.
-
         """
-        # update immutable default arguments
-        update_fields = dict() if update_fields is None else update_fields
-        q = dict() if q is None else q
-        # run database update
-        self.ensure_auth()
-        return self.collection(collection_id_or_name).update(id_, body_params=update_fields, query_params=q)
+        return self.collection(collection).update(record_id, data, files, expand, fields, query)
 
-    def delete(self, collection_id_or_name, id_, q=None):
+    def delete(self, collection, record_id, query=None):
         """
-        Delete a record from a collection.
-
-        Permanently removes a record from the specified collection.
+        Delete a record.
 
         ### Args
 
-        - **collection_id_or_name** (str): The ID or name of the collection
-        - **id_** (str): The ID of the record to delete
-        - **q** (dict): Additional query parameters to pass to PocketBase
+        - **collection** (str): The name or id of the collection
+        - **record_id** (str): The id of the record
+        - **query** (dict): Further query parameters
 
         ### Returns
 
-        - **bool**: True if the deletion was successful
+        - **bool**: True once deleted
 
         ### Raises
 
-        - **Exception**: If record deletion fails (e.g., record not found
-            or unauthorized)
-
-        ### Example
-
-        ```python
-        try:
-            # Delete a record
-            result = app.db.delete('products', 'record123')
-            if result:
-                print("Record successfully deleted")
-        except Exception as e:
-            print(f"Failed to delete record: {str(e)}")
-        ```
+        - **TokeoPocketBaseError**: If the deletion fails, e.g. not found or
+            not allowed
 
         ### Notes
 
-        : Deletion is permanent and cannot be undone. For sensitive data, consider
-            implementing soft deletes by updating a status field instead of
-            permanently deleting records.
+        : Deletion is permanent. For sensitive data, consider a soft delete
+            by a status field instead
 
         """
-        # update immutable default arguments
-        q = dict() if q is None else q
-        # run database delete
-        self.ensure_auth()
-        return self.collection(collection_id_or_name).delete(id_, query_params=q)
+        return self.collection(collection).delete(record_id, query)
 
 
 def pocketbase_extend_app(app):
@@ -684,8 +615,8 @@ def pocketbase_close(app):
     ### Notes
 
     : Called automatically during the application's pre_close phase. It
-        invokes app.db.close(), which is a deliberate no-op (the handler
-        keeps no session or connection); see close() for the rationale.
+        invokes app.db.close(), which drops the login and closes the
+        connections of the client.
 
     """
     app.db.close()
