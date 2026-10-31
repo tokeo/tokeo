@@ -24,13 +24,13 @@ polling mechanism.
 
 from sys import argv, executable as sys_executable
 from os import execv as os_execv
-from os.path import basename, dirname, isfile
+from os.path import basename, isdir, join
 from time import monotonic
-import importlib
 from asyncio import sleep as asyncio_sleep
 
 from tokeo.ext.argparse import Controller
 from tokeo.core.exc import TokeoError
+from tokeo.core.utils.modules import resolve_module, resolve_object
 from cement.core.meta import MetaMixin
 from cement import ex
 from nicegui import ui, app as fastapi_app, context
@@ -298,8 +298,6 @@ class TokeoNicegui(MetaMixin):
         config_defaults = dict(
             host='127.0.0.1',
             port='4123',
-            apis_module=None,
-            routes_module=None,
             routes=None,
             title='Tokeo NiceGUI',
             favicon=None,
@@ -365,9 +363,7 @@ class TokeoNicegui(MetaMixin):
         self.fastapi_app = fastapi_app
         # add the ux helper
         self.ux = NiceguiElementHelper()
-        # lazy import apis and routes modules
-        self._apis_module = self._config('apis_module')
-        self._routes_module = self._config('routes_module')
+        # the routes function as module:function, resolved at startup
         self._routes = self._config('routes')
         self._openapi_custom_module = self._config('openapi_custom_module')
         self._openapi_url = self._config('openapi_url')
@@ -487,9 +483,9 @@ class TokeoNicegui(MetaMixin):
         """
         Start the NiceGUI web server with Tokeo integration.
 
-        Loads configured APIs and routes, sets up file monitoring if requested,
-        and starts the NiceGUI server. This is the main entry point for running
-        the NiceGUI web application.
+        Maps the routes by the configured function, sets up file monitoring if
+        requested, and starts the NiceGUI server. This is the main entry point
+        for running the NiceGUI web application.
 
         ### Args
 
@@ -498,13 +494,16 @@ class TokeoNicegui(MetaMixin):
 
         ### Raises
 
-        - **TokeoNiceguiError**: If the default route handler cannot be found
+        - **TokeoNiceguiError**: If routes is set but no string
+        - **TokeoModulesLoadError**: If the routes function cannot be loaded
 
         ### Notes
 
-        - Dynamically imports API and route modules based on configuration
-        - Sets up the default route handler if specified
-        - Configures file monitoring if hot-reloading is enabled
+        - Calls the routes function, given as module:function, which maps
+            the pages and apis
+        - Watches for hotload the given dir, else the hotload_dir of the
+            config, else the site dir of the app package, always recursive;
+            without that dir it warns and runs without hotload
         - Loads and configure OpenAPI endpoint and custom swagger and redoc ui
         - Starts the NiceGUI server with configuration from the application
 
@@ -513,49 +512,35 @@ class TokeoNicegui(MetaMixin):
         # validate before start and always raise
         if self._routes is not None and not isinstance(self._routes, str):
             raise TokeoNiceguiError(
-                f'Misconfiguration for route handler. Must be null or name of method, but is: [{str(type(self._routes))}]'
+                f'Misconfiguration for route handler. Must be null or module:function, but is: [{str(type(self._routes))}]'
             )
 
         try:
-            # load the api and routes modules
-            apis_module = importlib.import_module(self._apis_module) if self._apis_module else None
-            routes_module = importlib.import_module(self._routes_module) if self._routes_module else None
-
-            # check default routes handler
+            # map the pages and apis by the routes function
             if self._routes:
-                routes_handler = getattr(routes_module, self._routes, None)
-                # verify
-                if routes_handler is None:
-                    raise TokeoNiceguiError(f'Route handler "{self._routes}" could not be found in module "{self._routes_module}"')
-                # initialize registered default route
-                routes_handler()
+                resolve_object(self._routes)()
 
         except Exception as err:
             # when hotload a failed start stays running, so the next save
             # can fix the error. _setup_watchdog() runs further down and
             # is reached either way.
             if hotload:
-                apis_module = routes_module = None
-                self.app.log.error(f'Loading apis and routes failed: {err}', exc_info=True)
+                self.app.log.error(f'Loading routes failed: {err}', exc_info=True)
             else:
                 # otherwise a failed start is a fail start and stops
                 raise
 
         # check config for watchdog
         if hotload:
-            self._hotload_dir = hotload_dir if hotload_dir else self._config('hotload_dir', fallback=None)
-            # if no dir set use the module's path
-            if self._hotload_dir is None:
-                self._hotload_dir = getattr(routes_module, '__file__', getattr(apis_module, '__file__', None))
-            # check to point for a dir
-            if not self._hotload_dir:
-                self._hotload_dir = self.app._meta.main_dir
-            elif isfile(self._hotload_dir):
-                self._hotload_dir = dirname(self._hotload_dir)
-            # activate watchdog
-            self._setup_watchdog()
-            # Create the file monitor task to run in the FastAPI's event loop
-            fastapi_app.on_startup(self._watchdog_file_changes)
+            # the given dir, else the config, else the site dir of the app
+            self._hotload_dir = hotload_dir or self._config('hotload_dir', fallback=None) or join(self.app._meta.main_dir, 'site')
+            if isdir(self._hotload_dir):
+                # activate watchdog
+                self._setup_watchdog()
+                # Create the file monitor task to run in the FastAPI's event loop
+                fastapi_app.on_startup(self._watchdog_file_changes)
+            else:
+                self.app.log.warning(f'Hotload is off, the dir to watch does not exist: {self._hotload_dir}')
 
         # use custom welcome message
         fastapi_app.on_startup(
@@ -574,7 +559,7 @@ class TokeoNicegui(MetaMixin):
             fastapi_app.setup()
             try:
                 # use module to customize ui
-                openapi_custom_module = importlib.import_module(self._openapi_custom_module) if self._openapi_custom_module else None
+                openapi_custom_module = resolve_module(self._openapi_custom_module) if self._openapi_custom_module else None
                 # try to customize get_openapi settings
                 fastapi_app.openapi = openapi_custom_module.get_openapi_custom
 

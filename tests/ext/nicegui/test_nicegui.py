@@ -12,7 +12,6 @@ client, without a browser. Every test starts and ends with the global state
 of nicegui reset.
 """
 
-import os
 import ast
 import sys
 import time
@@ -29,6 +28,7 @@ from nicegui.testing import User
 from nicegui.testing.general import nicegui_reset_globals
 from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileMovedEvent, FileOpenedEvent, FileClosedNoWriteEvent
 from tokeo.main import TokeoTest
+from tokeo.core.utils.modules import TokeoModulesLoadError
 from tokeo.ext.nicegui import (
     NiceguiElementHelper,
     TokeoNiceguiError,
@@ -38,7 +38,7 @@ from tokeo.ext.nicegui import (
 from tests.utils import wait_until
 
 #: The routes of the tests, _pages of this module
-ROUTES = dict(routes_module=__name__, routes='_pages')
+ROUTES = dict(routes=f'{__name__}:_pages')
 
 
 class NiceguiTest(TokeoTest):
@@ -171,44 +171,37 @@ def test_setup_welcome_message(settings, message):
 
 @pytest.mark.parametrize('hotload', [False, True])
 @pytest.mark.parametrize('routes', [5, ['index'], dict(path='/')], ids=['int', 'list', 'dict'])
-def test_startup_refuses_routes_other_than_a_name(runs, routes, hotload):
-    """routes other than null or a name raises, also with hotload."""
-    with NiceguiTest(routes_module=__name__, routes=routes) as app:
-        with pytest.raises(TokeoNiceguiError, match='Misconfiguration for route handler. Must be null or name of method'):
+def test_startup_refuses_routes_other_than_a_string(runs, routes, hotload):
+    """routes other than null or a string raises, also with hotload."""
+    with NiceguiTest(routes=routes) as app:
+        with pytest.raises(TokeoNiceguiError, match='Misconfiguration for route handler. Must be null or module:function'):
             app.nicegui.startup(hotload=hotload)
         assert app.nicegui._watchdog_observer is None
     assert runs == []
 
 
-@pytest.mark.parametrize('routes_module', [__name__, None], ids=['module', 'no_module'])
-def test_startup_route_handler_missing(runs, routes_module):
-    """A routes name missing in the routes module raises and serves nothing."""
-    with NiceguiTest(routes_module=routes_module, routes='_no_pages') as app:
-        with pytest.raises(TokeoNiceguiError, match=f'Route handler "_no_pages" could not be found in module "{routes_module}"'):
-            app.nicegui.startup()
-    assert runs == []
-
-
-@pytest.mark.parametrize('key', ['routes_module', 'apis_module'])
-def test_startup_module_not_importable(runs, key):
-    """A routes or apis module that does not import raises its ImportError."""
-    with NiceguiTest(**{key: 'no.such.module'}) as app:
-        with pytest.raises(ModuleNotFoundError, match="No module named 'no'"):
+@pytest.mark.parametrize(
+    'routes, reason',
+    [(f'{__name__}:_no_pages', 'could not be found'), ('no.such.module:routes', "does not import: No module named 'no'")],
+    ids=['function', 'module'],
+)
+def test_startup_routes_that_do_not_resolve(runs, routes, reason):
+    """A missing routes function or module raises and serves nothing."""
+    with NiceguiTest(routes=routes) as app:
+        with pytest.raises(TokeoModulesLoadError, match=reason):
             app.nicegui.startup()
     assert runs == []
 
 
 def test_startup_with_hotload_survives_a_failed_load(runs, tmp_path, monkeypatch):
-    """With hotload a missing route handler is logged, watched and served anyway."""
-    with NiceguiTest(routes_module=__name__, routes='_no_pages') as app:
+    """With hotload a missing routes function is logged, watched and served."""
+    with NiceguiTest(routes=f'{__name__}:_no_pages') as app:
         errors = []
         monkeypatch.setattr(app.log, 'error', lambda msg, **kw: errors.append(msg))
         app.nicegui.startup(hotload=True, hotload_dir=str(tmp_path))
         observer = app.nicegui._watchdog_observer
         assert observer.is_alive() and len(runs) == 1
-    assert errors == [
-        'Loading apis and routes failed: Route handler "_no_pages" could not be found in module "tests.ext.nicegui.test_nicegui"'
-    ]
+    assert len(errors) == 1 and errors[0].startswith(f"Loading routes failed: '{__name__}:_no_pages' could not be found")
     # the close of the app stops the watchdog
     assert not observer.is_alive()
 
@@ -326,18 +319,28 @@ def test_startup_hotload_dir_switch_wins_over_config(runs, tmp_path):
         assert app.nicegui._hotload_dir == str(tmp_path / 'config')
 
 
-def test_startup_hotload_dir_defaults_to_the_routes_module(runs):
-    """Without hotload_dir the folder of the routes module is watched."""
+def test_startup_hotload_dir_defaults_to_the_site_dir_of_the_app(runs, tmp_path):
+    """Without hotload_dir the site dir of the app package is watched."""
+    (tmp_path / 'site').mkdir()
     with NiceguiTest(**ROUTES) as app:
+        app._meta.main_dir = str(tmp_path)
         app.nicegui.startup(hotload=True)
-        assert app.nicegui._hotload_dir == os.path.dirname(__file__)
+        assert app.nicegui._hotload_dir == str(tmp_path / 'site')
+        assert app.nicegui._watchdog_observer.is_alive()
 
 
-def test_startup_hotload_dir_defaults_to_main_dir(runs):
-    """Without hotload_dir and modules the main dir of the app is watched."""
-    with NiceguiTest() as app:
+@pytest.mark.parametrize('configured', [True, False], ids=['config', 'site'])
+def test_startup_hotload_without_the_dir_warns_and_serves(runs, tmp_path, monkeypatch, configured):
+    """A missing dir to watch warns, no watchdog runs and nicegui serves anyway."""
+    settings = dict(hotload_dir=str(tmp_path / 'missing')) if configured else {}
+    with NiceguiTest(**settings) as app:
+        app._meta.main_dir = str(tmp_path)
+        warnings = []
+        monkeypatch.setattr(app.log, 'warning', lambda msg, **kw: warnings.append(msg))
         app.nicegui.startup(hotload=True)
-        assert app.nicegui._hotload_dir == app._meta.main_dir
+        assert app.nicegui._watchdog_observer is None and len(runs) == 1
+    expected = tmp_path / 'missing' if configured else tmp_path / 'site'
+    assert warnings == [f'Hotload is off, the dir to watch does not exist: {expected}']
 
 
 def test_hotload_restarts_the_process_after_a_change(runs, tmp_path, no_process_replacement):
