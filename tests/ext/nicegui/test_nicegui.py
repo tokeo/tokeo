@@ -258,18 +258,33 @@ def test_startup_openapi_with_custom_module(runs, openapi, monkeypatch):
     assert runs[0]['endpoint_documentation'] == 'page'
 
 
-def test_startup_openapi_without_custom_module_keeps_fastapi(runs, openapi, monkeypatch):
-    """Without a custom module fastapi serves its schema, no swagger or redoc."""
+def test_startup_openapi_without_custom_module_raises(runs, openapi):
+    """Without a custom module the openapi does not start, nothing is set up."""
     with NiceguiTest(**openapi) as app:
-        warnings = []
-        monkeypatch.setattr(app.log, 'warning', lambda msg, **kw: warnings.append(msg))
-        app.nicegui.startup()
-    assert nicegui_app.openapi.__func__ is FastAPI.openapi
-    assert '/openapi.json' in _paths() and not {'/docs', '/redoc'} & _paths()
-    # the missing module is logged as failed customizing
-    assert warnings == [
-        "Could not start the custom openapi interface and documentation: 'NoneType' object has no attribute 'get_openapi_custom'"
-    ]
+        with pytest.raises(TokeoNiceguiError, match='openapi_documentation and openapi_url need an openapi_custom_module'):
+            app.nicegui.startup()
+    assert nicegui_app.openapi.__func__ is FastAPI.openapi and nicegui_app.openapi_url is None
+    assert not runs
+
+
+@pytest.mark.parametrize(
+    'attributes, missing',
+    [
+        (None, 'does not import'),
+        (dict(custom_swagger_ui_html=str, custom_redoc_html=str), 'get_openapi_custom'),
+        (dict(get_openapi_custom=dict, custom_redoc_html=str), 'custom_swagger_ui_html'),
+        (dict(get_openapi_custom=dict, custom_swagger_ui_html=str), 'custom_redoc_html'),
+    ],
+    ids=['no_module', 'no_openapi', 'no_swagger', 'no_redoc'],
+)
+def test_startup_openapi_with_an_unfit_custom_module_raises(runs, openapi, monkeypatch, attributes, missing):
+    """A module that does not import or lacks a function raises, nothing set up."""
+    name = 'tokeo_tests_openapi_missing' if attributes is None else _module(monkeypatch, 'tokeo_tests_openapi_unfit', **attributes)
+    with NiceguiTest(openapi_custom_module=name, **openapi) as app:
+        with pytest.raises(TokeoNiceguiError, match=f"openapi_custom_module '{name}' cannot serve the openapi: .*{missing}"):
+            app.nicegui.startup()
+    assert nicegui_app.openapi.__func__ is FastAPI.openapi and nicegui_app.openapi_url is None
+    assert not runs
 
 
 @pytest.mark.parametrize('documentation, url', [(None, '/openapi.json'), ('page', None)], ids=['no_documentation', 'no_url'])

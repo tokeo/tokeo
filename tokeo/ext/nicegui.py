@@ -539,7 +539,9 @@ class TokeoNicegui(MetaMixin):
 
         ### Raises
 
-        - **TokeoNiceguiError**: If routes is set but no string
+        - **TokeoNiceguiError**: If routes is set but no string, or the
+            openapi is on without an openapi_custom_module that loads and
+            has the functions for it
         - **TokeoModulesLoadError**: If the routes function cannot be loaded
 
         ### Notes
@@ -550,6 +552,8 @@ class TokeoNicegui(MetaMixin):
             config, else the site dir of the app package, always recursive;
             without that dir it warns and runs without hotload
         - Loads and configure OpenAPI endpoint and custom swagger and redoc ui
+            from the openapi_custom_module, without it the openapi cannot
+            be switched on
         - Starts the NiceGUI server with configuration from the application
 
         """
@@ -598,37 +602,29 @@ class TokeoNicegui(MetaMixin):
 
         # config the openapi service and customizing
         if self._config('openapi_documentation') and self._openapi_url:
+            # the openapi of the app comes from its own module only, checked
+            # before anything is set up
+            if not self._openapi_custom_module:
+                raise TokeoNiceguiError('openapi_documentation and openapi_url need an openapi_custom_module')
+            try:
+                openapi_custom_module = resolve_module(self._openapi_custom_module)
+                get_openapi_custom = openapi_custom_module.get_openapi_custom
+                swagger_ui_html = openapi_custom_module.custom_swagger_ui_html if self._openapi_swagger_url else None
+                redoc_html = openapi_custom_module.custom_redoc_html if self._openapi_redoc_url else None
+            except (TokeoError, AttributeError) as err:
+                raise TokeoNiceguiError(f'openapi_custom_module {self._openapi_custom_module!r} cannot serve the openapi: {err}') from err
             # define general openapi.json url
             fastapi_app.openapi_url = self._openapi_url
             # setup openapi
             fastapi_app.setup()
-            try:
-                # use module to customize ui
-                openapi_custom_module = resolve_module(self._openapi_custom_module) if self._openapi_custom_module else None
-                # try to customize get_openapi settings
-                fastapi_app.openapi = openapi_custom_module.get_openapi_custom
-
-                # try to launch swagger doc
-                if self._openapi_swagger_url:
-                    try:
-                        self.fastapi_app.get(self._openapi_swagger_url, include_in_schema=False)(
-                            openapi_custom_module.custom_swagger_ui_html
-                        )
-                    except Exception as e:
-                        # ignore, just missing documentation ui
-                        self.app.log.warning(f'Could not start the openapi swagger ui for documentation: {str(e)}')
-
-                # try to launch redoc doc
-                if self._openapi_redoc_url:
-                    try:
-                        self.fastapi_app.get(self._openapi_redoc_url, include_in_schema=False)(openapi_custom_module.custom_redoc_html)
-                    except Exception as e:
-                        # ignore, just missing documentation ui
-                        self.app.log.warning(f'Could not start the openapi redoc for documentation: {str(e)}')
-
-            except Exception as e:
-                # use default get_openapi from fastapi
-                self.app.log.warning(f'Could not start the custom openapi interface and documentation: {str(e)}')
+            # customize get_openapi settings
+            fastapi_app.openapi = get_openapi_custom
+            # launch swagger doc
+            if swagger_ui_html:
+                self.fastapi_app.get(self._openapi_swagger_url, include_in_schema=False)(swagger_ui_html)
+            # launch redoc doc
+            if redoc_html:
+                self.fastapi_app.get(self._openapi_redoc_url, include_in_schema=False)(redoc_html)
 
         # config
         nicegui_run_config = dict(
