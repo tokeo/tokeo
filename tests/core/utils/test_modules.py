@@ -1,6 +1,6 @@
 """
 Tests for tokeo.core.utils.modules: resolve_module and resolve_object load
-what a config names, as module:attr or in the dotted form, and report every
+what a config names as module:attr and report every
 failure as TokeoModulesLoadError with its cause; find_module_dir finds a
 module without running it; override_module serves a local file in place of
 an installed module, also one its parent package loads itself.
@@ -75,10 +75,9 @@ def test_resolve_module_names_the_import_error_inside_the_module(pkg):
 # resolve_object
 
 
-@pytest.mark.parametrize('form', ['{}.inner:VALUE', '{}.inner.VALUE'], ids=['colon', 'dotted'])
-def test_resolve_object_takes_both_forms(pkg, form):
-    """module:attr and the dotted form give the same object."""
-    assert resolve_object(form.format(pkg)) == 'installed'
+def test_resolve_object_takes_module_attr(pkg):
+    """module:attr gives the object."""
+    assert resolve_object(f'{pkg}.inner:VALUE') == 'installed'
 
 
 def test_resolve_object_takes_a_dotted_attr_after_the_colon(pkg):
@@ -86,7 +85,7 @@ def test_resolve_object_takes_a_dotted_attr_after_the_colon(pkg):
     assert resolve_object(f'{pkg}.inner:Thing.method').__name__ == 'method'
 
 
-@pytest.mark.parametrize('form', ['{}.inner:', ':VALUE', '{}'], ids=['no_attr', 'no_module', 'no_separator'])
+@pytest.mark.parametrize('form', ['{}.inner:', ':VALUE', '{}', '{}.inner.VALUE'], ids=['no_attr', 'no_module', 'no_separator', 'dotted'])
 def test_resolve_object_refuses_a_missing_part(pkg, form):
     """A name without module or attr part raises TokeoModulesLoadError."""
     with pytest.raises(TokeoModulesLoadError, match='must be set as module:attr'):
@@ -106,11 +105,10 @@ def test_resolve_object_of_a_missing_attr_raises(pkg):
     assert isinstance(caught.value.__cause__, AttributeError)
 
 
-@pytest.mark.parametrize('form', ['{}.broken:run', '{}.broken.run'], ids=['colon', 'dotted'])
-def test_resolve_object_does_not_hide_an_import_error_inside_the_module(pkg, form):
-    """In both forms an import error inside the module names the dependency."""
+def test_resolve_object_does_not_hide_an_import_error_inside_the_module(pkg):
+    """An import error inside the module names the missing dependency."""
     with pytest.raises(TokeoModulesLoadError, match='tokeo_tests_not_installed'):
-        resolve_object(form.format(pkg))
+        resolve_object(f'{pkg}.broken:run')
 
 
 # find_module_dir and get_module_path

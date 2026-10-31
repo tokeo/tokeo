@@ -30,6 +30,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from tokeo.core.smtpd import GlobalLimits
+from tokeo.core.utils.modules import TokeoModulesLoadError
 from tokeo.ext.smtpd import (
     TokeoSmtpdError,
     SharedGlobalLimits,
@@ -44,18 +45,22 @@ needs_pdeathsig = pytest.mark.skipif(not sys.platform.startswith('linux'), reaso
 # ---- unit: handler resolving ----------------------------------------------------
 
 
-def test_resolve_events_handler_imports_and_rejects():
-    """A dotted path imports the handler, anything else raises TokeoSmtpdError."""
+def test_resolve_events_handler_imports_the_class():
+    """module:class imports the handler class."""
     from tokeo.ext.smtpd import TokeoSmtpdEvents
 
-    assert _resolve_events_handler('tokeo.ext.smtpd.TokeoSmtpdEvents') is TokeoSmtpdEvents
-    with pytest.raises(TokeoSmtpdError):
+    assert _resolve_events_handler('tokeo.ext.smtpd:TokeoSmtpdEvents') is TokeoSmtpdEvents
+
+
+def test_resolve_events_handler_rejects():
+    """A path that does not resolve or no TokeoSmtpdEvents subclass raises."""
+    with pytest.raises(TokeoModulesLoadError, match='must be set as module:attr'):
         _resolve_events_handler('NoDots')
-    with pytest.raises(TokeoSmtpdError):
-        _resolve_events_handler('tokeo.core.smtpd.events.NoSuchClass')
-    with pytest.raises(TokeoSmtpdError):
+    with pytest.raises(TokeoModulesLoadError, match='could not be found'):
+        _resolve_events_handler('tokeo.core.smtpd.events:NoSuchClass')
+    with pytest.raises(TokeoSmtpdError, match='must subclass'):
         # importable, but not a TokeoSmtpdEvents subclass: the core class
-        _resolve_events_handler('tokeo.core.smtpd.events.SmtpdEvents')
+        _resolve_events_handler('tokeo.core.smtpd.events:SmtpdEvents')
 
 
 def test_events_handler_carries_the_app():
@@ -157,7 +162,7 @@ def test_extension_loads_into_cement_app():
             services=[
                 {
                     'name': 'mx-a',
-                    'events_handler': 'tokeo.ext.smtpd.TokeoSmtpdEvents',
+                    'events_handler': 'tokeo.ext.smtpd:TokeoSmtpdEvents',
                     'listeners': [{'host': '127.0.0.1', 'port': 2525}],
                 }
             ]
@@ -183,8 +188,8 @@ def test_extension_loads_into_cement_app():
 @pytest.mark.parametrize(
     'svc, reason',
     [
-        (dict(events_handler='tokeo.ext.smtpd.TokeoSmtpdEvents', settings=dict(encrypt_mode='TLS_NOPE')), 'encrypt_mode must be one of'),
-        (dict(events_handler='NoDots'), 'events_handler needs a dotted path'),
+        (dict(events_handler='tokeo.ext.smtpd:TokeoSmtpdEvents', settings=dict(encrypt_mode='TLS_NOPE')), 'encrypt_mode must be one of'),
+        (dict(events_handler='NoDots'), "'NoDots' must be set as module:attr"),
     ],
     ids=['encrypt_mode', 'events_handler'],
 )
@@ -198,7 +203,7 @@ def test_build_server_names_the_service(svc, reason):
 def _build(svc):
     """Build the server of one service of a test app."""
     with SmtpdTest() as app:
-        server = app.smtpd._build_server(dict(svc, name='mx-x', listeners=[], events_handler='tokeo.ext.smtpd.TokeoSmtpdEvents'), None)
+        server = app.smtpd._build_server(dict(svc, name='mx-x', listeners=[], events_handler='tokeo.ext.smtpd:TokeoSmtpdEvents'), None)
         return app, server
 
 
@@ -273,7 +278,7 @@ def _free_port():
 def _service(name, port, pre_fork=0):
     svc = {
         'name': name,
-        'events_handler': 'tokeo.ext.smtpd.TokeoSmtpdEvents',
+        'events_handler': 'tokeo.ext.smtpd:TokeoSmtpdEvents',
         'listeners': [{'host': '127.0.0.1', 'port': port}],
     }
     if pre_fork:
@@ -438,7 +443,7 @@ def _broken_service(name, pre_fork=0):
     """A service whose listener cannot bind (TEST-NET address)."""
     svc = {
         'name': name,
-        'events_handler': 'tokeo.ext.smtpd.TokeoSmtpdEvents',
+        'events_handler': 'tokeo.ext.smtpd:TokeoSmtpdEvents',
         'listeners': [{'host': '203.0.113.1', 'port': 2525}],
     }
     if pre_fork:
@@ -512,7 +517,7 @@ def test_failed_worker_stops_all_services(tmp_path):
 def _tagged_service(name, port, pre_fork, settings=None):
     """A service whose handler answers EHLO with its tag and pid."""
     svc = _service(name, port, pre_fork=pre_fork)
-    svc['events_handler'] = 'tests.ext.smtpd.smtpd_tests_helper.TaggedSmtpdEvents'
+    svc['events_handler'] = 'tests.ext.smtpd.smtpd_tests_helper:TaggedSmtpdEvents'
     svc['options'] = {'tag': 'opt-42'}
     svc['settings'].update(settings or {})
     return svc

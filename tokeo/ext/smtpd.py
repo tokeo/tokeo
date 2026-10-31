@@ -84,12 +84,12 @@ import time
 import ctypes
 import signal
 import asyncio
-import importlib
 import multiprocessing
 from os.path import basename
 from cement.core.meta import MetaMixin
 from cement import ex
 from tokeo.core.exc import TokeoError
+from tokeo.core.utils.modules import resolve_object
 from tokeo.core.smtpd import SmtpdServer, GlobalLimits, SmtpdEvents
 from tokeo.ext.argparse import Controller
 
@@ -125,11 +125,12 @@ class TokeoSmtpdEvents(SmtpdEvents):
 
 def _resolve_events_handler(path):
     """
-    Import the events handler class from its dotted path.
+    Import the events handler class from its module:class path.
 
     ### Args
 
-    - **path** (str): Dotted path, e.g. ```myapp.core.smtpd.MailHandler```
+    - **path** (str): The class as module:class, e.g.
+        ```myapp.core.smtpd:MailHandler```
 
     ### Returns
 
@@ -137,17 +138,12 @@ def _resolve_events_handler(path):
 
     ### Raises
 
-    - **TokeoSmtpdError**: On a path without module part, on import failure
-        and on a class that does not subclass ```TokeoSmtpdEvents```
+    - **TokeoModulesLoadError**: If the path does not resolve to an object
+    - **TokeoSmtpdError**: On a class that does not subclass
+        ```TokeoSmtpdEvents```
 
     """
-    module, _, name = str(path).rpartition('.')
-    if not module:
-        raise TokeoSmtpdError(f'smtpd: events_handler needs a dotted path: {path!r}')
-    try:
-        events_handler = getattr(importlib.import_module(module), name)
-    except (ImportError, AttributeError) as err:
-        raise TokeoSmtpdError(f'smtpd: cannot import events_handler {path!r}: {err}')
+    events_handler = resolve_object(path)
     if not (isinstance(events_handler, type) and issubclass(events_handler, TokeoSmtpdEvents)):
         raise TokeoSmtpdError(f'smtpd: events_handler {path!r} must subclass tokeo.ext.smtpd.TokeoSmtpdEvents')
     return events_handler

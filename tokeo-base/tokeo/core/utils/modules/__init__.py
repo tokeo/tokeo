@@ -3,7 +3,7 @@ Tokeo Modules Module.
 
 Loads modules and objects that a config names, with one form and one error
 for all extensions. An object is named as ```module:attr```, like an entry
-point; the dotted form ```module.attr``` is read as well.
+point.
 
 ### Example
 
@@ -76,12 +76,12 @@ def resolve_module(name):
 
 def resolve_object(name):
     """
-    Import the object a config names as module:attr or module.attr.
+    Import the object a config names as module:attr.
 
     ### Args
 
-    - **name** (str): ```pkg.module:attr``` or ```pkg.module.attr```; after
-        the colon the attr may be dotted, e.g. ```pkg.module:Class.method```
+    - **name** (str): ```pkg.module:attr```; the attr may be dotted, e.g.
+        ```pkg.module:Class.method```
 
     ### Returns
 
@@ -94,9 +94,6 @@ def resolve_object(name):
 
     ### Notes
 
-    : ```module:attr``` is the form to use; the dotted form is split at its
-        last dot and kept for older configs
-
     : The module part is imported as named, so an import error inside the
         module shows as such and is not hidden
 
@@ -104,11 +101,13 @@ def resolve_object(name):
     if not is_filled_str(name):
         raise TokeoModulesLoadError(f'{name!r} is no name of module:attr')
     module, sep, attr = name.partition(':')
-    if not sep:
-        module, _, attr = name.rpartition('.')
-    if not module or not attr:
+    if not sep or not module or not attr:
         raise TokeoModulesLoadError(f'{name!r} must be set as module:attr')
-    obj = resolve_module(module)
+    # the error names the value as written in the config
+    try:
+        obj = importlib.import_module(module)
+    except ImportError as err:
+        raise TokeoModulesLoadError(f'{name!r} does not import: {err}') from err
     try:
         for part in attr.split('.'):
             obj = getattr(obj, part)

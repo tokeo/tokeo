@@ -29,7 +29,7 @@ from cement.core.exc import CaughtSignal
 from cement import ex
 from concurrent import futures
 import grpc
-import importlib
+from tokeo.core.utils.modules import resolve_object
 
 
 class TokeoGrpcError(TokeoError):
@@ -121,12 +121,10 @@ class TokeoGrpc(MetaMixin):
         #: The Cement application instance
         self.app = app
         self._server = None
-        self._proto_add_servicer_to_server_module = ''
-        self._proto_add_servicer_to_server_method = ''
-        self._grpc_servicer_module = ''
-        self._grpc_servicer_method = ''
-        self._grpc_interceptor_module = ''
-        self._grpc_interceptor_method = ''
+        # the module:attr settings, resolved when the server is built
+        self._proto_add_servicer_to_server = None
+        self._grpc_servicer = None
+        self._grpc_interceptor = None
 
     def _setup(self, app):
         # the app handed to _setup must be the same instance this handler
@@ -134,24 +132,14 @@ class TokeoGrpc(MetaMixin):
         if app is not self.app:
             raise TokeoGrpcError('_setup() received a different app than the one TokeoGrpc was initialized with')
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
-        a = self._config('proto_add_servicer_to_server')
-        if not a:
+        self._proto_add_servicer_to_server = self._config('proto_add_servicer_to_server')
+        if not self._proto_add_servicer_to_server:
             raise TokeoGrpcError('Missing mandatory proto_add_servicer_to_server setting in config')
-        a = a.split(':')
-        self._proto_add_servicer_to_server_module = a[0]
-        self._proto_add_servicer_to_server_method = a[1]
-        a = self._config('grpc_servicer')
-        if not a:
+        self._grpc_servicer = self._config('grpc_servicer')
+        if not self._grpc_servicer:
             raise TokeoGrpcError('Missing mandatory grpc_servicer setting in config')
-        a = a.split(':')
-        self._grpc_servicer_module = a[0]
-        self._grpc_servicer_method = a[1]
-        # optional interceptor chain factory (module:method); skip when unset
-        a = self._config('grpc_interceptor')
-        if a:
-            a = a.split(':')
-            self._grpc_interceptor_module = a[0]
-            self._grpc_interceptor_method = a[1]
+        # optional interceptor chain factory (module:method), None when unset
+        self._grpc_interceptor = self._config('grpc_interceptor')
 
     def _config(self, key, **kwargs):
         """
@@ -214,17 +202,10 @@ class TokeoGrpc(MetaMixin):
         if self._server is None:
             # resolve the optional interceptor chain before the server is
             # built, interceptors can only be passed at construction time
-            if self._grpc_interceptor_module:
-                grpc_interceptor_module = importlib.import_module(self._grpc_interceptor_module)
-                grpc_interceptor_method = getattr(grpc_interceptor_module, self._grpc_interceptor_method)
-                interceptors = grpc_interceptor_method()
-            else:
-                interceptors = None
+            interceptors = resolve_object(self._grpc_interceptor)() if self._grpc_interceptor else None
             # get dynamic methods for proto and service
-            proto_add_servicer_to_server_module = importlib.import_module(self._proto_add_servicer_to_server_module)
-            proto_add_servicer_to_server_method = getattr(proto_add_servicer_to_server_module, self._proto_add_servicer_to_server_method)
-            grpc_servicer_module = importlib.import_module(self._grpc_servicer_module)
-            grpc_servicer_method = getattr(grpc_servicer_module, self._grpc_servicer_method)
+            proto_add_servicer_to_server = resolve_object(self._proto_add_servicer_to_server)
+            grpc_servicer = resolve_object(self._grpc_servicer)
             # create the server
             server = grpc.server(
                 futures.ThreadPoolExecutor(max_workers=self._config('max_worker')),
@@ -237,7 +218,7 @@ class TokeoGrpc(MetaMixin):
             else:
                 server.add_insecure_port(self._config('url'))
             # append services
-            proto_add_servicer_to_server_method(grpc_servicer_method(), server)
+            proto_add_servicer_to_server(grpc_servicer(), server)
             # keep the server only once it is complete, a failed build is retried
             self._server = server
 

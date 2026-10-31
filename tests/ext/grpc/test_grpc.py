@@ -9,6 +9,7 @@ echo service of the helper is built from grpc generic handlers, so no .proto
 file is compiled and no generated code is needed.
 """
 
+import re
 import socket
 import signal
 import contextlib
@@ -25,6 +26,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cement.core.exc import CaughtSignal
 from tokeo.ext.grpc import TokeoGrpcError
+from tokeo.core.utils.modules import TokeoModulesLoadError
 from tests.ext.grpc.grpc_tests_helper import GrpcTest, SERVICE, ADD_SERVICER, SERVICER, INTERCEPTORS
 
 
@@ -145,19 +147,17 @@ def test_setup_merges_the_defaults_below_the_settings():
         assert app.config.get('grpc', 'tls_valid_days') == 90
 
 
-def test_setup_splits_module_and_attribute_of_each_setting():
-    """Each module:attribute setting is split into module and attribute."""
+def test_setup_keeps_each_module_attr_setting():
+    """Each module:attr setting is kept as given, resolved later by the server."""
     with GrpcTest(settings={'grpc_interceptor': INTERCEPTORS}) as app:
         ext = app.grpc
-        assert [ext._proto_add_servicer_to_server_module, ext._proto_add_servicer_to_server_method] == ADD_SERVICER.split(':')
-        assert [ext._grpc_servicer_module, ext._grpc_servicer_method] == SERVICER.split(':')
-        assert [ext._grpc_interceptor_module, ext._grpc_interceptor_method] == INTERCEPTORS.split(':')
+        assert (ext._proto_add_servicer_to_server, ext._grpc_servicer, ext._grpc_interceptor) == (ADD_SERVICER, SERVICER, INTERCEPTORS)
 
 
 def test_setup_without_interceptor_leaves_it_unset():
-    """Without grpc_interceptor no interceptor module is set."""
+    """Without grpc_interceptor no interceptor is set."""
     with GrpcTest() as app:
-        assert app.grpc._grpc_interceptor_module == ''
+        assert app.grpc._grpc_interceptor is None
 
 
 @pytest.mark.parametrize('key', ['proto_add_servicer_to_server', 'grpc_servicer'])
@@ -168,13 +168,15 @@ def test_setup_mandatory_setting_missing_raises(key):
             pass
 
 
-@pytest.mark.xfail(strict=True, raises=IndexError, reason='a setting without a colon raises IndexError (grpc.py:143, 149, 155)')
+@pytest.mark.parametrize(
+    'value', ['tests.ext.grpc.grpc_tests_helper:', 'tests.ext.grpc.no_such_module:echo'], ids=['no_attr', 'no_module']
+)
 @pytest.mark.parametrize('key', ['proto_add_servicer_to_server', 'grpc_servicer', 'grpc_interceptor'])
-def test_setup_setting_without_colon_raises(key):
-    """A module path without :attribute stops the setup with TokeoGrpcError."""
-    with pytest.raises(TokeoGrpcError):
-        with GrpcTest(settings={key: 'tests.ext.grpc.grpc_tests_helper'}):
-            pass
+def test_server_with_a_setting_that_does_not_resolve_raises(key, value):
+    """A setting without attr or with a missing module raises with its value."""
+    with GrpcTest(settings={key: value}) as app:
+        with pytest.raises(TokeoModulesLoadError, match=re.escape(repr(value))):
+            app.grpc.server
 
 
 def test_setup_refuses_a_different_app():
