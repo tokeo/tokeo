@@ -11,7 +11,7 @@ from jinja2.exceptions import TemplateSyntaxError
 from cement.core.exc import FrameworkError
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
-from tokeo.ext.jinja2 import TokeoJinja2OutputHandler, TokeoJinja2TemplateHandler
+from tokeo.ext.jinja2 import TokeoJinja2Error, TokeoJinja2OutputHandler, TokeoJinja2TemplateHandler
 
 # a block tag on its own line, followed by a line with a trailing newline
 BLOCK = '{% if x %}\nyes\n{% endif %}\nend\n'
@@ -59,6 +59,23 @@ def test_load_makes_tokeo_jinja2_the_output_and_template_handler():
         assert app._meta.output_handler == app._meta.template_handler == 'tokeo.jinja2'
         assert isinstance(app.output, TokeoJinja2OutputHandler)
         assert isinstance(app.template, TokeoJinja2TemplateHandler)
+
+
+class Jinja2JsonTest(Jinja2Test):
+    """A test app with json as its own output handler next to tokeo.ext.jinja2."""
+
+    class Meta:
+        extensions = [
+            'json',
+            'tokeo.ext.jinja2',
+        ]
+        output_handler = 'json'
+
+
+def test_load_keeps_an_output_handler_the_app_chose_itself():
+    """An app keeps its own output handler, the template handler is tokeo's."""
+    with Jinja2JsonTest() as app:
+        assert (app._meta.output_handler, app._meta.template_handler) == ('json', 'tokeo.jinja2')
 
 
 # TokeoJinja2OutputHandler
@@ -126,6 +143,15 @@ def test_template_handler_setup_applies_the_config_to_the_env(settings, expected
     """trim_blocks and keep_trailing_newline of the env follow the config."""
     with Jinja2Test(settings) as app:
         assert (app.template.env.trim_blocks, app.template.env.keep_trailing_newline) == expected
+
+
+@pytest.mark.parametrize('key', ['trim_blocks', 'keep_trailing_newline'])
+@pytest.mark.parametrize('value', ['false', 1, None], ids=['str', 'int', 'none'])
+def test_template_handler_setup_refuses_no_bool(key, value):
+    """trim_blocks and keep_trailing_newline other than true or false raise."""
+    with pytest.raises(TokeoJinja2Error, match=f'{key} must be true or false'):
+        with Jinja2Test({key: value}):
+            pass
 
 
 def test_template_handler_setup_takes_the_config_of_a_yaml_file(tmp_path):

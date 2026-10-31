@@ -10,7 +10,8 @@ configuration options and improved template handling.
 - Configures the Jinja2 environment (trim_blocks, keep_trailing_newline)
     from the 'jinja2' config section
 - Resolves and registers template directories from configuration
-- Registers as the application's default output and template handler
+- Registers as the application's default output and template handler,
+    unless the application chose its own
 - Binds tokeo's own 'tokeo.jinja2' template handler for all rendering
 
 """
@@ -18,6 +19,21 @@ configuration options and improved template handling.
 from cement.ext.ext_jinja2 import Jinja2OutputHandler, Jinja2TemplateHandler
 from cement.core.output import OutputHandler
 from cement.core.template import TemplateHandler
+from tokeo.core.exc import TokeoError
+from tokeo.core.utils.validate import is_bool
+
+
+class TokeoJinja2Error(TokeoError):
+    """
+    Raised for a jinja2 config that cannot be applied.
+
+    ### Notes
+
+    : Derives from TokeoError, so main reports it as a clean message
+
+    """
+
+    pass
 
 
 class TokeoJinja2OutputHandler(Jinja2OutputHandler):
@@ -96,12 +112,20 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
 
         - **app** (Application): The Cement application instance
 
+        ### Raises
+
+        - **TokeoJinja2Error**: If keep_trailing_newline or trim_blocks is
+            not true or false
+
         """
         super()._setup(app)
 
         # use exposed Jinja2 Environment instance to manipulate it
-        self.env.keep_trailing_newline = self._config('keep_trailing_newline')
-        self.env.trim_blocks = self._config('trim_blocks')
+        for key in ('keep_trailing_newline', 'trim_blocks'):
+            value = self._config(key)
+            if not is_bool(value):
+                raise TokeoJinja2Error(f'{key} must be true or false, not {value!r}')
+            setattr(self.env, key, value)
 
     def _config(self, key, **kwargs):
         """
@@ -163,7 +187,7 @@ def load(app):
 
     Registers handlers and hooks needed for Jinja2 templating support.
     Sets this extension's handlers as the application's default output
-    and template handlers.
+    and template handlers, unless the application chose its own.
 
     ### Args
 
@@ -173,11 +197,15 @@ def load(app):
 
     - Registers the post_setup hook to configure Jinja2
     - Registers both the output and template handlers
-    - Sets the Tokeo Jinja2 handlers as the application defaults
+    - Sets the Tokeo Jinja2 handlers as the application defaults, while
+        the application has only the dummy handlers of cement
 
     """
     app.hook.register('post_setup', tokeo_jinja2_config)
     app.handler.register(TokeoJinja2OutputHandler)
     app.handler.register(TokeoJinja2TemplateHandler)
-    app._meta.output_handler = TokeoJinja2OutputHandler.Meta.label
-    app._meta.template_handler = TokeoJinja2TemplateHandler.Meta.label
+    # jinja2 becomes the default, a handler the app chose itself stays
+    if app._meta.output_handler == 'dummy':
+        app._meta.output_handler = TokeoJinja2OutputHandler.Meta.label
+    if app._meta.template_handler == 'dummy':
+        app._meta.template_handler = TokeoJinja2TemplateHandler.Meta.label
