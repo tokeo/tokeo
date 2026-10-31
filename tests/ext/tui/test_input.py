@@ -21,7 +21,7 @@ from prompt_toolkit.history import InMemoryHistory
 from cement.core.exc import CaughtSignal
 from tokeo.ext.tui import TokeoTuiError
 from tokeo.ext.tui.input import TokeoTuiInput
-from tests.utils import Terminal
+from tests.utils.tui import Terminal
 from tests.ext.tui.tui_tests_helper import TuiInputTest
 
 CTRL_C, CTRL_D = '\x03', '\x04'

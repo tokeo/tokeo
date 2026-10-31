@@ -5,11 +5,9 @@ handed to ```ui.run```, the hotload by watchdog, the serve command, the ux
 helper and the pdoc hook.
 
 ```ui.run``` is recorded instead of run, except for the page tests: they
-start nicegui in its user simulation, as ```nicegui.testing.user_simulation```
-does, but around ```app.nicegui.startup()```, which calls ```ui.run``` itself,
-and drive the page by the ```User``` of ```nicegui.testing``` through an ASGI
-client, without a browser. Every test starts and ends with the global state
-of nicegui reset.
+run the app by ```NiceguiSimulation``` of ```tests.utils.nicegui```, in the
+user simulation of nicegui without a browser. Every test starts and ends
+with the global state of nicegui reset.
 """
 
 import ast
@@ -18,13 +16,11 @@ import time
 import types
 import asyncio
 
-import httpx
 import pytest
 from cement.utils.misc import init_defaults
 from fastapi import FastAPI
-from nicegui import core, ui, app as nicegui_app
+from nicegui import ui, app as nicegui_app
 from nicegui.client import Client
-from nicegui.testing import User
 from nicegui.testing.general import nicegui_reset_globals
 from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileMovedEvent, FileOpenedEvent, FileClosedNoWriteEvent
 from tokeo.main import TokeoTest
@@ -36,6 +32,7 @@ from tokeo.ext.nicegui import (
     tokeo_nicegui_pdoc_render_decorator,
 )
 from tests.utils import wait_until
+from tests.utils.nicegui import NiceguiSimulation
 
 #: The routes of the tests, _pages of this module
 ROUTES = dict(routes=f'{__name__}:_pages')
@@ -85,18 +82,6 @@ def _paths():
     return {getattr(route, 'path', None) for route in nicegui_app.routes}
 
 
-def _simulate(app, visit):
-    # nicegui's user simulation around startup: ui.run only prepares the
-    # app, the lifespan starts it and an ASGI client asks it
-    async def go():
-        app.nicegui.startup()
-        async with core.app.router.lifespan_context(core.app):
-            async with httpx.AsyncClient(transport=httpx.ASGITransport(core.app), base_url='http://test') as client:
-                await visit(User(client), client)
-
-    asyncio.run(go())
-
-
 @pytest.fixture(autouse=True)
 def nicegui_globals():
     """The global state of nicegui, reset before and after the test."""
@@ -122,15 +107,6 @@ def runs(monkeypatch):
     calls = []
     monkeypatch.setattr(ui, 'run', lambda **settings: calls.append(settings))
     return calls
-
-
-@pytest.fixture
-def simulation(monkeypatch):
-    """The user simulation of nicegui, ui.run serves nothing then."""
-    monkeypatch.setenv('NICEGUI_USER_SIMULATION', 'true')
-    # the User of nicegui puts its own navigate, notify and download into ui
-    for name in ('navigate', 'notify', 'download'):
-        monkeypatch.setattr(ui, name, getattr(ui, name))
 
 
 # setup
@@ -243,16 +219,16 @@ def test_startup_run_kwargs_win_over_the_config(runs, run_kwargs, port):
     assert run['port'] == port and ('ssl_keyfile' in run) is isinstance(run_kwargs, dict)
 
 
-def test_startup_welcome_message_logged_when_nicegui_starts(simulation, monkeypatch):
+def test_startup_welcome_message_logged_when_nicegui_starts(monkeypatch):
     """The welcome message is logged once nicegui has started."""
     with NiceguiTest(welcome_message='Shop is up at') as app:
         infos = []
         monkeypatch.setattr(app.log, 'info', lambda msg, **kw: infos.append(msg))
 
-        async def visit(user, client):
+        async def visit(simulation):
             assert any(info.startswith('Shop is up at') for info in infos)
 
-        _simulate(app, visit)
+        NiceguiSimulation(app).run(visit)
 
 
 # openapi
@@ -415,41 +391,42 @@ def test_serve_hotload_switches(runs, tmp_path):
 # pages
 
 
-def test_page_of_the_route_handler_shows_label_and_ux_element(simulation):
+def test_page_of_the_route_handler_shows_label_and_ux_element():
     """The page / shows its label and the article made by the ux helper."""
     with NiceguiTest(**ROUTES) as app:
 
-        async def visit(user, client):
+        async def visit(simulation):
+            user = simulation.user()
             await user.open('/')
             await user.should_see('Hello tokeo')
             await user.should_see('An article by ux')
 
-        _simulate(app, visit)
+        NiceguiSimulation(app).run(visit)
 
 
-def test_api_of_the_route_handler_answers(simulation):
+def test_api_of_the_route_handler_answers():
     """The api /api/ping of the route handler answers with its json."""
     with NiceguiTest(**ROUTES) as app:
 
-        async def visit(user, client):
-            response = await client.get('/api/ping')
+        async def visit(simulation):
+            response = await simulation.client.get('/api/ping')
             assert (response.status_code, response.json()) == (200, dict(pong=True))
 
-        _simulate(app, visit)
+        NiceguiSimulation(app).run(visit)
 
 
 # ux
 
 
-def test_ux_outside_a_page_while_nicegui_runs_raises(simulation):
+def test_ux_outside_a_page_while_nicegui_runs_raises():
     """The ux helper refuses an element outside of a page while nicegui runs."""
     with NiceguiTest() as app:
 
-        async def visit(user, client):
+        async def visit(simulation):
             with pytest.raises(TokeoNiceguiError, match='No active NiceGUI client context found'):
                 app.nicegui.ux.article('outside')
 
-        _simulate(app, visit)
+        NiceguiSimulation(app).run(visit)
 
 
 def test_ux_in_the_global_scope_before_nicegui_runs_raises():

@@ -22,7 +22,8 @@ from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
 from tokeo.ext.dramatiq.controller import _duration, _monitor_view
 from tokeo.ext.tui.output import TokeoTuiOutput
 from tokeo.core.exc import TokeoError
-from tests.utils import Terminal, wait_until
+from tests.utils import wait_until
+from tests.utils.tui import Terminal
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqMiddlewareTest
 
 needs_pty = pytest.mark.skipif(sys.platform == 'win32', reason='needs a pseudo terminal')

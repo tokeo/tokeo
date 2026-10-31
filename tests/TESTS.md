@@ -60,7 +60,7 @@ An example from the tests of tokeo:
 
 ```
 tests/
-  conftest.py  utils.py  bootstrap.py  test_init.py   # shared base
+  conftest.py  utils/  bootstrap.py  test_init.py     # shared base
   app/test_tokeo_app.py
   core/utils/test_date.py
   ext/test_print.py                   # a subject with one file stays flat
@@ -110,13 +110,24 @@ tests/
 
 The root of ```tests/``` holds what every test may use: the setup pytest
 needs for all tests in ```conftest.py``` and a few general tools in
-```utils.py```. It comes with the app template, so every project starts
+```utils/```. It comes with the app template, so every project starts
 with the same base. Keeping it small lets each subject be read on its own.
 
 | File | Holds |
 |---|---|
 | ```conftest.py``` | the hook that puts the temporary files into ```tmp/tests/```, the fixtures ```tmp``` and ```rando``` |
-| ```utils.py``` | ```ROOT```, ```stresstest```, ```wait_until```, ```wait_until_async```, ```wait_process_group_ended```, ```Terminal``` |
+| ```utils/__init__.py``` | ```ROOT```, ```stresstest```, ```wait_until```, ```wait_until_async```, ```wait_process_group_ended``` |
+| ```utils/tui.py``` | ```Terminal```, runs a program in a pseudo terminal |
+| ```utils/nicegui.py``` | ```NiceguiSimulation```, runs an app with nicegui in its user simulation |
+
+The functions are imported from ```tests.utils```, each class by the full
+path of its module, it is not exported by ```tests.utils```:
+
+```python
+from tests.utils import wait_until
+from tests.utils.tui import Terminal
+from tests.utils.nicegui import NiceguiSimulation
+```
 
 - ```tmp``` is a cement ```fs.Tmp``` inside ```tmp_path```, with
   ```tmp.dir``` and ```tmp.file```, for a test app that takes one
@@ -126,12 +137,13 @@ with the same base. Keeping it small lets each subject be read on its own.
   program a test starts
 
 A fixture goes into ```conftest.py``` only if every test may need it.
-```utils.py``` holds functions and classes, no asserts; the test asserts.
+```utils/``` holds functions and classes, no asserts; the test asserts. A
+new class gets a module of its own in ```utils/```.
 
 .. note::
 
     Only code that is truly general and needed again and again goes into
-    ```tests/utils.py```, e.g. waiting for a condition or running a program
+    ```tests/utils/```, e.g. waiting for a condition or running a program
     in a terminal. Add to it with restraint: code of one subject stays with
     that subject, even when another subject keeps a similar copy.
 
@@ -151,7 +163,8 @@ Every import of the tests names the full path from the project root, also
 within the own subject:
 
 ```python
-from tests.utils import Terminal, wait_until                   # shared base
+from tests.utils import wait_until                             # shared base
+from tests.utils.tui import Terminal                           # shared base
 from tests.ext.tui.tui_tests_helper import TuiInputTest         # own subject
 
 # never from another subject, a conftest.py or a test file, never by a bare name
@@ -486,6 +499,20 @@ needs_rabbitmq = pytest.mark.skipif(
 
 pytestmark = needs_rabbitmq
 ```
+
+The live tests of PocketBase, ```tests/core/pocketbase/test_live.py``` and
+```tests/ext/pocketbase/test_live.py```, need its binary, a single program
+without installation. Download the zip for the platform from
+[the releases of PocketBase](https://github.com/pocketbase/pocketbase/releases),
+e.g. ```pocketbase_0.40.6_linux_amd64.zip```, unpack it and name the binary
+by ```TOKEO_TEST_POCKETBASE_BIN```; without it these tests are skipped:
+
+```bash
+TOKEO_TEST_POCKETBASE_BIN=~/bin/pocketbase make test
+```
+
+Each test module starts its own PocketBase on a free port with a fresh data
+dir, no server needs to run.
 
 ## Probes
 

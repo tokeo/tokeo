@@ -13,7 +13,7 @@ from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from tokeo.core.exc import TokeoError
 from tokeo.ext.automate import TokeoAutomateShell
-from tests.utils import Terminal
+from tests.utils.tui import Terminal
 from tests.ext.automate.automate_tests_helper import AutomateTest
 
 CTRL_C, CTRL_D = '\x03', '\x04'

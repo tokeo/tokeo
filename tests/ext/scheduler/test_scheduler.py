@@ -10,7 +10,7 @@ import pytest
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from tokeo.core.exc import TokeoError
-from tests.utils import Terminal
+from tests.utils.tui import Terminal
 from tests.ext.scheduler.scheduler_tests_helper import SchedulerTest
 
 CTRL_D = '\x04'
