@@ -452,11 +452,6 @@ def test_ux_outside_a_page_while_nicegui_runs_raises(simulation):
         _simulate(app, visit)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason='guard_user_context checks for the shared client of NiceGUI 2; NiceGUI 3 makes a script client '
-    'for UI in the global scope, so the guard passes (tokeo/ext/nicegui.py:174-192)',
-)
 def test_ux_in_the_global_scope_before_nicegui_runs_raises():
     """The ux helper refuses an element in the global scope before ui.run."""
     with NiceguiTest() as app:

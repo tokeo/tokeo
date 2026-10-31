@@ -33,7 +33,8 @@ from tokeo.core.exc import TokeoError
 from tokeo.core.utils.modules import resolve_module, resolve_object
 from cement.core.meta import MetaMixin
 from cement import ex
-from nicegui import ui, app as fastapi_app, context
+from nicegui import ui, app as fastapi_app, context, core as nicegui_core
+from nicegui.slot import Slot
 from nicegui.element import Element
 from nicegui.elements.mixins.text_element import TextElement
 
@@ -170,35 +171,52 @@ def guard_user_context():
     Stores the validation flag directly on the NiceGUI client object to eliminate
     the need for external ContextVars.
 
+    ### Raises
+
+    - **TokeoNiceguiError**: If no page of a visitor is built, in the global
+        scope or in a background task
+
+    ### Notes
+
+    : The slot stack of the asyncio task tells whether a page is built; it
+        is read before ```context.client```, which makes a script client of
+        nicegui in the global scope
+
     """
-    try:
-        # ctx.get_client() is just proxy for ContextVar.get() call inside NiceGUI
-        client = context.client
-
-        # SIMPLE TEST: If valid flag, skip!
-        if getattr(client, '_tokeo_ctx_guard_flag', False):
-            return
-
-        # check for shared global client ('id' points to 'shared')
-        if client.id == 'shared' or getattr(client, 'is_shared', False):
+    # no slot means no page runs; context.client would make a script client
+    # of nicegui then, so it is not touched before
+    if not Slot.get_stack():
+        if nicegui_core.app.is_started:
             # fmt: off
             raise TokeoNiceguiError(
-                'CRITICAL: Attempted to create an UI element in the global scope! '
-                'UI elements must only be created inside an active page route function.'
+                'CRITICAL: No active NiceGUI client context found. '
+                'Are you trying to instantiate a UI element outside of a route?'
             )
             # fmt: on
-
-        # place the flag for next requests
-        client._tokeo_ctx_guard_flag = True
-
-    except RuntimeError:
-        # NiceGUI throws a RuntimeError if no active context
         # fmt: off
         raise TokeoNiceguiError(
-            'CRITICAL: No active NiceGUI client context found. '
-            'Are you trying to instantiate a UI element outside of a route?'
+            'CRITICAL: Attempted to create an UI element in the global scope! '
+            'UI elements must only be created inside an active page route function.'
         )
         # fmt: on
+
+    client = context.client
+
+    # SIMPLE TEST: If valid flag, skip!
+    if getattr(client, '_tokeo_ctx_guard_flag', False):
+        return
+
+    # the script client of nicegui is the global scope as well
+    if client is nicegui_core.script_client:
+        # fmt: off
+        raise TokeoNiceguiError(
+            'CRITICAL: Attempted to create an UI element in the global scope! '
+            'UI elements must only be created inside an active page route function.'
+        )
+        # fmt: on
+
+    # place the flag for next requests
+    client._tokeo_ctx_guard_flag = True
 
 
 class NiceguiElementHelper:
