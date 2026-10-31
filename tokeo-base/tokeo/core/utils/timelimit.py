@@ -50,6 +50,12 @@ async def page():
 : Combine it with ```temper``` so a hanging call frees its slot before the
     expire
 
+: Python 3.11 with an active trace function, e.g. of coverage or a debugger:
+    after a limit that fired, the next traced call can hang for good. The
+    cause is the drop of the exception by ```PyThreadState_SetAsyncExc(id,
+    None)```; Python 3.13 and 3.14 are not affected, 3.12 was not checked,
+    so the tests of a limit that fires are skipped before Python 3.13
+
 """
 
 import ctypes
@@ -58,6 +64,7 @@ import inspect
 import functools
 import threading
 from tokeo.core.exc import TokeoBaseException
+from tokeo.core.utils.validate import is_number_gt
 
 
 class TokeoTimelimitExceeded(TokeoBaseException):
@@ -92,7 +99,7 @@ def timelimit(seconds):
     - **TokeoTimelimitExceeded**: In the call, when it runs longer
 
     """
-    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or seconds <= 0:
+    if not is_number_gt(seconds, 0):
         raise ValueError(f'seconds must be a number above 0, not {seconds!r}')
 
     def decorator(func):

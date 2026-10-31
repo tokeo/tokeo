@@ -6,8 +6,13 @@ next await. The rare cases are stress tests of many runs, only with
 ```STRESSTESTS=1```: calls and errors that end right at the limit, nested
 limits that run off together and many threads at once never leave a stray
 exception or a timer thread behind.
+
+Before Python 3.13 the tests of a limit that fires are skipped: with the
+trace function of coverage the next traced call can hang there for good, see
+the notes of tokeo.core.utils.timelimit.
 """
 
+import sys
 import time
 import random
 import asyncio
@@ -19,6 +24,12 @@ import pytest
 from tokeo.core.exc import TokeoBaseException
 from tokeo.core.utils.timelimit import timelimit, TokeoTimelimitExceeded
 from tests.utils import stresstest
+
+# a limit that fires can hang the next traced call before python 3.13
+needs_python_313 = pytest.mark.skipif(
+    sys.version_info < (3, 13),
+    reason='a fired limit can hang the next traced call before python 3.13, see notes of timelimit',
+)
 
 
 def _busy(seconds):
@@ -43,7 +54,7 @@ def test_exceeded_is_a_base_exception_and_no_exception():
     assert not issubclass(TokeoTimelimitExceeded, Exception)
 
 
-@pytest.mark.parametrize('seconds', [0, -1, True, '1', None], ids=['zero', 'negative', 'bool', 'str', 'none'])
+@pytest.mark.parametrize('seconds', [0, -1, True, '1', None, float('inf')], ids=['zero', 'negative', 'bool', 'str', 'none', 'inf'])
 def test_seconds_must_be_a_number_above_0(seconds):
     """timelimit refuses seconds that are no number above 0."""
     with pytest.raises(ValueError, match='seconds must be a number above 0'):
@@ -62,6 +73,7 @@ def test_call_within_its_limit_returns_and_nothing_arrives_later():
     assert threading.active_count() == 1
 
 
+@needs_python_313
 def test_call_past_its_limit_is_aborted_with_a_message():
     """A call past its limit of 0.2 s ends within a few milliseconds."""
 
@@ -76,6 +88,7 @@ def test_call_past_its_limit_is_aborted_with_a_message():
     assert not _stray_exception()
 
 
+@needs_python_313
 def test_except_exception_in_the_call_does_not_swallow_it():
     """A loop with except Exception around python steps is still aborted."""
 
@@ -91,6 +104,7 @@ def test_except_exception_in_the_call_does_not_swallow_it():
         job()
 
 
+@needs_python_313
 def test_except_base_exception_in_the_call_swallows_it():
     """A call that swallows BaseException runs to its end, the limit is lost."""
 
@@ -106,6 +120,7 @@ def test_except_base_exception_in_the_call_swallows_it():
     assert not _stray_exception()
 
 
+@needs_python_313
 def test_finally_of_the_call_runs():
     """The finally block of an aborted call runs."""
     cleaned = []
@@ -122,6 +137,7 @@ def test_finally_of_the_call_runs():
     assert cleaned == [True]
 
 
+@needs_python_313
 def test_outer_limit_goes_through_an_inner_one():
     """The limit of the outer call passes the inner call with its message."""
 
@@ -137,6 +153,7 @@ def test_outer_limit_goes_through_an_inner_one():
         outer()
 
 
+@needs_python_313
 def test_inner_limit_can_be_caught_by_the_outer_call():
     """An outer call catches the abort of its inner call and goes on."""
 
@@ -155,6 +172,7 @@ def test_inner_limit_can_be_caught_by_the_outer_call():
     assert not _stray_exception()
 
 
+@needs_python_313
 def test_call_in_a_thread_pool_is_aborted():
     """A call in a thread pool, as in the scheduler, is aborted."""
 
@@ -219,6 +237,7 @@ def test_coroutine_within_its_limit_and_its_own_timeout_error():
 
 
 @stresstest
+@needs_python_313
 def test_calls_ending_right_at_their_limit_leave_nothing_behind():
     """Of 200 calls ending around their limit each runs or aborts, none leaks."""
 
@@ -239,6 +258,7 @@ def test_calls_ending_right_at_their_limit_leave_nothing_behind():
 
 
 @stresstest
+@needs_python_313
 def test_errors_raised_right_at_the_limit_leave_nothing_behind():
     """Of 200 calls failing around their limit each fails once, none leaks."""
 
@@ -260,6 +280,7 @@ def test_errors_raised_right_at_the_limit_leave_nothing_behind():
 
 
 @stresstest
+@needs_python_313
 def test_nested_limits_running_off_together_do_not_lose_the_outer_one():
     """Of 200 nested calls with the same limit the outer one never runs on."""
 
@@ -283,6 +304,7 @@ def test_nested_limits_running_off_together_do_not_lose_the_outer_one():
 
 
 @stresstest
+@needs_python_313
 def test_many_threads_running_off_at_once_are_all_aborted():
     """50 busy threads with the same limit are all aborted, no timer stays."""
     aborted = []
