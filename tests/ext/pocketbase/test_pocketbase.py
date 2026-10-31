@@ -343,6 +343,13 @@ def test_get_one_adds_q_to_the_query(server):
     assert _params(server.requests[0]) == dict(cache='no-cache', sort='title', expand='author', fields='id,title')
 
 
+def test_get_one_q_wins_over_the_arguments(server):
+    """A key of q that is also an argument is no error, the q value wins."""
+    with PocketbaseTest() as app:
+        app.db.get_one('posts', 'abc', sort='title', cache=False, q=dict(sort='-created', cache='x'))
+    assert _params(server.requests[0]) == dict(cache='x', sort='-created')
+
+
 def test_get_one_missing_record_raises_the_sdk_error(server):
     """A missing record raises the ClientResponseError of the sdk, status 404."""
     with PocketbaseTest() as app:
@@ -393,6 +400,14 @@ def test_get_list_returns_the_page_as_list_result(server):
     assert isinstance(result, ListResult)
     assert (result.page, result.per_page, result.total_items, result.total_pages) == (1, 1, 2, 2)
     assert [(item.id, item.title) for item in result.items] == [('abc', 'Hello')]
+
+
+def test_get_list_q_wins_over_the_arguments(server):
+    """A filter or sort in q is no error, the q value wins over the argument."""
+    with PocketbaseTest() as app:
+        app.db.get_list('posts', sort='title', q=dict(filter='views > 3', sort='-created'))
+    params = _params(server.requests[0])
+    assert (params['filter'], params['sort']) == ('views > 3', '-created')
 
 
 def test_get_list_keeps_q_of_the_caller(server):
@@ -626,11 +641,6 @@ def test_ensure_auth_expired_token_logs_in_without_refresh(server):
     assert USERS_REFRESH not in server.calls
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=KeyError,
-    reason='ensure_auth asks auth_store.is_valid, which raises KeyError on a token without exp (pocketbase.py:316)',
-)
 def test_ensure_auth_token_without_exp_logs_in_again(server):
     """A token without exp counts as unusable and leads to a new login."""
     server.lifetime = None

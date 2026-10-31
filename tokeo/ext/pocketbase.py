@@ -312,8 +312,10 @@ class TokeoPocketBaseHandler(MetaMixin):
             # a token with more than the minimum valid window left is good
             if token and not jwt_token_expires_within(token, self._auth_min_valid):
                 return
-            # a still-valid token near expiry can be refreshed on its collection
-            if token and self._auth_collection and self.pb.auth_store.is_valid:
+            # a still-valid token near expiry can be refreshed on its collection;
+            # the own check, auth_store.is_valid of the sdk raises KeyError on a
+            # token without exp
+            if token and self._auth_collection and not jwt_token_expires_within(token, 0):
                 try:
                     self.pb.collection(self._auth_collection).auth_refresh()
                     return
@@ -393,7 +395,8 @@ class TokeoPocketBaseHandler(MetaMixin):
             fetching a single record by id; kept for SDK passthrough and
             symmetry with get_list
         - **cache** (bool): Whether to use cached results if available
-        - **q** (dict): Additional query parameters to pass to PocketBase
+        - **q** (dict): Additional query parameters to pass to PocketBase, a
+            key here wins over the arguments
 
         ### Returns
 
@@ -421,7 +424,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
         # run database query for one element by id
         self.ensure_auth()
-        return self.collection(collection_id_or_name).get_one(id_, dict(**cache_opt, **sort_opt, **q))
+        # q wins over the arguments, a key in both is no error
+        return self.collection(collection_id_or_name).get_one(id_, {**cache_opt, **sort_opt, **q})
 
     def get_list(self, collection_id_or_name, page=1, perPage=20, filter='', sort=None, cache=True, q=None):
         """
@@ -438,7 +442,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         - **filter** (str): Filter expression to apply (PocketBase filter syntax)
         - **sort** (str, optional): Sort expression (format: ```field,-field```)
         - **cache** (bool): Whether to use cached results if available
-        - **q** (dict): Additional query parameters to pass to PocketBase
+        - **q** (dict): Additional query parameters to pass to PocketBase, a
+            key here wins over the arguments
 
         ### Returns
 
@@ -494,7 +499,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         sort_opt = dict() if sort is None or sort == '' else dict(sort=sort)
         # run database query for multiple elements
         self.ensure_auth()
-        return self.collection(collection_id_or_name).get_list(page, perPage, dict(filter=filter, **cache_opt, **sort_opt, **q))
+        # q wins over the arguments, a key in both is no error
+        return self.collection(collection_id_or_name).get_list(page, perPage, {'filter': filter, **cache_opt, **sort_opt, **q})
 
     def create(self, collection_id_or_name, create_fields=None, q=None):
         """
