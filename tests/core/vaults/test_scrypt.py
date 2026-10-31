@@ -152,12 +152,20 @@ def test_profile_without_salt_fails(passphrase, method, salt):
 
 @pytest.mark.parametrize(
     'field, value',
-    [('salt', 'xyz'), ('salt', 12345678), ('cost', 15), ('cost', 1), ('cost', 'many')],
-    ids=['salt_no_base64', 'salt_int', 'cost_no_power_of_two', 'cost_one', 'cost_no_number'],
+    [
+        ('salt', 'xyz'),
+        ('salt', 'MmEZ!BlUsC/NETOEsIHEg+w=='),
+        ('salt', 12345678),
+        ('cost', 15),
+        ('cost', 1),
+        ('cost', 'many'),
+        ('cost', 2**24),
+    ],
+    ids=['salt_no_base64', 'salt_foreign_char', 'salt_int', 'cost_no_power_of_two', 'cost_one', 'cost_no_number', 'cost_too_much_memory'],
 )
 def test_invalid_profile_value_fails(passphrase, field, value):
-    """An invalid salt or cost raises TokeoVaultError, not a raw error."""
-    with pytest.raises(TokeoVaultError):
+    """An invalid salt or cost raises TokeoVaultError naming salt and cost."""
+    with pytest.raises(TokeoVaultError, match='invalid salt or cost'):
         ScryptVault().encrypt(dict(PROFILE, **{field: value}), 'value')
 
 

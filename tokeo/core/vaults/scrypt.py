@@ -65,15 +65,21 @@ class ScryptVault(EncVault):
         salt = profile.get('salt')
         if not salt:
             raise TokeoVaultError('scrypt vault profile is missing a "salt"')
-        kdf = Scrypt(
-            salt=base64.b64decode(salt),
-            length=32,
-            n=int(profile.get('cost', self._default_cost)),
-            r=int(profile.get('block_size', self._default_block_size)),
-            p=int(profile.get('parallelization', self._default_parallelization)),
-        )
+        # a salt that is no base64, a cost that is no power of two or needs
+        # more memory than there is, are errors of the profile
+        try:
+            kdf = Scrypt(
+                salt=base64.b64decode(salt, validate=True),
+                length=32,
+                n=int(profile.get('cost', self._default_cost)),
+                r=int(profile.get('block_size', self._default_block_size)),
+                p=int(profile.get('parallelization', self._default_parallelization)),
+            )
+            key = kdf.derive(passphrase)
+        except (ValueError, TypeError, MemoryError):
+            raise TokeoVaultError('scrypt vault profile has an invalid salt or cost')
         # Fernet expects a url-safe base64 key
-        return base64.urlsafe_b64encode(kdf.derive(passphrase))
+        return base64.urlsafe_b64encode(key)
 
     def create(self, name):
         """

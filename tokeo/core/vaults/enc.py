@@ -47,8 +47,10 @@ class EncVault(Vault):
             raise TokeoVaultError(f'environment variable {name!r} is not set')
 
     def _fernet(self, profile):
+        # the key of the profile reports its own errors
+        key = self._key(profile)
         try:
-            return Fernet(self._key(profile))
+            return Fernet(key)
         except (ValueError, TypeError):
             raise TokeoVaultError('vault key is not a valid Fernet key')
 
