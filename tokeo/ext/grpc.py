@@ -30,6 +30,7 @@ from cement import ex
 from concurrent import futures
 import grpc
 from tokeo.core.utils.modules import resolve_object
+from tokeo.core.utils.validate import as_list, is_bool, is_filled_str, is_int_gt
 
 
 class TokeoGrpcError(TokeoError):
@@ -213,7 +214,10 @@ class TokeoGrpc(MetaMixin):
             )
             # bind the listen port; tls is opt-in and only that branch pulls
             # in any tls machinery, so a plain server never touches tls code
-            if self._config('tls_enabled'):
+            tls_enabled = self._config('tls_enabled')
+            if not is_bool(tls_enabled):
+                raise TokeoGrpcError(f'tls_enabled must be true or false, not {tls_enabled!r}')
+            if tls_enabled:
                 server.add_secure_port(self._config('url'), self._tls_server_credentials())
             else:
                 server.add_insecure_port(self._config('url'))
@@ -293,8 +297,9 @@ class TokeoGrpc(MetaMixin):
 
         ### Raises
 
-        - **TokeoGrpcError**: On an unsupported tls_key_type or an ec
-            tls_key_size that is not one of 256, 384, 521
+        - **TokeoGrpcError**: On a missing or unsupported tls_key_type, a
+            tls_key_size or tls_valid_days that is no integer greater than 0,
+            or an ec tls_key_size that is not one of 256, 384, 521
 
         ### Notes
 
@@ -321,12 +326,13 @@ class TokeoGrpc(MetaMixin):
         # host is both the cn fallback and the first san
         host = self._config('url').rsplit(':', 1)[0].strip('[]') or 'localhost'
         # private key: rsa by bit size, or ec by curve (256, 384, 521)
-        key_type = (self._config('tls_key_type') or 'ec').lower()
-        # get key_size as int
-        try:
-            key_size = int(str(self._config('tls_key_size') or 521))
-        except ValueError:
-            raise TokeoGrpcError('tls_key_size is not a valid number')
+        key_type = self._config('tls_key_type')
+        if not is_filled_str(key_type):
+            raise TokeoGrpcError(f"tls_key_type must be set to 'rsa' or 'ec', not {key_type!r}")
+        key_type = key_type.lower()
+        key_size = self._config('tls_key_size')
+        if not is_int_gt(key_size, 0):
+            raise TokeoGrpcError(f'tls_key_size must be an integer greater than 0, not {key_size!r}')
         # generate key but validate also senseful key_size
         if key_type == 'rsa':
             if key_size < 2048:
@@ -347,7 +353,7 @@ class TokeoGrpc(MetaMixin):
         # build sans from host + tls_sans, dedup, typed as ip or dns name
         sans = []
         seen = set()
-        for entry in [host, *(self._config('tls_sans') or [])]:
+        for entry in [host, *as_list(self._config('tls_sans'))]:
             if not entry or entry in seen:
                 continue
             seen.add(entry)
@@ -358,11 +364,9 @@ class TokeoGrpc(MetaMixin):
             except ValueError:
                 sans.append(x509.DNSName(entry))
 
-        # parse validity as int, mirroring the tls_key_size handling above
-        try:
-            valid_days = int(str(self._config('tls_valid_days') or 90))
-        except ValueError:
-            raise TokeoGrpcError('tls_valid_days is not a valid number')
+        valid_days = self._config('tls_valid_days')
+        if not is_int_gt(valid_days, 0):
+            raise TokeoGrpcError(f'tls_valid_days must be an integer greater than 0, not {valid_days!r}')
 
         now = datetime.now(timezone.utc)
         cert = (
