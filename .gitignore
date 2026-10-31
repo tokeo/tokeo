@@ -33,8 +33,8 @@
 !/tokeo-smtpd/
 !/tokeo-smtpd/**
 
-!/tokeo-pb/
-!/tokeo-pb/**
+!/tokeo-pocketbase/
+!/tokeo-pocketbase/**
 
 !/tokeo-diskcache/
 !/tokeo-diskcache/**

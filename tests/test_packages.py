@@ -1,7 +1,7 @@
 """
 Tests for the packages of the repository: tokeo, tokeo-base, tokeo-smtpd and
-tokeo-pb carry the same version, set by ```make version```, tokeo-diskcache
-the version of DiskCache it is taken from. tokeo-base, tokeo-smtpd, tokeo-pb
+tokeo-pocketbase carry the same version, set by ```make version```, tokeo-diskcache
+the version of DiskCache it is taken from. tokeo-base, tokeo-smtpd, tokeo-pocketbase
 and tokeo-diskcache import only what their own package provides, so each one
 works without the rest of tokeo, and tokeo-diskcache never imports pickle.
 """
@@ -20,7 +20,7 @@ from tests.utils import ROOT
 ALLOWED = {
     'tokeo-base': ('tokeo.core.exc', 'tokeo.core.utils'),
     'tokeo-smtpd': ('tokeo.core.exc', 'tokeo.core.utils', 'tokeo.core.smtpd', 'cryptography'),
-    'tokeo-pb': ('tokeo.core.exc', 'tokeo.core.utils', 'tokeo.core.pocketbase', 'httpx'),
+    'tokeo-pocketbase': ('tokeo.core.exc', 'tokeo.core.utils', 'tokeo.core.pocketbase', 'httpx'),
     'tokeo-diskcache': ('tokeo.core.diskcache',),
 }
 
@@ -59,22 +59,22 @@ def _allowed(module, allowed):
 
 
 def test_all_packages_carry_the_version_of_tokeo():
-    """tokeo-base, tokeo-smtpd and tokeo-pb have the version of tokeo."""
+    """tokeo-base, tokeo-smtpd and tokeo-pocketbase have the version of tokeo."""
     version = get_version()
     assert _pyproject('tokeo-base')['project']['version'] == version
     assert _pyproject('tokeo-smtpd')['project']['version'] == version
-    assert _pyproject('tokeo-pb')['project']['version'] == version
+    assert _pyproject('tokeo-pocketbase')['project']['version'] == version
 
 
 def test_all_packages_pin_each_other_by_the_version_of_tokeo():
-    """tokeo-base is pinned by all, tokeo-smtpd and tokeo-pb by tokeo dev."""
+    """tokeo-base is pinned by all, tokeo-smtpd and -pocketbase by tokeo dev."""
     version = get_version()
     tokeo = _pyproject('.')['project']
     assert f'tokeo-base=={version}' in tokeo['dependencies']
     assert f'tokeo-smtpd=={version}' in tokeo['optional-dependencies']['dev']
-    assert f'tokeo-pb=={version}' in tokeo['optional-dependencies']['dev']
+    assert f'tokeo-pocketbase=={version}' in tokeo['optional-dependencies']['dev']
     assert _pyproject('tokeo-smtpd')['project']['dependencies'] == [f'tokeo-base=={version}']
-    assert f'tokeo-base=={version}' in _pyproject('tokeo-pb')['project']['dependencies']
+    assert f'tokeo-base=={version}' in _pyproject('tokeo-pocketbase')['project']['dependencies']
 
 
 def test_tokeo_pins_tokeo_diskcache_by_its_own_version():

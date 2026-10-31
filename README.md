@@ -81,7 +81,7 @@ pip install tokeo tokeo-fundi
 pip install tokeo tokeo-smtpd
 
 # Or add the PocketBase driver for the pocketbase extension
-pip install tokeo tokeo-pb
+pip install tokeo tokeo-pocketbase
 
 # Verify installation
 tokeo --help

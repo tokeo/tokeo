@@ -16,6 +16,7 @@ import httpx
 import pytest
 from tokeo.core.exc import TokeoError
 from tokeo.core.pocketbase import (
+    AuthKeeper,
     Batch,
     Collection,
     ListResult,
@@ -73,12 +74,12 @@ def _body(request):
     return json.loads(request.content)
 
 
-def _jwt(lifetime):
+def _jwt(lifetime, **claims):
     # a token shaped like the one of PocketBase; None leaves exp out
     def encode(data):
         return base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip('=')
 
-    payload = {'type': 'auth'}
+    payload = {'type': 'auth', **claims}
     if lifetime is not None:
         payload['exp'] = int(datetime.now(timezone.utc).timestamp()) + lifetime
     return f'{encode({"alg": "HS256", "typ": "JWT"})}.{encode(payload)}.signature'
@@ -478,12 +479,130 @@ def test_token_valid_tells_whether_the_token_lasts(pb, token, seconds, valid):
     assert pb.token_valid(seconds) is valid
 
 
+def test_logins_count_each_login_but_no_refresh(pb, server):
+    """A login and an impersonation into the client count, a refresh does not."""
+    server.answers[('POST', '/api/collections/users/auth-with-password')] = _auth('tok1')
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth('tok2')
+    server.answers[('POST', '/api/collections/users/impersonate/u2')] = _auth('imp', 'u2')
+    pb.auth_with_password('users', 'anna@tokeo.test', 'pass')
+    pb.auth_refresh()
+    assert pb.logins == 1
+    with PocketBase(URL, transport=httpx.MockTransport(server.handle)) as other:
+        assert pb.impersonate('users', 'u2', client=other) is other
+        assert (other.logins, other.token, pb.logins) == (1, 'imp', 1)
+
+
+def test_auth_refresh_takes_the_collection_of_a_token_from_elsewhere(pb, server):
+    """A token from elsewhere is refreshed on the collection it names."""
+    server.answers[('POST', '/api/collections/pbc_users/auth-refresh')] = _auth('tok2')
+    pb.token = _jwt(3600, collectionId='pbc_users')
+    pb.auth_refresh()
+    assert (pb.token, pb.auth_collection) == ('tok2', 'pbc_users')
+
+
+@pytest.mark.parametrize('token', ['broken', _jwt(3600)], ids=['broken', 'no_collection'])
+def test_auth_refresh_of_a_token_without_collection_raises(pb, server, token):
+    """A token that names no collection cannot be refreshed and sends nothing."""
+    pb.token = token
+    with pytest.raises(TokeoPocketBaseAuthError, match='needs a login first'):
+        pb.auth_refresh()
+    assert server.requests == []
+
+
 def test_close_forgets_the_login_and_closes_the_client(server):
     """Leaving the with block clears the login and closes the http client."""
     with PocketBase(URL, token='tok', transport=httpx.MockTransport(server.handle)) as client:
         pass
     assert (client.token, client.auth_record, client.auth_collection) == (None, None, None)
     assert client.http_client.is_closed
+
+
+# AuthKeeper
+
+
+@pytest.fixture
+def keeper(pb, server):
+    """An AuthKeeper of the client whose login sets a token valid for an hour."""
+    logins = []
+
+    def login():
+        logins.append(1)
+        pb.token, pb.auth_collection = _jwt(3600), 'users'
+
+    keeper = AuthKeeper(pb, login, min_valid_seconds=60, check_seconds=60)
+    keeper.logins = logins
+    pb.before_request = keeper
+    return keeper
+
+
+def test_auth_keeper_logs_in_once_and_trusts_the_login_for_check_seconds(keeper, pb, server):
+    """It logs in once, then asks the server nothing within check_seconds."""
+    pb.collection('posts').get_list()
+    pb.collection('posts').get_list()
+    assert len(keeper.logins) == 1
+    assert [request.url.path for request in server.requests] == ['/api/collections/posts/records'] * 2
+
+
+def test_auth_keeper_asks_the_server_once_check_seconds_passed(keeper, pb, server):
+    """With check_seconds 0 each request confirms the login by a refresh first."""
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth(_jwt(3600))
+    keeper.check_seconds = 0
+    pb.collection('posts').get_list()
+    pb.collection('posts').get_list()
+    paths = [request.url.path for request in server.requests]
+    assert paths == ['/api/collections/posts/records', '/api/collections/users/auth-refresh', '/api/collections/posts/records']
+    assert len(keeper.logins) == 1
+
+
+def test_auth_keeper_logs_in_anew_when_the_server_refuses_the_login(keeper, pb, server):
+    """A refresh refused with 401, e.g. after a new password, logs in anew."""
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = httpx.Response(401, json={'message': 'refused'})
+    pb.token, pb.auth_collection = _jwt(3600), 'users'
+    pb.collection('posts').get_list()
+    assert len(keeper.logins) == 1 and server.requests[0].url.path.endswith('/auth-refresh')
+
+
+def test_auth_keeper_renews_a_token_near_its_expiry_by_a_refresh(keeper, pb, server):
+    """A token valid 30 more seconds is refreshed, without a new login."""
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth(_jwt(3600))
+    pb.token, pb.auth_collection = _jwt(30), 'users'
+    pb.collection('posts').get_list()
+    assert keeper.logins == [] and pb.token_valid(3000)
+
+
+def test_auth_keeper_logs_in_when_the_refresh_keeps_a_short_token(keeper, pb, server):
+    """A refresh keeping a short token, as of an impersonation, logs in."""
+    short = _jwt(30)
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth(short)
+    pb.token, pb.auth_collection = short, 'users'
+    pb.collection('posts').get_list()
+    assert len(keeper.logins) == 1 and pb.token_valid(3000)
+
+
+@pytest.mark.parametrize(
+    'logins, refreshes',
+    [(0, 1), (1, 0)],
+    ids=['token_from_elsewhere', 'new_login'],
+)
+def test_auth_keeper_trusts_a_new_login_but_checks_a_token_from_elsewhere(pb, server, logins, refreshes):
+    """A new login of the client needs no refresh, a token from elsewhere does."""
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth(_jwt(3600))
+    pb.before_request = AuthKeeper(pb, lambda: None)
+    pb.token, pb.auth_collection, pb.logins = _jwt(3600), 'users', logins
+    pb.collection('posts').get_list()
+    assert sum(request.url.path.endswith('/auth-refresh') for request in server.requests) == refreshes
+
+
+def test_auth_keeper_raises_when_the_login_fails(pb, server):
+    """A failing login raises out of the request, which is not sent."""
+
+    def login():
+        raise TokeoPocketBaseAuthError('wrong password')
+
+    pb.before_request = AuthKeeper(pb, login)
+    with pytest.raises(TokeoPocketBaseAuthError, match='wrong password'):
+        pb.collection('posts').get_list()
+    assert server.requests == []
 
 
 # batch and health

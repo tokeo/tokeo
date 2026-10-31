@@ -1,4 +1,4 @@
-# Tokeo-PB
+# Tokeo-PocketBase
 
 Copyright 2012-2026 Tom (Thomas) Freudenberg <th.freudenberg@gmail.com>
 
