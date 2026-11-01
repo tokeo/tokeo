@@ -233,6 +233,25 @@ def test_server_with_tls_enabled_no_bool_raises(start_grpc, value):
     assert app.grpc._server is None
 
 
+def test_server_on_an_address_that_does_not_bind_raises_and_ends_its_pool(start_grpc):
+    """An address that does not bind raises TokeoGrpcError, its pool ends."""
+    app, _ = start_grpc({'url': '256.1.1.1:5000'}, startup=False)
+    with pytest.raises(TokeoGrpcError, match='grpc server could not be built on 256.1.1.1:5000: Failed to bind'):
+        app.grpc.server
+    assert app.grpc._server is None and app.grpc._executor is None
+
+
+def test_close_shuts_a_started_server_down():
+    """Closing the app stops a server started by startup, its port is free again."""
+    port = _free_port()
+    with GrpcTest(settings={'url': f'localhost:{port}'}) as app:
+        app.grpc.startup()
+        assert _call(port) == b'echo hi'
+        threads = list(app.grpc._executor._threads)
+    assert _refused(port) == grpc.StatusCode.UNAVAILABLE
+    assert wait_until(lambda: not any(thread.is_alive() for thread in threads))
+
+
 # startup and shutdown
 
 

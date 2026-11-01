@@ -211,18 +211,26 @@ class TokeoGrpc(MetaMixin):
             grpc_servicer = resolve_object(self._grpc_servicer)
             # create the server
             self._executor = futures.ThreadPoolExecutor(max_workers=self._config('max_worker'))
-            server = grpc.server(self._executor, interceptors=interceptors)
-            # bind the listen port; tls is opt-in and only that branch pulls
-            # in any tls machinery, so a plain server never touches tls code
-            tls_enabled = self._config('tls_enabled')
-            if not is_bool(tls_enabled):
-                raise TokeoGrpcError(f'tls_enabled must be true or false, not {tls_enabled!r}')
-            if tls_enabled:
-                server.add_secure_port(self._config('url'), self._tls_server_credentials())
-            else:
-                server.add_insecure_port(self._config('url'))
-            # append services
-            proto_add_servicer_to_server(grpc_servicer(), server)
+            try:
+                server = grpc.server(self._executor, interceptors=interceptors)
+                # bind the listen port; tls is opt-in and only that branch pulls
+                # in any tls machinery, so a plain server never touches tls code
+                tls_enabled = self._config('tls_enabled')
+                if not is_bool(tls_enabled):
+                    raise TokeoGrpcError(f'tls_enabled must be true or false, not {tls_enabled!r}')
+                if tls_enabled:
+                    server.add_secure_port(self._config('url'), self._tls_server_credentials())
+                else:
+                    server.add_insecure_port(self._config('url'))
+                # append services
+                proto_add_servicer_to_server(grpc_servicer(), server)
+            except Exception as err:
+                # a failed build ends its pool, the next try builds anew
+                self._executor.shutdown(wait=False)
+                self._executor = None
+                if isinstance(err, TokeoGrpcError):
+                    raise
+                raise TokeoGrpcError(f'grpc server could not be built on {self._config("url")}: {err}') from err
             # keep the server only once it is complete, a failed build is retried
             self._server = server
 
@@ -511,6 +519,24 @@ def tokeo_grpc_extend_app(app):
     app.grpc._setup(app)
 
 
+def tokeo_grpc_shutdown(app):
+    """
+    Shut the grpc server down when the app closes, if it was built.
+
+    ### Args
+
+    - **app** (Application): The Cement application instance
+
+    ### Notes
+
+    : Registered on ```pre_close```, so a server started by ```startup()```
+        does not outlive ```app.close()```
+
+    """
+    if app.grpc._server is not None:
+        app.grpc.shutdown()
+
+
 def load(app):
     """
     Load the gRPC extension into the application.
@@ -521,3 +547,4 @@ def load(app):
     """
     app.handler.register(TokeoGrpcController)
     app.hook.register('post_setup', tokeo_grpc_extend_app)
+    app.hook.register('pre_close', tokeo_grpc_shutdown)
