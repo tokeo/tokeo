@@ -364,6 +364,20 @@ class GlobalLimits:
         """Count one more in-progress dialog."""
         self.active_processings += 1
 
+    def try_begin_processing(self):
+        """
+        Count one more in-progress dialog if the cap allows it.
+
+        ### Returns
+
+        - **bool**: True when the dialog was counted, False at the cap
+
+        """
+        if self.max_processings is not None and self.active_processings >= self.max_processings:
+            return False
+        self.active_processings += 1
+        return True
+
     def end_processing(self):
         """Drop one in-progress dialog."""
         self.active_processings = max(0, self.active_processings - 1)
@@ -638,6 +652,9 @@ class SmtpdServer:
             self.logger.warning('Line breaks in DATA (crlf_data_mode) CRLF_DATA_UNSAFE allow SMTP smuggling!')
         if self.whitespace_mode is WhitespaceMode.WHITESPACE_UNSAFE:
             self.logger.warning('Whitespace of commands (whitespace_mode) WHITESPACE_UNSAFE passes control chars to the events!')
+        # shown with the debug lines only: they log the whole dialog
+        if self.auth_mode is not AuthMode.AUTH_FORBIDDEN:
+            self.logger.debug('Debug logs the whole smtp dialog, AUTH credentials included!')
         for lst in listeners:
             host, port = lst.get('host', '127.0.0.1'), int(lst.get('port', 2525))
             self.logger.info(f'Starting service on {f"[{host}]" if ":" in host else host}:{port or "(auto)"}')
@@ -852,10 +869,10 @@ class SmtpdServer:
             return svc_ok and glob_ok
 
         while True:
-            if _slot_ok():
+            # the global cap is checked and counted in one step, so two
+            # processes cannot both take the last slot
+            if (limit is None or self._processings < limit) and (gl is None or gl.try_begin_processing()):
                 self._processings += 1
-                if gl is not None:
-                    gl.begin_processing()
                 session.processing = True
                 return
             # arm the wake-up, then re-check once: a release between the failed

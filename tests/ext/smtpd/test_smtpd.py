@@ -140,6 +140,28 @@ def test_shared_limits_count_across_processes():
     assert limits.active == 0 and limits.active_processings == 0
 
 
+@isolated
+def test_shared_limits_give_the_last_slot_to_one_process_only():
+    """Of forked processes taking the last slot at once exactly one gets it."""
+    limits = SharedGlobalLimits(max_processings=1)
+    context = multiprocessing.get_context('fork')
+    start = context.Barrier(8)
+    taken = context.Value('i', 0)
+
+    def child():
+        start.wait()
+        if limits.try_begin_processing():
+            with taken.get_lock():
+                taken.value += 1
+
+    procs = [context.Process(target=child) for _ in range(8)]
+    for proc in procs:
+        proc.start()
+    for proc in procs:
+        proc.join(5)
+    assert taken.value == 1 and limits.active_processings == 1
+
+
 def test_shared_limits_slot_wait_recheck_interval():
     """slot_wait returns by its poll within 0.5 s without an event."""
     limits = SharedGlobalLimits(max_processings=1)

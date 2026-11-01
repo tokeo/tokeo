@@ -116,3 +116,11 @@ def test_external_counter_release_is_seen_via_slot_wait_override():
             await srv.stop(wait_seconds_before_close=0.3)
 
     asyncio.run(go())
+
+
+def test_try_begin_processing_counts_up_to_the_cap():
+    """try_begin_processing counts until the cap, then refuses without counting."""
+    gl = GlobalLimits(max_processings=2)
+    assert [gl.try_begin_processing() for _ in range(3)] == [True, True, False]
+    assert gl.active_processings == 2
+    assert GlobalLimits().try_begin_processing() is True

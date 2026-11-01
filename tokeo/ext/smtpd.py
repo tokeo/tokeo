@@ -293,6 +293,26 @@ class SharedGlobalLimits(GlobalLimits):
         with self._shared_processings.get_lock():
             self._shared_processings.value += 1
 
+    def try_begin_processing(self):
+        """
+        Count one in-progress dialog if the cap allows it, under one lock.
+
+        ### Returns
+
+        - **bool**: True when the dialog was counted, False at the cap
+
+        ### Notes
+
+        : Check and count under the same lock, so two processes cannot both
+            take the last slot
+
+        """
+        with self._shared_processings.get_lock():
+            if self.max_processings is not None and self._shared_processings.value >= self.max_processings:
+                return False
+            self._shared_processings.value += 1
+            return True
+
     def end_processing(self):
         """Drop one in-progress dialog."""
         with self._shared_processings.get_lock():

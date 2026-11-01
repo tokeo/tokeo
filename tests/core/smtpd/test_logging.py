@@ -291,6 +291,21 @@ def test_start_logs_every_listener_and_its_bound_address(host, shown, bound):
     assert (None, Severity.INFO, f'Service listening on {bound}:{port}', None) in events.lines
 
 
+@pytest.mark.parametrize('auth_mode, noted', [('AUTH_OPTIONAL', True), ('AUTH_FORBIDDEN', False)], ids=['auth', 'no_auth'])
+def test_start_notes_at_debug_that_the_dialog_shows_the_credentials(auth_mode, noted):
+    """With AUTH start() notes at DEBUG that the log shows the credentials."""
+    events = LinesEvents()
+
+    async def go():
+        server = SmtpdServer(events, settings={'auth_mode': auth_mode})
+        await server.start([{'host': '127.0.0.1', 'port': 0}])
+        await server.stop(wait_seconds_before_close=0)
+
+    asyncio.run(go())
+    note = (None, Severity.DEBUG, 'Debug logs the whole smtp dialog, AUTH credentials included!', None)
+    assert (note in events.lines) is noted
+
+
 def test_disconnect_fault_is_logged_critical_and_closes_the_connection():
     """A fault of on_disconnect_event is logged CRITICAL, the connection closes."""
 
