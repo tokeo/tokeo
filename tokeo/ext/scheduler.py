@@ -184,8 +184,9 @@ class TokeoCronAndFireTrigger(CronTrigger):
         """
         # check cron based trigger
         next_fire_time = super().get_next_fire_time(previous_fire_time, now)
-        # if there is an additional delay, put it on top
-        if self.delay is None:
+        # if there is an additional delay, put it on top; without a next
+        # fire time the task fires no more, so there is no delay either
+        if self.delay is None or next_fire_time is None:
             return next_fire_time
         else:
             return next_fire_time + timedelta(seconds=self.delay)
@@ -739,6 +740,8 @@ class TokeoScheduler(MetaMixin):
             self._scheduler.pause()
         # drop the job queue
         self._scheduler.remove_all_jobs()
+        # the tasks keep their ids, pause 1 still means the first task
+        self._taskid = 0
         # fill in from config again (the in-memory config dict; the file
         # on disk is not reread - the docstring documents this)
         self.init_tasks()

@@ -1,15 +1,19 @@
 """
-Tests for tokeo.ext.scheduler: launch and its switches, the list of the tasks
-and the shell. The shell gets its keys from a pipe; one test runs a real app
-in a pseudo terminal and reads its screen by pyte, a terminal emulator.
+Tests for tokeo.ext.scheduler: the trigger and its delay, launch and its
+switches, the list of the tasks, reload and the shell. The shell gets its
+keys from a pipe; one test runs a real app in a pseudo terminal and reads its
+screen by pyte, a terminal emulator.
 """
 
 import sys
+import types
+from datetime import datetime, timezone
 
 import pytest
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from tokeo.core.exc import TokeoError
+from tokeo.ext.scheduler import TokeoCronAndFireTrigger
 from tests.utils.tui import Terminal
 from tests.ext.scheduler.scheduler_tests_helper import SchedulerTest
 
@@ -34,6 +38,29 @@ def started():
     with SchedulerTest() as app:
         app.scheduler.startup(interactive=True)
         yield app
+
+
+@pytest.mark.parametrize(
+    'crontab, delay, expected',
+    [
+        ('0 8 * * *', None, datetime(2026, 11, 1, 8, 0, 0, tzinfo=timezone.utc)),
+        ('0 8 * * *', 5, datetime(2026, 11, 1, 8, 0, 5, tzinfo=timezone.utc)),
+        ('0 0 30 2 *', None, None),
+        ('0 0 30 2 *', 5, None),
+    ],
+    ids=['daily', 'daily_delayed', 'never', 'never_delayed'],
+)
+def test_trigger_puts_the_delay_on_a_next_fire_time_only(crontab, delay, expected):
+    """The delay goes on top of a next fire time, a never firing cron stays None."""
+    trigger = TokeoCronAndFireTrigger.from_crontab(crontab, delay=delay, timezone='UTC')
+    assert trigger.get_next_fire_time(None, datetime(2026, 11, 1, tzinfo=timezone.utc)) == expected
+
+
+def test_reload_keeps_the_ids_of_the_tasks(started):
+    """After a reload the tasks have the same ids, pause 1 still means the first."""
+    before = sorted(job.id for job in started.scheduler.scheduler.get_jobs())
+    started.scheduler.handle_command_reload(types.SimpleNamespace(restart=False))
+    assert sorted(job.id for job in started.scheduler.scheduler.get_jobs()) == before
 
 
 def test_needs_the_tui_extensions():
