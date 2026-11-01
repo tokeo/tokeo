@@ -45,6 +45,9 @@ def overload_with_auth(url=None, auth_identity=None, auth_password=None):
     pw = auth_password if auth_password is not None else url_pass
     # rebuild host[:port]
     host = parts.hostname or ''
+    # an ipv6 address keeps its brackets in a url
+    if ':' in host:
+        host = f'[{host}]'
     if parts.port is not None:
         host = f'{host}:{parts.port}'
     # rebuild netloc with re-encoded userinfo when any credential is present
