@@ -9,6 +9,7 @@ import base64
 import hashlib
 
 import pytest
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from tokeo.core.vaults import TokeoVaultError
 from tokeo.core.vaults.enc import EncVault
@@ -76,6 +77,23 @@ def test_key_without_cost_parameters_uses_the_defaults(passphrase):
     """Without cost parameters the key is derived with N=2**14, r=8, p=1."""
     profile = {'type': 'scrypt', 'env': ENV, 'salt': SALT}
     assert ScryptVault()._key(profile) == _derive(passphrase, SALT, 2**14)
+
+
+def test_key_is_derived_once_per_passphrase_salt_and_cost(passphrase, monkeypatch):
+    """scrypt runs once per passphrase, salt and cost, again for another one."""
+    calls = []
+
+    def counting(**options):
+        calls.append(options['salt'])
+        return Scrypt(**options)
+
+    monkeypatch.setattr('tokeo.core.vaults.scrypt.Scrypt', counting)
+    vault = ScryptVault()
+    assert vault._key(PROFILE) == vault._key(PROFILE) and len(calls) == 1
+    vault._key(dict(PROFILE, salt=OTHER_SALT))
+    monkeypatch.setenv(ENV, 'another passphrase')
+    vault._key(PROFILE)
+    assert len(calls) == 3
 
 
 # encrypt and decrypt

@@ -29,6 +29,7 @@ sensible values when omitted.
 
 import os
 import base64
+import hashlib
 
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
@@ -53,6 +54,11 @@ class ScryptVault(EncVault):
     _default_block_size = 8
     _default_parallelization = 1
 
+    def __init__(self):
+        # the derived keys by passphrase, salt and cost: scrypt is slow on
+        # purpose, it runs once each; the passphrase is in the process anyway
+        self._keys = {}
+
     def _key(self, profile):
         # derive the Fernet key from the passphrase; salt and cost are public
         name = profile.get('env')
@@ -68,14 +74,16 @@ class ScryptVault(EncVault):
         # a salt that is no base64, a cost that is no power of two or needs
         # more memory than there is, are errors of the profile
         try:
-            kdf = Scrypt(
-                salt=base64.b64decode(salt, validate=True),
-                length=32,
-                n=int(profile.get('cost', self._default_cost)),
-                r=int(profile.get('block_size', self._default_block_size)),
-                p=int(profile.get('parallelization', self._default_parallelization)),
+            cost = (
+                int(profile.get('cost', self._default_cost)),
+                int(profile.get('block_size', self._default_block_size)),
+                int(profile.get('parallelization', self._default_parallelization)),
             )
-            key = kdf.derive(passphrase)
+            cache_key = (hashlib.sha256(passphrase).digest(), salt, cost)
+            key = self._keys.get(cache_key)
+            if key is None:
+                kdf = Scrypt(salt=base64.b64decode(salt, validate=True), length=32, n=cost[0], r=cost[1], p=cost[2])
+                key = self._keys[cache_key] = kdf.derive(passphrase)
         except (ValueError, TypeError, MemoryError):
             raise TokeoVaultError('scrypt vault profile has an invalid salt or cost')
         # Fernet expects a url-safe base64 key
