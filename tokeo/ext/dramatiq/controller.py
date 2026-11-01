@@ -394,26 +394,26 @@ class TokeoDramatiqController(Controller):
             use_spawn = self.app.dramatiq.config('use_spawn')
             if not is_bool(use_spawn):
                 raise TokeoDramatiqConfigError('config', 'use_spawn', use_spawn, 'true or false')
-        # build a synthetic sys.argv that dramatiq's own argparser will
+        # build a synthetic argv that dramatiq's own argparser will
         # consume: cli.make_argument_parser().parse_args() reads from
-        # sys.argv directly, so we override it here, then restore the
+        # sys.argv directly, so we set it for the parse, then restore the
         # caller's argv afterwards so internal dramatiq restarts (which
         # re-exec the python process) see the original command line
-        sys.argv = [sys.argv[0]]
+        argv = [sys.argv[0]]
         # append some worker settings, without --processes dramatiq takes the cpus
         if processes != 'auto':
-            sys.argv.extend(
+            argv.extend(
                 ['--processes', str(processes)],
             )
-        sys.argv.extend(
+        argv.extend(
             ['--threads', str(threads)],
         )
-        sys.argv.extend(
+        argv.extend(
             ['--worker-shutdown-timeout', str(shutdown_timeout)],
         )
         # restart_delay and prefetch are env-only on dramatiq's side, no
         # cli flags exist, so pass them via the environment
-        restart_delay = int(self.app.dramatiq.config('restart_delay'))
+        restart_delay = _number('config', 'restart_delay', self.app.dramatiq.config('restart_delay'), min_value=0)
         queue_prefetch = 0 if queue_prefetch == 'auto' else queue_prefetch
         delay_queue_prefetch = 0 if delay_queue_prefetch == 'auto' else delay_queue_prefetch
         os.environ['dramatiq_restart_delay'] = str(restart_delay)
@@ -425,22 +425,22 @@ class TokeoDramatiqController(Controller):
         # check for logging parameter
         if self.app.pargs.skip_logging:
             # add logging parameter
-            sys.argv.extend(
+            argv.extend(
                 ['--skip-logging'],
             )
         elif self.app.debug:
             # dramatiq knows only info and debug, a single --verbose is enough
-            sys.argv.extend(
+            argv.extend(
                 ['--verbose'],
             )
         # check for watch parameter
         if self.app.pargs.watch is not None:
             # add watcher for the module path of tasks
-            sys.argv.extend(
+            argv.extend(
                 ['--watch', dirname(abspath(self.app.pargs.watch))],
             )
         # add the broker and actors
-        sys.argv.extend(
+        argv.extend(
             [
                 self.app.dramatiq.config('serve'),
                 self.app.dramatiq.config('actors'),
@@ -448,14 +448,18 @@ class TokeoDramatiqController(Controller):
         )
         # --queues takes any number of values, so it follows broker and actors
         if self.app.pargs.queues:
-            sys.argv.extend(
+            argv.extend(
                 ['--queues', *self.app.pargs.queues],
             )
         # parse the synthetic argv we just assembled
-        args = cli.make_argument_parser().parse_args()
-        # restore sys.argv: dramatiq forks workers and may re-exec on
-        # restart, those processes pick the current sys.argv up again
-        sys.argv = [sys.argv[0]] + self.app.argv
+        sys.argv = argv
+        try:
+            args = cli.make_argument_parser().parse_args()
+        finally:
+            # restore sys.argv, also when the parse fails: dramatiq forks
+            # workers and may re-exec on restart, those processes pick the
+            # current sys.argv up again
+            sys.argv = [argv[0]] + self.app.argv
         # clear the locks of a crashed worker generation only when asked, a
         # purge on every start would free the locks of a running instance
         if self.app.pargs.purge:

@@ -201,6 +201,8 @@ def test_serve_invalid_switches(serve, options):
         ('worker_shutdown_timeout', 'auto'),
         ('queue_prefetch', -1),
         ('delay_queue_prefetch', 'x'),
+        ('restart_delay', -1),
+        ('restart_delay', 'x'),
     ],
 )
 def test_serve_invalid_config(serve, key, value):
@@ -209,6 +211,18 @@ def test_serve_invalid_config(serve, key, value):
         serve(config={key: value})
     # the error comes before sys.argv is changed and dramatiq is called
     assert sys.argv == ['tokeo']
+
+
+def test_serve_restores_sys_argv_when_the_parse_fails(serve, monkeypatch):
+    """A failing parse of dramatiq still restores the sys.argv of the app."""
+
+    def failing_parser():
+        raise SystemExit(2)
+
+    monkeypatch.setattr('tokeo.ext.dramatiq.controller.cli.make_argument_parser', failing_parser)
+    with pytest.raises(SystemExit):
+        serve()
+    assert sys.argv == ['tokeo', 'dramatiq', 'serve']
 
 
 # ---- start method -------------------------------------------------------------
