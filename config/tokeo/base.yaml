@@ -44,7 +44,7 @@
 ### - When running in production mode, ```smtp.host``` will be ```production.host.domain```
 ### - All other smtp settings from the base config.yaml remain unchanged
 ###
-### ### Extende Local Configuration Files:
+### ### Extend Local Configuration Files:
 ###
 ### <p>
 ### Local configuration files (ending with ```.local.yaml```) are used for environment-specific
@@ -99,7 +99,7 @@ pdoc:
   port: 9999
   ### relative filepath or absolute URL to a favicon
   favicon: public/favicon.ico
-  ### module or absolute path to the mako templates
+  ### module or absolute path to the jinja2 templates
   templates:
     - tokeo.templates.pdoc.html
 

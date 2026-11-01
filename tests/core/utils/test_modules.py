@@ -24,8 +24,7 @@ from tokeo.core.utils.modules.override import TokeoModulesOverrideFinder, overri
 
 @pytest.fixture
 def pkg(tmp_path, monkeypatch):
-    # a package of its own per test: its __init__ loads inner itself, like a
-    # library does, broken fails on a missing dependency
+    """A package per test, its __init__ loads inner, broken misses a dependency."""
     name = f'tokeo_tests_modules_{uuid.uuid4().hex[:8]}'
     folder = tmp_path / name
     folder.mkdir()
