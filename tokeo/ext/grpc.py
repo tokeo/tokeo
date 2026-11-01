@@ -109,9 +109,10 @@ class TokeoGrpc(MetaMixin):
             tls_cn=None,
             # auto cert extra names/ips for SAN (url host is always included)
             tls_sans=None,
-            # auto cert key: 'rsa' (size in bits) or 'ec' (size = curve 256/384/521)
+            # auto cert key: 'rsa' (size in bits) or 'ec' (size = curve 256/384),
+            # grpc does no tls handshake with a P-521 key
             tls_key_type='ec',
-            tls_key_size=521,
+            tls_key_size=384,
             # client ca: when set, only clients with a valid cert of this ca
             # pass the tls handshake, the interceptors still decide each call
             tls_client_ca=None,
@@ -307,7 +308,7 @@ class TokeoGrpc(MetaMixin):
 
         - **TokeoGrpcError**: On a missing or unsupported tls_key_type, a
             tls_key_size or tls_valid_days that is no integer greater than 0,
-            or an ec tls_key_size that is not one of 256, 384, 521
+            or an ec tls_key_size that is not one of 256, 384
 
         ### Notes
 
@@ -333,7 +334,8 @@ class TokeoGrpc(MetaMixin):
         # derive the host from a "host:port" url (strip ipv6 brackets); the
         # host is both the cn fallback and the first san
         host = self._config('url').rsplit(':', 1)[0].strip('[]') or 'localhost'
-        # private key: rsa by bit size, or ec by curve (256, 384, 521)
+        # private key: rsa by bit size, or ec by curve (256, 384); the tls of
+        # grpc offers no P-521 signature, a P-521 server finds no common one
         key_type = self._config('tls_key_type')
         if not is_filled_str(key_type):
             raise TokeoGrpcError(f"tls_key_type must be set to 'rsa' or 'ec', not {key_type!r}")
@@ -347,9 +349,9 @@ class TokeoGrpc(MetaMixin):
                 raise TokeoGrpcError(f'tls_key_size {key_size} is not valid for rsa (use 2048 or greater)')
             key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
         elif key_type == 'ec':
-            curves = {256: ec.SECP256R1, 384: ec.SECP384R1, 521: ec.SECP521R1}
+            curves = {256: ec.SECP256R1, 384: ec.SECP384R1}
             if key_size not in curves:
-                raise TokeoGrpcError(f'tls_key_size {key_size} is not valid for ec (use 256, 384 or 521)')
+                raise TokeoGrpcError(f'tls_key_size {key_size} is not valid for ec (use 256 or 384, grpc does no handshake with 521)')
             key = ec.generate_private_key(curves[key_size]())
         else:
             raise TokeoGrpcError(f"tls_key_type '{key_type}' is not supported (use 'rsa' or 'ec')")

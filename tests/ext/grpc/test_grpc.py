@@ -136,7 +136,7 @@ def test_setup_merges_the_defaults_below_the_settings():
         assert app.config.get('grpc', 'max_worker') == 3
         assert app.config.get('grpc', 'tls_enabled') is False
         assert app.config.get('grpc', 'tls_key_type') == 'ec'
-        assert app.config.get('grpc', 'tls_key_size') == 521
+        assert app.config.get('grpc', 'tls_key_size') == 384
         assert app.config.get('grpc', 'tls_valid_days') == 90
 
 
@@ -329,10 +329,10 @@ def _sans_of(cert):
 
 
 def test_generate_self_signed_cert_defaults():
-    """By default a self signed localhost cert, ec P-521 key, valid 90 days."""
+    """By default a self signed localhost cert, ec P-384 key, valid 90 days."""
     key, cert = _auto_cert()
     assert isinstance(key, ec.EllipticCurvePrivateKey)
-    assert key.curve.name == 'secp521r1'
+    assert key.curve.name == 'secp384r1'
     assert cert.subject == cert.issuer
     assert cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == 'localhost'
     assert _sans_of(cert) == [x509.DNSName('localhost')]
@@ -340,9 +340,9 @@ def test_generate_self_signed_cert_defaults():
     cert.verify_directly_issued_by(cert)
 
 
-@pytest.mark.parametrize('size, curve', [(256, 'secp256r1'), (384, 'secp384r1'), (521, 'secp521r1')])
+@pytest.mark.parametrize('size, curve', [(256, 'secp256r1'), (384, 'secp384r1')])
 def test_generate_self_signed_cert_ec_key_size_picks_the_curve(size, curve):
-    """tls_key_size 256, 384 and 521 pick the curves P-256, P-384 and P-521."""
+    """tls_key_size 256 and 384 pick the curves P-256 and P-384."""
     key, _ = _auto_cert({'tls_key_type': 'EC', 'tls_key_size': size})
     assert key.curve.name == curve
 
@@ -399,6 +399,7 @@ def test_generate_self_signed_cert_tls_valid_days():
         ({'tls_key_type': ''}, "tls_key_type must be set to 'rsa' or 'ec', not ''"),
         ({'tls_key_type': 'rsa', 'tls_key_size': 1024}, 'tls_key_size 1024 is not valid for rsa'),
         ({'tls_key_type': 'ec', 'tls_key_size': 512}, 'tls_key_size 512 is not valid for ec'),
+        ({'tls_key_type': 'ec', 'tls_key_size': 521}, 'tls_key_size 521 is not valid for ec .* grpc does no handshake with 521'),
         ({'tls_key_size': 'big'}, "tls_key_size must be an integer greater than 0, not 'big'"),
         ({'tls_key_size': '521'}, "tls_key_size must be an integer greater than 0, not '521'"),
         ({'tls_key_size': 0}, 'tls_key_size must be an integer greater than 0, not 0'),
@@ -412,6 +413,7 @@ def test_generate_self_signed_cert_tls_valid_days():
         'key_type_empty',
         'rsa_size',
         'ec_size',
+        'ec_size_521',
         'key_size_nan',
         'key_size_str',
         'key_size_zero',
@@ -443,8 +445,8 @@ def _record_auto_cert(app, monkeypatch):
 
 
 def test_tls_auto_cert_serves_clients_trusting_it(start_grpc, monkeypatch):
-    """With tls but no cert files a client trusting the auto cert is served."""
-    app, port = start_grpc({'tls_enabled': True, 'tls_key_size': 256}, startup=False)
+    """With tls and the default auto cert a client trusting it is served."""
+    app, port = start_grpc({'tls_enabled': True}, startup=False)
     made = _record_auto_cert(app, monkeypatch)
     app.grpc.startup()
     assert len(made) == 1
@@ -455,7 +457,7 @@ def test_tls_auto_cert_serves_clients_trusting_it(start_grpc, monkeypatch):
 
 def test_tls_auto_cert_is_not_trusted_by_others(start_grpc, certs):
     """A client trusting only another ca refuses the auto cert, UNAVAILABLE."""
-    _, port = start_grpc({'tls_enabled': True, 'tls_key_size': 256})
+    _, port = start_grpc({'tls_enabled': True})
     assert _refused(port, credentials=grpc.ssl_channel_credentials(root_certificates=certs.ca)) == grpc.StatusCode.UNAVAILABLE
 
 
