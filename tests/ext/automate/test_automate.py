@@ -5,12 +5,13 @@ read from the config and the results of a task run.
 
 import io
 import copy
+from unittest import mock
 
 import invoke
 import pytest
 from cement.utils.misc import init_defaults
 from tokeo.core.utils.props import hasprops, anyprop, getprop
-from tokeo.ext.automate import TokeoAutomateError, TokeoAutomateResult
+from tokeo.ext.automate import TokeoAutomateError, TokeoAutomateResult, TokeoInvokeLocalContext, TokeoInvokeRemoteContext
 from tests.ext.automate.automate_tests_helper import (
     AutomateTest,
     DEFAULTS,
@@ -152,3 +153,77 @@ def test_result_is_read_by_attributes_not_as_dict():
             app.inspect(res['stderr'])
         with pytest.raises(AttributeError):
             app.inspect(res.get('stderr'))
+
+
+# config, connections and environment of a run
+
+
+def test_tasks_build_leaves_the_config_as_it_is():
+    """Building the tasks reads the config without changing it, also _defaults."""
+    with AutomateTest() as app:
+        before = copy.deepcopy(app.config.get('automate', 'tasks'))
+        assert app.automate.tasks
+        assert app.config.get('automate', 'tasks') == before
+
+
+def test_run_closes_the_connections_of_every_host(monkeypatch):
+    """A run closes each connection it opened, also of a host whose task failed."""
+    closed = []
+    monkeypatch.setattr(TokeoInvokeRemoteContext, 'close', lambda self: closed.append(self.host))
+    monkeypatch.setattr(TokeoInvokeLocalContext, 'close', lambda self: closed.append('local'))
+
+    def func(run, verbose=False, **kwargs):
+        if getattr(run.__self__, 'host', None) == '10.0.0.2':
+            raise RuntimeError('host failed')
+        return dict(stdout='', stderr='', command='', exited=0)
+
+    test_defaults = init_defaults('automate')
+    test_defaults['automate']['tasks'] = dict(
+        task1=dict(module='tests.ext.automate.automate_tests_helper', connection=dict(hosts=['local', '10.0.0.1', '10.0.0.2'])),
+    )
+    with AutomateTest(config_defaults=test_defaults) as app:
+        task = app.automate.tasks['task1']
+        task['func'] = func
+        results = app.automate.run(task)
+    assert sorted(closed) == ['10.0.0.1', '10.0.0.2', 'local']
+    assert [result.exited for result in results] == [0, 0, -1]
+
+
+def _task_ref(**kwprotected):
+    # a task reference for a context, strict and sanitized unless given
+    return dict(kwargs={}, kwprotected=dict(dict(protect='strict', sanitize=True, env={}), **kwprotected))
+
+
+def test_local_run_gets_the_env_values_as_they_are(monkeypatch):
+    """A local run gets the env values unquoted, a bad name is dropped."""
+    env = {'GREETING': 'hello world', 'BAD-NAME': 'x'}
+    context = TokeoInvokeLocalContext(config=invoke.Config(overrides={}), task_ref=_task_ref(env=env))
+    monkeypatch.setattr('sys.stdin', io.StringIO(''))
+    result = context.run('printenv GREETING; env | grep -c "^BAD-NAME=" ; true', hide=True)
+    assert result.stdout == 'hello world\n0\n'
+
+
+def _remote(exited, **kwprotected):
+    # a remote context on a fake ssh client whose command ends with exited
+    context = TokeoInvokeRemoteContext(host='h', config=invoke.Config(overrides={}), connect_kwargs={}, task_ref=_task_ref(**kwprotected))
+    context.client = mock.MagicMock()
+    channel = context.client.get_transport.return_value.open_session.return_value
+    channel.exit_status_ready.return_value = True
+    channel.recv_ready.return_value = channel.recv_stderr_ready.return_value = False
+    channel.recv_exit_status.return_value = exited
+    return context, channel
+
+
+def test_remote_run_exports_the_env_values_quoted():
+    """The export line of a remote shell has the values quoted, no bad names."""
+    context, channel = _remote(0, env={'GREETING': 'hello world', 'BAD-NAME': 'x'})
+    context.run('echo "$GREETING"', hide=True)
+    channel.exec_command.assert_called_once_with('export GREETING=\'hello world\' ; echo "$GREETING"')
+
+
+def test_remote_run_failing_raises_unless_warn():
+    """A failing remote command raises UnexpectedExit, with warn it returns."""
+    context, _ = _remote(1)
+    with pytest.raises(invoke.exceptions.UnexpectedExit):
+        context.run('false', hide=True)
+    assert context.run('false', hide=True, warn=True).exited == 1

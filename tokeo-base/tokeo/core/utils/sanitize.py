@@ -73,6 +73,38 @@ def quoted(s):
         raise ValueError(f'Error to sanitize by quote. {e}')
 
 
+def keywords_only(d):
+    """
+    Build a copy of a mapping with only its keyword keys, values unchanged.
+
+    ### Args
+
+    - **d** (dict|None): The mapping to check; None is passed through
+
+    ### Returns
+
+    - **dict|None**: A new dict with the keys that are safe keywords, or None
+        when d was None
+
+    ### Raises
+
+    - **ValueError**: If d is not None and exposes no items() interface
+
+    ### Notes
+
+    : For values that go on without a shell, e.g. the environment of a local
+        process; ```keyword_dict``` quotes them too, for a shell line
+
+    """
+    if d is None:
+        return d
+
+    if not hasprop(d, 'items'):
+        raise ValueError('No iterable dict given to sanitize dict.')
+
+    return {k: v for k, v in d.items() if is_keyword(k)}
+
+
 def keyword_dict(d):
     """
     Build a sanitized copy of a mapping with keyword keys and shell-quoted
@@ -101,12 +133,4 @@ def keyword_dict(d):
     if d is None:
         return d
 
-    if not hasprop(d, 'items'):
-        raise ValueError('No iterable dict given to sanitize dict.')
-
-    _sanitize_d = dict()
-    for k, v in d.items():
-        if is_keyword(k):
-            _sanitize_d[k] = quoted(v)
-
-    return _sanitize_d
+    return {k: quoted(v) for k, v in keywords_only(d).items()}

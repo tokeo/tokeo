@@ -156,6 +156,9 @@ class TokeoInvokeLocalContext(invoke.Context):
         # a unique, shell-safe SUDO_PROMPT we set and match 1:1 in env mode
         return f'__tokeo_automate_sudo_{secrets.token_hex(14)}__'
 
+    def close(self):
+        """Nothing to close for a local run, the same call as on a remote one."""
+
     @staticmethod
     def protect_kwargs_inplace(self, kwargs):
         """
@@ -180,9 +183,11 @@ class TokeoInvokeLocalContext(invoke.Context):
         # check valid encoding
         if encoding is None:
             encoding = invoke.runners.default_encoding()
-        # if the task should be sanitized then check the envs
+        # sanitize keeps the env names that are keywords; the values are
+        # quoted only for the export line of a remote shell, a local process
+        # gets them without a shell and so as they are
         if env and self.sanitize:
-            env = sanitize.keyword_dict(env)
+            env = sanitize.keywords_only(env)
         # if strict protected, remove all kwargs, except safe ones
         if self.protect == 'strict':
             for k in kwargs.keys() - {'hide', 'warn'}:
@@ -218,10 +223,9 @@ class TokeoInvokeLocalContext(invoke.Context):
 
         ### Notes
 
-        : Env vars are exported into the shell verbatim, without
-            shell-quoting here. Escaping is delegated to the
-            task's sanitize setting; with sanitize enabled the values pass
-            through sanitize.keyword_dict(), otherwise they are exported as-is.
+        : Env vars reach the local process without a shell, so their values
+            stay as they are; with sanitize enabled only names that are
+            keywords pass, by sanitize.keywords_only().
 
         : A sudo password (sudo.password) is injected reactively when the
             configured prompt is seen in the last tail chars of stdout or
@@ -388,10 +392,9 @@ class TokeoInvokeRemoteContext(invoke.Context):
 
         ### Notes
 
-        : Env vars are exported into the remote shell verbatim, without
-            shell-quoting here (unlike invoke). Escaping is delegated to the
-            task's sanitize setting; with sanitize enabled the values pass
-            through sanitize.keyword_dict(), otherwise they are exported as-is.
+        : Env vars are exported into the remote shell; with sanitize enabled
+            only names that are keywords pass and the values are quoted by
+            sanitize.keyword_dict(), otherwise they are exported as-is.
 
         : A sudo password (sudo.password) is injected reactively when the
             configured prompt is seen in the last tail chars of stdout or
@@ -450,10 +453,10 @@ class TokeoInvokeRemoteContext(invoke.Context):
 
         # create the export string to survive env while on ssh
         env = kwargs.get('env', {})
+        # the export line is read by the remote shell, so its values are quoted
+        if env and self.sanitize:
+            env = sanitize.keyword_dict(env)
         if env:
-            # explicitly do not quote here anything
-            # quoting can be configured by sanitize
-            # but not here like in invoke
             env_exports = 'export ' + ' '.join(f'{k}={str(v)}' for k, v in env.items()) + ' ; '
         else:
             env_exports = ''
@@ -521,7 +524,11 @@ class TokeoInvokeRemoteContext(invoke.Context):
         err = stderr_buffer.decode(encoding, errors='replace')
         exited = channel.recv_exit_status()
 
-        return invoke.runners.Result(stdout=out, stderr=err, exited=exited, command=command)
+        result = invoke.runners.Result(stdout=out, stderr=err, exited=exited, command=command)
+        # like a local run: a failed command stops the task unless warn is set
+        if exited != 0 and not kwargs.get('warn', False):
+            raise invoke.exceptions.UnexpectedExit(result)
+        return result
 
     def close(self):
         """
@@ -1271,7 +1278,8 @@ class TokeoAutomate(MetaMixin):
         # initialize tasks
         self._tasks = {}
         # save list reference
-        _config_tasks = self._config('tasks', fallback={})
+        # a copy, the build must not change the config it reads
+        _config_tasks = copy.deepcopy(self._config('tasks', fallback={}))
         # get the _defaults dict
         _defaults = _config_tasks.pop('_defaults', {})
         # test for a default module
@@ -1526,36 +1534,41 @@ class TokeoAutomate(MetaMixin):
         # list results for all connections
         results = []
         run_connections = self._run_connections(task)
-        for run_connection in run_connections:
-            if len(filter_host_ids) == 0 or run_connection['host_id'] in filter_host_ids:
-                try:
-                    results.append(
-                        TokeoAutomateResult(
-                            task['id'],
-                            run_connection['connection_id'],
-                            run_connection['host_id'],
-                            task['func'](
-                                run_connection['context'].run,
-                                verbose=verbose,
-                                **run_connection['context']['task_ref']['kwargs'],
-                            ),
+        try:
+            for run_connection in run_connections:
+                if len(filter_host_ids) == 0 or run_connection['host_id'] in filter_host_ids:
+                    try:
+                        results.append(
+                            TokeoAutomateResult(
+                                task['id'],
+                                run_connection['connection_id'],
+                                run_connection['host_id'],
+                                task['func'](
+                                    run_connection['context'].run,
+                                    verbose=verbose,
+                                    **run_connection['context']['task_ref']['kwargs'],
+                                ),
+                            )
                         )
-                    )
-                except Exception as e:
-                    results.append(
-                        TokeoAutomateResult(
-                            task['id'],
-                            run_connection['connection_id'],
-                            run_connection['host_id'],
-                            dict(
-                                stdout=None,
-                                stderr=f'{e}',
-                                command=None,
-                                exited=-1,
-                                exception=f'{type(e).__name__}',
-                            ),
+                    except Exception as e:
+                        results.append(
+                            TokeoAutomateResult(
+                                task['id'],
+                                run_connection['connection_id'],
+                                run_connection['host_id'],
+                                dict(
+                                    stdout=None,
+                                    stderr=f'{e}',
+                                    command=None,
+                                    exited=-1,
+                                    exception=f'{type(e).__name__}',
+                                ),
+                            )
                         )
-                    )
+        finally:
+            # each run opens its own connections, they end with it
+            for run_connection in run_connections:
+                run_connection['context'].close()
         # return that content
         return tuple(results)
 
