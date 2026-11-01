@@ -12,9 +12,11 @@
 ### settings from the previous ones:
 ### </p>
 ###
-### 1. Base configuration: ```config/tokeo.yaml```
-### 1. Environment-specific configuration: ```config/tokeo.[environment].yaml```
-### 1. Local environment-specific configuration: ```config/tokeo.[environment].local.yaml```
+### 1. Base configuration: ```config/tokeo/base.yaml```, then ```config/tokeo/base.d/*.yaml```
+### 1. Environment configuration: ```config/tokeo/[environment].yaml```, then
+###    ```config/tokeo/[environment].d/*.yaml```
+### 1. Local configuration: ```[environment].local.yaml``` and the ```*.local.yaml``` of
+###    ```[environment].d```, never for base
 ###
 ### <p>
 ### Where ```[environment]``` can be one of:
@@ -22,6 +24,7 @@
 ###
 ### - ```development``` - Used during development
 ### - ```testing``` - Used for testing environments
+### - ```staging``` - Used for staging environments
 ### - ```production``` - Used in production deployments
 ###
 ### ### Overloading Configuration:

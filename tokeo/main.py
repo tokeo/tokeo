@@ -20,8 +20,9 @@ class Tokeo(App):
     ### Notes
 
     - The application includes several extensions by default:
-        colorlog, generate, pdoc, print, jinja2, and yaml
-    - The application's configuration is loaded from YAML files
+        colorlog, generate, pdoc, appenv, print, jinja2, and yaml
+    - The application's configuration is loaded from the YAML files of
+        config/tokeo by appenv, for log, pdoc and generate
     - Signal handling (SIGINT, SIGTERM) is automatically managed
 
     """
@@ -49,6 +50,7 @@ class Tokeo(App):
             'colorlog',
             'generate',
             'tokeo.ext.pdoc',
+            'tokeo.ext.appenv',
             'tokeo.ext.print',
             'tokeo.ext.jinja2',
             'tokeo.ext.yaml',
