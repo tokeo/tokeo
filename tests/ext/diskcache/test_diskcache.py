@@ -10,7 +10,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from tokeo.ext.diskcache import _ThreadConnection
+from tokeo.ext.diskcache import TokeoDiskCacheError, _ThreadConnection
 from tests.ext.diskcache.diskcache_tests_helper import (
     DiskcacheTest,
     Connections,
@@ -67,6 +67,14 @@ def _throttle_worker(directory, count, per_seconds, result_queue):
 # --------------------------------------------------------------------------------------
 # connections: each thread closes its own when it ends
 # --------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize('directory', [None, ''], ids=['none', 'empty'])
+def test_setup_without_directory_raises(directory):
+    """Without directory the setup stops, temp dirs would split the locks."""
+    with pytest.raises(TokeoDiskCacheError, match='diskcache.directory must be set'):
+        with DiskcacheTest(directory):
+            pass
 
 
 def test_connections_of_threads_close_when_they_end(tmp, monkeypatch):

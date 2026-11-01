@@ -61,6 +61,19 @@ import time
 import re
 
 
+class TokeoDiskCacheError(TokeoError):
+    """
+    Exception raised for a diskcache config that cannot be used.
+
+    ### Notes
+
+    : Inherits from TokeoError, so main reports it as a clean message
+
+    """
+
+    pass
+
+
 class TokeoDiskCacheLockError(TokeoError):
     """
     Exception raised for errors during lock operations.
@@ -805,7 +818,8 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         config_defaults = dict(
             # Directory where cache db files are stored. When using
             # diskcache to synchronize processes, make sure that all
-            # pointed to the same directory.
+            # pointed to the same directory. Must be set, a temp dir per
+            # process would split the locks between the workers.
             directory=None,
             # Default timeout for cache operations in seconds
             timeout=60,
@@ -840,8 +854,15 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         - **kw**: Keyword arguments passed to the parent class
 
+        ### Raises
+
+        - **TokeoDiskCacheError**: If ```directory``` is not set
+
         """
         super()._setup(*args, **kw)
+        # a temp dir per process would split the locks between workers
+        if not is_filled_str(self._config('directory')):
+            raise TokeoDiskCacheError('diskcache.directory must be set, all processes share the cache and its locks by it')
         # create the key/value store for datas (permanent)
         self._cache = diskcache.Cache(
             directory=self._config('directory'),
