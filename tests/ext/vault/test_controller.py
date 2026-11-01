@@ -4,6 +4,7 @@ vault encrypt and vault decrypt, what they print, how their output pastes
 into a config and environment, and the errors of wrong arguments.
 """
 
+import io
 import shlex
 
 import pytest
@@ -161,11 +162,25 @@ def test_encrypt_without_the_key_fails(vault, monkeypatch):
         vault('encrypt', '--profile', 'master', 's3cret')
 
 
-@pytest.mark.parametrize('args', [['encrypt', 's3cret'], ['encrypt', '--profile', 'master']], ids=['no_profile', 'no_value'])
-def test_encrypt_needs_profile_and_value(vault, key, args):
-    """vault encrypt without --profile or without a value exits with an error."""
+def test_encrypt_needs_a_profile(vault, key):
+    """vault encrypt without --profile exits with an error."""
     with pytest.raises(SystemExit):
-        vault(*args)
+        vault('encrypt', 's3cret')
+
+
+def test_encrypt_without_value_asks_for_it_hidden(vault, key, monkeypatch):
+    """Without a value the secret is asked for by getpass, not shown."""
+    asked = []
+    monkeypatch.setattr('getpass.getpass', lambda prompt: asked.append(prompt) or 's3cret')
+    token = vault('encrypt', '--profile', 'master').strip().split(' ', 1)[1]
+    assert asked == ['value: '] and Fernet(key.encode()).decrypt(token.encode()) == b's3cret'
+
+
+def test_encrypt_with_a_dash_reads_the_value_from_stdin(vault, key, monkeypatch):
+    """A - as value reads the secret from stdin, without its last line break."""
+    monkeypatch.setattr('sys.stdin', io.StringIO('s3cret\n'))
+    token = vault('encrypt', '--profile', 'master', '-').strip().split(' ', 1)[1]
+    assert Fernet(key.encode()).decrypt(token.encode()) == b's3cret'
 
 
 # decrypt with a payload

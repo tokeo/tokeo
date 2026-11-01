@@ -29,6 +29,7 @@ handler; no consumer code needs to change to read encrypted values.
 """
 
 import sys
+import getpass
 from configparser import RawConfigParser
 from os.path import basename
 import yaml
@@ -346,7 +347,7 @@ class TokeoVaultController(Controller):
     @ex(
         help='encrypt a value for a profile',
         description='Encrypt a value with a vault profile and print the !vault payload.',
-        epilog=f'Use "{basename(sys.argv[0])} vault encrypt --profile master my-secret".',
+        epilog=f'Use "{basename(sys.argv[0])} vault encrypt --profile master" and type the secret.',
         arguments=[
             (
                 ['--profile'],
@@ -354,7 +355,7 @@ class TokeoVaultController(Controller):
             ),
             (
                 ['value'],
-                dict(help='the plaintext value to encrypt'),
+                dict(nargs='?', help='the plaintext, else asked for hidden; - reads it from stdin'),
             ),
         ],
     )
@@ -362,7 +363,9 @@ class TokeoVaultController(Controller):
         """
         Encrypt a value with a vault profile and print the !vault payload.
 
-        The value is the positional argument. Only the encrypted payload is
+        Without a value the secret is asked for hidden, ```-``` reads it from
+        stdin, e.g. in a script; a value given as argument stays in the shell
+        history and shows in the process list. Only the encrypted payload is
         printed, never the profile's key, passphrase or salt.
 
         ### Raises
@@ -377,7 +380,12 @@ class TokeoVaultController(Controller):
         """
         name = self.app.pargs.profile
         profile = self._profile(name)
-        token = self.app.config.get_handler(profile['type']).encrypt(profile, self.app.pargs.value)
+        value = self.app.pargs.value
+        if value is None:
+            value = getpass.getpass('value: ')
+        elif value == '-':
+            value = sys.stdin.read().rstrip('\n')
+        token = self.app.config.get_handler(profile['type']).encrypt(profile, value)
         self.app.print(f'!vault:{name} {token}')
 
     @ex(
