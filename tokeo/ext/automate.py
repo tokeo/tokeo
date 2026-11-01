@@ -482,16 +482,19 @@ class TokeoInvokeRemoteContext(invoke.Context):
                     invoke.runners.Result(stdout='', stderr='CommandTimeOut', exited=-1, command=command), timeout
                 )
 
+            received = False
             # 2. Read standard output
             if channel.recv_ready():
-                chunk = channel.recv(4096)
+                chunk = channel.recv(65536)
+                received = True
                 stdout_buffer += chunk
                 if not hide_out:
                     print(chunk.decode(encoding, errors='replace'), end='', flush=True)
 
             # 3. Read standard error
             if channel.recv_stderr_ready():
-                chunk = channel.recv_stderr(4096)
+                chunk = channel.recv_stderr(65536)
+                received = True
                 stderr_buffer += chunk
                 if not hide_err:
                     print(chunk.decode(encoding, errors='replace'), end='', flush=True)
@@ -504,8 +507,10 @@ class TokeoInvokeRemoteContext(invoke.Context):
                 channel.sendall(sudo_pass.encode(encoding) + b'\n')
                 sudo_pass = None
 
-            # 4. Sleep briefly to prevent pinning the CPU at 100%
-            time.sleep(0.01)
+            # 4. Sleep briefly when nothing came, not to pin the CPU;
+            #    while data comes the next round reads at once
+            if not received:
+                time.sleep(0.01)
 
         # Drain any remaining bytes after the command finishes
         while channel.recv_ready():
