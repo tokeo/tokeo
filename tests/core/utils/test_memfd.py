@@ -24,6 +24,14 @@ def test_single_blob_is_readable():
             assert f.read() == b'hello world'
 
 
+@pytest.mark.skipif(not hasattr(os, 'memfd_create'), reason='memfd_create is linux only')
+def test_memory_file_is_closed_on_exec():
+    """The fd of the blob is not inherited by a program started meanwhile."""
+    with memory_paths(b'key') as (path,):
+        fd = int(os.path.basename(path))
+        assert os.get_inheritable(fd) is False
+
+
 def test_multiple_blobs_are_independent():
     """Each blob gets its own path with its own bytes."""
     with memory_paths(b'first', b'second') as (a, b):

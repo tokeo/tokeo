@@ -66,7 +66,8 @@ def memory_paths(*blobs):
         try:
             paths = []
             for blob in data:
-                fd = os.memfd_create('tokeo-mem', 0)
+                # close on exec: a program started meanwhile gets no key
+                fd = os.memfd_create('tokeo-mem')
                 fds.append(fd)
                 os.write(fd, blob)
                 os.lseek(fd, 0, os.SEEK_SET)
