@@ -1,3 +1,8 @@
+import logging
+
+LOG = logging.getLogger(__name__)
+
+
 def deep_merge(a, b):
     """
     Recursively merge two data structures with special handling for different types.
@@ -70,11 +75,14 @@ def deep_merge(a, b):
                     else:
                         a[key] = b[key]
             else:
-                raise ValueError(f'Cannot merge non-dict "{b}" into dict "{a}"')
+                # the values only for debug, they may hold secrets
+                LOG.debug(f'deep_merge: cannot merge {b!r} into {a!r}')
+                raise ValueError(f'Cannot merge a {type(b).__name__} into a dict')
     except TypeError as e:
         # only name a key when the failure actually happened in the loop
         in_key = f' in key "{key}"' if key is not None else ''
-        raise ValueError(f'TypeError "{e}"{in_key} when merging "{b}" into "{a}"')
+        LOG.debug(f'deep_merge: TypeError {e}{in_key} when merging {b!r} into {a!r}')
+        raise ValueError(f'TypeError "{e}"{in_key} when merging a {type(b).__name__} into a {type(a).__name__}')
     return a
 
 
