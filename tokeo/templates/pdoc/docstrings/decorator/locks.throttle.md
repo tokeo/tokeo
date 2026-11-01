@@ -27,7 +27,7 @@ When the rate limit is exceeded, the decorator will either:
 - **cb_on_locked** (callable, optional): Function to call when rate limited instead
     of waiting
 - **verbose** (bool, optional): Whether to log throttling information. Defaults to
-    True.
+    False.
 
 ### Returns
 

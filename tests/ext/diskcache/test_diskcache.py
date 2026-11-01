@@ -606,6 +606,21 @@ def test_temper_lock_and_acquire_expire_defaults_to_3600(tmp):
         assert 3599 < _expires_in(app, 'dc_acquire') <= 3600
 
 
+def test_throttle_and_temper_log_nothing_by_default(tmp, monkeypatch):
+    """Without verbose throttle and temper write no info line per call."""
+    with DiskcacheTest(tmp.dir) as app:
+        infos = []
+        monkeypatch.setattr(app.log, 'info', lambda msg, *args, **kwargs: infos.append(msg))
+
+        @app.cache.locks.throttle(count=1, per_seconds=60, name='quiet_throttle')
+        @app.cache.locks.temper(name='quiet_temper')
+        def job():
+            return 'ran'
+
+        assert job() == 'ran'
+        assert infos == []
+
+
 # --------------------------------------------------------------------------------------
 # temper: the deadlines of the holders
 # --------------------------------------------------------------------------------------

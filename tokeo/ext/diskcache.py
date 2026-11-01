@@ -358,7 +358,7 @@ class TokeoDiskCacheLocksHandler:
         time_func=time.time,
         sleep_func=time.sleep,
         cb_on_locked=None,
-        verbose=True,
+        verbose=False,
     ):
         """
         Rate-limiting decorator to throttle function calls to a given
@@ -399,7 +399,7 @@ class TokeoDiskCacheLocksHandler:
         - **cb_on_locked** (callable, optional): Function to call when rate
             limited, instead of waiting.
         - **verbose** (bool, optional): Whether to log throttling
-            information. Defaults to True.
+            information. Defaults to False.
 
         ### Returns
 
@@ -554,7 +554,7 @@ class TokeoDiskCacheLocksHandler:
         sleep_func=time.sleep,
         sleep_time=None,
         cb_on_locked=None,
-        verbose=True,
+        verbose=False,
     ):
         """
         Resource-limiting decorator to control concurrent access to a
@@ -595,7 +595,7 @@ class TokeoDiskCacheLocksHandler:
             slot is free, instead of waiting. It receives the unpacked
             function arguments and never consumes a slot.
         - **verbose** (bool, optional): Whether to log tempering
-            information. Defaults to True.
+            information. Defaults to False.
 
         ### Returns
 

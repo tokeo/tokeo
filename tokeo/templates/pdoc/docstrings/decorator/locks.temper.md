@@ -28,7 +28,7 @@ deadline, now plus expire, and removes it when the function completes.
 - **cb_on_locked** (callable, optional): Function to call on limit instead of
     waiting
 - **verbose** (bool, optional): Whether to log tempering information. Defaults to
-    True.
+    False.
 
 ### Returns
 
