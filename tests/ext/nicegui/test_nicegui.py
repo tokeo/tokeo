@@ -340,7 +340,18 @@ def test_hotload_restarts_the_process_after_a_change(runs, tmp_path, no_process_
         app.nicegui.startup(hotload=True, hotload_dir=str(tmp_path))
         (tmp_path / 'page.py').write_text('changed = True\n')
         assert wait_until(lambda: app.nicegui._watchdog_hotload_requested)
-    assert no_process_replacement == ['exit_function', (sys.executable, [sys.executable] + sys.argv)]
+    assert no_process_replacement == ['exit_function', (sys.executable, [sys.executable] + sys.orig_argv[1:])]
+
+
+def test_hotload_restarts_a_module_as_module(runs, tmp_path, no_process_replacement, monkeypatch):
+    """An app started by python -m app.main restarts as module, not as script."""
+    monkeypatch.setattr(sys, 'orig_argv', ['python3', '-X', 'utf8', '-m', 'inspire.main', 'nicegui', 'serve'])
+    with NiceguiTest() as app:
+        app.nicegui.startup(hotload=True, hotload_dir=str(tmp_path))
+        (tmp_path / 'page.py').write_text('changed = True\n')
+        assert wait_until(lambda: app.nicegui._watchdog_hotload_requested)
+    args = [sys.executable, '-X', 'utf8', '-m', 'inspire.main', 'nicegui', 'serve']
+    assert no_process_replacement == ['exit_function', (sys.executable, args)]
 
 
 def test_hotload_without_change_keeps_the_process(runs, tmp_path, no_process_replacement):

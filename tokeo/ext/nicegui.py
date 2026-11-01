@@ -25,6 +25,7 @@ polling mechanism.
 
 """
 
+import sys
 from sys import argv, executable as sys_executable
 from os import execv as os_execv
 from os.path import basename, isdir, join
@@ -698,6 +699,8 @@ class TokeoNicegui(MetaMixin):
         - Performs a full process restart to ensure clean reloading
         - Called automatically by the post_close application hook
         - Logs a message indicating that hotload is in progress
+        - Restarts the command line as given, e.g. ```python -m app.main```
+            stays a module and is not started as a script
 
         """
 
@@ -707,7 +710,8 @@ class TokeoNicegui(MetaMixin):
         if self._watchdog_hotload_requested:
             self.app.log.info('Hotload webservice ...')
             mp_exit_function()
-            os_execv(sys_executable, [sys_executable] + argv)
+            # the command line as given, with -m or options of the interpreter
+            os_execv(sys_executable, [sys_executable] + sys.orig_argv[1:])
 
 
 class TokeoNiceguiController(Controller):
