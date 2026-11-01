@@ -489,8 +489,13 @@ def test_realtime_lost_login_while_connected_hangs_up_and_shows_the_error(silent
     """
     url, gets = silent_server
     calls = []
+    test_thread = threading.current_thread()
 
     def hook():
+        # only the calls of the channel count: subscribe in the test thread
+        # confirms the login too, at a moment the test does not control
+        if threading.current_thread() is test_thread:
+            return
         calls.append(1)
         if len(calls) > 1:
             raise TokeoPocketBaseAuthError('login refused')
