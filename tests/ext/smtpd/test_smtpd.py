@@ -112,6 +112,13 @@ def test_plan_multi_services_rules():
     assert plan['inloop'] == [] and plan['shared'] is False
 
 
+@pytest.mark.parametrize('pre_fork', [-1, 1.5, '3', True], ids=['negative', 'float', 'str', 'bool'])
+def test_plan_refuses_a_pre_fork_that_is_no_count(pre_fork):
+    """A pre_fork that is no integer of 0 or more names the service, none starts."""
+    with pytest.raises(TokeoSmtpdError, match=f"smtpd: service 'mx1': pre_fork must be an integer of 0 or more, not {pre_fork!r}"):
+        _plan([_svc('mx1', pre_fork)], has_global_limit=False)
+
+
 # ---- unit: shared limits --------------------------------------------------------
 
 

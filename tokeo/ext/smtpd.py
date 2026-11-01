@@ -90,6 +90,7 @@ from cement.core.meta import MetaMixin
 from cement import ex
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.modules import resolve_object
+from tokeo.core.utils.validate import is_int_ge
 from tokeo.core.smtpd import SmtpdServer, GlobalLimits, SmtpdEvents
 from tokeo.ext.argparse import Controller
 
@@ -234,7 +235,10 @@ def _set_pdeathsig(sig=signal.SIGTERM):
 
 def _pre_fork(svc):
     """Read the pre_fork worker count of a service config (default 0)."""
-    return int((svc.get('settings') or {}).get('pre_fork') or 0)
+    count = (svc.get('settings') or {}).get('pre_fork') or 0
+    if not is_int_ge(count, 0):
+        raise TokeoSmtpdError(f"smtpd: service '{svc.get('name')}': pre_fork must be an integer of 0 or more, not {count!r}")
+    return count
 
 
 class SharedGlobalLimits(GlobalLimits):
@@ -542,7 +546,9 @@ class TokeoSmtpd(MetaMixin):
         else:
             global_limits = None
         # build every service once before the fork: a broken config ends the
-        # run here, before a worker starts or a port is bound
+        # run here, before a worker starts or a port is bound; a deliberate
+        # choice, the time of a second build in each process is the price for
+        # forks that start and do not end on a config error
         for svc in services:
             self._build_server(svc, global_limits)
         # fork the worker groups BEFORE any event loop exists; the shared
