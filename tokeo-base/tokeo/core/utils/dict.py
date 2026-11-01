@@ -4,7 +4,7 @@ def deep_merge(a, b):
 
     This function handles merging of dictionaries, lists, and primitive types:
 
-    - Primitives: b replaces a
+    - Single values (str, number, date, VaultRef, ...): b replaces a
     - Lists: elements from b are appended to a
     - Dicts: recursively merge keys from b into a
 
@@ -19,13 +19,13 @@ def deep_merge(a, b):
 
     ### Raises
 
-    - **ValueError**: If trying to merge incompatible types or unsupported types
+    - **ValueError**: If a dict gets a value that is no dict
     - **ValueError**: If a TypeError occurs during merging (with context details)
 
     ### Notes
 
-    : Tuples and arbitrary objects are not handled, as their merge behavior
-        would be ambiguous.
+    : A value that is no list and no dict is replaced by b as a whole,
+        e.g. a date or an encrypted VaultRef of another config file
 
     : Lists are always appended, never replaced or de-duplicated. Merging
         the same b into a more than once (or re-merging an already merged
@@ -52,8 +52,8 @@ def deep_merge(a, b):
     # stays None when the failure is not inside the dict-merge loop
     key = None
     try:
-        if a is None or isinstance(a, (str, float, int)):
-            # border case for first run or if a is a primitive
+        if a is None or not isinstance(a, (list, dict)):
+            # border case for first run or a single value: b replaces it
             a = b
         elif isinstance(a, list):
             # lists will be only appended
@@ -71,8 +71,6 @@ def deep_merge(a, b):
                         a[key] = b[key]
             else:
                 raise ValueError(f'Cannot merge non-dict "{b}" into dict "{a}"')
-        else:
-            raise ValueError(f'NOT IMPLEMENTED "{b}" into "{a}"')
     except TypeError as e:
         # only name a key when the failure actually happened in the loop
         in_key = f' in key "{key}"' if key is not None else ''
