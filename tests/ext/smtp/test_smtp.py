@@ -6,6 +6,8 @@ headers, attachments, inline images, mime structure) and the smtplib calls.
 import os
 import ssl
 import base64
+import email
+import email.policy
 from unittest import mock
 
 import pytest
@@ -90,6 +92,19 @@ def test_starttls_and_login():
     server.send_message.assert_called_once()
 
 
+@pytest.mark.parametrize('auth', [True, False], ids=['auth', 'no_auth'])
+def test_debug_prints_the_dialog_and_warns_with_auth(auth):
+    """Debug prints the whole dialog, with auth a warning names the credentials."""
+    warnings = []
+    with mock.patch('smtplib.SMTP') as smtp:
+        with SmtpTest(auth=auth, auth_identity='user', auth_password='secret') as app:
+            app._meta.debug = True
+            with mock.patch.object(app.log, 'warning', side_effect=warnings.append):
+                app.mail.send('body')
+    smtp.return_value.set_debuglevel.assert_called_once_with(9)
+    assert any('AUTH credentials included' in msg for msg in warnings) is auth
+
+
 # ---- host certificate context -----------------------------------------------
 
 
@@ -155,6 +170,20 @@ def test_attachment_names(tmp):
     assert names == ['docs/2026/q3.pdf', 'invoice.pdf', 'invoice.pdf']
 
 
+def test_attachment_name_with_spaces_and_umlauts(tmp):
+    """A name with spaces and umlauts arrives readable for the recipient."""
+    pdf = os.path.join(tmp.dir, 'invoice.pdf')
+    with open(pdf, 'wb') as f:
+        f.write(b'%PDF-1.4 dummy')
+    names = ['my report ä.pdf', 'my report.pdf']
+    with SmtpTest() as app:
+        raw = app.mail._make_message('body', **app.mail._get_params(files=[(name, pdf) for name in names])).as_string()
+    # read by the classic parser of python and by the current one
+    for policy in (email.policy.compat32, email.policy.default):
+        parsed = email.message_from_string(raw, policy=policy)
+        assert [part.get_filename() for part in parsed.walk() if part.get_filename()] == names
+
+
 def test_inline_image(tmp):
     """With html a cid file is an inline image, without html an attachment."""
     png = os.path.join(tmp.dir, 'logo.png')
@@ -170,14 +199,14 @@ def test_inline_image(tmp):
     related = [p for p in html.walk() if p.get_content_type() == 'multipart/related'][0]
     image = [p for p in related.walk() if p.get_content_type() == 'image/png'][0]
     assert image['Content-ID'] == '<logo>'
-    assert image['Content-Disposition'] == 'inline; filename=logo.png'
+    assert image['Content-Disposition'] == 'inline; filename="logo.png"'
     # the image part is encoded once, with exactly one transfer encoding header
     assert image.get_all('Content-Transfer-Encoding') == ['base64']
     assert image.get_payload(decode=True) == PNG
     # without html the file is a plain attachment
     attachment = [p for _, p in _parts(text) if p.get_filename()][0]
     assert attachment.get_content_type() == 'application/octet-stream'
-    assert attachment['Content-Disposition'] == 'attachment; filename=logo.png'
+    assert attachment['Content-Disposition'] == 'attachment; filename="logo.png"'
     assert attachment['Content-ID'] is None
 
 
@@ -223,6 +252,14 @@ def test_mime_structure(tmp, body, with_file, content_type):
 
 
 # ---- invalid body -----------------------------------------------------------
+
+
+@pytest.mark.parametrize('item', ['to', 'cc', 'bcc'])
+def test_recipients_as_str_raise(item):
+    """to, cc or bcc as a str raises TypeError, not a mail to each character."""
+    with SmtpTest() as app:
+        with pytest.raises(TypeError, match=f'{item} must be a list of addresses'):
+            app.mail._get_params(**{item: 'a@b.de'})
 
 
 @pytest.mark.parametrize('body', [5, {'text': None}, (5, '')], ids=['int', 'dict_none', 'tuple_int'])

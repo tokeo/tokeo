@@ -200,6 +200,11 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             config_item = self.app.config.get(self._meta.config_section, item)
             params[item] = kw.get(item, config_item)
 
+        # the recipients are lists, a str would be sent to each of its characters
+        for item in ('to', 'cc', 'bcc'):
+            if isinstance(params[item], str):
+                raise TypeError(f'{item} must be a list of addresses, not the str {params[item]!r}')
+
         # Connection parameters always come from configuration
         for item in [
             # fmt: off
@@ -272,7 +277,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         ### Raises
 
-        - **TypeError**: If the body parameter is not a string, tuple, or dict
+        - **TypeError**: If the body parameter is not a string, tuple, or dict,
+            or to, cc or bcc is a str instead of a list
         - **smtplib.SMTPException**: If SMTP server connection or sending fails
 
         ### Example
@@ -337,6 +343,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # use context manager instead try finally to keep all original exceptions
         with server:
             if self.app.debug is True:
+                # debug shows the whole dialog, so the credentials too
+                if is_true(params['auth']):
+                    self.app.log.warning(f'{self._meta.label} : debug prints the whole smtp dialog, AUTH credentials included')
                 server.set_debuglevel(9)
 
             if is_true(params['tls']):
@@ -597,17 +606,12 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
             # inline only into the related part, otherwise as attachment
             if cid and rel is not None:
-                part.add_header(
-                    'Content-Disposition',
-                    f'inline; filename={altname}',
-                )
+                # add_header quotes and encodes the name, e.g. with umlauts
+                part.add_header('Content-Disposition', 'inline', filename=altname)
                 part.add_header('Content-ID', f'<{cid}>')
                 rel.attach(part)
             else:
-                part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename={altname}',
-                )
+                part.add_header('Content-Disposition', 'attachment', filename=altname)
                 msg.attach(part)
 
     def _make_message(self, body, **params):
