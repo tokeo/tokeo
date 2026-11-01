@@ -14,7 +14,6 @@ with no order and runs the app by ```NiceguiSimulation``` of
 """
 
 import os
-import socket
 import asyncio
 import subprocess
 
@@ -24,7 +23,8 @@ from nicegui import ui
 from tokeo.main import TokeoTest
 from tokeo.ext.nicegui import TokeoNiceguiError
 from tokeo.core.pocketbase import PocketBase, TokeoPocketBaseError
-from tests.utils import wait_until, wait_until_async
+from tests.utils import free_port, wait_until_async
+from tests.utils.process import SubProcess
 from tests.utils.nicegui import NiceguiSimulation
 
 #: The pocketbase binary of the tests, e.g. of version 0.40.6
@@ -102,13 +102,6 @@ def _pages():
         await _orders_page(feed, filter=feed.pb.filter('owner = {:id}', {'id': user_id}))
 
 
-def _free_port():
-    # a port nobody listens on right now
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
-
-
 def _healthy(url):
     # whether the server answers its health check
     try:
@@ -123,14 +116,9 @@ def server(tmp_path_factory):
     """A running PocketBase with the superuser, anna, bert and orders."""
     data = str(tmp_path_factory.mktemp('pocketbase'))
     subprocess.run([POCKETBASE_BIN, 'superuser', 'upsert', *SUPERUSER, '--dir', data], check=True, capture_output=True)
-    url = f'http://127.0.0.1:{_free_port()}'
-    process = subprocess.Popen(
-        [POCKETBASE_BIN, 'serve', '--dir', data, '--http', url.removeprefix('http://')],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    try:
-        assert wait_until(lambda: _healthy(url), timeout=15)
+    url = f'http://127.0.0.1:{free_port()}'
+    with SubProcess.run(POCKETBASE_BIN, 'serve', '--dir', data, '--http', url.removeprefix('http://'), timeout=15) as process:
+        process.wait_for(lambda: _healthy(url))
         with PocketBase(url) as su:
             su.auth_with_password('_superusers', *SUPERUSER)
             su.send(
@@ -155,9 +143,6 @@ def server(tmp_path_factory):
                     .id
                 )
         yield dict(url=url, **users)
-    finally:
-        process.terminate()
-        process.wait(10)
 
 
 @pytest.fixture

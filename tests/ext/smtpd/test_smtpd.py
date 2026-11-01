@@ -14,14 +14,13 @@ import asyncio
 import hashlib
 import datetime
 import multiprocessing
-import os
 import re
 import signal
 import smtplib
 import socket
-import subprocess
 import sys
 import time
+import json
 
 import pytest
 from cryptography import x509
@@ -37,7 +36,8 @@ from tokeo.ext.smtpd import (
     _resolve_events_handler,
     _plan,
 )
-from tests.utils import ROOT, isolated, wait_until, wait_process_group_ended
+from tests.utils import free_port, isolated, wait_until, wait_process_group_ended
+from tests.utils.process import SubProcess
 from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
 needs_pdeathsig = pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the parent-death signal is Linux-only')
@@ -299,12 +299,6 @@ def test_list_command_prints_the_services(capsys):
 PROBE = 'tests.ext.smtpd.smtpd_tests_serve_probe'
 
 
-def _free_port():
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
-
-
 def _service(name, port, pre_fork=0):
     svc = {
         'name': name,
@@ -316,55 +310,18 @@ def _service(name, port, pre_fork=0):
     return svc
 
 
-def _spawn(tmp_path, config, names=None):
-    import json
-
-    # an own session = an own process group: master and all its workers,
-    # observable from outside via os.killpg; all output goes to a file so a
-    # failing probe can report its actual error instead of a blind timeout
-    probe_log = tmp_path / 'smtpd-probe.log'
-    with open(probe_log, 'w') as log:
-        proc = subprocess.Popen(
-            [sys.executable, '-m', PROBE, json.dumps(config), json.dumps(names)],
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-            env=dict(os.environ),
-            cwd=ROOT,
-        )
-    proc.probe_log = probe_log
-    return proc
+def _serve(config, names=None):
+    """The serve probe of the config, it leads a group with its workers."""
+    return SubProcess.probe(PROBE, json.dumps(config), json.dumps(names), timeout=8)
 
 
-def _wait_exit(proc, timeout=8):
-    """Wait for the probe; a hang reports the probe's own story."""
-    try:
-        return proc.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        raise AssertionError(f'probe still running after {timeout}s:\n{_probe_log(proc, lines=30)}')
-
-
-def _probe_log(proc, lines=15):
-    with open(proc.probe_log) as f:
-        tail = f.readlines()[-lines:]
-    return ''.join(tail).strip() or '(no output)'
-
-
-# test rules exception: a wait loop of its own, it tells why the probe did not serve
-def _wait_banner(proc, port, timeout=8.0):
+def _banner(port):
     """Readiness: the SMTP banner answers on the port."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if proc.poll() is not None:
-            raise AssertionError(f'probe exited rc={proc.returncode} before serving:\n{_probe_log(proc)}')
-        try:
-            with socket.create_connection(('127.0.0.1', port), timeout=1) as sock:
-                if sock.recv(4).startswith(b'220'):
-                    return
-        except OSError:
-            pass
-        time.sleep(0.05)
-    raise AssertionError(f'no smtp banner on port {port}:\n{_probe_log(proc)}')
+    try:
+        with socket.create_connection(('127.0.0.1', port), timeout=1) as sock:
+            return sock.recv(4).startswith(b'220')
+    except OSError:
+        return False
 
 
 def _child_pids(pid):
@@ -386,87 +343,72 @@ def _assert_port_free(port):
         sock.bind(('127.0.0.1', port))
 
 
-def test_term_single_service_in_main_process(tmp_path):
+def test_term_single_service_in_main_process():
     """SIGTERM ends one service in main with 0, the port is free again."""
-    port = _free_port()
-    proc = _spawn(tmp_path, {'services': [_service('mx1', port)]}, names=None)
-    try:
-        _wait_banner(proc, port)
+    port = free_port()
+    with _serve({'services': [_service('mx1', port)]}) as process:
+        process.wait_for(lambda: _banner(port))
         _ehlo_ok(port)
-        proc.send_signal(signal.SIGTERM)
-        assert proc.wait(timeout=8) == 0
-        assert wait_process_group_ended(proc.pid)
+        process.signal(signal.SIGTERM)
+        assert process.wait(8) == 0
+        assert wait_process_group_ended(process.pid)
         _assert_port_free(port)
-    finally:
-        proc.kill()
 
 
-def test_term_single_service_with_global_limits(tmp_path):
+def test_term_single_service_with_global_limits():
     """A single service with global limits serves unforked and ends by SIGTERM."""
-    port = _free_port()
-    proc = _spawn(tmp_path, {'max_processings': 2, 'services': [_service('mx1', port)]}, names=None)
-    try:
-        _wait_banner(proc, port)
+    port = free_port()
+    with _serve({'max_processings': 2, 'services': [_service('mx1', port)]}) as process:
+        process.wait_for(lambda: _banner(port))
         _ehlo_ok(port)
-        proc.send_signal(signal.SIGTERM)
-        assert proc.wait(timeout=8) == 0
-        assert wait_process_group_ended(proc.pid)
-    finally:
-        proc.kill()
+        process.signal(signal.SIGTERM)
+        assert process.wait(8) == 0
+        assert wait_process_group_ended(process.pid)
 
 
-def test_term_single_service_prefork_group(tmp_path):
+def test_term_single_service_prefork_group():
     """SIGTERM ends main and its 2 forks with 0, the port is free again."""
-    port = _free_port()
-    proc = _spawn(tmp_path, {'services': [_service('mx1', port, pre_fork=3)]}, names=None)
-    try:
-        _wait_banner(proc, port)
+    port = free_port()
+    with _serve({'services': [_service('mx1', port, pre_fork=3)]}) as process:
+        process.wait_for(lambda: _banner(port))
         if sys.platform.startswith('linux'):
-            assert len(_child_pids(proc.pid)) == 2
+            assert len(_child_pids(process.pid)) == 2
         _ehlo_ok(port)
-        proc.send_signal(signal.SIGTERM)
-        assert proc.wait(timeout=8) == 0
-        assert wait_process_group_ended(proc.pid)
+        process.signal(signal.SIGTERM)
+        assert process.wait(8) == 0
+        assert wait_process_group_ended(process.pid)
         _assert_port_free(port)
-    finally:
-        proc.kill()
 
 
 @needs_pdeathsig
-def test_kill_master_takes_workers_down(tmp_path):
+def test_kill_master_takes_workers_down():
     """After SIGKILL of the master its workers end by the parent death signal."""
-    port = _free_port()
-    proc = _spawn(tmp_path, {'services': [_service('mx1', port, pre_fork=3)]}, names=None)
-    try:
-        _wait_banner(proc, port)
-        assert len(_child_pids(proc.pid)) == 2
-        proc.kill()
-        proc.wait(timeout=8)
-        assert wait_process_group_ended(proc.pid)
-    finally:
-        proc.kill()
+    port = free_port()
+    with _serve({'services': [_service('mx1', port, pre_fork=3)]}) as process:
+        process.wait_for(lambda: _banner(port))
+        assert len(_child_pids(process.pid)) == 2
+        process.signal(signal.SIGKILL)
+        process.wait(8)
+        assert wait_process_group_ended(process.pid)
 
 
-def test_term_mixed_services_with_shared_limits(tmp_path):
+def test_term_mixed_services_with_shared_limits():
     """One SIGTERM ends forked and main services with shared limits."""
-    port_a, port_b = _free_port(), _free_port()
+    port_a, port_b = free_port(), free_port()
     config = {
         'max_connections': 10,
         'services': [_service('mx1', port_a, pre_fork=2), _service('mx2', port_b)],
     }
-    proc = _spawn(tmp_path, config, names=None)
-    try:
-        _wait_banner(proc, port_a)
-        _wait_banner(proc, port_b)
+    with _serve(config) as process:
+        process.wait_for(lambda: _banner(port_a))
+        process.wait_for(lambda: _banner(port_b))
         _ehlo_ok(port_a)
         _ehlo_ok(port_b)
-        proc.send_signal(signal.SIGTERM)
-        assert proc.wait(timeout=8) == 0
-        assert wait_process_group_ended(proc.pid)
+        process.signal(signal.SIGTERM)
+        assert process.wait(8) == 0
+        assert wait_process_group_ended(process.pid)
         _assert_port_free(port_a)
         _assert_port_free(port_b)
-    finally:
-        proc.kill()
 
 
 def _broken_service(name, pre_fork=0):
@@ -481,64 +423,52 @@ def _broken_service(name, pre_fork=0):
     return svc
 
 
-def test_failed_service_start_aborts_and_stops_started_ones(tmp_path):
+def test_failed_service_start_aborts_and_stops_started_ones():
     """A service that cannot bind ends the run with an error, ports free."""
-    port_a = _free_port()
-    proc = _spawn(tmp_path, {'services': [_service('mx1', port_a), _broken_service('mx2')]}, names=None)
-    try:
-        assert _wait_exit(proc) != 0
-        assert wait_process_group_ended(proc.pid)
+    port_a = free_port()
+    with _serve({'services': [_service('mx1', port_a), _broken_service('mx2')]}) as process:
+        assert process.wait() != 0
+        assert wait_process_group_ended(process.pid)
         _assert_port_free(port_a)
-    finally:
-        proc.kill()
 
 
-def test_failed_start_terminates_forked_workers(tmp_path):
+def test_failed_start_terminates_forked_workers():
     """A failed start in main also ends the forked workers, before their SIGKILL."""
-    port_a = _free_port()
+    port_a = free_port()
     started = time.monotonic()
-    proc = _spawn(tmp_path, {'services': [_service('mx1', port_a, pre_fork=2), _broken_service('mx2')]}, names=None)
-    try:
-        assert _wait_exit(proc) != 0
+    with _serve({'services': [_service('mx1', port_a, pre_fork=2), _broken_service('mx2')]}) as process:
+        assert process.wait() != 0
         # the workers stop on the SIGTERM of the master; a lost one costs the
         # 5 s until the SIGKILL of the reap
         assert time.monotonic() - started < 4.0
-        assert wait_process_group_ended(proc.pid)
+        assert wait_process_group_ended(process.pid)
         _assert_port_free(port_a)
-    finally:
-        proc.kill()
 
 
-def test_broken_config_of_a_worker_stops_before_the_fork(tmp_path):
+def test_broken_config_of_a_worker_stops_before_the_fork():
     """A worker service with a broken config ends the start before any fork."""
-    port_a, port_b = _free_port(), _free_port()
+    port_a, port_b = free_port(), free_port()
     broken = _service('mx2', port_b, pre_fork=1)
     broken['settings']['encrypt_mode'] = 'TLS_NOPE'
-    proc = _spawn(tmp_path, {'services': [_service('mx1', port_a), broken]}, names=None)
-    try:
-        assert _wait_exit(proc) != 0
-        assert wait_process_group_ended(proc.pid)
-        log = proc.probe_log.read_text()
+    with _serve({'services': [_service('mx1', port_a), broken]}) as process:
+        assert process.wait() != 0
+        assert wait_process_group_ended(process.pid)
+        log = process.output
         assert "smtpd: service 'mx2': encrypt_mode must be one of" in log
         assert 'forked workers' not in log
         _assert_port_free(port_a)
-    finally:
-        proc.kill()
 
 
-def test_failed_worker_stops_all_services(tmp_path):
+def test_failed_worker_stops_all_services():
     """A worker that cannot bind logs why and ends all services, ports free."""
-    port_a = _free_port()
-    proc = _spawn(tmp_path, {'services': [_service('mx1', port_a), _broken_service('mx2', pre_fork=1)]}, names=None)
-    try:
-        assert _wait_exit(proc) != 0
-        assert wait_process_group_ended(proc.pid)
-        log = proc.probe_log.read_text()
+    port_a = free_port()
+    with _serve({'services': [_service('mx1', port_a), _broken_service('mx2', pre_fork=1)]}) as process:
+        assert process.wait() != 0
+        assert wait_process_group_ended(process.pid)
+        log = process.output
         assert "of service 'mx2' failed: could not bind" in log
         assert "of service 'mx2' ended with 1, all services stopped" in log
         _assert_port_free(port_a)
-    finally:
-        proc.kill()
 
 
 # ---- process tests: services in the forked workers -----------------------------
@@ -553,15 +483,6 @@ def _tagged_service(name, port, pre_fork, settings=None):
     return svc
 
 
-def _kill_group(proc):
-    """End the probe and all its workers, also when a test failed."""
-    try:
-        os.killpg(proc.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    proc.wait(timeout=8)
-
-
 def _open_dialogs(port, count):
     """Open count connections and read their banner."""
     socks = []
@@ -572,12 +493,11 @@ def _open_dialogs(port, count):
     return socks
 
 
-def test_prefork_workers_hand_the_options_to_their_handler(tmp_path):
+def test_prefork_workers_hand_the_options_to_their_handler():
     """Every process of a group of 3 answers EHLO with the tag of the options."""
-    port = _free_port()
-    proc = _spawn(tmp_path, {'services': [_tagged_service('mx1', port, pre_fork=3)]}, names=None)
-    try:
-        _wait_banner(proc, port)
+    port = free_port()
+    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3)]}) as process:
+        process.wait_for(lambda: _banner(port))
         pids = set()
         for _ in range(40):
             client = smtplib.SMTP('127.0.0.1', port, timeout=5)
@@ -589,59 +509,48 @@ def test_prefork_workers_hand_the_options_to_their_handler(tmp_path):
         # SO_REUSEPORT spreads 40 connections over more than one process
         assert len(pids) > 1
         if sys.platform.startswith('linux'):
-            assert pids <= {proc.pid, *_child_pids(proc.pid)}
-    finally:
-        _kill_group(proc)
+            assert pids <= {process.pid, *_child_pids(process.pid)}
 
 
-def test_prefork_workers_apply_the_settings(tmp_path):
+def test_prefork_workers_apply_the_settings():
     """Open dialogs of a group of 3 end by 421 after io_session_timeout of 1 s."""
-    port = _free_port()
-    proc = _spawn(tmp_path, {'services': [_tagged_service('mx1', port, pre_fork=3, settings={'io_session_timeout': 1})]}, names=None)
-    try:
-        _wait_banner(proc, port)
+    port = free_port()
+    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3, settings={'io_session_timeout': 1})]}) as process:
+        process.wait_for(lambda: _banner(port))
         socks = _open_dialogs(port, 6)
         for sock in socks:
             assert sock.recv(1024).startswith(b'421')
             sock.close()
-    finally:
-        _kill_group(proc)
 
 
-def test_term_prefork_group_ends_open_dialogs_with_421(tmp_path):
+def test_term_prefork_group_ends_open_dialogs_with_421():
     """SIGTERM ends the waiting dialogs of all processes of a group of 3 by 421."""
-    port = _free_port()
+    port = free_port()
     # SO_REUSEPORT may hand all 6 dialogs to one process, it needs a slot for each
     service = _tagged_service('mx1', port, pre_fork=3, settings={'max_processings': 6})
-    proc = _spawn(tmp_path, {'services': [service]}, names=None)
-    try:
-        _wait_banner(proc, port)
+    with _serve({'services': [service]}) as process:
+        process.wait_for(lambda: _banner(port))
         socks = _open_dialogs(port, 6)
-        proc.send_signal(signal.SIGTERM)
+        process.signal(signal.SIGTERM)
         for sock in socks:
             assert sock.recv(1024).startswith(b'421')
             sock.close()
-        assert proc.wait(timeout=8) == 0
-        assert wait_process_group_ended(proc.pid)
-    finally:
-        _kill_group(proc)
+        assert process.wait(8) == 0
+        assert wait_process_group_ended(process.pid)
 
 
 @needs_pdeathsig
-def test_prefork_logs_the_started_service_of_every_process(tmp_path):
+def test_prefork_logs_the_started_service_of_every_process():
     """The master logs its workers, every process its started service and pid."""
-    port = _free_port()
-    proc = _spawn(tmp_path, {'services': [_tagged_service('mx1', port, pre_fork=3)]}, names=None)
-    try:
-        _wait_banner(proc, port)
-        pids = [proc.pid, *_child_pids(proc.pid)]
+    port = free_port()
+    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3)]}) as process:
+        process.wait_for(lambda: _banner(port))
+        pids = [process.pid, *_child_pids(process.pid)]
         assert len(pids) == 3
         started = [f"smtpd: service 'mx1' started (pid {pid})" for pid in pids]
-        assert wait_until(lambda: all(line in proc.probe_log.read_text() for line in started))
-        forked = re.search(r'smtpd: forked workers \[([0-9, ]+)\]', proc.probe_log.read_text())
+        assert wait_until(lambda: all(line in process.output for line in started))
+        forked = re.search(r'smtpd: forked workers \[([0-9, ]+)\]', process.output)
         assert {int(pid) for pid in forked.group(1).split(',')} == set(pids[1:])
-    finally:
-        _kill_group(proc)
 
 
 @pytest.fixture(scope='module')
@@ -667,17 +576,16 @@ def cert_files(tmp_path_factory):
     return str(tmp / 'cert.pem'), str(tmp / 'key.pem'), hashlib.sha256(cert.public_bytes(serialization.Encoding.DER)).hexdigest()
 
 
-def test_prefork_workers_present_the_configured_certificate(tmp_path, cert_files):
+def test_prefork_workers_present_the_configured_certificate(cert_files):
     """All processes of a group of 3 present the certificate of tls_cert_path."""
     cert_path, key_path, fingerprint = cert_files
-    port = _free_port()
+    port = free_port()
     settings = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_path': cert_path, 'tls_key_path': key_path}
-    proc = _spawn(tmp_path, {'services': [_tagged_service('mx1', port, pre_fork=3, settings=settings)]}, names=None)
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
-    try:
-        _wait_banner(proc, port)
+    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3, settings=settings)]}) as process:
+        process.wait_for(lambda: _banner(port))
         pids, fingerprints = set(), set()
         for _ in range(40):
             client = smtplib.SMTP('127.0.0.1', port, timeout=5)
@@ -689,5 +597,3 @@ def test_prefork_workers_present_the_configured_certificate(tmp_path, cert_files
         # more than one process served, all with the one certificate
         assert len(pids) > 1
         assert fingerprints == {fingerprint}
-    finally:
-        _kill_group(proc)

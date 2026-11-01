@@ -116,7 +116,8 @@ with the same base. Keeping it small lets each subject be read on its own.
 | File | Holds |
 |---|---|
 | ```conftest.py``` | the hook that puts the temporary files into ```tmp/tests/```, the hook that runs a test marked ```isolated``` in a pytest of its own, the fixtures ```tmp```, ```rando```, ```key``` and ```disable_stdin_capture``` |
-| ```utils/__init__.py``` | ```ROOT```, ```stresstest```, ```isolated```, ```wait_until```, ```wait_until_async```, ```wait_process_group_ended```, ```use_disabled_stdin_capture``` |
+| ```utils/__init__.py``` | ```ROOT```, ```stresstest```, ```isolated```, ```wait_until```, ```wait_until_async```, ```free_port```, ```wait_process_group_ended```, ```use_disabled_stdin_capture``` |
+| ```utils/process.py``` | ```SubProcess```, runs a program as a process of its own and observes it from outside |
 | ```utils/tui.py``` | ```Terminal```, runs a program in a pseudo terminal |
 | ```utils/nicegui.py``` | ```NiceguiSimulation```, runs an app with nicegui in its user simulation |
 | ```utils/isolation.py``` | ```IsolatedPytest```, runs a test in a pytest of its own, in a fresh process |
@@ -126,6 +127,7 @@ by the full path of its module, it is not exported by ```tests.utils```:
 
 ```python
 from tests.utils import wait_until
+from tests.utils.process import SubProcess
 from tests.utils.tui import Terminal
 from tests.utils.nicegui import NiceguiSimulation
 from tests.utils.isolation import IsolatedPytest
@@ -554,9 +556,20 @@ with Terminal([sys.executable, '-m', probe], rows=12, columns=80) as terminal:
 ```
 
 ```Terminal``` runs the program in a pseudo terminal and reads its screen by
-pyte; without pyte the test is skipped. Other probes run by
-```subprocess.Popen(..., cwd=ROOT)```, with ```start_new_session=True```
-when the test checks that every process ended.
+pyte; without pyte the test is skipped. A probe without a terminal runs by
+```SubProcess``` of ```tests.utils.process```, in a group of its own; a wait
+that fails shows the end of its output, leaving the block ends the group:
+
+```python
+with SubProcess.probe('tests.ext.smtpd.smtpd_tests_serve_probe', config, names) as process:
+    process.wait_for(lambda: banner(port))
+    process.signal(signal.SIGTERM)
+    assert process.wait() == 0
+```
+
+Another program, e.g. the server of a live test, runs by
+```SubProcess.run(program, *args)```, a free port for it gives
+```free_port()``` of ```tests.utils```.
 
 ## Stress tests
 

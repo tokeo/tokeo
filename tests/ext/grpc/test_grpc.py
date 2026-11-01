@@ -10,7 +10,6 @@ file is compiled and no generated code is needed.
 """
 
 import re
-import socket
 import signal
 import contextlib
 import ipaddress
@@ -27,16 +26,8 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cement.core.exc import CaughtSignal
 from tokeo.ext.grpc import TokeoGrpcError
 from tokeo.core.utils.modules import TokeoModulesLoadError
-from tests.utils import wait_until
+from tests.utils import free_port, wait_until
 from tests.ext.grpc.grpc_tests_helper import GrpcTest, SERVICE, ADD_SERVICER, SERVICER, INTERCEPTORS
-
-
-def _free_port():
-    # a port on localhost that is free right now; the extension drops the port
-    # grpc binds for port 0, so the tests need a fixed one
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(('localhost', 0))
-        return sock.getsockname()[1]
 
 
 def _stop(app):
@@ -124,7 +115,7 @@ def start_grpc():
     with contextlib.ExitStack() as stack:
 
         def start(settings=None, startup=True):
-            port = _free_port()
+            port = free_port()
             app = stack.enter_context(GrpcTest(settings={'url': f'localhost:{port}', **(settings or {})}))
             # the stack runs this before it closes the app
             stack.callback(_stop, app)
@@ -243,7 +234,7 @@ def test_server_on_an_address_that_does_not_bind_raises_and_ends_its_pool(start_
 
 def test_close_shuts_a_started_server_down():
     """Closing the app stops a server started by startup, its port is free again."""
-    port = _free_port()
+    port = free_port()
     with GrpcTest(settings={'url': f'localhost:{port}'}) as app:
         app.grpc.startup()
         assert _call(port) == b'echo hi'

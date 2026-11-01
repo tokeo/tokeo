@@ -5,16 +5,18 @@ General tools every test may import: the root of the project, the markers
 of the stress tests and of the tests in a fresh process, waiting for a
 condition and an empty stdin for a step. They hold no asserts, the test
 asserts on what they return. The classes live in modules of their own and
-are imported by their full path: ```tests.utils.tui``` runs a program in a
-pseudo terminal, ```tests.utils.nicegui``` runs an app in the user
-simulation of nicegui, ```tests.utils.isolation``` runs a test in a pytest
-of its own.
+are imported by their full path: ```tests.utils.process``` runs a program
+as a process of its own, ```tests.utils.tui``` runs a program in a pseudo
+terminal, ```tests.utils.nicegui``` runs an app in the user simulation of
+nicegui, ```tests.utils.isolation``` runs a test in a pytest of its own.
 
 ### Example
 
 ```python
 from tests.utils import ROOT, stresstest, isolated, wait_until, wait_until_async
-from tests.utils import wait_process_group_ended, use_disabled_stdin_capture
+from tests.utils import free_port, wait_process_group_ended
+from tests.utils import use_disabled_stdin_capture
+from tests.utils.process import SubProcess
 from tests.utils.tui import Terminal
 from tests.utils.nicegui import NiceguiSimulation
 from tests.utils.isolation import IsolatedPytest
@@ -50,6 +52,7 @@ def test_counts_in_a_fork():
 
 import os
 import time
+import socket
 import asyncio
 from io import StringIO
 from contextlib import contextmanager
@@ -100,6 +103,23 @@ def wait_until(check, timeout=5.0, interval=0.02):
     while not (result := check()) and time.monotonic() < deadline:
         time.sleep(interval)
     return result
+
+
+def free_port():
+    """
+    Return a port on localhost that nobody listens on right now.
+
+    For a server a test starts with a fixed port, e.g. one that drops port 0
+    or runs as a process of its own.
+
+    ### Returns
+
+    - **int**: The port
+
+    """
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1', 0))
+        return sock.getsockname()[1]
 
 
 def wait_process_group_ended(pgid, timeout=5.0):

@@ -11,16 +11,15 @@ by markers on disk and the process group, so the test runner itself never
 forks and never receives a signal.
 """
 
-import os
 import sys
 import signal
 import ctypes
-import subprocess
 
 import pytest
 
 from tokeo.ext.smtpd import _set_pdeathsig
-from tests.utils import ROOT, wait_until, wait_process_group_ended
+from tests.utils import wait_until, wait_process_group_ended
+from tests.utils.process import SubProcess
 
 LINUX = sys.platform.startswith('linux')
 
@@ -35,16 +34,6 @@ def _read_pdeathsig():
 
 
 PROBE = 'tests.ext.smtpd.smtpd_tests_pdeathsig_probe'
-
-
-def _spawn(*args):
-    """Run a probe scenario as its own process group."""
-    return subprocess.Popen(
-        [sys.executable, '-m', PROBE, *[str(arg) for arg in args]],
-        start_new_session=True,
-        env=dict(os.environ),
-        cwd=ROOT,
-    )
 
 
 # --------------------------------------------------------------------------
@@ -100,13 +89,10 @@ def test_worker_self_terminates_when_master_crashes(tmp_path):
     The master of two workers dies by SIGKILL; each worker stops itself by
     the parent death signal and the group ends.
     """
-    proc = _spawn(tmp_path, 2)
-    try:
+    with SubProcess.probe(PROBE, tmp_path, 2) as process:
         assert wait_until(lambda: len(list(tmp_path.glob('pid_*'))) == 2, 3.0)
-        proc.kill()
-        proc.wait(timeout=8)
+        process.signal(signal.SIGKILL)
+        process.wait(8)
         # every worker observed the parent death and the group is gone
         assert wait_until(lambda: len(list(tmp_path.glob('stopped_*'))) == 2, 3.0)
-        assert wait_process_group_ended(proc.pid)
-    finally:
-        proc.kill()
+        assert wait_process_group_ended(process.pid)

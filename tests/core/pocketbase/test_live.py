@@ -18,7 +18,6 @@ channel runs. A second server runs with the hook file of tokeo-pocketbase,
 
 import os
 import time
-import socket
 import asyncio
 import threading
 import subprocess
@@ -26,7 +25,8 @@ import subprocess
 import pytest
 from tokeo.core.pocketbase import AuthKeeper, PocketBase, TokeoPocketBaseAuthError, TokeoPocketBaseError
 from tokeo.core.pocketbase.realtime import AsyncRealtime, Realtime
-from tests.utils import ROOT, wait_until, wait_until_async
+from tests.utils import ROOT, free_port, wait_until, wait_until_async
+from tests.utils.process import SubProcess
 
 #: The pocketbase binary of the tests, e.g. of version 0.40.6
 POCKETBASE_BIN = os.environ.get('TOKEO_TEST_POCKETBASE_BIN', '')
@@ -41,13 +41,6 @@ USER = ('anna@tokeo.test', 'anna-pass-123')
 
 # titles that try to leave their string in a filter
 TRICKY = ["it's", 'back\\', 'q"uote', "x\\' || id != '", '{:t}']
-
-
-def _free_port():
-    # a port nobody listens on right now
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
 
 
 def _sockets():
@@ -87,14 +80,9 @@ def live(tmp_path_factory):
     """A running PocketBase with superuser, user, posts and the batch api on."""
     data = str(tmp_path_factory.mktemp('pocketbase'))
     subprocess.run([POCKETBASE_BIN, 'superuser', 'upsert', *SUPERUSER, '--dir', data], check=True, capture_output=True)
-    url = f'http://127.0.0.1:{_free_port()}'
-    process = subprocess.Popen(
-        [POCKETBASE_BIN, 'serve', '--dir', data, '--http', url.removeprefix('http://')],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    try:
-        assert wait_until(lambda: _healthy(url), timeout=15)
+    url = f'http://127.0.0.1:{free_port()}'
+    with SubProcess.run(POCKETBASE_BIN, 'serve', '--dir', data, '--http', url.removeprefix('http://'), timeout=15) as process:
+        process.wait_for(lambda: _healthy(url))
         with PocketBase(url) as su:
             su.auth_with_password('_superusers', *SUPERUSER)
             rule = '@request.auth.id != ""'
@@ -117,9 +105,6 @@ def live(tmp_path_factory):
             su.send('PATCH', '/api/settings', json={'batch': {'enabled': True, 'maxRequests': 50, 'timeout': 3}})
             user = su.collection('users').create({'email': USER[0], 'password': USER[1], 'passwordConfirm': USER[1], 'name': 'Anna'})
         yield url, user.id
-    finally:
-        process.terminate()
-        process.wait(10)
 
 
 @pytest.fixture
@@ -440,18 +425,13 @@ def short(tmp_path_factory):
     """A PocketBase by the hook file as it is: 1 s idle, 3 s in all, ticks."""
     data = str(tmp_path_factory.mktemp('pocketbase_short'))
     subprocess.run([POCKETBASE_BIN, 'superuser', 'upsert', *SUPERUSER, '--dir', data], check=True, capture_output=True)
-    url = f'http://127.0.0.1:{_free_port()}'
+    url = f'http://127.0.0.1:{free_port()}'
     hooks = tmp_path_factory.mktemp('pb_hooks')
     (hooks / 'realtime.pb.js').write_text(open(HOOK).read())
-    env = dict(os.environ, PB_REALTIME_IDLE_SECONDS='1', PB_REALTIME_MAX_SECONDS='3')
-    process = subprocess.Popen(
-        [POCKETBASE_BIN, 'serve', '--dir', data, '--hooksDir', str(hooks), '--hooksWatch=false', '--http', url.removeprefix('http://')],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        env=env,
-    )
-    try:
-        assert wait_until(lambda: _healthy(url), timeout=15)
+    env = dict(PB_REALTIME_IDLE_SECONDS='1', PB_REALTIME_MAX_SECONDS='3')
+    args = [POCKETBASE_BIN, 'serve', '--dir', data, '--hooksDir', str(hooks), '--hooksWatch=false', '--http', url.removeprefix('http://')]
+    with SubProcess.run(*args, env=env, timeout=15) as process:
+        process.wait_for(lambda: _healthy(url))
         with PocketBase(url) as su:
             su.auth_with_password('_superusers', *SUPERUSER)
             su.send(
@@ -460,9 +440,6 @@ def short(tmp_path_factory):
                 json={'name': 'ticks', 'type': 'base', 'listRule': '', 'viewRule': '', 'fields': [{'name': 'n', 'type': 'number'}]},
             )
         yield url
-    finally:
-        process.terminate()
-        process.wait(10)
 
 
 def test_live_hook_file_ends_silent_connections_and_the_channel_comes_back(short, monkeypatch):
