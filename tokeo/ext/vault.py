@@ -9,7 +9,8 @@ plaintext at its leaf, while the parent handler provides the walk, the
 copy-only-when-changed behaviour, and environment overrides at any depth.
 
 A profile lives in the ```vault``` config section and binds a handler by its
-```type``` (the built-in ```enc``` and ```scrypt``` handlers are registered here):
+```type``` (the built-in ```enc```, ```scrypt``` and ```plain``` handlers are
+registered here, ```enc``` and ```scrypt``` need cryptography on first use):
 
 ```yaml
 vault:
@@ -33,29 +34,15 @@ from os.path import basename
 import yaml
 from cement import Controller, ex
 from tokeo.ext.yaml import TokeoYamlConfigHandler
+from tokeo.core.exc import TokeoError
+from tokeo.core.utils.modules import resolve_object
 from tokeo.core.vaults import (
     VaultRef,
+    VaultLoader,
+    VaultSecret,
     TokeoVaultError,
 )
-from tokeo.core.vaults.enc import EncVault
-from tokeo.core.vaults.scrypt import ScryptVault
-
-
-class VaultLoader(yaml.FullLoader):
-    """
-    The yaml loader of the vault config handler, it knows the !vault: tag.
-
-    ### Notes
-
-    : The tag is known to this loader only, not to ```yaml.FullLoader```,
-        so another ```yaml.full_load``` of the process loads no ```VaultRef```
-
-    """
-
-    pass
-
-
-VaultLoader.add_multi_constructor('!vault:', VaultRef.from_yaml)
+from tokeo.core.vaults.plain import PlainVault
 
 
 class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
@@ -107,9 +94,10 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
 
         Extends the yaml handler's setup to hold the vault handler registry on
         this instance (no module-level state) and register the built-in
-        ```enc``` and ```scrypt``` handlers. The config handler is set up early, so
-        the registry is ready before any secret is resolved on read. Other
-        extensions add their own handler via ```app.config.register_handler```.
+        ```enc```, ```scrypt``` and ```plain``` handlers. The config handler is
+        set up early, so the registry is ready before any secret is resolved
+        on read. Other extensions add their own handler via
+        ```app.config.register_handler```.
 
         ### Args
 
@@ -117,10 +105,12 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
 
         """
         super(TokeoVaultConfigHandler, self)._setup(app)
-        # registry of vault handler instances keyed by their config ```type```
+        # registry of vault handler instances keyed by their config ```type```;
+        # enc and scrypt load on first use, so plain runs without cryptography
         self._handlers = {}
-        self.register_handler('enc', EncVault())
-        self.register_handler('scrypt', ScryptVault())
+        self.register_handler('enc', 'tokeo.core.vaults.enc:EncVault')
+        self.register_handler('scrypt', 'tokeo.core.vaults.scrypt:ScryptVault')
+        self.register_handler('plain', PlainVault())
 
     def _parse_file(self, file_path):
         """
@@ -154,7 +144,8 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
 
         - **name** (str): The ```type``` value a vault profile uses to select
             this handler
-        - **handler** (Vault): The handler instance to register
+        - **handler** (Vault|str): The handler instance, or its class as
+            ```module:Class```, imported and created on first use
 
         """
         self._handlers[name] = handler
@@ -173,13 +164,22 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
 
         ### Raises
 
-        - **TokeoVaultError**: If no handler is registered for the name
+        - **TokeoVaultError**: If no handler is registered for the name, or
+            its module cannot be imported, e.g. without cryptography
 
         """
         try:
-            return self._handlers[name]
+            handler = self._handlers[name]
         except KeyError:
             raise TokeoVaultError(f'no vault handler registered for type {name!r}')
+        if isinstance(handler, str):
+            # a handler named by module:Class is imported on first use
+            try:
+                handler = resolve_object(handler)()
+            except TokeoError as err:
+                raise TokeoVaultError(f'vault handler for type {name!r} cannot be loaded: {err}') from err
+            self._handlers[name] = handler
+        return handler
 
     def get_profile(self, name):
         """
@@ -227,7 +227,8 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
 
         ### Returns
 
-        - The decrypted plaintext for a ```VaultRef```, otherwise the value as is
+        - The decrypted plaintext for a ```VaultRef``` as ```VaultSecret```,
+            otherwise the value as is
 
         ### Raises
 
@@ -238,7 +239,8 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
         if not isinstance(value, VaultRef):
             return value
         profile = self.get_profile(value.profile)
-        return self.get_handler(profile['type']).decrypt(profile, value.ciphertext)
+        # marked as vault value, so redact_vault masks it wherever it goes
+        return VaultSecret(self.get_handler(profile['type']).decrypt(profile, value.ciphertext))
 
     def _resolve_leaf(self, value, path):
         """
@@ -302,7 +304,7 @@ class TokeoVaultController(Controller):
         arguments=[
             (
                 ['--type'],
-                dict(action='store', required=True, help='vault type to scaffold, e.g. enc or scrypt'),
+                dict(action='store', required=True, help='vault type to scaffold, e.g. enc, scrypt or plain'),
             ),
             (
                 ['name'],

@@ -65,6 +65,7 @@ from tokeo.core.utils.props import hasprops, getprop
 from tokeo.core.utils.validate import is_filled_str, is_list, is_number_gt
 from tokeo.core.utils.json import json_dump, TokeoJsonUnknownNoneEncoder
 from tokeo.core.utils import sanitize
+from tokeo.core.vaults import redact_vault
 from tokeo.ext.argparse import Controller
 from tokeo.core.cement.extensions import required as extensions_required
 
@@ -2045,7 +2046,8 @@ class TokeoAutomateShell:
             if task_id not in self.app.automate.tasks:
                 self.app.log.error(f'Task {task_id} not found!')
                 continue
-            self.app.tui.output.json(self.app.automate.tasks[task_id])
+            # the credentials from the vault show masked, never their values
+            self.app.tui.output.json(redact_vault(self.app.automate.tasks[task_id]))
 
     def handle_command_run(self, args):
         """

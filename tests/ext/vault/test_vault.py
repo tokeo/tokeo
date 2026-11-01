@@ -5,6 +5,7 @@ read, its registry of vault handlers, the profiles and their validation,
 environment overrides of secrets and the hook for handlers from outside.
 """
 
+import sys
 from configparser import RawConfigParser
 
 import pytest
@@ -12,10 +13,11 @@ import yaml
 from cryptography.fernet import Fernet
 
 from tokeo.ext.yaml import TokeoYamlConfigError
-from tokeo.ext.vault import TokeoVaultConfigHandler, VaultLoader
-from tokeo.core.vaults import Vault, VaultRef, TokeoVaultError
+from tokeo.ext.vault import TokeoVaultConfigHandler
+from tokeo.core.vaults import Vault, VaultRef, VaultLoader, VaultSecret, TokeoVaultError, redact_vault
 from tokeo.core.vaults.enc import EncVault
 from tokeo.core.vaults.scrypt import ScryptVault
+from tokeo.core.vaults.plain import PlainVault
 from tests.ext.vault.vault_tests_helper import (
     MASTER_ENV,
     VaultTest,
@@ -101,10 +103,20 @@ def test_load_does_not_need_the_key(tmp_path, monkeypatch):
 
 
 def test_get_handler_gives_the_built_in_handlers():
-    """enc and scrypt are registered with their handler classes."""
+    """enc, scrypt and plain are registered with their handler classes."""
     with VaultTest() as app:
         assert type(app.config.get_handler('enc')) is EncVault
         assert type(app.config.get_handler('scrypt')) is ScryptVault
+        assert type(app.config.get_handler('plain')) is PlainVault
+
+
+def test_get_handler_loads_enc_on_first_use_and_names_a_missing_module(monkeypatch):
+    """enc loads on first use, a missing module raises TokeoVaultError naming it."""
+    monkeypatch.setitem(sys.modules, 'tokeo.core.vaults.enc', None)
+    with VaultTest() as app:
+        assert type(app.config.get_handler('plain')) is PlainVault
+        with pytest.raises(TokeoVaultError, match="vault handler for type 'enc' cannot be loaded"):
+            app.config.get_handler('enc')
 
 
 def test_get_handler_of_an_unknown_type_fails():
@@ -272,6 +284,24 @@ def test_get_decrypts_a_secret(key, tmp_path):
     path = write_config(tmp_path, f'db:\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
     with VaultTest(path) as app:
         assert app.config.get('db', 'password') == 's3cret'
+
+
+def test_get_marks_a_secret_as_vault_secret(key, tmp_path):
+    """A read secret is a VaultSecret, so redact_vault masks it in a copy."""
+    path = write_config(tmp_path, f'db:\n  user: shop\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
+    with VaultTest(path) as app:
+        db = app.config.get_section_dict('db')
+    assert isinstance(db['password'], VaultSecret) and redact_vault(db) == {'user': 'shop', 'password': '***'}
+
+
+def test_get_reads_a_plain_value_without_a_key(tmp_path, monkeypatch):
+    """A plain profile gives its value back as VaultSecret, no key is needed."""
+    monkeypatch.delenv(MASTER_ENV, raising=False)
+    path = tmp_path / 'app.yaml'
+    path.write_text('vault:\n  profiles:\n    dev:\n      type: plain\ndb:\n  address: !vault:dev Main Street 1\n')
+    with VaultTest(str(path)) as app:
+        address = app.config.get('db', 'address')
+    assert address == 'Main Street 1' and isinstance(address, VaultSecret)
 
 
 def test_get_decrypts_secrets_at_any_depth(key, tmp_path):

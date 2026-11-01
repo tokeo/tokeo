@@ -40,7 +40,7 @@ def vault(tmp_path, capsys):
     return run
 
 
-class _PlainVault(Vault):
+class _NoScaffoldVault(Vault):
     # a handler of its own without a profile scaffold
     def encrypt(self, profile, plaintext):
         return plaintext
@@ -49,9 +49,9 @@ class _PlainVault(Vault):
         return ciphertext
 
 
-def _register_plain(app):
-    # hook function registering _PlainVault as type plain from outside
-    app.config.register_handler('plain', _PlainVault())
+def _register_noscaffold(app):
+    # hook function registering _NoScaffoldVault as type noscaffold from outside
+    app.config.register_handler('noscaffold', _NoScaffoldVault())
 
 
 def _split_scaffold(out):
@@ -108,7 +108,13 @@ def test_create_of_an_unknown_type_fails(vault):
 def test_create_of_a_type_without_scaffold_fails(vault):
     """A registered type whose handler has no scaffold raises TokeoVaultError."""
     with pytest.raises(TokeoVaultError, match='cannot create a profile scaffold'):
-        vault('create', '--type', 'plain', 'example', hooks=[('tokeo_vault_register_handlers', _register_plain)])
+        vault('create', '--type', 'noscaffold', 'example', hooks=[('tokeo_vault_register_handlers', _register_noscaffold)])
+
+
+def test_create_plain_prints_a_profile_without_secrets(vault):
+    """create --type plain dev prints its profile and no environment variable."""
+    profile, env = _split_scaffold(vault('create', '--type', 'plain', 'dev'))
+    assert profile == {'vault': {'profiles': {'dev': {'type': 'plain'}}}} and env == {}
 
 
 @pytest.mark.parametrize('args', [['create', 'example'], ['create', '--type', 'enc']], ids=['no_type', 'no_name'])

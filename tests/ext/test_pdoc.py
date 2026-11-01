@@ -2,8 +2,8 @@
 Tests for tokeo.ext.pdoc, on what it adds on top of pdoc, not on pdoc itself:
 
 - ```#:``` variable comments, which pdoc3 understood and pdoc 16 does not
-- the yaml config page: comment extraction, per-setting slicing, ```.local```
-  redaction and the block boundaries
+- the yaml config page: comment extraction, per-setting slicing, masked
+  ```!vault:``` values and the block boundaries
 - namespace-aware module discovery, which pkgutil-based walking misses
 - ```serve()```, including the daemon thread it starts for the watch monitor
 - the controller's flag handling, driven through the real CLI
@@ -451,7 +451,7 @@ LOCAL_YAML = """### Secrets, never checked in.
 ---
 
 smtp:
-  password: PLAINTEXT-SECRET
+  password: !vault:dev PLAINTEXT-SECRET  # the mail password
   host: mail.internal
 """
 
@@ -469,7 +469,9 @@ def local_settings(app):
     """The settings extracted from LOCAL_YAML as config development.local."""
     import yaml
 
-    return app.pdoc._config_settings('development.local', LOCAL_YAML.split('\n'), yaml.safe_load(LOCAL_YAML))
+    from tokeo.core.vaults import VaultLoader
+
+    return app.pdoc._config_settings('development.local', LOCAL_YAML.split('\n'), yaml.load(LOCAL_YAML, Loader=VaultLoader))
 
 
 def test_config_settings_extracts_intro_and_source(base_settings):
@@ -486,22 +488,15 @@ def test_config_settings_block_ends_at_a_dotted_key(base_settings):
     assert base_settings['log.colorlog']['source'] == 'log.colorlog:\n  level: info'
 
 
-def test_config_settings_redacts_local_files(local_settings):
-    """In a .local file every value shows as ***, the keys stay."""
-    source = local_settings['smtp']['source']
-
-    assert 'PLAINTEXT-SECRET' not in source
-    assert 'mail.internal' not in source
-    # structure survives, only the values are replaced
-    assert 'host' in source and 'password' in source
-    assert source.count('***') == 2
+def test_config_settings_masks_only_the_vault_values(local_settings):
+    """A !vault: value shows as ***, the other values, comments and order stay."""
+    assert local_settings['smtp']['source'] == 'smtp:\n  password: ***  # the mail password\n  host: mail.internal'
 
 
-def test_config_settings_keeps_key_order_when_redacting(local_settings):
-    """Redacted keys keep the order of the file."""
-    # the file lists password first; sorting would reorder it to host first
-    source = local_settings['smtp']['source']
-    assert source.index('password') < source.index('host')
+def test_config_settings_hides_a_source_it_cannot_read(app):
+    """A block that is no valid yaml shows a note instead of its text."""
+    lines = ['smtp:', '  password: !vault:dev "open']
+    assert app.pdoc._config_settings('base', lines, {'smtp': None})['smtp']['source'].startswith('# source hidden, could not be read')
 
 
 def test_config_settings_returns_empty_for_a_non_mapping(app):
@@ -521,7 +516,7 @@ def _build_config_tree(root):
     _write(root / 'production.yaml', 'smtp:\n  host: prod\n')
     _write(root / 'production.d' / 'smtp.yaml', 'smtp:\n  port: 587\n')
     _write(root / 'production.d' / 'creds.local.yaml', 'smtp:\n  user: u\n')
-    _write(root / 'production.local.yaml', 'smtp:\n  password: SECRET\n')
+    _write(root / 'production.local.yaml', 'smtp:\n  password: !vault:dev SECRET\n')
     return root
 
 
@@ -593,6 +588,15 @@ def test_config_page_follows_the_load_order(app, tmp_path, monkeypatch):
         'production.local',
         'production.d/creds.local',
     ]
+
+
+def test_config_page_shows_a_file_with_vault_values_masked(app, tmp_path, monkeypatch):
+    """A file with a !vault: value is listed, its value shows as ***."""
+    import pdoc.render
+
+    assert 'production.local' in _collect_config_sections(app, tmp_path, monkeypatch)
+    source = pdoc.render.env.globals['configdict']['production.local']['settings']['smtp']['source']
+    assert source == 'smtp:\n  password: ***'
 
 
 def test_config_page_skips_base_local(app, tmp_path, monkeypatch):

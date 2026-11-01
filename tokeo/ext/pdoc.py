@@ -753,8 +753,10 @@ class TokeoPdoc(Handler):
 
         For every top-level yaml key this returns the comment block written
         directly above it (as Markdown) and the yaml source of the key itself,
-        reproducing the prior pdoc3 ```show_settings``` behaviour. Files ending in
-        ```.local``` are redacted: the structure is kept, every value replaced.
+        reproducing the prior pdoc3 ```show_settings``` behaviour. In every
+        file each ```!vault:``` value shows as ```***```, comments and layout
+        stay; mark a value by ```!vault:```, e.g. of a ```plain``` profile, to
+        keep it out of the page.
 
         ### Returns
 
@@ -762,11 +764,10 @@ class TokeoPdoc(Handler):
           holds no mapping.
         """
         import yaml
+        from tokeo.core.vaults import redact_vault_yaml
 
         if not isinstance(parsed, dict):
             return {}
-
-        from tokeo.core.utils.dict import redact_data
 
         settings = {}
         for key in parsed:
@@ -794,15 +795,11 @@ class TokeoPdoc(Handler):
                 end -= 1
             source = '\n'.join(lines[start : end + 1])  # noqa: E203
 
-            if section.endswith('.local'):
-                try:
-                    source = yaml.dump(
-                        redact_data(yaml.safe_load(source), '***'),
-                        default_flow_style=False,
-                        sort_keys=False,
-                    ).rstrip('\n')
-                except Exception as err:
-                    source = f'# source hidden, could not be redacted\n# {err}'
+            # the vault values never show, not even encrypted
+            try:
+                source = redact_vault_yaml(source)
+            except yaml.YAMLError as err:
+                source = f'# source hidden, could not be read\n# {err}'
 
             settings[key] = dict(intro=intro, source=source)
 
@@ -814,7 +811,8 @@ class TokeoPdoc(Handler):
         Reproduces the prior pdoc3 ```show_config``` feature: it collects the
         config files cement actually loads (via appenv's resolver), reads
         each into ```configdict[section] = {content: [lines], yaml: parsed}```,
-        redacts ```.local``` files, and renders a synthetic ```config/index.html```.
+        masks the ```!vault:``` values, and renders a synthetic
+        ```config/index.html```.
         Requires the appenv extension (```app.env```); skipped otherwise.
         """
         if not self._show_config:
@@ -825,6 +823,7 @@ class TokeoPdoc(Handler):
 
         import yaml
         from tokeo.ext.appenv import ENVIRONMENTS
+        from tokeo.core.vaults import VaultLoader
 
         suffix = self.app._meta.config_file_suffix
         config_dir = env.APP_CONFIG_DIR
@@ -847,7 +846,8 @@ class TokeoPdoc(Handler):
                     with open(filename, 'r', encoding='utf-8') as f:
                         content = f.read()
                     lines = content.split('\n')
-                    parsed = yaml.safe_load(content)
+                    # a !vault: value loads as VaultRef, it is never decrypted
+                    parsed = yaml.load(content, Loader=VaultLoader)
                     configdict[section] = {
                         'content': lines,
                         'yaml': parsed,

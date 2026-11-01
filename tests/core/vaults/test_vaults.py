@@ -1,26 +1,20 @@
 """
 Tests for tokeo.core.vaults: the VaultRef built from a ```!vault:<profile>```
-yaml scalar, the base Vault interface and the vault error class.
+yaml scalar by the VaultLoader, the VaultSecret of a decrypted value and
+redact_vault that masks both, the base Vault interface and the vault error
+class.
 """
 
 import pytest
 import yaml
 
 from tokeo.core.exc import TokeoError
-from tokeo.core.vaults import VaultRef, Vault, TokeoVaultError
-
-
-class _Loader(yaml.SafeLoader):
-    # a loader of its own, so the !vault tag never reaches yaml's shared loaders
-    pass
-
-
-_Loader.add_multi_constructor('!vault:', VaultRef.from_yaml)
+from tokeo.core.vaults import VAULT_MASK, VaultRef, VaultLoader, VaultSecret, Vault, TokeoVaultError, redact_vault, redact_vault_yaml
 
 
 def _load(text):
     # parse text with the !vault tag and return the value of its key "a"
-    return yaml.load(text, Loader=_Loader)['a']
+    return yaml.load(text, Loader=VaultLoader)['a']
 
 
 # TokeoVaultError
@@ -113,3 +107,77 @@ def test_vault_create_is_not_supported_by_the_base():
 def test_vault_env_name_is_sanitised_and_upper_case(name, env):
     """Each run of other characters becomes one _, letters go upper case."""
     assert Vault()._env_name(name, 'KEY') == env
+
+
+# VaultLoader
+
+
+def test_vault_loader_leaves_the_full_loader_without_the_tag():
+    """Only the VaultLoader knows !vault:, yaml.full_load still refuses it."""
+    assert isinstance(_load('a: !vault:master gAAA'), VaultRef)
+    with pytest.raises(yaml.constructor.ConstructorError, match='!vault:master'):
+        yaml.full_load('a: !vault:master gAAA')
+
+
+# VaultSecret and redact_vault
+
+
+def test_vault_secret_is_the_str_and_hides_in_repr():
+    """A VaultSecret works as its str, only repr shows the mask."""
+    secret = VaultSecret('s3cret')
+    assert secret == 's3cret' and f'{secret}' == 's3cret' and secret.upper() == 'S3CRET'
+    assert repr(secret) == repr(VAULT_MASK) and repr({'password': secret}) == "{'password': '***'}"
+
+
+def test_redact_vault_masks_vault_values_at_any_depth():
+    """VaultRef and VaultSecret become the mask, all other values stay."""
+    data = {
+        'user': 'tom',
+        'password': VaultSecret('s3cret'),
+        'hosts': [{'password': VaultRef('master', 'gAAA'), 'port': 22}],
+        'pair': ('a', VaultSecret('b')),
+    }
+    assert redact_vault(data) == {'user': 'tom', 'password': '***', 'hosts': [{'password': '***', 'port': 22}], 'pair': ('a', '***')}
+    # the data itself stays as it is
+    assert data['password'] == 's3cret'
+
+
+def test_redact_vault_leaves_a_plain_str_built_from_a_secret():
+    """A str built from a VaultSecret is no vault value any more."""
+    url = 'amqp://u:' + VaultSecret('pw') + '@host'
+    assert redact_vault({'url': url}) == {'url': 'amqp://u:pw@host'}
+
+
+# redact_vault_yaml
+
+
+def test_redact_vault_yaml_masks_each_vault_value_and_keeps_the_text():
+    """Each !vault: value becomes the mask, comments, layout and others stay."""
+    text = (
+        'db:\n'
+        '  # the password\n'
+        '  password: !vault:master gAAAA  # comment\n'
+        '  address: !vault:dev Main Street 1\n'
+        '  list: [1, !vault:human gBBB, 3]\n'
+        '  quoted: !vault:dev "a: b"\n'
+        '  block: !vault:dev |\n'
+        '    line one\n'
+        '    line two\n'
+        '  after: x\n'
+    )
+    assert redact_vault_yaml(text) == (
+        'db:\n'
+        '  # the password\n'
+        '  password: ***  # comment\n'
+        '  address: ***\n'
+        '  list: [1, ***, 3]\n'
+        '  quoted: ***\n'
+        '  block: ***\n'
+        '  after: x\n'
+    )
+
+
+def test_redact_vault_yaml_keeps_a_text_without_vault_values():
+    """A text without !vault: comes back unchanged, also an empty one."""
+    assert redact_vault_yaml('a: 1  # one\n') == 'a: 1  # one\n'
+    assert redact_vault_yaml('') == ''

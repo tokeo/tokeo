@@ -17,8 +17,12 @@ vault:
       env: VAULT_MASTER1
 ```
 
-The ```type``` selects a registered handler (for example the built-in ```enc```
-or ```scrypt``` handlers); the remaining keys are handler specific.
+The ```type``` selects a registered handler (for example the built-in ```enc```,
+```scrypt``` or ```plain``` handlers); the remaining keys are handler specific.
+
+This module needs no cryptography: it reads the tag by ```VaultLoader```, marks
+a decrypted value as ```VaultSecret``` and masks both by ```redact_vault```, so
+e.g. pdoc shows a config without decrypting anything.
 
 ### Reminders
 
@@ -31,7 +35,11 @@ or ```scrypt``` handlers); the remaining keys are handler specific.
 
 import re
 
+import yaml
 from tokeo.core.exc import TokeoError
+
+#: The text that stands for a vault value wherever it is shown
+VAULT_MASK = '***'
 
 
 class TokeoVaultError(TokeoError):
@@ -84,6 +92,119 @@ class VaultRef:
 
         """
         return cls(tag_suffix, loader.construct_scalar(node))
+
+
+class VaultLoader(yaml.FullLoader):
+    """
+    The yaml loader that knows the !vault: tag, a tagged value loads as VaultRef.
+
+    ### Notes
+
+    : The tag is known to this loader only, not to ```yaml.FullLoader```,
+        so another ```yaml.full_load``` of the process loads no ```VaultRef```
+
+    """
+
+    pass
+
+
+VaultLoader.add_multi_constructor('!vault:', VaultRef.from_yaml)
+
+
+class VaultSecret(str):
+    """
+    The plaintext of a vault value, a str that ```redact_vault``` masks.
+
+    ### Notes
+
+    : Works as the plain str everywhere, only ```repr()``` shows the mask,
+        e.g. in a printed dict or a traceback
+
+    : A str built from it, e.g. a url with the password in it, is a plain
+        str again and no longer masked
+
+    """
+
+    def __repr__(self):
+        return repr(VAULT_MASK)
+
+
+def redact_vault(data):
+    """
+    Copy data with every vault value masked, at any depth.
+
+    ### Args
+
+    - **data** (Any): A value, dict, list or tuple, e.g. a task of automate
+
+    ### Returns
+
+    - **Any**: The same shape, each ```VaultRef``` and ```VaultSecret``` replaced
+        by ```VAULT_MASK```
+
+    ### Example
+
+    ```python
+    redact_vault({'user': 'tom', 'password': app.config.get('db', 'password')})
+    # {'user': 'tom', 'password': '***'}
+    ```
+
+    """
+    if isinstance(data, (VaultRef, VaultSecret)):
+        return VAULT_MASK
+    if isinstance(data, dict):
+        return {key: redact_vault(value) for key, value in data.items()}
+    if isinstance(data, list):
+        return [redact_vault(value) for value in data]
+    if isinstance(data, tuple):
+        return tuple(redact_vault(value) for value in data)
+    return data
+
+
+def redact_vault_yaml(text):
+    """
+    Copy yaml text with each !vault: value replaced by the mask.
+
+    ### Args
+
+    - **text** (str): The yaml text, e.g. a config file or a part of it
+
+    ### Returns
+
+    - **str**: The same text, comments and layout kept, each ```!vault:```
+        value with its tag shown as ```VAULT_MASK```
+
+    ### Raises
+
+    - **yaml.YAMLError**: If the text is no valid yaml
+
+    ### Example
+
+    ```python
+    redact_vault_yaml('password: !vault:master gAAAA  # db')
+    # 'password: ***  # db'
+    ```
+
+    """
+    stack = [node for node in yaml.compose_all(text, Loader=VaultLoader) if node is not None]
+    found = []
+    while stack:
+        node = stack.pop()
+        if isinstance(node, yaml.ScalarNode):
+            if node.tag.startswith('!vault:'):
+                found.append(node)
+        elif isinstance(node, yaml.SequenceNode):
+            stack.extend(node.value)
+        elif isinstance(node, yaml.MappingNode):
+            for key, value in node.value:
+                stack.extend((key, value))
+    # from the end, so the positions before stay valid
+    for node in sorted(found, key=lambda node: node.start_mark.index, reverse=True):
+        start, end = node.start_mark.index, node.end_mark.index
+        # a block value ends with its line breaks, they stay
+        breaks = len(text[start:end]) - len(text[start:end].rstrip('\n'))
+        text = text[:start] + VAULT_MASK + '\n' * breaks + text[end:]
+    return text
 
 
 class Vault:

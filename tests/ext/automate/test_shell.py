@@ -13,6 +13,7 @@ from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from tokeo.core.exc import TokeoError
 from tokeo.ext.automate import TokeoAutomateShell
+from tokeo.core.vaults import VaultSecret
 from tests.utils.tui import Terminal
 from tests.ext.automate.automate_tests_helper import AutomateTest
 
@@ -102,6 +103,18 @@ def test_show_as_json(shell, capsys):
     start = text.index('{')
     task = json.loads(text[start:])
     assert (task['id'], task['name']) == ('task2', 'Ping our hosts')
+
+
+def test_show_masks_the_vault_values(shell, capsys):
+    """show masks a password read from the vault, the task keeps its value."""
+    host = shell.app.automate.tasks['task2']['connection']['hosts'][1]
+    host['password'] = VaultSecret(host['password'])
+    capsys.readouterr()
+    shell.command('show task2')
+    text = capsys.readouterr().out
+    start = text.index('{')
+    shown = json.loads(text[start:])
+    assert shown['connection']['hosts'][1]['password'] == '***' and host['password'] == 'password1'
 
 
 def test_show_unknown_task(shell, monkeypatch):
