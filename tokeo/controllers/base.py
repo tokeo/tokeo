@@ -1,4 +1,3 @@
-from cement import ex  # noqa: F401
 from cement.utils.version import get_version_banner as cement_version_banner
 from tokeo.ext.argparse import Controller
 from tokeo.core.version import get_version as tokeo_get_version

@@ -13,7 +13,6 @@ from tokeo.core.utils.modules.override import override_module
 
 # a fixed copy of pocketbase/utils.py, its validate_token raises KeyError
 # on a token without exp
-# TODO: remove after the pocketbase update
 override_module('pocketbase.utils', Path(__file__).with_name('pocketbase_utils.py'))
 ```
 
