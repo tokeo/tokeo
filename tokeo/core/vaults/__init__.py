@@ -94,14 +94,17 @@ class VaultRef:
         return cls(tag_suffix, loader.construct_scalar(node))
 
 
-class VaultLoader(yaml.FullLoader):
+class VaultLoader(yaml.SafeLoader):
     """
     The yaml loader that knows the !vault: tag, a tagged value loads as VaultRef.
 
     ### Notes
 
-    : The tag is known to this loader only, not to ```yaml.FullLoader```,
-        so another ```yaml.full_load``` of the process loads no ```VaultRef```
+    : The tag is known to this loader only, not to the loaders of yaml, so
+        another ```yaml.full_load``` of the process loads no ```VaultRef```
+
+    : Based on the safe loader: a config holds plain values only, a
+        ```!!python``` tag is refused
 
     """
 

@@ -119,6 +119,12 @@ def test_vault_loader_leaves_the_full_loader_without_the_tag():
         yaml.full_load('a: !vault:master gAAA')
 
 
+def test_vault_loader_refuses_a_python_tag():
+    """The VaultLoader is a safe loader, a !!python tag raises."""
+    with pytest.raises(yaml.constructor.ConstructorError, match='python/name:os.system'):
+        _load('a: !!python/name:os.system')
+
+
 # VaultSecret and redact_vault
 
 
