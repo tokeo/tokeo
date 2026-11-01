@@ -595,6 +595,16 @@ def test_ensure_auth_wrong_password_raises_auth_error(server):
     assert caught.value.__cause__.status == 400
 
 
+def test_ensure_auth_server_error_is_no_wrong_password(server):
+    """A login failing by the server raises its error, tries no other collection."""
+    server.errors[USERS_LOGIN] = (503, 'Service unavailable.')
+    with PocketbaseTest(SERVICE) as app:
+        with pytest.raises(TokeoPocketBaseError) as caught:
+            app.db.get_one('posts', 'abc')
+    assert not isinstance(caught.value, TokeoPocketBaseAuthError) and caught.value.status == 503
+    assert server.calls == [USERS_LOGIN]
+
+
 def test_ensure_auth_identity_without_password_fails_on_first_request(server):
     """An identity without password passes the setup and fails the first request."""
     with PocketbaseTest(dict(auth_identity='service@example.com')) as app:

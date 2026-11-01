@@ -295,7 +295,9 @@ class TokeoPocketBaseHandler(MetaMixin):
                 self.pb.auth_with_password(name, self._auth_identity, self._config('auth_password'))
                 self._auth_collection = name
                 return
-            except Exception as error:
+            except TokeoPocketBaseAuthError as error:
+                # only a refused login tries the next collection, a failed
+                # request (unreachable, 5xx) is no wrong password and rises
                 last_error = error
         raise TokeoPocketBaseAuthError(f'PocketBase authentication failed for identity {self._auth_identity!r}') from last_error
 
