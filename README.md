@@ -24,7 +24,7 @@ The [Dramatiq](https://dramatiq.io) background task processing library, paired w
 
 An integrated [gRPC](https://grpc.io) service allows external access to available tasks and workflows.
 
-For timed job execution, a background and interactive [APScheduler](https://apscheduler.readthedocs.io/en/master/) cron service is included.
+For timed job execution, an [APScheduler](https://apscheduler.readthedocs.io/en/master/) cron service with an interactive shell is included.
 
 Receive mails right inside your application with the smtpd service, an asyncio port of the battle-tested Ruby [midi-smtp-server](https://github.com/4commerce-technologies-AG/midi-smtp-server) that turns incoming SMTP messages into events.
 
@@ -163,10 +163,10 @@ your_app grpc-client count-words --url https://github.com
 ### Schedule Recurring Tasks
 
 ```bash
-# Run the scheduler in the background, the default
+# Run the scheduler as a service, it blocks the terminal until Ctrl-C
 your_app scheduler launch
 
-# Run the scheduler with the interactive shell in the foreground
+# Run the scheduler and launch the interactive shell on console
 your_app scheduler launch --shell
 
 # Within the scheduler shell, list and manage tasks
