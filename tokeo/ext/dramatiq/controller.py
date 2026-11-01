@@ -257,10 +257,10 @@ class TokeoDramatiqController(Controller):
                 ),
             ),
             (
-                ['--no-purge'],
+                ['--purge'],
                 dict(
                     action='store_true',
-                    help='keep the dramatiq locks on start and on restarts by --watch',
+                    help='clear the locks of a crashed worker generation before start, never while another instance runs',
                 ),
             ),
             (
@@ -340,7 +340,7 @@ class TokeoDramatiqController(Controller):
 
         - **--skip-logging** (flag): Skip Dramatiq's default logging configuration
         - **--watch** (str): Path to watch for file changes to reload actors
-        - **--no-purge** (flag): Keep the diskcache locks
+        - **--purge** (flag): Clear the diskcache locks before start
         - **-p, --processes** (int|auto): Number of worker processes
         - **-t, --threads** (int): Number of worker threads per process
         - **--queue-prefetch** (int|auto): Messages to prefetch per queue
@@ -456,13 +456,13 @@ class TokeoDramatiqController(Controller):
         # restore sys.argv: dramatiq forks workers and may re-exec on
         # restart, those processes pick the current sys.argv up again
         sys.argv = [sys.argv[0]] + self.app.argv
-        # clear stale locks from a previously crashed worker generation;
-        # best-effort since the diskcache extension may not be loaded
-        if not self.app.pargs.no_purge:
+        # clear the locks of a crashed worker generation only when asked, a
+        # purge on every start would free the locks of a running instance
+        if self.app.pargs.purge:
             try:
                 self.app.dramatiq.locks.purge()
-            except Exception:
-                pass
+            except Exception as err:
+                raise TokeoDramatiqError(f'Purge of the locks failed: {err}') from err
         # set the start method here, dramatiq would fail on it without force
         start_method = 'spawn' if use_spawn else 'forkserver'
         if start_method not in multiprocessing.get_all_start_methods():

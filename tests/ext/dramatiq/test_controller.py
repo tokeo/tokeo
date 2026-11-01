@@ -10,7 +10,7 @@ import sys
 import pytest
 from dramatiq import broker as dramatiq_broker
 from dramatiq import cli as dramatiq_cli
-from tokeo.ext.dramatiq import TokeoDramatiqConfigError
+from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoDramatiqError
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest
 
 
@@ -51,13 +51,15 @@ def serve(tmp, monkeypatch):
 
     monkeypatch.setattr('tokeo.ext.dramatiq.controller.multiprocessing.set_start_method', fake_set_start_method)
 
-    def run(*options, config=None, debug=False):
+    def run(*options, config=None, debug=False, purge_error=None):
         with DramatiqTest(tmp, ['--debug'] * debug + ['dramatiq', 'serve', *options]) as app:
             for key, value in (config or {}).items():
                 app.config.set('dramatiq', key, value)
 
             def fake_purge():
                 calls['purge'] += 1
+                if purge_error is not None:
+                    raise purge_error
                 return 0
 
             monkeypatch.setattr(app.dramatiq.locks, 'purge', fake_purge)
@@ -69,25 +71,31 @@ def serve(tmp, monkeypatch):
     return run
 
 
-def test_serve_purges_locks(serve):
-    """serve purges the locks once and starts dramatiq."""
+def test_serve_keeps_locks(serve):
+    """serve keeps the locks of a running instance and starts dramatiq."""
     calls = serve()
-    assert calls['purge'] == 1
+    assert calls['purge'] == 0
     assert len(calls['main']) == 1
     assert calls['exit_code'] == 0
 
 
-def test_serve_no_purge_keeps_locks(serve):
-    """serve --no-purge keeps the locks."""
-    calls = serve('--no-purge')
-    assert calls['purge'] == 0
+def test_serve_purge_clears_locks(serve):
+    """serve --purge clears the locks once before start."""
+    calls = serve('--purge')
+    assert calls['purge'] == 1
     assert len(calls['main']) == 1
 
 
-def test_serve_no_purge_survives_watch_restart(serve):
-    """The argv kept for a restart by --watch still holds --no-purge."""
-    calls = serve('--no-purge', '--watch', __file__)
-    assert calls['argv'] == ['tokeo', 'dramatiq', 'serve', '--no-purge', '--watch', __file__]
+def test_serve_purge_failing_stops_the_start(serve):
+    """A failed purge stops serve with TokeoDramatiqError naming the cause."""
+    with pytest.raises(TokeoDramatiqError, match='Purge of the locks failed: disk full'):
+        serve('--purge', purge_error=OSError('disk full'))
+
+
+def test_serve_purge_survives_watch_restart(serve):
+    """The argv kept for a restart by --watch still holds --purge."""
+    calls = serve('--purge', '--watch', __file__)
+    assert calls['argv'] == ['tokeo', 'dramatiq', 'serve', '--purge', '--watch', __file__]
     assert calls['main'][0].watch is not None
 
 

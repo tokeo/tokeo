@@ -85,6 +85,27 @@ class TokeoAsyncIO(middleware.AsyncIO):
         set_event_loop_thread(event_loop_thread)
 
 
+#: The options of a parsed amqp url that pika.ConnectionParameters takes,
+#: all but the ssl options
+_URL_OPTIONS = (
+    'host',
+    'port',
+    'virtual_host',
+    'credentials',
+    'channel_max',
+    'frame_max',
+    'heartbeat',
+    'connection_attempts',
+    'retry_delay',
+    'socket_timeout',
+    'stack_timeout',
+    'locale',
+    'blocked_connection_timeout',
+    'client_properties',
+    'tcp_options',
+)
+
+
 class ExtendedRabbitmqBroker(RabbitmqBroker):
     """
     Extended RabbitMQ broker with support for single-active-consumer queues.
@@ -156,18 +177,11 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
             # forbids url + parameters, so decompose the url and hand pika
             # ConnectionParameters carrying our ssl_options instead
             params = pika.URLParameters(url)
-            super().__init__(
-                parameters=[
-                    dict(
-                        host=params.host,
-                        port=params.port,
-                        virtual_host=params.virtual_host,
-                        credentials=params.credentials,
-                        ssl_options=pika.SSLOptions(context, server_hostname),
-                    )
-                ],
-                **kwargs,
-            )
+            # every option the url sets (heartbeat, connection_attempts, ...)
+            # goes on, only the ssl options are our own
+            options = {name: getattr(params, name) for name in _URL_OPTIONS}
+            options['ssl_options'] = pika.SSLOptions(context, server_hostname)
+            super().__init__(parameters=[options], **kwargs)
 
     @property
     def address(self):

@@ -387,7 +387,7 @@ flowchart TB
 <tr><td>--worker-shutdown-timeout MS</td><td>how long a stopping worker waits for running actors</td></tr>
 <tr><td>--use-spawn / --use-forkserver</td><td>how the worker processes start; forkserver is the default</td></tr>
 <tr><td>--watch PATH</td><td>restart the workers when files below PATH change (development)</td></tr>
-<tr><td>--no-purge</td><td>keep the diskcache locks on start and on restarts by --watch</td></tr>
+<tr><td>--purge</td><td>clear the diskcache locks of a crashed worker generation before start and on restarts by --watch, never while another instance runs</td></tr>
 <tr><td>--skip-logging</td><td>do not let dramatiq set up the logging; without it dramatiq logs on debug level when the app runs with --debug</td></tr>
 </tbody>
 </table>
@@ -637,8 +637,9 @@ def export(customer_id):
 The locks live in the diskcache directory, so they count across all worker
 processes of one machine. The directory must be local: SQLite does not lock
 reliably over a network file system.
-```serve``` purges stale locks on start, ```dramatiq locks --purge``` does it by
-hand.
+```serve --purge``` clears the locks of a crashed worker generation before it
+starts, ```dramatiq locks --purge``` does it by hand. Neither runs while another
+instance of the same machine still holds its locks.
 
 A call that waits for a lock or a free slot of ```temper``` checks the cache
 every ```locks_sleep_time``` seconds (section 7), ```sleep_time``` of the call

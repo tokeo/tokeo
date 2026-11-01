@@ -108,6 +108,18 @@ def test_register_confirm_delivery_with_tls_parameters(tmp):
         assert broker.confirm_delivery is True
 
 
+def test_register_tls_parameters_keep_the_options_of_the_url(tmp):
+    """With an own tls context the options of the url stay, e.g. heartbeat."""
+    url = 'amqps://u:p@localhost:5671/vh?heartbeat=30&connection_attempts=3&blocked_connection_timeout=10'
+    rabbitmq = dict(url=url, tls_ca=os.path.join(tmp.dir, 'ca.pem'))
+    with open(rabbitmq['tls_ca'], 'w') as f:
+        f.write(_ca_cert('localhost'))
+    with DramatiqBrokerTest(tmp, rabbitmq):
+        (params,) = dramatiq.get_broker().parameters
+    assert (params.heartbeat, params.connection_attempts, params.blocked_connection_timeout) == (30, 3, 10)
+    assert (params.virtual_host, params.credentials.username, params.ssl_options is not None) == ('vh', 'u', True)
+
+
 @pytest.mark.parametrize('value', ['yes', 1, None])
 def test_register_invalid_confirm_delivery(tmp, value):
     """confirm_delivery other than a bool raises the config error."""
