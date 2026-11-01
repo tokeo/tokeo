@@ -144,7 +144,10 @@ class TlsTransport:
         if hasattr(ssl, 'OP_NO_RENEGOTIATION'):
             self.context.options |= ssl.OP_NO_RENEGOTIATION
         self.context.set_ciphers(ciphers if ciphers else TLS_CIPHERS_ADVANCED_PLUS)
-        self.context.minimum_version = _TLS_VERSIONS.get(methods or TLS_METHODS_ADVANCED, ssl.TLSVersion.TLSv1_2)
+        methods = methods or TLS_METHODS_ADVANCED
+        if methods not in _TLS_VERSIONS:
+            raise ValueError(f'Minimum TLS version (tls_methods) must be one of {", ".join(_TLS_VERSIONS)}!')
+        self.context.minimum_version = _TLS_VERSIONS[methods]
         if cert is not None:
             # certificate content given in memory (Tokeo-only extension):
             # load it via RAM-backed paths so nothing is written to disk

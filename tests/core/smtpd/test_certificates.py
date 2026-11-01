@@ -129,6 +129,13 @@ def test_legacy_tls_preset_still_delivers(certs):
     assert ev.ev_auth_authorization_id == 'supervisor'
 
 
+@pytest.mark.parametrize('methods', ['TLSv1.3', 'tls1_2', 'TLSv2'])
+def test_unknown_minimum_tls_version_raises(methods):
+    """A tls_methods that names no TLS version raises, it does not weaken to 1.2."""
+    with pytest.raises(ValueError, match=r'Minimum TLS version \(tls_methods\) must be one of TLSv1, TLSv1_1, TLSv1_2, TLSv1_3!'):
+        TlsTransport(methods=methods)
+
+
 def test_self_signed_chain_certificate(certs):
     """A certificate with its chain delivers to a client trusting the CA."""
     ev = CaptureSmtpdEvents()
