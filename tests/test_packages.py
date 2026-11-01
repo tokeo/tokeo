@@ -4,6 +4,7 @@ tokeo-pocketbase carry the same version, set by ```make version```, tokeo-diskca
 the version of DiskCache it is taken from. tokeo-base, tokeo-smtpd, tokeo-pocketbase
 and tokeo-diskcache import only what their own package provides, so each one
 works without the rest of tokeo, and tokeo-diskcache never imports pickle.
+The pact keeps its copies of the base utils equal to tokeo-base.
 """
 
 import os
@@ -94,3 +95,13 @@ def test_tokeo_diskcache_never_imports_pickle():
     """No module of tokeo-diskcache imports pickle or another unsafe loader."""
     found = [f'{os.path.relpath(path, ROOT)}: {module}' for path, module in _imports('tokeo-diskcache') if module.split('.')[0] in UNSAFE]
     assert found == []
+
+
+@pytest.mark.parametrize('module', ['date', 'date_compat', 'json'])
+def test_pact_keeps_its_copies_of_the_base_utils_equal(module):
+    """tokeo/pact/utils holds the base utils unchanged, make pact copies them."""
+    with open(os.path.join(ROOT, 'tokeo-base', 'tokeo', 'core', 'utils', f'{module}.py'), 'rb') as f:
+        base = f.read()
+    with open(os.path.join(ROOT, 'tokeo', 'pact', 'utils', f'{module}.py'), 'rb') as f:
+        copy = f.read()
+    assert copy == base
