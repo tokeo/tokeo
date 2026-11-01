@@ -664,7 +664,6 @@ class TokeoAutomate(MetaMixin):
         #: Dict with initial settings
         config_defaults = dict(
             hosts={},
-            passwords={},
             hostgroups={},
             connections=dict(
                 _defaults=dict(
