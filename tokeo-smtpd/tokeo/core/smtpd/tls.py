@@ -192,7 +192,7 @@ class TlsTransport:
 
         ### Notes
 
-        : EC P-256, 90-day validity, SHA256, subject CN and subject alt names
+        : EC P-384, 90-day validity, SHA256, subject CN and subject alt names
             (DNS for every SAN plus IP entries for those that are IP addresses),
             generated in-process with ```cryptography``` and loaded from memory
 
@@ -220,8 +220,9 @@ class TlsTransport:
                 pass
         self._log(Severity.DEBUG, f'SSL: using self generated test certificate! CN={cn} SAN=[{",".join(sans)}]')
         # generate the key and the self-signed certificate
-        # EC P-256: generated in about a millisecond, a key per process is cheap
-        key = ec.generate_private_key(ec.SECP256R1())
+        # EC P-384 like the grpc auto cert: generated in about a millisecond,
+        # a key per process is cheap
+        key = ec.generate_private_key(ec.SECP384R1())
         name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
         now = datetime.now(timezone.utc)
         certificate = (

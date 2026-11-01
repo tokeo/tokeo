@@ -572,7 +572,7 @@ works as well: pass it as ```tls_cert_path``` alone and leave
 ```tls_key_path``` unset - the key is then read from the same file.
 
 The self-signed certificate is generated in-process with ```cryptography```
-(EC P-256, SHA256, valid for 90 days, serverAuth) - no subprocess and no temp
+(EC P-384, SHA256, valid for 90 days, serverAuth) - no subprocess and no temp
 file is involved. It is meant for tests and debugging only, never for
 production. Every server generates its own, so the workers of ```pre_fork```
 present different ones; configure a certificate (```tls_cert_path``` or
