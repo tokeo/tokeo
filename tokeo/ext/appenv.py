@@ -27,6 +27,7 @@ if app.env.IS_DEV_MODE:
 import os
 from cement.utils import fs
 import glob
+from tokeo.core.exc import TokeoError
 from tokeo.core.utils.sort import sort_key_by_lex_and_num_ordered
 
 # Environment constants
@@ -65,6 +66,11 @@ class TokeoAppEnv:
     - If no environment is detected (APP_ENV is None), only the base config
         files are loaded and all IS_*_MODE flags are False
 
+    ### Raises
+
+    - **TokeoError**: If the environment variable names no environment,
+        e.g. a typo like ```prd```
+
     """
 
     #: (str|None) The detected environment (production, development, staging,
@@ -102,6 +108,12 @@ class TokeoAppEnv:
             self.APP_ENV_VAR_NAME = self.APP_LABEL.upper() + '_ENV'
             self.APP_ENV_VAR_VALUE = 'test'
             self.APP_ENV = TESTING
+        elif self.APP_ENV_VAR_VALUE:
+            # a typo must not run with the base config only
+            raise TokeoError(
+                f'{self.APP_ENV_VAR_NAME}={self.APP_ENV_VAR_VALUE!r} is no environment, '
+                'use dev, development, prod, production, stage, staging, test or testing'
+            )
         else:
             self.APP_ENV = None
         # identify MODES
