@@ -4,7 +4,8 @@ tokeo-pocketbase carry the same version, set by ```make version```, tokeo-diskca
 the version of DiskCache it is taken from. tokeo-base, tokeo-smtpd, tokeo-pocketbase
 and tokeo-diskcache import only what their own package provides, so each one
 works without the rest of tokeo, and tokeo-diskcache never imports pickle.
-The pact keeps its copies of the base utils equal to tokeo-base.
+The modules fundi copies into its wasm guest import only the standard library
+and each other.
 """
 
 import os
@@ -97,11 +98,22 @@ def test_tokeo_diskcache_never_imports_pickle():
     assert found == []
 
 
-@pytest.mark.parametrize('module', ['date', 'date_compat', 'json'])
-def test_pact_keeps_its_copies_of_the_base_utils_equal(module):
-    """tokeo/pact/utils holds the base utils unchanged, make pact copies them."""
-    with open(os.path.join(ROOT, 'tokeo-base', 'tokeo', 'core', 'utils', f'{module}.py'), 'rb') as f:
-        base = f.read()
-    with open(os.path.join(ROOT, 'tokeo', 'pact', 'utils', f'{module}.py'), 'rb') as f:
-        copy = f.read()
-    assert copy == base
+# the base utils fundi copies into its wasm guest, next to each other
+GUEST_UTILS = ('date', 'date_compat', 'json')
+
+
+@pytest.mark.parametrize('module', GUEST_UTILS)
+def test_the_wasm_guest_utils_import_only_the_stdlib_or_each_other(module):
+    """date, date_compat and json of tokeo-base import the stdlib or each other."""
+    path = os.path.join(ROOT, 'tokeo-base', 'tokeo', 'core', 'utils', f'{module}.py')
+    with open(path, encoding='utf-8') as f:
+        tree = ast.parse(f.read(), path)
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found += [alias.name for alias in node.names if alias.name.split('.')[0] not in sys.stdlib_module_names]
+        elif isinstance(node, ast.ImportFrom) and node.level:
+            found += [name for name in ([node.module] if node.module else [a.name for a in node.names]) if name not in GUEST_UTILS]
+        elif isinstance(node, ast.ImportFrom) and node.module.split('.')[0] not in sys.stdlib_module_names:
+            found.append(node.module)
+    assert found == []

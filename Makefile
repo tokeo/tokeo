@@ -1,4 +1,4 @@
-.PHONY: help clean venv outdated dev prod doc test fmt lint docker version pact sdist wheel dist dist-upload
+.PHONY: help clean venv outdated dev prod doc test fmt lint docker version sdist wheel dist dist-upload
 
 help:
 	@echo
@@ -152,17 +152,13 @@ version:
 # the packages to build, tokeo last as it depends on the others
 packages=tokeo-base tokeo-smtpd tokeo-pocketbase tokeo-diskcache .
 
-# the pact copies base utils, it runs without tokeo-base, e.g. in a sandbox
-pact:
-	for module in date date_compat json; do cp tokeo-base/tokeo/core/utils/$$module.py tokeo/pact/utils/$$module.py; done
-
-sdist: clean version pact
+sdist: clean version
 	for package in $(packages); do python -m build --sdist --outdir dist $$package || exit 1; done
 
-wheel: clean version pact
+wheel: clean version
 	for package in $(packages); do python -m build --wheel --outdir dist $$package || exit 1; done
 
-dist: clean version pact
+dist: clean version
 	for package in $(packages); do python -m build --outdir dist $$package || exit 1; done
 
 dist-upload:
