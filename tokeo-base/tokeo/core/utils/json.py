@@ -1,3 +1,8 @@
+"""
+Writes JSON with the encoders of tokeo for dates, dataclasses and values json
+cannot serialize itself.
+"""
+
 import json
 from datetime import date as date_type, datetime as datetime_type
 import dataclasses

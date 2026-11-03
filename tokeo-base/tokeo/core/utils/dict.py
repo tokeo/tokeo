@@ -1,3 +1,7 @@
+"""
+Merges nested data deeply and redacts its values before they are logged.
+"""
+
 import logging
 
 LOG = logging.getLogger(__name__)

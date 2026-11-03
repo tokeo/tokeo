@@ -1,3 +1,9 @@
+"""
+Reads the meta of the dispatched or the default subcommand of a Cement
+controller, and logs the help of a subcommand.
+"""
+
+
 def subcmdmeta(controller):
     """
     Access the \\_\\_cement_meta\\_\\_ information of subcommand within the command.

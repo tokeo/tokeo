@@ -1,3 +1,8 @@
+"""
+Runs the tokeo CLI: the app class ```Tokeo```, its test variant
+```TokeoTest``` and the entry point ```main```.
+"""
+
 import os
 import sys
 import signal

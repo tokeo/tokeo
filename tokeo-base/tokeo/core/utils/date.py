@@ -1,3 +1,7 @@
+"""
+Converts dates and times to UTC and writes them as ISO strings.
+"""
+
 from datetime import date as date_type, time as time_type, datetime as datetime_type, timezone
 from .date_compat import fromisoformat
 

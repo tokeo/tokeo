@@ -1,3 +1,8 @@
+"""
+Defines the root command of the tokeo CLI with its help and the version
+banner.
+"""
+
 from cement.utils.version import get_version_banner as cement_version_banner
 from tokeo.ext.argparse import Controller
 from tokeo.core.version import get_version as tokeo_get_version

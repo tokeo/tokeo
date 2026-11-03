@@ -1,3 +1,7 @@
+"""
+Checks that the extensions an extension builds on are enabled.
+"""
+
 from tokeo.core.exc import TokeoError
 
 

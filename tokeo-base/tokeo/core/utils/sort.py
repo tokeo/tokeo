@@ -1,3 +1,7 @@
+"""
+Sorts strings with embedded numbers in natural order.
+"""
+
 import re
 
 

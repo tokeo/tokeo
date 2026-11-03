@@ -1,3 +1,7 @@
+"""
+Strips strings to safe keywords and quotes them for the shell.
+"""
+
 import re
 import shlex
 from .props import hasprop

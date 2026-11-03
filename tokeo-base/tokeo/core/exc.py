@@ -1,3 +1,9 @@
+"""
+Defines the bases of all exceptions of tokeo, ```TokeoBaseException``` and
+```TokeoError```.
+"""
+
+
 class TokeoBaseException(BaseException):
     """
     Base of all exceptions of tokeo.
