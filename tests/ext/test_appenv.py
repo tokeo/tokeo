@@ -46,3 +46,51 @@ def test_test_app_runs_in_testing(monkeypatch):
     app = types.SimpleNamespace(_meta=types.SimpleNamespace(label='shop_test', main_dir='/tmp', config_file_suffix='.yaml'))
     appenv = TokeoAppEnv(app)
     assert (appenv.APP_ENV, appenv.APP_ENV_VAR_VALUE, app._meta.label) == ('testing', 'testing', 'shop')
+
+
+def test_no_environment_reads_base_only(monkeypatch, tmp_path):
+    """Without an environment only the base configs are read."""
+    monkeypatch.delenv('SHOP_ENV', raising=False)
+    config = tmp_path / 'config' / 'shop'
+    config.mkdir(parents=True)
+    (config / 'base.yaml').write_text('')
+    (config / 'production.yaml').write_text('')
+    app = types.SimpleNamespace(_meta=types.SimpleNamespace(label='shop', main_dir=str(tmp_path / 'shop'), config_file_suffix='.yaml'))
+    assert TokeoAppEnv(app).APP_ENV is None
+    assert app._meta.config_files == [str(config / 'base.yaml')]
+
+
+def test_partial_and_local_configs(monkeypatch, tmp_path):
+    """
+    Partial configs follow their env config in natural order, .local ones come
+    last and never for base.
+    """
+    monkeypatch.setenv('SHOP_ENV', 'production')
+    config = tmp_path / 'config' / 'shop'
+    for name in [
+        'base.yaml',
+        'base.local.yaml',
+        'base.d/10-b.yaml',
+        'base.d/2-a.yaml',
+        'base.d/x.local.yaml',
+        'production.yaml',
+        'production.local.yaml',
+        'production.d/1-a.yaml',
+        'production.d/sub/2-b.local.yaml',
+    ]:
+        (config / name).parent.mkdir(parents=True, exist_ok=True)
+        (config / name).write_text('')
+    app = types.SimpleNamespace(_meta=types.SimpleNamespace(label='shop', main_dir=str(tmp_path / 'shop'), config_file_suffix='.yaml'))
+    TokeoAppEnv(app)
+    assert app._meta.config_files == [
+        str(config / name)
+        for name in [
+            'base.yaml',
+            'base.d/2-a.yaml',
+            'base.d/10-b.yaml',
+            'production.yaml',
+            'production.d/1-a.yaml',
+            'production.local.yaml',
+            'production.d/sub/2-b.local.yaml',
+        ]
+    ]
