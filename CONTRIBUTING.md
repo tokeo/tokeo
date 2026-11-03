@@ -23,10 +23,6 @@ Please confirm two things when you submit:
 - If your employer holds rights in your work, you have permission to
   contribute.
 
-One part of the sources is separate. The ```akili``` module generated into
-projects is Apache-2.0 as well, and its file headers and ```LICENSE.txt``` copy
-must stay intact in any change you make there.
-
 <br/>
 
 ## What we accept
