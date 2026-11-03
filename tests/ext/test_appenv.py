@@ -16,7 +16,7 @@ def test_unknown_environment_raises(monkeypatch, value):
     """An env value that names no environment raises, naming variable and value."""
     monkeypatch.setenv('SHOP_ENV', value)
     app = types.SimpleNamespace(_meta=types.SimpleNamespace(label='shop', main_dir='/tmp'))
-    with pytest.raises(TokeoError, match=f"^SHOP_ENV='{value.lower()}' is no environment, use development, "):
+    with pytest.raises(TokeoError, match=f"^SHOP_ENV='{value.lower()}' is no environment, use development, staging, "):
         TokeoAppEnv(app)
 
 
@@ -34,18 +34,18 @@ def test_unknown_environment_raises(monkeypatch, value):
     ],
 )
 def test_long_and_short_names(monkeypatch, value, env):
-    """The long name of an environment is its value, the short name works too."""
+    """Each accepted value of the variable selects its environment."""
     monkeypatch.setenv('SHOP_ENV', value)
     app = types.SimpleNamespace(_meta=types.SimpleNamespace(label='shop', main_dir='/tmp', config_file_suffix='.yaml'))
     assert TokeoAppEnv(app).APP_ENV == env
 
 
 def test_test_app_runs_in_testing(monkeypatch):
-    """A "<app>_test" app runs in testing and names it by the long name."""
+    """A "<app>_test" app runs in testing, its variable says test."""
     monkeypatch.delenv('SHOP_ENV', raising=False)
     app = types.SimpleNamespace(_meta=types.SimpleNamespace(label='shop_test', main_dir='/tmp', config_file_suffix='.yaml'))
     appenv = TokeoAppEnv(app)
-    assert (appenv.APP_ENV, appenv.APP_ENV_VAR_VALUE, app._meta.label) == ('testing', 'testing', 'shop')
+    assert (appenv.APP_ENV, appenv.APP_ENV_VAR_VALUE, app._meta.label) == ('testing', 'test', 'shop')
 
 
 def test_no_environment_reads_base_only(monkeypatch, tmp_path):

@@ -5,9 +5,11 @@ This module provides environment detection and configuration based on
 environment variables. It supports different runtime environments like
 production, staging, development, and testing.
 
-The variable ```<APP_LABEL>_ENV``` names the environment by its long name,
-e.g. ```SHOP_ENV=production```. The short names ```prod```, ```stage```,
-```dev``` and ```test``` work too.
+The variable ```<APP_LABEL>_ENV``` names the environment with the values of
+```NODE_ENV``` and Rails: ```development```, ```staging```, ```production```
+or ```test```, e.g. ```SHOP_ENV=test```. ```testing``` and the short names
+```dev```, ```stage``` and ```prod``` work too. The config files carry the long
+name of the environment, e.g. ```testing.yaml```.
 
 When the appenv extension is used, the normal cement config file behavior
 is replaced by tokeo's environment based configuration. A cement
@@ -108,13 +110,13 @@ class TokeoAppEnv:
             app._meta.label = self.APP_LABEL[: -len('_test')]
             self.APP_LABEL = app._meta.label
             self.APP_ENV_VAR_NAME = self.APP_LABEL.upper() + '_ENV'
-            self.APP_ENV_VAR_VALUE = 'testing'
+            self.APP_ENV_VAR_VALUE = 'test'
             self.APP_ENV = TESTING
         elif self.APP_ENV_VAR_VALUE:
             # a typo must not run with the base config only
             raise TokeoError(
                 f'{self.APP_ENV_VAR_NAME}={self.APP_ENV_VAR_VALUE!r} is no environment, '
-                'use development, production, staging or testing (or dev, prod, stage, test)'
+                'use development, staging, production or test (or dev, stage, prod, testing)'
             )
         else:
             self.APP_ENV = None
