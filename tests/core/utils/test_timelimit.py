@@ -231,9 +231,7 @@ def test_coroutine_within_its_limit_and_its_own_timeout_error():
         asyncio.run(failing())
 
 
-# --------------------------------------------------------------------------------------
-# rare cases: things that happen at the same moment, stress tests
-# --------------------------------------------------------------------------------------
+# ---- rare cases: things that happen at the same moment, stress tests --------
 
 
 @stresstest

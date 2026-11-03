@@ -51,7 +51,7 @@ def _ca_cert(name):
     return cert.public_bytes(serialization.Encoding.PEM).decode()
 
 
-# ---- asyncio middleware -------------------------------------------------------
+# ---- asyncio middleware -----------------------------------------------------
 
 
 def test_asyncio_event_loop_thread_is_daemon():
@@ -255,7 +255,7 @@ def test_register_invalid_middleware_defaults(tmp, key, value):
             pass
 
 
-# ---- dead message ttl env -----------------------------------------------------
+# ---- dead message ttl env ---------------------------------------------------
 
 
 def test_register_dead_message_ttl_valid_env(tmp, keep_dead_message_ttl, monkeypatch):
@@ -284,7 +284,7 @@ def test_register_dead_message_ttl_config_wins_over_env(tmp, monkeypatch):
         assert dramatiq_rabbitmq.DEAD_MESSAGE_TTL == 60000
 
 
-# ---- locks --------------------------------------------------------------------
+# ---- locks ------------------------------------------------------------------
 
 
 def test_locks_sleep_time_is_an_own_setting_of_dramatiq(tmp):
@@ -296,7 +296,7 @@ def test_locks_sleep_time_is_an_own_setting_of_dramatiq(tmp):
         assert app.cache.locks._sleep_time == 0.1
 
 
-# ---- actor send wrapper -------------------------------------------------------
+# ---- actor send wrapper -----------------------------------------------------
 
 
 def test_actor_alias_declares_tokeo_actor(tmp):

@@ -237,7 +237,7 @@ class TokeoPdoc(Handler):
         self._watchdog_stop = None
         self._watchdog_restart_requested = False
 
-    # ---- config helpers --------------------------------------------------
+    # ---- config helpers -----------------------------------------------------
 
     def _config(self, key, default=None):
         """Read a value from the extension's config section, never raising.
@@ -453,7 +453,7 @@ class TokeoPdoc(Handler):
                 self.app.log.debug(f'pdoc: template dir not resolvable: {entry}')
         return dirs
 
-    # ---- rendering -------------------------------------------------------
+    # ---- rendering ----------------------------------------------------------
 
     def render(self, clean=False, raise_on_error=True):
         """Render HTML documentation for the configured modules.
@@ -532,7 +532,7 @@ class TokeoPdoc(Handler):
             for offset, extra in enumerate(template_dirs[1:]):
                 searchpath.insert(1 + offset, extra)
 
-        # ---- custom globals available to every template ----
+        # ---- custom globals available to every template ---------------------
         pdoc.render.env.globals['app'] = self.app
         pdoc.render.env.globals['app_name'] = getattr(self.app._meta, 'label', 'app')
 
@@ -1354,7 +1354,7 @@ class TokeoPdoc(Handler):
         # expose the state so render() can set the current module dir
         self._md_state = state
 
-    # ---- watching --------------------------------------------------------
+    # ---- watching -----------------------------------------------------------
 
     def _module_dirs(self):
         """Filesystem roots of the packages that get documented."""
@@ -1663,7 +1663,7 @@ class TokeoPdoc(Handler):
         mp_exit_function()
         os.execv(sys.executable, [sys.executable] + argv + ['--restart'])
 
-    # ---- serving ---------------------------------------------------------
+    # ---- serving ------------------------------------------------------------
 
     def serve(self, watch=False, restarted=False):
         """Serve the rendered documentation directory over HTTP.

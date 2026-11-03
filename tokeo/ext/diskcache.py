@@ -194,7 +194,7 @@ class TokeoDiskCacheLocksHandler:
             raise ValueError(_ERR_SECONDS_GT_0.format('sleep_time', sleep_time))
         self._sleep_time = sleep_time
 
-    # --------------------------------------------------------------------------------------
+    # ---- purge --------------------------------------------------------------
 
     def purge(self):
         """
@@ -346,7 +346,7 @@ class TokeoDiskCacheLocksHandler:
                 lost = 'missing' if value is _missing else 'taken by another'
                 self.app.log.warning(f'lock {key} was lost before release ({lost})')
 
-    # --------------------------------------------------------------------------------------
+    # ---- throttle -----------------------------------------------------------
 
     def throttle(
         self,
@@ -543,7 +543,7 @@ class TokeoDiskCacheLocksHandler:
 
         return decorator
 
-    # --------------------------------------------------------------------------------------
+    # ---- temper -------------------------------------------------------------
 
     def temper(
         self,
@@ -784,8 +784,6 @@ class TokeoDiskCacheLocksHandler:
 
         return decorator
 
-    # --------------------------------------------------------------------------------------
-
 
 class TokeoDiskCacheCacheHandler(cache.CacheHandler):
     """
@@ -1009,7 +1007,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         self._cache.close()
 
-    # --------------------------------------------------------------------------------------
+    # ---- purge --------------------------------------------------------------
 
     def purge(self, **kw):
         """
@@ -1027,7 +1025,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         retry = kw.get('retry', False)
         return self._cache.clear(retry=retry)
 
-    # --------------------------------------------------------------------------------------
+    # ---- check --------------------------------------------------------------
 
     def check(self, fix=False, retry=False):
         """
@@ -1215,7 +1213,7 @@ class TokeoDiskCacheController(Controller):
         description = 'Provides command-line interfaces to manage diskcache content.'
         epilog = f'Example: {basename(sys.argv[0])} cache command --options'
 
-    # --------------------------------------------------------------------------------------
+    # ---- check --------------------------------------------------------------
 
     @ex(
         help='verify the cache',
@@ -1251,7 +1249,7 @@ class TokeoDiskCacheController(Controller):
         cnt = self.app.cache._cache.__len__()
         self.app.print(f'Currently {cnt} keys in cache.')
 
-    # --------------------------------------------------------------------------------------
+    # ---- list ---------------------------------------------------------------
 
     @ex(
         help='list the current cache content',
@@ -1373,7 +1371,7 @@ class TokeoDiskCacheController(Controller):
             if _show:
                 self.app.print(out.format(key=key, value=value, value_type=type(value).__name__, expire_time=expire_time, tag=tag))
 
-    # --------------------------------------------------------------------------------------
+    # ---- locks --------------------------------------------------------------
 
     @ex(
         help='access the locks from cache',
@@ -1421,7 +1419,7 @@ class TokeoDiskCacheController(Controller):
             self.app.pargs.tag = self.app.cache.locks._tag
             self.list()
 
-    # --------------------------------------------------------------------------------------
+    # ---- purge --------------------------------------------------------------
 
     @ex(
         help='purge the cache',
@@ -1493,7 +1491,7 @@ class TokeoDiskCacheController(Controller):
 
         self.app.print(f'Purged {num} items from cache.')
 
-    # --------------------------------------------------------------------------------------
+    # ---- delete -------------------------------------------------------------
 
     @ex(
         help='delete keys from cache content',
@@ -1546,7 +1544,7 @@ class TokeoDiskCacheController(Controller):
 
         self.app.print(f'In total {num} keys deleted.')
 
-    # --------------------------------------------------------------------------------------
+    # ---- set ----------------------------------------------------------------
 
     @ex(
         help='set key with value',
@@ -1650,7 +1648,7 @@ class TokeoDiskCacheController(Controller):
         else:
             self.app.log.error(f'Error: {key}')
 
-    # --------------------------------------------------------------------------------------
+    # ---- get ----------------------------------------------------------------
 
     @ex(
         help='get value by key',

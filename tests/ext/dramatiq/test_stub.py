@@ -77,7 +77,7 @@ def _dead_ids(broker):
     return [message.message_id for message in broker.dead_letters]
 
 
-# ---- actors -------------------------------------------------------------------
+# ---- actors -----------------------------------------------------------------
 
 
 def test_actor_sent_runs_in_the_worker(tmp, start_worker):
@@ -152,7 +152,7 @@ def test_callbacks_get_result_and_error(tmp, start_worker):
     assert sorted(calls) == [('failure', 'LookupError'), ('success', 42)]
 
 
-# ---- retries ------------------------------------------------------------------
+# ---- retries ----------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -181,7 +181,7 @@ def test_retries_follow_message_actor_and_config(tmp, start_worker, actor_option
         assert len(calls) == runs and _dead_ids(app.dramatiq.broker) == [message.message_id]
 
 
-# ---- time limit, age limit and shutdown notice -------------------------------
+# ---- time limit, age limit and shutdown notice ------------------------------
 
 
 # dramatiq ends the thread of its limit checks only with the worker process
@@ -249,7 +249,7 @@ def test_notify_shutdown_from_config(tmp, start_worker, notify_shutdown, ended):
     assert results == [ended]
 
 
-# ---- locks --------------------------------------------------------------------
+# ---- locks ------------------------------------------------------------------
 
 
 def test_locks_temper_keeps_worker_threads_apart(tmp, start_worker):
@@ -313,7 +313,7 @@ def test_locks_purge_command_frees_a_lock_an_actor_waits_for(tmp, start_worker, 
     assert capsys.readouterr().out.strip() == 'Purged 1 dramatiq locks from cache.'
 
 
-# ---- monitoring ---------------------------------------------------------------
+# ---- monitoring -------------------------------------------------------------
 
 
 def test_monitor_hears_a_worker_of_the_app(tmp, start_worker, monkeypatch):

@@ -923,7 +923,7 @@ class SmtpdServer:
         # like Ruby to_s, None is an empty text
         return f'220 {str(session.ctx.server.local_response or "").strip()}' if session.cmd_sequence is CMD_HELO else ''
 
-    # ---- per-connection dialog --------------------------
+    # ---- per-connection dialog ----------------------------------------------
 
     async def serve_client(self, session, reader, writer):
         """
@@ -1329,7 +1329,7 @@ class SmtpdServer:
         except (OSError, socket.herror):
             return None
 
-    # ---- the command dispatcher --------------------------
+    # ---- the command dispatcher ---------------------------------------------
 
     #: Flags of every command regex: the verbs match case-insensitive in ASCII
     #: only, so "ſ" is no "s" and a no-break space no "\s" (RFC 5321 2.4); a
@@ -1944,7 +1944,7 @@ class SmtpdServer:
         except Exception as e:  # noqa: B902
             raise fault(f'{e} ({type(e).__name__})') from e
 
-    # ---- authentication --------------------------------
+    # ---- authentication -----------------------------------------------------
 
     @staticmethod
     def _decode64(encoded):
@@ -2092,7 +2092,7 @@ class SmtpdServer:
             # and reset auth_challenge
             session.auth_challenge = {}
 
-    # ---- session reset --------------------------
+    # ---- session reset ------------------------------------------------------
 
     def process_reset_session(self, session, connection_initialize=False):
         """
@@ -2134,7 +2134,7 @@ class SmtpdServer:
         ctx.envelope = EnvelopeCtx()
         ctx.message = MessageCtx()
 
-    # ---- event dispatch -------------------------------------------------------
+    # ---- event dispatch -----------------------------------------------------
 
     #: Dispatch kinds, resolved once per handler class (see the builder below)
     _EMIT_SYNC, _EMIT_ASYNC, _EMIT_THREAD = 0, 1, 2

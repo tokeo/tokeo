@@ -31,9 +31,7 @@ from tokeo.ext.pdoc import (
     _yaml_header_end,
 )
 
-# --------------------------------------------------------------------------------------
-# app under test
-# --------------------------------------------------------------------------------------
+# ---- app under test ---------------------------------------------------------
 
 
 class PdocTest(TokeoTest):
@@ -99,9 +97,7 @@ def log_lines(app, monkeypatch):
     return lines
 
 
-# --------------------------------------------------------------------------------------
-# helpers
-# --------------------------------------------------------------------------------------
+# ---- helpers ----------------------------------------------------------------
 
 
 def _write(path, text):
@@ -116,9 +112,7 @@ def _has(lines, needle):
     return any(needle in line for line in lines)
 
 
-# --------------------------------------------------------------------------------------
-# yaml comment helpers
-# --------------------------------------------------------------------------------------
+# ---- yaml comment helpers ---------------------------------------------------
 
 
 def test_strip_comment_markers_keeps_markdown_headings():
@@ -163,9 +157,7 @@ def test_yaml_header_end(lines, expected):
     assert _yaml_header_end(lines) == expected
 
 
-# --------------------------------------------------------------------------------------
-# `#:` variable comments (pdoc3 behaviour restored)
-# --------------------------------------------------------------------------------------
+# ---- `#:` variable comments (pdoc3 behaviour restored) ----------------------
 
 
 HASH_COLON_SOURCE = '''"""Module."""
@@ -426,9 +418,7 @@ def test_render_keeps_test_functions_of_other_modules_under_functions(tmp_path, 
     assert 'test_box_opens' in _section(html, 'h2', 'Functions')
 
 
-# --------------------------------------------------------------------------------------
-# config page: per-setting slicing and redaction
-# --------------------------------------------------------------------------------------
+# ---- config page: per-setting slicing and redaction -------------------------
 
 
 BASE_YAML = """### **Main Configuration**
@@ -505,9 +495,7 @@ def test_config_settings_returns_empty_for_a_non_mapping(app):
     assert app.pdoc._config_settings('base', ['- a', '- b'], ['a', 'b']) == {}
 
 
-# --------------------------------------------------------------------------------------
-# config page: which files appear and in what order
-# --------------------------------------------------------------------------------------
+# ---- config page: which files appear and in what order ----------------------
 
 
 def _build_config_tree(root):
@@ -611,9 +599,7 @@ def test_config_page_skips_base_local(app, tmp_path, monkeypatch):
     assert 'base.local' not in sections
 
 
-# --------------------------------------------------------------------------------------
-# module discovery, including namespace packages
-# --------------------------------------------------------------------------------------
+# ---- module discovery, including namespace packages -------------------------
 
 
 def test_discover_walks_namespace_subpackages(app, tmp_path, monkeypatch):
@@ -672,9 +658,7 @@ def test_discover_honours_pdoc_overrides(app, tmp_path, monkeypatch):
     assert 'ovpkg.hidden' not in found
 
 
-# --------------------------------------------------------------------------------------
-# watched directories (pure path logic, no observer involved)
-# --------------------------------------------------------------------------------------
+# ---- watched directories (pure path logic, no observer involved) ------------
 
 
 def _stub_dirs(app, monkeypatch, dirs):
@@ -793,9 +777,7 @@ def test_watch_dirs_includes_the_config_dir_when_appenv_is_loaded(
     assert sorted(Path(d).name for d in dirs) == ['config', 'spiral']
 
 
-# --------------------------------------------------------------------------------------
-# external docstrings for namespace packages
-# --------------------------------------------------------------------------------------
+# ---- external docstrings for namespace packages -----------------------------
 
 
 def test_init_md_becomes_the_docstring_of_a_namespace_package(
@@ -869,9 +851,7 @@ def test_decorator_docstrings_return_none_when_missing(app):
     assert app.pdoc.docstrings('decorator', 'does.not.exist') is None
 
 
-# --------------------------------------------------------------------------------------
-# sidebar rendering: class entries and their indentation
-# --------------------------------------------------------------------------------------
+# ---- sidebar rendering: class entries and their indentation -----------------
 
 
 SIDEBAR_SOURCES = {
@@ -1077,9 +1057,7 @@ def test_sidebar_padding_class_exists_in_the_stylesheet(tmp_path, monkeypatch):
     assert '.pl-3\\.5{' in stylesheet
 
 
-# --------------------------------------------------------------------------------------
-# markdown of the docstrings
-# --------------------------------------------------------------------------------------
+# ---- markdown of the docstrings ---------------------------------------------
 
 
 def test_markdown_keeps_switches_and_makes_ellipses(app, monkeypatch):
@@ -1162,9 +1140,7 @@ def test_markdown_include_of_code_counts_as_a_level(to_html, tmp_path):
     assert 'echo third' in html and '<p>three</p>' in html and 'echo fourth' not in html
 
 
-# --------------------------------------------------------------------------------------
-# serve
-# --------------------------------------------------------------------------------------
+# ---- serve ------------------------------------------------------------------
 
 
 def test_serve_answers_and_stops_via_the_started_monitor(app, tmp_path, monkeypatch):
@@ -1224,9 +1200,7 @@ def test_serve_raises_a_clean_error_when_the_port_is_taken(tmp_path):
         blocker.close()
 
 
-# --------------------------------------------------------------------------------------
-# startup output and the hidden --restart flag
-# --------------------------------------------------------------------------------------
+# ---- startup output and the hidden --restart flag ---------------------------
 
 
 def test_documented_lists_the_configured_modules(app, monkeypatch):
@@ -1452,9 +1426,7 @@ def test_restart_flag_is_hidden_from_the_help(tmp_path, monkeypatch, capsys):
     assert '--restart' not in help_text
 
 
-# --------------------------------------------------------------------------------------
-# render error handling
-# --------------------------------------------------------------------------------------
+# ---- render error handling --------------------------------------------------
 
 
 def _render_minimal(tmp_path, monkeypatch, package_name, clean):
@@ -1632,9 +1604,7 @@ def test_module_source_dir_of_a_package(app, tmp_path, monkeypatch):
     assert Path(app.pdoc._module_source_dir(module)).name == 'mdpkg'
 
 
-# --------------------------------------------------------------------------------------
-# controller flags
-# --------------------------------------------------------------------------------------
+# ---- controller flags -------------------------------------------------------
 
 
 def _run_cli(tmp_path, monkeypatch, argv):
@@ -1804,9 +1774,7 @@ def test_controller_passes_clean(tmp_path, monkeypatch):
     assert seen['clean'] is True
 
 
-# --------------------------------------------------------------------------------------
-# light and dark mode of the pages
-# --------------------------------------------------------------------------------------
+# ---- light and dark mode of the pages ---------------------------------------
 
 
 # the templates and the theme the mode works on

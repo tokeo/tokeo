@@ -45,7 +45,7 @@ class DramatiqWithoutTuiTest(DramatiqTest):
         ]
 
 
-# ---- config ------------------------------------------------------------------
+# ---- config -----------------------------------------------------------------
 
 
 @pytest.mark.parametrize('value', [True, 'on', 'yes', 'True', 'ON'])
@@ -107,7 +107,7 @@ def test_monitoring_config_checked(tmp, config, error):
             pass
 
 
-# ---- heartbeat middleware ----------------------------------------------------
+# ---- heartbeat middleware ---------------------------------------------------
 
 
 @pytest.fixture
@@ -283,7 +283,7 @@ def test_heartbeat_without_broker_parameters_sends_nothing(monkeypatch):
     TokeoDramatiqHeartbeat('probe.dramatiq.monitoring', 5, False, {})._send(dict(a=1))
 
 
-# ---- monitor -----------------------------------------------------------------
+# ---- monitor ----------------------------------------------------------------
 
 
 def _beat(pid, interval=5, state='running', running=(), since=None, details=False):
@@ -368,7 +368,7 @@ def test_monitor_without_rabbitmq(tmp, monkeypatch):
             app.dramatiq.monitor.workers()
 
 
-# ---- monitor command ---------------------------------------------------------
+# ---- monitor command --------------------------------------------------------
 
 
 def test_duration():

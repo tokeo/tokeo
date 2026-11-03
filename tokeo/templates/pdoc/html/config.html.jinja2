@@ -51,7 +51,7 @@
   <div class="min-h-screen tk-page text-brand-ink font-sans flex flex-col">
     <div class="flex flex-1 flex-col md:flex-row">
 
-    {# ---------- sidebar ---------- #}
+    {# ---- sidebar -------------------------------------------------------- #}
     <aside class="md:w-72 md:shrink-0 md:h-screen md:sticky md:top-0 md:overflow-auto border-b md:border-b-0 md:border-r tk-line tk-surface px-6 py-7">
       <a href="{{ root }}index.html" class="tk-header block !py-3 !px-4 !mb-7 !text-left"><span class="text-lg font-semibold">{{ brand | default("🚀 " + (app_name | default("tokeo")), true) }}</span></a>
       {% include "mode.html" %}
@@ -75,7 +75,7 @@
       </nav>
     </aside>
 
-    {# ---------- main ---------- #}
+    {# ---- main ----------------------------------------------------------- #}
     <main class="flex-1 min-w-0 tk-surface px-6 sm:px-10 lg:px-14 py-10">
       <div class="max-w-5xl">
         <header class="mb-8">

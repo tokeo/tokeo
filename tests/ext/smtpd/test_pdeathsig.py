@@ -36,9 +36,7 @@ def _read_pdeathsig():
 PROBE = 'tests.ext.smtpd.smtpd_tests_pdeathsig_probe'
 
 
-# --------------------------------------------------------------------------
-# platform-neutral: off-linux no-op
-# --------------------------------------------------------------------------
+# ---- platform-neutral: off-linux no-op --------------------------------------
 
 
 def test_set_pdeathsig_is_noop_off_linux(monkeypatch):
@@ -58,9 +56,7 @@ def test_set_pdeathsig_returns_false_without_prctl(monkeypatch):
     assert _set_pdeathsig(signal.SIGTERM) is False
 
 
-# --------------------------------------------------------------------------
-# Linux-specialised: PR_SET_PDEATHSIG
-# --------------------------------------------------------------------------
+# ---- Linux-specialised: PR_SET_PDEATHSIG ------------------------------------
 
 
 @needs_pdeathsig

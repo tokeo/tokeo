@@ -21,9 +21,8 @@ from tests.ext.diskcache.diskcache_tests_helper import (
     stop_processes,
 )
 
-# --------------------------------------------------------------------------------------
-# multiprocessing workers (must stay importable at module level for spawn)
-# --------------------------------------------------------------------------------------
+# ---- multiprocessing workers ------------------------------------------------
+# the workers must stay importable at module level for spawn
 
 
 def _temper_worker(directory, count, hold, result_queue):
@@ -64,9 +63,7 @@ def _throttle_worker(directory, count, per_seconds, result_queue):
         result_queue.put(('error', repr(err)))
 
 
-# --------------------------------------------------------------------------------------
-# connections: each thread closes its own when it ends
-# --------------------------------------------------------------------------------------
+# ---- connections: each thread closes its own when it ends -------------------
 
 
 @pytest.mark.parametrize('directory', [None, ''], ids=['none', 'empty'])
@@ -152,9 +149,7 @@ def test_connections_stay_open_when_released_in_another_thread():
     con.close()
 
 
-# --------------------------------------------------------------------------------------
-# locks
-# --------------------------------------------------------------------------------------
+# ---- locks ------------------------------------------------------------------
 
 
 def test_locks_acquire_returns_true(tmp):
@@ -286,9 +281,7 @@ def test_locks_sleep_time_must_be_a_number_greater_than_0(tmp, sleep_time):
             pass
 
 
-# --------------------------------------------------------------------------------------
-# temper: five essential points
-# --------------------------------------------------------------------------------------
+# ---- temper: five essential points ------------------------------------------
 
 
 def test_temper_acquire_and_release(tmp):
@@ -413,9 +406,7 @@ def test_temper_process_concurrency_cap(tmp):
     assert max_overlap(intervals) <= count
 
 
-# --------------------------------------------------------------------------------------
-# throttle: five essential points
-# --------------------------------------------------------------------------------------
+# ---- throttle: five essential points ----------------------------------------
 
 
 def test_throttle_allows_burst_up_to_count(tmp):
@@ -527,9 +518,7 @@ def test_throttle_process_rate_cap(tmp):
     assert payloads.count('locked') == workers - count
 
 
-# --------------------------------------------------------------------------------------
-# expire: a default for every key, only numbers greater than 0
-# --------------------------------------------------------------------------------------
+# ---- expire: a default for every key, only numbers greater than 0 -----------
 
 
 def _expires_in(app, key):
@@ -621,9 +610,7 @@ def test_throttle_and_temper_log_nothing_by_default(tmp, monkeypatch):
         assert infos == []
 
 
-# --------------------------------------------------------------------------------------
-# temper: the deadlines of the holders
-# --------------------------------------------------------------------------------------
+# ---- temper: the deadlines of the holders -----------------------------------
 
 
 def test_temper_holds_its_slot_by_a_deadline(tmp):

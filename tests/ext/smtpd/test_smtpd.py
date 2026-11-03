@@ -42,7 +42,7 @@ from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
 needs_pdeathsig = pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the parent-death signal is Linux-only')
 
-# ---- unit: handler resolving ----------------------------------------------------
+# ---- unit: handler resolving ------------------------------------------------
 
 
 def test_resolve_events_handler_imports_the_class():
@@ -72,7 +72,7 @@ def test_events_handler_carries_the_app():
     assert events_handler.options == {'answer': 42}
 
 
-# ---- unit: topology planning ---------------------------------------------------
+# ---- unit: topology planning ------------------------------------------------
 
 
 def _svc(name, pre_fork=0):
@@ -119,7 +119,7 @@ def test_plan_refuses_a_pre_fork_that_is_no_count(pre_fork):
         _plan([_svc('mx1', pre_fork)], has_global_limit=False)
 
 
-# ---- unit: shared limits --------------------------------------------------------
+# ---- unit: shared limits ----------------------------------------------------
 
 
 @isolated
@@ -182,7 +182,7 @@ def test_shared_limits_slot_wait_recheck_interval():
     assert asyncio.run(go()) < 0.5  # returns via the poll
 
 
-# ---- cement wiring --------------------------------------------------------------
+# ---- cement wiring ----------------------------------------------------------
 
 
 def test_extension_loads_into_cement_app():
@@ -293,7 +293,7 @@ def test_list_command_prints_the_services(capsys):
     assert 'mx-a' in capsys.readouterr().out
 
 
-# ---- process tests: real termination behaviour ---------------------------------
+# ---- process tests: real termination behaviour ------------------------------
 
 
 PROBE = 'tests.ext.smtpd.smtpd_tests_serve_probe'
@@ -471,7 +471,7 @@ def test_failed_worker_stops_all_services():
         _assert_port_free(port_a)
 
 
-# ---- process tests: services in the forked workers -----------------------------
+# ---- process tests: services in the forked workers --------------------------
 
 
 def _tagged_service(name, port, pre_fork, settings=None):

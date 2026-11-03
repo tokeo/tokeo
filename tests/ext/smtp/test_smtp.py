@@ -289,7 +289,7 @@ def test_date_and_message_id():
     assert absent['Date'] is None and absent['Message-Id'] is None
 
 
-# ---- send_by_template --------------------------------------------------------
+# ---- send_by_template -------------------------------------------------------
 
 
 def test_send_by_template_mail_params_wins_over_data():

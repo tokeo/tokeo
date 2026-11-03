@@ -51,7 +51,7 @@ def test_2_ports_2_hosts_addresses():
     assert _smtpd('2525, 3535', '127.0.0.1, ::1').addresses == ['127.0.0.1:2525', '::1:3535']
 
 
-# ---- 3 ports (a range), 2 hosts --------------------------------------------
+# ---- 3 ports (a range), 2 hosts ---------------------------------------------
 
 
 def test_3_ports_2_hosts_ports():

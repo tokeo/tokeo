@@ -31,7 +31,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     TLS_SETTINGS,
 )
 
-# ---- RSET and a later EHLO ---------------------------------------------------
+# ---- RSET and a later EHLO --------------------------------------------------
 
 
 def test_rset_before_helo_answers_250_and_still_needs_the_greeting():
@@ -80,7 +80,7 @@ def test_a_later_ehlo_keeps_the_auth():
     assert r[3][0].startswith('503')
 
 
-# ---- the name of the server --------------------------------------------------
+# ---- the name of the server -------------------------------------------------
 
 
 def test_without_a_host_name_the_server_names_itself_by_an_address_literal():
@@ -115,7 +115,7 @@ def test_an_ipv6_address_literal_is_tagged():
     assert asyncio.run(go()) == ['220 [IPv6:::1] says welcome!']
 
 
-# ---- VRFY, EXPN and HELP -----------------------------------------------------
+# ---- VRFY, EXPN and HELP ----------------------------------------------------
 
 
 def test_vrfy_expn_and_help_without_a_handler():
@@ -203,7 +203,7 @@ def test_vrfy_expn_and_help_without_tls_on_tls_required_answer_530():
     assert [reply[0][:3] for reply in r[1:]] == ['530', '530', '530']
 
 
-# ---- STARTTLS and AUTH -------------------------------------------------------
+# ---- STARTTLS and AUTH ------------------------------------------------------
 
 
 def test_starttls_with_an_argument_answers_501():
@@ -243,7 +243,7 @@ def test_auth_login_with_a_not_stripped_authzid_answers_454():
     assert r[3][0].startswith('454')
 
 
-# ---- the trace header --------------------------------------------------------
+# ---- the trace header -------------------------------------------------------
 
 
 class TraceEvents(RecordingEvents):

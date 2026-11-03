@@ -77,9 +77,7 @@ class PocketBase:
         self.clear_auth()
         self.http_client.close()
 
-    # ----------------------------------------------------------------------------------
-    # requests
-    # ----------------------------------------------------------------------------------
+    # ---- requests -----------------------------------------------------------
 
     def send(self, method, path, params=None, json=None, data=None, files=None, headers=None):
         """
@@ -196,9 +194,7 @@ class PocketBase:
         """
         return self._send('GET', '/api/health')
 
-    # ----------------------------------------------------------------------------------
-    # auth
-    # ----------------------------------------------------------------------------------
+    # ---- auth ---------------------------------------------------------------
 
     def _set_auth(self, collection, answer):
         # keep the token and the record of a login

@@ -202,7 +202,7 @@ def test_in_memory_certificate_string(certs):
     assert ev.ev_auth_authorization_id == 'supervisor'
 
 
-# ---- self-signed CN/SAN: derivation and configured override --------------------
+# ---- self-signed CN/SAN: derivation and configured override -----------------
 
 
 def _peer_certificate(settings, hosts=None):
@@ -279,7 +279,7 @@ def test_self_signed_uses_configured_names():
     assert set(dns) == {'mx.tokeo.test', 'alt.tokeo.test'}
 
 
-# ---- cryptography is lazy: only the self-signed generator needs it -------------
+# ---- cryptography is lazy: only the self-signed generator needs it ----------
 
 
 def test_plain_smtpd_runs_without_cryptography():

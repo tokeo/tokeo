@@ -79,7 +79,7 @@ class TokeoDramatiqController(Controller):
         # 0 stays valid in the config for prefetch and means auto as before
         return 'auto' if value == 0 else value
 
-    # --------------------------------------------------------------------------------------
+    # ---- locks --------------------------------------------------------------
 
     @ex(
         help='access the dramatiq locks from cache',
@@ -118,7 +118,7 @@ class TokeoDramatiqController(Controller):
             # show the locks info
             self.app.print(f'Dramatiq locks using the cache tag: {self.app.dramatiq.locks._tag}')
 
-    # --------------------------------------------------------------------------------------
+    # ---- queues -------------------------------------------------------------
 
     @ex(
         help='show and maintain the dramatiq queues',
@@ -190,7 +190,7 @@ class TokeoDramatiqController(Controller):
                 return
         self.app.print(json_dump(result, indent=2) if pargs.json else '\n'.join(lines))
 
-    # --------------------------------------------------------------------------------------
+    # ---- monitor ------------------------------------------------------------
 
     @ex(
         help='monitor the dramatiq workers and queues',
@@ -227,7 +227,7 @@ class TokeoDramatiqController(Controller):
             # listening fills the time between two displays
             output.follow(lambda: _monitor_view(output, monitor.snapshot(wait=interval), self.app._meta.label, interval), interval=0)
 
-    # --------------------------------------------------------------------------------------
+    # ---- serve --------------------------------------------------------------
 
     @ex(
         help='spin up the dramatiq service workers',

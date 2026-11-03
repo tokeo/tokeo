@@ -156,7 +156,7 @@ def test_noop_and_unknown_command():
     assert r[2][0].startswith('500')
 
 
-# ---- sequence and reject codes --------------------------------
+# ---- sequence and reject codes ----------------------------------------------
 
 
 def test_sequence_rcpt_before_mail_is_503():
@@ -1386,7 +1386,7 @@ def test_join_waits_until_the_server_has_stopped():
     assert asyncio.run(go()) is False
 
 
-# ---- AUTH (PLAIN / LOGIN) -----------------------------------------------------
+# ---- AUTH (PLAIN / LOGIN) ---------------------------------------------------
 
 
 def _b64(text):
@@ -1806,7 +1806,7 @@ def test_mail_from_auth_parameter_ends_with_the_transaction():
     assert mails == [('<a@x>', 's@example.com', 's@example.com'), ('<b@x>', '', '')]
 
 
-# ---- STARTTLS -------------------
+# ---- STARTTLS ---------------------------------------------------------------
 
 
 class TlsEvents(RecordingEvents):
