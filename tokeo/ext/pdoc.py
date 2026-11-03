@@ -505,6 +505,11 @@ class TokeoPdoc(Handler):
         template_dirs = self._template_dirs()
         primary_tpl = Path(template_dirs[0]) if template_dirs else None
 
+        # the favicon, a path in the project, is copied into the root of the
+        # docs below, where browsers look for it; without the file no link
+        favicon_file = self._config('favicon')
+        favicon = 'favicon' + os.path.splitext(favicon_file)[1] if favicon_file and os.path.isfile(favicon_file) else None
+
         # pdoc render configuration
         pdoc.render.configure(
             docformat='markdown',
@@ -512,7 +517,7 @@ class TokeoPdoc(Handler):
             math=False,
             mermaid=True,
             search=False,
-            favicon=self._config('favicon'),
+            favicon=favicon,
             template_directory=primary_tpl,
         )
 
@@ -726,8 +731,10 @@ class TokeoPdoc(Handler):
             (Path(self._output_dir) / 'index.html').write_text(index, encoding='utf-8')
 
         # copy template assets (highlight.js, mermaid, hljs themes, css) into
-        # the output dir so the pages' /assets/ references resolve
+        # the output dir so the pages' assets/ references resolve
         self._copy_assets(template_dirs, self._output_dir)
+        if favicon:
+            shutil.copyfile(favicon_file, os.path.join(self._output_dir, favicon))
 
         # optional config documentation page
         self._render_config_page(self._output_dir)

@@ -1,6 +1,37 @@
-<link rel="stylesheet" href="/assets/hljs/styles/base16/woodland.min.css">
-<script defer src="/assets/highlight.min.js"></script>
-<script defer src="/assets/mermaid.min.js"></script>
+<script>
+/* the colour mode: os (default), light or dark, kept per browser under the
+key tokeo-theme; set before the stylesheets so the page does not flash */
+(function () {
+var mode = 'os';
+try { mode = localStorage.getItem('tokeo-theme') || 'os'; } catch (error) {}
+if (['os', 'light', 'dark'].indexOf(mode) < 0) mode = 'os';
+document.documentElement.setAttribute('data-theme', mode);
+})();
+function tokeoDark() {
+var mode = document.documentElement.getAttribute('data-theme');
+return mode === 'dark' || (mode === 'os' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+document.addEventListener('DOMContentLoaded', function () {
+var buttons = document.querySelectorAll('.tk-mode button');
+function mark(mode) {
+buttons.forEach(function (button) { button.setAttribute('aria-pressed', String(button.dataset.mode === mode)); });
+}
+mark(document.documentElement.getAttribute('data-theme'));
+buttons.forEach(function (button) {
+button.addEventListener('click', function () {
+var dark = tokeoDark();
+document.documentElement.setAttribute('data-theme', button.dataset.mode);
+try { localStorage.setItem('tokeo-theme', button.dataset.mode); } catch (error) {}
+mark(button.dataset.mode);
+// mermaid draws once with the theme of the mode, a change redraws the page
+if (dark !== tokeoDark() && document.querySelector('.mermaid')) location.reload();
+});
+});
+});
+</script>
+<link rel="stylesheet" href="{{ root }}assets/hljs/styles/base16/woodland.min.css">
+<script defer src="{{ root }}assets/highlight.min.js"></script>
+<script defer src="{{ root }}assets/mermaid.min.js"></script>
 <script>
 window.addEventListener('DOMContentLoaded', () => {
 // Process mermaid blocks before highlighting
@@ -30,7 +61,14 @@ hljs.highlightAll();
 // Initialize mermaid
 mermaid.initialize({
 startOnLoad: true,
-theme: 'forest',
+// dark: the base theme drawn with the colours of the dark mode
+theme: tokeoDark() ? 'base' : 'forest',
+themeVariables: tokeoDark() ? {
+darkMode: true, background: '#1d1a26', fontFamily: 'Inter, sans-serif',
+primaryColor: '#241f30', primaryBorderColor: '#84b4ea', primaryTextColor: '#e6e1ee',
+secondaryColor: '#1f2433', tertiaryColor: '#1a1722', lineColor: '#a9c6ea', textColor: '#e6e1ee',
+edgeLabelBackground: '#2f2838', clusterBkg: '#1a1722', clusterBorder: '#3a3446'
+} : {},
 securityLevel: 'loose'
 });
 })

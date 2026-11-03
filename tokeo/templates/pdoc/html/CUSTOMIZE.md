@@ -21,7 +21,7 @@ Set in the ```[pdoc]``` section of the app config, e.g.
 pdoc:
   title: "Spiral Docs"                 # suffix in <title>: "module · Spiral Docs"
   brand: "🍒 Spiral"                   # sidebar label; null => "🚀 <app label>"
-  favicon: public/spiral-favicon.ico   # target of <link rel="icon">
+  favicon: public/spiral-favicon.ico   # project path, copied to the root of the docs
   html_lang: de                        # lang attribute of <html>
   show_config: true                    # render the yaml config page
   ancestors_max_depth: 2               # class hierarchy levels in the docs
@@ -71,6 +71,12 @@ The same tokens back the ```brand-*``` Tailwind utilities (```text-brand-primary
 | ```.tk-chev``` | The expand chevron in the sidebar |
 | ```.admonition```, ```.admonition-title``` | ```!!! note``` / ```.. note::``` boxes |
 | ```.pdoc-copy``` | The copy button on code blocks |
+| ```.tk-page```, ```.tk-surface```, ```.tk-footer``` | Page background, sidebar and cards, footer |
+| ```.tk-line```, ```.tk-line-strong``` | Borders |
+| ```.tk-namebox``` | Signature and name boxes |
+| ```.tk-badge```, ```.tk-badge-soft```, ```.tk-faint``` | Badges, source labels, faint notes |
+| ```.tk-codebox``` | The source boxes behind EXPAND |
+| ```.tk-mode```, ```.tk-mode-row``` | The light and dark switch |
 
 Override or extend with ordinary CSS:
 
@@ -78,6 +84,53 @@ Override or extend with ordinary CSS:
 .tk-doc h2 { margin-top: 3rem; }
 .tk-doc pre { border-radius: 0; }
 ```
+
+### Light and dark mode
+
+A switch with three positions chooses the mode: auto follows the system, light
+and dark set it. It sits in the sidebar right below the brand box, and on the
+start page top right above the banner. The choice is kept per browser in
+```localStorage``` under the key ```tokeo-theme``` and holds for every page.
+
+- ```<html>``` carries ```data-theme``` with ```os```, ```light``` or ```dark```;
+  without a stored choice it is ```os```. A short script at the top of
+  ```head.html``` sets it before the stylesheets, so the page does not flash.
+- Every colour is a token. ```:root``` holds the light values,
+  ```:root[data-theme='dark']``` the dark ones, and the same dark values sit in
+  ```:root[data-theme='os']``` under ```@media (prefers-color-scheme: dark)```.
+- Besides the ```--color-brand-*``` tokens there are ```--tk-*``` tokens for
+  surfaces, lines, boxes, code, tables, the copy button, the type badges of the
+  sidebar (```--tk-type-enum```, ```--tk-type-function```, ```--tk-type-variable```)
+  and the admonitions (```--tk-note-*```, ```--tk-important-*```, ```--tk-tip-*```,
+  ```--tk-success-*```, ```--tk-warning-*```, ```--tk-error-*```).
+- Mermaid draws with the theme ```forest``` in the light mode and with ```base```
+  in the dark mode, its ```themeVariables``` set to the dark tokens (surface,
+  lines, ink, the blue of the brand), in ```head.html```; switching the mode on a
+  page with a diagram reloads the page.
+
+To change a colour in a derived project, set the token in your own
+```tokeo.theme.css``` for both modes:
+
+```css
+:root { --tk-surface: #fffdf7; }
+:root[data-theme='dark'] { --tk-surface: #1b1a20; }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='os'] { --tk-surface: #1b1a20; }
+}
+```
+
+The templates use the semantic ```tk-*``` classes instead of fixed colour
+utilities, because ```tailwind.min.css``` is pre-built and knows no ```dark:```
+variants.
+
+### Relative paths
+
+Every page loads its assets and links the other pages by relative paths: a
+module page ```a.b.c``` reaches the root with ```../../```, the config page with
+```../```. The templates set this as ```root``` at the top and put it in front of
+every path; ```tokeo.theme.css``` loads its fonts relative to itself. So the docs
+work from any sub path, for example a GitHub Page under ```<user>.github.io/tokeo/```,
+and opened as files. A page of your own sets ```root``` the same way.
 
 ### Fonts
 
@@ -118,7 +171,8 @@ pdoc:
 | File | Contents |
 |---|---|
 | ```frame.html.jinja2``` | ```<!doctype>```, ```<html lang>```, ```<head>``` skeleton, ```<body>``` |
-| ```head.html``` | Highlighting, mermaid, copy button, extra CSS/JS |
+| ```head.html``` | Mode script, highlighting, mermaid, copy button, extra CSS/JS |
+| ```mode.html``` | The light and dark switch, included by the pages |
 | ```module.html.jinja2``` | Module page: sidebar plus content |
 | ```index.html.jinja2``` | Landing page listing the root packages |
 | ```config.html.jinja2``` | The yaml config page |

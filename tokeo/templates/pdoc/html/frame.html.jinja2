@@ -9,13 +9,13 @@
 {#- math/mermaid includes are off (`head.html` wires up mermaid itself).   -#}
 {#- ===================================================================== -#}
 <!doctype html>
-<html lang="{{ html_lang | default("en", true) }}">
+<html lang="{{ html_lang | default("en", true) }}" data-theme="os">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="generator" content="tokeo pdoc {{ tokeo_version }}"/>
   <title>{% block title %}{% endblock %}</title>
-  {% block favicon %}{% if favicon %}<link rel="icon" href="{{ favicon }}"/>{% endif %}{% endblock %}
+  {% block favicon %}{% if favicon %}<link rel="icon" href="{{ root | default('') }}{{ favicon }}"/>{% endif %}{% endblock %}
   {% block head %}{% endblock %}
   {% block style %}{% endblock %}
 </head>

@@ -7,6 +7,7 @@ Tests for tokeo.ext.pdoc, on what it adds on top of pdoc, not on pdoc itself:
 - namespace-aware module discovery, which pkgutil-based walking misses
 - ```serve()```, including the daemon thread it starts for the watch monitor
 - the controller's flag handling, driven through the real CLI
+- the light and dark mode of the pages: the switch, the tokens, the classes
 
 Everything that can fail at runtime is executed rather than inspected: the
 server really binds and answers a request. The watch machinery itself is not
@@ -1801,3 +1802,111 @@ def test_controller_passes_clean(tmp_path, monkeypatch):
         booted.run()
 
     assert seen['clean'] is True
+
+
+# --------------------------------------------------------------------------------------
+# light and dark mode of the pages
+# --------------------------------------------------------------------------------------
+
+
+# the templates and the theme the mode works on
+PDOC_HTML = Path(__file__).resolve().parents[2] / 'tokeo' / 'templates' / 'pdoc' / 'html'
+
+# the colour utilities the templates replaced by semantic classes
+REPLACED_UTILITIES = [
+    'from-slate-50',
+    'to-slate-100',
+    'bg-white',
+    'border-black/5',
+    'border-black/10',
+    'from-[#f4f8fb]',
+    'to-[#e6f0f6]',
+    'border-brand-primary/10',
+    'bg-black/[0.06]',
+    'bg-black/[0.04]',
+    'text-black/25',
+    'bg-[#231e18]',
+    'text-teal-600',
+    'text-amber-600',
+    'text-slate-500',
+]
+
+
+def _css_block(css, selector):
+    """The custom properties of the first block that opens with the selector."""
+    start = css.index(selector + ' {')
+    end = css.index('}', start)
+    body = css[start:end]
+    return set(re.findall(r'(--[\w-]+)\s*:', body))
+
+
+def _assert_mode_switch(html):
+    """The switch with its three modes, and the mode script before the styles."""
+    for mode in ('os', 'light', 'dark'):
+        assert f'data-mode="{mode}"' in html
+    assert html.count('aria-pressed=') == 3
+    assert html.index("localStorage.getItem('tokeo-theme')") < html.index('tokeo.theme.css')
+
+
+def test_pages_carry_the_mode_switch_and_the_early_script(tmp_path, monkeypatch):
+    """Start, module and config page have the switch and the early script."""
+    import pdoc.render
+
+    module = _render_page(tmp_path, monkeypatch, 'darkmode_pages', {'sample': '"""A module."""\n'})['sample']
+    start = (tmp_path / 'html' / 'index.html').read_text()
+    pdoc.render.env.globals.update(configdict={}, configsettings=[], configenvs=[])
+    config = pdoc.render.env.get_template('config.html.jinja2').render(app_name='darkmode')
+
+    for html in (start, module, config):
+        _assert_mode_switch(html)
+        assert '<html lang="en" data-theme="os">' in html
+
+
+def test_every_colour_token_has_a_dark_value_for_dark_and_os():
+    """Each colour token of :root is set in the dark block and in the os block."""
+    css = (PDOC_HTML / 'assets' / 'tokeo.theme.css').read_text()
+    tokens = {token for token in _css_block(css, ':root') if token.startswith(('--color-brand-', '--gradient-', '--tk-'))}
+    dark = _css_block(css, ":root[data-theme='dark']")
+    os_dark = _css_block(css, ":root[data-theme='os']")
+
+    assert tokens and tokens <= dark and tokens <= os_dark
+
+
+def test_no_template_uses_a_replaced_colour_utility():
+    """The templates use the tk-* classes, none of the old colour utilities."""
+    for template in PDOC_HTML.glob('*.jinja2'):
+        classes = ' '.join(re.findall(r'class="([^"]*)"', template.read_text())).split()
+        assert not set(classes) & set(REPLACED_UTILITIES), template.name
+
+
+def test_pages_use_relative_paths_only(tmp_path, monkeypatch):
+    """No page links or loads by an absolute path, so a sub path works."""
+    _render_page(tmp_path, monkeypatch, 'relpaths', {'deep': '"""A module."""\n'})
+    pages = {path.relative_to(tmp_path / 'html').as_posix(): path.read_text() for path in (tmp_path / 'html').rglob('*.html')}
+    css = (tmp_path / 'html' / 'assets' / 'tokeo.theme.css').read_text()
+
+    for name, html in pages.items():
+        assert not re.findall(r'(?:href|src)="/(?!/)', html), name
+    assert 'href="../assets/tokeo.theme.css"' in pages['relpaths/deep.html']
+    assert 'href="../index.html"' in pages['relpaths/deep.html']
+    assert 'href="assets/tokeo.theme.css"' in pages['index.html']
+    assert 'url("/' not in css
+
+
+def test_a_local_favicon_is_copied_into_the_root_of_the_docs(tmp_path, monkeypatch):
+    """public/favicon.ico becomes html/favicon.ico, linked relatively."""
+    _write(tmp_path / 'public' / 'favicon.ico', 'icon')
+    deep = _render_page(tmp_path, monkeypatch, 'favicons', {'deep': '"""A module."""\n'})['deep']
+    start = (tmp_path / 'html' / 'index.html').read_text()
+
+    assert (tmp_path / 'html' / 'favicon.ico').read_text() == 'icon'
+    assert '<link rel="icon" href="favicon.ico"/>' in start
+    assert '<link rel="icon" href="../favicon.ico"/>' in deep
+
+
+def test_without_the_favicon_file_no_page_links_one(tmp_path, monkeypatch):
+    """A favicon path that names no file gives no icon link and no copy."""
+    deep = _render_page(tmp_path, monkeypatch, 'nofavicon', {'deep': '"""A module."""\n'})['deep']
+
+    assert 'rel="icon"' not in deep
+    assert not (tmp_path / 'html' / 'favicon.ico').exists()

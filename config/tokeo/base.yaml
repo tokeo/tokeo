@@ -97,7 +97,7 @@ pdoc:
   host: '127.0.0.1'
   ### port for serving the pdoc service
   port: 9999
-  ### relative filepath or absolute URL to a favicon
+  ### relative project path of the favicon, copied into the root of the docs
   favicon: public/favicon.ico
   ### module or absolute path to the jinja2 templates
   templates:
