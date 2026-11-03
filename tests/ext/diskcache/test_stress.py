@@ -62,14 +62,19 @@ def _payload(rnd):
 
 
 def _value_of(key, data):
-    return (key, hashlib.sha256(data).hexdigest(), data)
+    # raw bytes as diskcache stores them unchanged: key, separator, digest, data
+    return key.encode() + b'\0' + hashlib.sha256(data).digest() + data
 
 
 def _wrong_value(key, value):
     # a value is right when it is missing or belongs to its key and is complete
     if value is None:
         return None
-    if type(value) is not tuple or value[0] != key or hashlib.sha256(value[2]).hexdigest() != value[1]:
+    head = key.encode() + b'\0'
+    if type(value) is not bytes or not value.startswith(head):
+        return f'{key}: {value!r:.80}'
+    rest = value.removeprefix(head)
+    if hashlib.sha256(rest[32:]).digest() != rest[:32]:
         return f'{key}: {value!r:.80}'
     return None
 
