@@ -1,9 +1,7 @@
 """
-Tokeo Jinja2 Extension Module.
-
-This extension provides enhanced Jinja2 templating capabilities to Tokeo
-applications. It extends the base Cement Jinja2 functionality with additional
-configuration options and improved template handling.
+Renders templates with Jinja2 for Tokeo applications. It extends the base
+Cement Jinja2 functionality with additional configuration options and improved
+template handling.
 
 ### Features
 

@@ -1,12 +1,10 @@
 """
-Tokeo VAULT Extension Module.
-
-This extension adds transparent decryption of secrets on top of the Tokeo YAML
-config handler. Encrypted values are marked in yaml with a ```!vault:<profile>```
-tag and loaded as opaque ```VaultRef``` objects, so the stored configuration
-never holds a decrypted secret. On read, an encrypted value is resolved to
-plaintext at its leaf, while the parent handler provides the walk, the
-copy-only-when-changed behaviour, and environment overrides at any depth.
+Decrypts secrets transparently on top of the Tokeo YAML config handler.
+Encrypted values are marked in yaml with a ```!vault:<profile>``` tag and loaded
+as opaque ```VaultRef``` objects, so the stored configuration never holds a
+decrypted secret. On read, an encrypted value is resolved to plaintext at its
+leaf, while the parent handler provides the walk, the copy-only-when-changed
+behaviour, and environment overrides at any depth.
 
 A profile lives in the ```vault``` config section and binds a handler by its
 ```type``` (the built-in ```enc```, ```scrypt``` and ```plain``` handlers are

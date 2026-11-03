@@ -1,10 +1,8 @@
 """
-Tokeo NiceGUI Extension Module.
-
-This extension integrates NiceGUI with Tokeo applications, providing a modern
-web interface capability. In compliance with NiceGUI 3.x architecture, this
-module strictly manages server state, configuration, and dynamic route orchestration
-without defining any global UI elements.
+Runs a web interface with NiceGUI in Tokeo applications. In compliance with
+NiceGUI 3.x architecture, this module strictly manages server state,
+configuration, and dynamic route orchestration without defining any global UI
+elements.
 
 The extension provides file monitoring capabilities for hot reloading during
 development, with both watchdog-based monitoring (preferred) and a fallback

@@ -1,6 +1,4 @@
 """
-Tokeo TUI Extension Package.
-
 General terminal input and output for Tokeo applications, split into two
 extensions that are enabled one by one:
 

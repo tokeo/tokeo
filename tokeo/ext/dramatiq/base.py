@@ -1,6 +1,4 @@
 """
-Tokeo Dramatiq extension base.
-
 Everything behind ```app.dramatiq```: the actor wrapper, the asyncio
 middleware, the RabbitMQ broker with single-active-consumer queues and the
 ```TokeoDramatiq``` object that reads the config, registers the broker with

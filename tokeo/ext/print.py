@@ -1,9 +1,6 @@
 """
-Tokeo Print Extension Module.
-
-This extension provides enhanced printing capabilities for Tokeo applications.
-It integrates with the Cement framework to provide structured output handling
-for print operations, ensuring that pre_render and post_render hooks are honored.
+Prints structured output for Tokeo applications through the output handling
+of Cement, so the pre_render and post_render hooks are honored.
 
 The extension provides framework-aware printing functionality that respects the
 application's output handling pipeline, including hooks, formatters, and

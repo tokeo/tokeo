@@ -1,6 +1,4 @@
 """
-Tokeo Base Module.
-
 Hand back a value, or a default when the value is missing, empty or blank.
 """
 

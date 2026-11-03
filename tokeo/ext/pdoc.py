@@ -1,6 +1,4 @@
 """
-Tokeo Pdoc Extension Module (pdoc / MIT-0 backend).
-
 Wraps pdoc (https://pdoc.dev, MIT-0) behind the existing Tokeo extension
 surface. The controller commands (```pdoc render```, ```pdoc serve```),
 their arguments (```--clean```, ```--serve```, positional ```modules```) and

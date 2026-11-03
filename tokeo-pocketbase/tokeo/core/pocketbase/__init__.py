@@ -1,6 +1,4 @@
 """
-Tokeo PocketBase Module.
-
 A driver for the REST API of PocketBase 0.40 and later, built on httpx. It
 reads and writes records, builds filters with safely quoted values, logs in
 with a password, refreshes and impersonates, sends batches and checks the

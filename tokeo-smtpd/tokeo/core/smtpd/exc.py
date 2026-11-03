@@ -1,7 +1,5 @@
 """
-Tokeo SMTPD Exceptions Module.
-
-This module defines the exception model of the SMTPD extension. It mirrors the
+Defines the exception model of the SMTPD library. It mirrors the
 ported exception hierarchy, so a handler raises the very same names like
 (```Smtpd550Exception```, ```Smtpd554Exception```, ...) it did in MidiSmtpServer.
 The server is the single place that catches these and translates them into

@@ -1,6 +1,4 @@
 """
-Tokeo SMTPD Context Module.
-
 The per-connection ```ctx``` handed to every handler event, a one-to-one
 translation of the ```session[:ctx]``` hash (```:server```,
 ```:envelope```, ```:message```) into three dataclasses with attribute access.

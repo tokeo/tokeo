@@ -1,6 +1,4 @@
 """
-Tokeo AppEnv Extension Module.
-
 Environment management extension for Tokeo applications.
 
 This module provides environment detection and configuration based on

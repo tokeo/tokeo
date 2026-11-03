@@ -1,6 +1,4 @@
 """
-Tokeo DiskCache Library.
-
 The disk and file backed cache of DiskCache 5.6.3 by Grant Jenks
 (github.com/grantjenks/python-diskcache), without pickle: keys and values that
 are no raw types are stored as JSON, pickled data is never loaded, and new

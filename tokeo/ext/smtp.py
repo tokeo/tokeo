@@ -1,10 +1,7 @@
 """
-Tokeo SMTP Extension Module.
-
-This extension provides a robust email sending capability via SMTP protocol
-for Tokeo applications. It supports plain text and HTML email messages,
-file attachments, inline images, template-based emails, and various
-encoding options.
+Sends emails over SMTP for Tokeo applications. It supports plain text and HTML
+email messages, file attachments, inline images, template-based emails, and
+various encoding options.
 
 The module implements a mail handler that is fully compliant with the
 Cement framework mail interface, while extending it with additional

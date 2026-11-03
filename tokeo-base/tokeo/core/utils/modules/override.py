@@ -1,6 +1,4 @@
 """
-Tokeo Module Override.
-
 Load a local file in place of an installed module, e.g. a fixed copy of a
 library module until its next release. Kept apart from
 tokeo.core.utils.modules, so only an import from here loads it.

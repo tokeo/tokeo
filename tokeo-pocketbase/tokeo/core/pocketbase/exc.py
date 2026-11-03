@@ -1,6 +1,4 @@
 """
-Tokeo PocketBase Errors.
-
 The errors of the driver: every error of the server or of the connection
 raises ```TokeoPocketBaseError```, a refused login its subclass
 ```TokeoPocketBaseAuthError```.

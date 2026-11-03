@@ -1,6 +1,4 @@
 """
-Tokeo PocketBase Realtime Module.
-
 Follows the changes of records by the realtime api of PocketBase, a stream
 of server sent events. ```Realtime``` runs in threads of its own and calls
 plain functions, ```AsyncRealtime``` runs as task of an asyncio event loop,

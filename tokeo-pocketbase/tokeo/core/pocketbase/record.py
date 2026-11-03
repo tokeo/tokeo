@@ -1,6 +1,4 @@
 """
-Tokeo PocketBase Records.
-
 The records of PocketBase as dicts that read and write their fields also as
 attributes, and a page of records with its counts.
 

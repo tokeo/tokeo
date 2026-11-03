@@ -1,6 +1,4 @@
 """
-Tokeo SMTPD Extension Module.
-
 Runs one or more SMTP receiving services from the application config on top
 of the ```tokeo.core.smtpd``` library: per-service events handlers, listener
 lists, process topology with pre-forked workers and machine-wide limits.

@@ -1,6 +1,4 @@
 """
-Tokeo Dramatiq queue management.
-
 State and maintenance of the queues of the app by AMQP only. Each queue comes
 with its delay queue (DQ) and its dead letter queue (XQ), which are handled
 together under the name of the queue.

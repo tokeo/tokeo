@@ -1,6 +1,4 @@
 """
-Tokeo Automate Extension Module.
-
 Task automation and remote execution for Tokeo applications.
 
 This module provides an automation framework for running local and remote tasks,

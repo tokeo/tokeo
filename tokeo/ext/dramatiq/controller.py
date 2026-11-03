@@ -1,6 +1,4 @@
 """
-Tokeo Dramatiq extension controller.
-
 The ```dramatiq``` commands of the app: ```serve``` starts the worker
 processes from the config and its switches, ```locks``` shows or purges the
 diskcache locks of the actors, ```queues``` shows and maintains the queues,

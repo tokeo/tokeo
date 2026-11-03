@@ -1,6 +1,4 @@
 """
-Tokeo PocketBase Filters and Paths.
-
 Values from outside put safely into a request: into a filter, quoted and
 escaped for the filter syntax of PocketBase, and into a segment of a path.
 

@@ -1,9 +1,7 @@
 """
-Tokeo Scheduler Extension Module.
-
-This extension provides task scheduling capabilities for Tokeo applications.
-It integrates the APScheduler library to enable cron-style scheduled tasks
-and provides an interactive shell for managing the scheduler at runtime.
+Schedules tasks for Tokeo applications. It integrates the APScheduler library
+to enable cron-style scheduled tasks and provides an interactive shell for
+managing the scheduler at runtime.
 
 The extension orchestrates the execution of background tasks with precise
 timing controls and offers both programmatic and interactive management

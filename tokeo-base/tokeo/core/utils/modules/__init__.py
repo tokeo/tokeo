@@ -1,6 +1,4 @@
 """
-Tokeo Modules Module.
-
 Loads modules and objects that a config names, with one form and one error
 for all extensions. An object is named as ```module:attr```, like an entry
 point.

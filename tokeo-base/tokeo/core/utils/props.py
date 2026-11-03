@@ -1,6 +1,4 @@
 """
-Tokeo Props Module.
-
 Read an attribute of an object or a key of a dict or container by one call,
 whatever the kind of the object is.
 """

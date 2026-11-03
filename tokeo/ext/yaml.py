@@ -1,10 +1,7 @@
 """
-Tokeo YAML Extension Module.
-
-This extension provides enhanced YAML configuration handling for Tokeo applications.
-It extends the standard Cement YamlConfigHandler with additional capabilities for
-deep merging of configuration dictionaries, preserving nested structures and
-handling various data types appropriately.
+Reads the YAML configuration of Tokeo applications. It extends the standard
+Cement YamlConfigHandler with deep merging of configuration dictionaries,
+preserving nested structures and handling various data types appropriately.
 
 The module enables loading and parsing of YAML configuration files with proper
 handling of nested dictionaries, allowing for more complex configuration structures

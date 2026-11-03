@@ -1,6 +1,4 @@
 """
-Tokeo SMTPD TLS Transport Module.
-
 A translation of MidiSmtpServer ```tls-transport.rb```: it builds the
 server ```ssl.SSLContext``` for STARTTLS and immediate TLS from a
 certificate/key (or a generated self-signed test certificate when none is

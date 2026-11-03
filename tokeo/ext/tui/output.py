@@ -1,6 +1,4 @@
 """
-Tokeo TUI Output Extension Module.
-
 Tables and a live display for the terminal, available as ```app.tui.output```
 once ```tokeo.ext.tui.output``` is enabled. Built on rich, which is loaded
 when the extension is enabled.

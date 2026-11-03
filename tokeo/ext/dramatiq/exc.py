@@ -1,6 +1,4 @@
 """
-Tokeo Dramatiq extension errors.
-
 All errors of the extension derive from ```TokeoDramatiqError```. The
 subclasses keep the details of the error as fields and build their message
 from them. The fields hold plain values only, so the errors survive copy and

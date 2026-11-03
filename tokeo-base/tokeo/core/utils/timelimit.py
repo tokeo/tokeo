@@ -1,6 +1,4 @@
 """
-Tokeo Time Limit Module.
-
 Limits the run time of a function by the decorator ```@timelimit```.
 
 A normal function gets ```TokeoTimelimitExceeded``` raised into its own

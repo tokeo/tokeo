@@ -1,7 +1,6 @@
 """
-Tokeo Dramatiq queue and worker monitoring.
-
-With ```monitoring: true``` each worker process sends a heartbeat every
+Shows the workers of the app and the state of their queues. With
+```monitoring: true``` each worker process sends a heartbeat every
 ```monitoring_interval``` seconds to the fanout exchange
 ```<app label>.dramatiq.monitoring```. A monitor listens on a queue of its own
 and shows the workers it heard of together with the state of the queues.

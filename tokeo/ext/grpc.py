@@ -1,9 +1,7 @@
 """
-Tokeo gRPC Extension Module.
-
-This module provides gRPC integration for Tokeo applications, allowing Tokeo apps
-to serve as gRPC servers and clients. It includes a controller for managing gRPC
-services and templates for generating client/server implementations.
+Serves a Tokeo application as gRPC server and calls other gRPC services as
+client. It includes a controller for managing gRPC services and templates for
+generating client/server implementations.
 
 The extension handles server lifecycle management, dynamic loading of servicers,
 and configuration management.

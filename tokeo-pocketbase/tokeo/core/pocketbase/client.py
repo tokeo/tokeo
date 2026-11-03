@@ -1,6 +1,4 @@
 """
-Tokeo PocketBase Client.
-
 The client of one PocketBase server with one login, and the keeper of a
 login that confirms it on the server.
 

@@ -1,6 +1,4 @@
 """
-Tokeo SMTPD Server Module.
-
 A one-to-one translation of MidiSmtpServer dialog engine from Ruby to
 Python on ```asyncio```. ```serve_client``` owns the per-connection io loop
 (timeout, buffer limit, PIPELINING guard, CRLF handling), ```process_line```

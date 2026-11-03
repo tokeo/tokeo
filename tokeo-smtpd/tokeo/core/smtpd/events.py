@@ -1,7 +1,5 @@
 """
-Tokeo SMTPD Events Contract Module.
-
-This module defines the handler contract: a base class whose method names match
+Defines the handler contract: a base class whose method names match
 (```on_message_data_event```, ```on_rcpt_to_event```, ...). An application
 implements the contract and binds it per service via config; the server
 dispatches to these methods and turns any raised SMTP exception into a response.

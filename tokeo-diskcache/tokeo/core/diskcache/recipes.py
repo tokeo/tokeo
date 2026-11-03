@@ -1,4 +1,4 @@
-"""Disk Cache Recipes
+"""The Lock recipe of DiskCache for locks across threads and processes.
 
 Modified for tokeo-diskcache: only the Lock recipe is taken.
 """

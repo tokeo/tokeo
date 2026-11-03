@@ -1,6 +1,4 @@
 """
-Tokeo Dramatiq Extension Module.
-
 Background tasks for Tokeo applications with dramatiq and RabbitMQ: the broker
 from the app config, ```app.dramatiq.actor``` for actors, the ```dramatiq```
 commands ```serve```, ```queues```, ```monitor``` and ```locks```, queue

@@ -1,6 +1,4 @@
 """
-Tokeo PocketBase Live Module.
-
 The realtime data of PocketBase for the pages of nicegui, reached as
 ```app.nicegui.pb.live```. The pocketbase extension adds it to the nicegui
 extension by the hook ```tokeo_nicegui_extend```, only when both are loaded.

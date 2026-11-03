@@ -1,6 +1,4 @@
 """
-Tokeo TUI Input Extension Module.
-
 An interactive shell for the terminal, available as ```app.tui.input``` once
 ```tokeo.ext.tui.input``` is enabled. Built on prompt_toolkit, which is loaded
 when the extension is enabled.

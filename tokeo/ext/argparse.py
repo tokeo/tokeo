@@ -1,6 +1,4 @@
 """
-Tokeo ArgParse Extension Module.
-
 Custom command-line argument handling for Tokeo applications.
 
 This module extends Cement's ArgparseController with an improved help formatter

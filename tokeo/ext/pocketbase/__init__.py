@@ -1,10 +1,7 @@
 """
-Tokeo PocketBase Extension Module.
-
-This extension integrates PocketBase with Tokeo applications, providing a
-lightweight database solution and backend services. PocketBase is a
-zero-config backend built on SQLite that provides REST API, authentication,
-and realtime subscriptions.
+Connects Tokeo applications to PocketBase as a lightweight database and
+backend. PocketBase is a zero-config backend built on SQLite that provides REST
+API, authentication, and realtime subscriptions.
 
 The extension exposes a Cement-style database handler, reachable as app.db
 throughout your Tokeo application, that maps the usual CRUD methods onto

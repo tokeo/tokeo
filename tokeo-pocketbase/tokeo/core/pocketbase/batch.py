@@ -1,6 +1,4 @@
 """
-Tokeo PocketBase Batches.
-
 Record changes sent in one transaction, all or nothing, by the batch api of
 PocketBase; it must be switched on in the settings of PocketBase.
 

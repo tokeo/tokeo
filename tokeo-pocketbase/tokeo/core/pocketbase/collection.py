@@ -1,6 +1,4 @@
 """
-Tokeo PocketBase Collections.
-
 The record methods of one collection: list, page through, find, get,
 create, update and delete, with files along with the fields.
 

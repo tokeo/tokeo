@@ -1,6 +1,4 @@
 """
-Tokeo DiskCache Extension Module.
-
 Disk-based caching system with advanced locking, throttling, and rate limiting.
 
 This module extends the standard diskcache library to provide a robust caching

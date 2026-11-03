@@ -1,6 +1,4 @@
 """
-Tokeo Validate Module.
-
 The ```is_``` checks tell by True or False whether a value fits. They never
 raise and never convert, so the caller raises its own error with its own
 message. ```valid_or_default``` hands back a value that passes a check, else
