@@ -1,7 +1,7 @@
 FROM python:3.13-alpine
 LABEL MAINTAINER="Tom Freudenberg <th.freudenberg@gmail.com>"
 ENV PS1="\[\e[0;33m\]\(> tokeo <\) \[\e[1;35m\]\W\[\e[0m\] \[\e[0m\]# "
-ENV TOKEO_ENV=prod
+ENV TOKEO_ENV=production
 
 WORKDIR /app
 COPY . /app

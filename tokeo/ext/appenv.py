@@ -5,6 +5,10 @@ This module provides environment detection and configuration based on
 environment variables. It supports different runtime environments like
 production, staging, development, and testing.
 
+The variable ```<APP_LABEL>_ENV``` names the environment by its long name,
+e.g. ```SHOP_ENV=production```. The short names ```prod```, ```stage```,
+```dev``` and ```test``` work too.
+
 When the appenv extension is used, the normal cement config file behavior
 is replaced by tokeo's environment based configuration. A cement
 runtime configuration is built from base plus a detected environment.
@@ -104,13 +108,13 @@ class TokeoAppEnv:
             app._meta.label = self.APP_LABEL[: -len('_test')]
             self.APP_LABEL = app._meta.label
             self.APP_ENV_VAR_NAME = self.APP_LABEL.upper() + '_ENV'
-            self.APP_ENV_VAR_VALUE = 'test'
+            self.APP_ENV_VAR_VALUE = 'testing'
             self.APP_ENV = TESTING
         elif self.APP_ENV_VAR_VALUE:
             # a typo must not run with the base config only
             raise TokeoError(
                 f'{self.APP_ENV_VAR_NAME}={self.APP_ENV_VAR_VALUE!r} is no environment, '
-                'use dev, development, prod, production, stage, staging, test or testing'
+                'use development, production, staging or testing (or dev, prod, stage, test)'
             )
         else:
             self.APP_ENV = None
