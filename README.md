@@ -50,7 +50,7 @@ Tom
 Tokeo is a robust CLI framework for task automation, message queues, and web interfaces, making it ideal for Python backend projects. Its key features:
 
 - Combines Dramatiq, RabbitMQ and gRPC for efficient task processing and external access, plus APScheduler for scheduled jobs.
-- Adds governed AI agents with the optional [tokeo-fundi](https://github.com/tokeo/fundi) extension, a provider-agnostic AI runtime with typed contracts, profiles and agents as plain configuration. Every tool call passes a guard pipeline (validate, policy, audit) and leaves a full trace. ```tokeo-fundi``` is installed separately and entirely optional.
+- Adds governed AI agents with the optional [tokeo-fundi](https://github.com/tokeo/fundi) extension, a provider-agnostic AI runtime with typed contracts, profiles and agents as plain configuration. Every tool call passes a pipeline of governors (validate, policy, confirm, audit) and leaves a full trace. ```tokeo-fundi``` is installed separately and entirely optional.
 - Keeps credentials encrypted inside your YAML with the vault extension (```tokeo.ext.vault```): ```!vault:<profile>``` tags, built-in ```enc``` and ```scrypt``` handlers and keys from the environment, and a ```plain``` handler that only marks a value. Values are decrypted transparently at the leaf, consumer code never changes and plaintext never lands in the config; a vault value shows as ```***``` in the config page of pdoc, in ```redact_vault``` and in ```repr```.
 - Defines and runs local or remote tasks with the Fabric-based ```tokeo.ext.automate```, configured by YAML and CLI overrides.
 - Builds on Cement, tokeo supports custom commands and plugins, simplifying complex workflows with minimal setup.
@@ -74,6 +74,9 @@ Whether you're building microservices, automating workflows, or prototyping, Tok
 # Install directly from Pypi.org
 pip install tokeo
 
+# Add the project templates for tokeo generate
+pip install tokeo tokeo-ramani
+
 # Or add the optional governed AI runtime
 pip install tokeo tokeo-fundi
 
@@ -89,7 +92,7 @@ tokeo --help
 
 ### Creating a New Project
 
-Set up a Tokeo project in minutes:
+Set up a Tokeo project in minutes. The templates come from ```tokeo-ramani```, so install it next to Tokeo first:
 
 ```bash
 # Define a dedicated space for your project
@@ -206,8 +209,11 @@ your_app nicegui serve
 # Ask through the default profile (mock provider, no external service needed)
 your_app ai ask "ping"
 
-# Run the guarded agent: every tool call passes validate, policy, audit
-your_app ai ask "add 14 days to 2026-06-08" --profile akili --agent guarded
+# Run the guarded agent: every tool call passes validate, policy, redact, audit
+your_app ai ask "weekday 2026-06-08" --agent guarded
+
+# Inspect the result with its full trace as JSON
+your_app ai ask "weekday 2026-06-08" --agent guarded --trace
 ```
 
 ### Use Diskcache
@@ -239,11 +245,11 @@ CEMENT_LOG=1 your_app command
 
 > The governed AI runtime described here is the separate [tokeo-fundi](https://github.com/tokeo/fundi) project, installed via ```tokeo-fundi```. Tokeo runs fully without it; add it when you want AI. See the [tokeo-fundi README](https://github.com/tokeo/fundi) for the complete picture.
 
-[tokeo-fundi](https://github.com/tokeo/fundi) is a small AI agent runtime built on one rule: the model plans, the pipeline governs and the tools compute. Every step is explicit and can be inspected. It is compact, fully typed and tested end to end: the same suite drives the mock provider, the guard pipeline and a real trained model.
+[tokeo-fundi](https://github.com/tokeo/fundi) is a small AI agent runtime built on one rule: the model plans, the pipeline governs and the tools compute. Every step is explicit and can be inspected. It is compact, fully typed and tested end to end: the same suite drives the mock provider, the governor pipeline and a real trained model.
 
 - Messages, tool calls, results and traces are typed values (```tokeo.core.ai```), independent of any provider SDK.
-- An agent is a named guard chain in YAML. ```audited``` records everything and forbids nothing; ```guarded``` adds validation and policy (e.g. a readonly filesystem). With ```agent: null```, the default, requests run plain and untraced; governance is opted into.
-- Tools are plain functions, registered with a spec and activated in groups (calendar, filesystem, mathematics) per profile. The provider never executes anything itself; results return as feedback through the guards.
+- An agent is a named composition in YAML: its tools, its governors and its sandbox chain. ```audited``` records everything and forbids nothing; ```guarded``` adds validation, policy (e.g. a readonly filesystem) and a person to confirm before writing. There is always an agent: when none is named, the implicit agent offers no tools, so a plain question gets an answer and nothing can be called.
+- Tools are plain classes with a spec, grouped by name (calendar, filesystem, mathematics). The agent is the only source of tools; a profile or a call can only take tools away. The provider never executes anything itself; results return as feedback through the governors.
 - Providers are resolved late, by class path. The built-in ```mock``` provider makes the whole pipeline testable without any external service.
 
 ### akili
@@ -258,13 +264,13 @@ When you generate a project with the AI branch, it ships ```akili```, a train-fi
 
 ### Providers
 
-The same agents and guards run against every backend, so a change of provider is an edit of the profile and not a refactor:
+The same agents and governors run against every backend, so a change of provider is an edit of the profile and not a refactor:
 
 - ```mock```: the deterministic local provider without server or network, the driver for tests and demos.
 - ```akili```: the trained micro model, running in-process with plain NumPy.
 - ```oai_compat```: any OpenAI-compatible endpoint you run yourself (Ollama, vLLM, llama.cpp, MLX) or a commercial API; the API key resolves through the vault, encrypted inside the config.
 
-Response guards (redact, truncate), sandboxed tool execution (subprocess and a WebAssembly guest), and a code-mode tool that runs model-written Python behind that sandbox are all part of the runtime. The full description is in the [tokeo-fundi README](https://github.com/tokeo/fundi).
+Governors at every stage (guards such as redact and confirm, transformers such as truncate), sandboxed tool execution (subprocess, a docker container and a WebAssembly guest), and a code-mode tool that runs model-written Python behind that sandbox are all part of the runtime. The full description is in the [tokeo-fundi README](https://github.com/tokeo/fundi).
 
 <br/>
 
