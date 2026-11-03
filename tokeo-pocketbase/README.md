@@ -18,9 +18,7 @@ The [PocketBase](https://pocketbase.io) driver of [Tokeo](https://github.com/tok
 - Records as dicts that read and write their fields also as attributes
 - Errors with the status, the url and the invalid fields of the answer
 
-<br/>
-
-#### Why not the PocketBase SDK for Python
+### Why not the PocketBase SDK for Python
 
 PocketBase itself offers SDKs for JavaScript and Dart only. The SDK for Python is a translation of the one for JavaScript by the community. Its filter helper escapes the quote but not the backslash, so a value ending in a backslash breaks out of its string, and it fails on a token without expiry. Tokeo PocketBase covers what Tokeo needs directly on the REST API and quotes filter values as the filter parser of PocketBase reads them.
 
