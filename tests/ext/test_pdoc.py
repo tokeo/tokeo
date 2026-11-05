@@ -1778,10 +1778,10 @@ def test_controller_passes_clean(tmp_path, monkeypatch):
 
 
 # the templates and the theme the mode works on
-PDOC_HTML = Path(__file__).resolve().parents[2] / 'tokeo' / 'templates' / 'pdoc' / 'html'
+PDOC_TEMPLATE_DIR = Path(__file__).resolve().parents[2] / 'tokeo' / 'templates' / 'pdoc' / 'html'
 
 # the colour utilities the templates replaced by semantic classes
-REPLACED_UTILITIES = [
+PDOC_REPLACED_COLOR_CLASSES = [
     'from-slate-50',
     'to-slate-100',
     'bg-white',
@@ -1832,7 +1832,7 @@ def test_pages_carry_the_mode_switch_and_the_early_script(tmp_path, monkeypatch)
 
 def test_every_colour_token_has_a_dark_value_for_dark_and_os():
     """Each colour token of :root is set in the dark block and in the os block."""
-    css = (PDOC_HTML / 'assets' / 'tokeo.theme.css').read_text()
+    css = (PDOC_TEMPLATE_DIR / 'assets' / 'tokeo.theme.css').read_text()
     tokens = {token for token in _css_block(css, ':root') if token.startswith(('--color-brand-', '--gradient-', '--tk-'))}
     dark = _css_block(css, ":root[data-theme='dark']")
     os_dark = _css_block(css, ":root[data-theme='os']")
@@ -1842,9 +1842,9 @@ def test_every_colour_token_has_a_dark_value_for_dark_and_os():
 
 def test_no_template_uses_a_replaced_colour_utility():
     """The templates use the tk-* classes, none of the old colour utilities."""
-    for template in PDOC_HTML.glob('*.jinja2'):
+    for template in PDOC_TEMPLATE_DIR.glob('*.jinja2'):
         classes = ' '.join(re.findall(r'class="([^"]*)"', template.read_text())).split()
-        assert not set(classes) & set(REPLACED_UTILITIES), template.name
+        assert not set(classes) & set(PDOC_REPLACED_COLOR_CLASSES), template.name
 
 
 def test_pages_use_relative_paths_only(tmp_path, monkeypatch):

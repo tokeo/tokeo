@@ -99,10 +99,10 @@ def test_tokeo_diskcache_never_imports_pickle():
 
 
 # the base utils fundi copies into its wasm guest, next to each other
-GUEST_UTILS = ('date', 'date_compat', 'json')
+WASM_GUEST_UTIL_MODULES = ('date', 'date_compat', 'json')
 
 
-@pytest.mark.parametrize('module', GUEST_UTILS)
+@pytest.mark.parametrize('module', WASM_GUEST_UTIL_MODULES)
 def test_the_wasm_guest_utils_import_only_the_stdlib_or_each_other(module):
     """date, date_compat and json of tokeo-base import the stdlib or each other."""
     path = os.path.join(ROOT, 'tokeo-base', 'tokeo', 'core', 'utils', f'{module}.py')
@@ -113,7 +113,8 @@ def test_the_wasm_guest_utils_import_only_the_stdlib_or_each_other(module):
         if isinstance(node, ast.Import):
             found += [alias.name for alias in node.names if alias.name.split('.')[0] not in sys.stdlib_module_names]
         elif isinstance(node, ast.ImportFrom) and node.level:
-            found += [name for name in ([node.module] if node.module else [a.name for a in node.names]) if name not in GUEST_UTILS]
+            names = [node.module] if node.module else [a.name for a in node.names]
+            found += [name for name in names if name not in WASM_GUEST_UTIL_MODULES]
         elif isinstance(node, ast.ImportFrom) and node.module.split('.')[0] not in sys.stdlib_module_names:
             found.append(node.module)
     assert found == []
