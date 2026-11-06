@@ -29,9 +29,10 @@ automate:
 # Execute via CLI
 # tokeo automate run check_uptime
 
-# define your method
-def check_uptime(app, connection, verbose=False):
-    return connection.run('uptime', hide=not verbose, warn=False)
+# define your method, runner runs a command on the host of the call; the app
+# is shared by tokeo.ext.appshare
+def check_uptime(runner, verbose=False, **kwargs):
+    return runner('uptime', hide=not verbose, warn=False)
 ```
 
 """
@@ -1272,7 +1273,7 @@ class TokeoAutomate(MetaMixin):
 
         # a simple wrapper to raise not exist function error on runtime
         def __unknown_function(module, key):
-            def wrapper(app, connection, **kwargs):
+            def wrapper(runner, **kwargs):
                 raise TokeoAutomateError(f'A function named "{key}" does not exist in module "{module}"')
 
             return wrapper

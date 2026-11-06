@@ -65,20 +65,29 @@ def test_tasks_are_read_and_expanded():
         assert tasks == defaults_automate_tasks(validate=True)
 
 
-def test_tasks_task1_runs_locally(monkeypatch):
-    """task1 runs uname by invoke on the local host and exits with 0."""
-    with AutomateTest() as app:
-        task = app.automate.tasks['task1']
-        connection = invoke.Context(config=invoke.Config(overrides={}))
+def test_run_calls_a_task_with_its_runner(monkeypatch):
+    """run calls the real task1 with the runner of the local host, exit 0."""
+    test_defaults = init_defaults('automate')
+    test_defaults['automate']['tasks'] = dict(task1=dict(module='tests.ext.automate.automate_tests_helper'))
+    with AutomateTest(config_defaults=test_defaults) as app:
         with monkeypatch.context() as patch:
             # invoke hands stdin on, pytest blocks reading it
             patch.setattr('sys.stdin', io.StringIO(''))
-            ran = task['func'](app, connection, **task['kwargs'])
-        result = TokeoAutomateResult('task1', task['connection']['id'], 'local', result=ran)
-        assert result.exited == 0
-        assert 'darwin' in result.stdout.lower() or 'linux' in result.stdout.lower()
+            results = app.automate.run(app.automate.tasks['task1'])
+        assert [(r.host_id, r.exited, r.exception) for r in results] == [('local', 0, None)]
+        assert results[0].stdout.strip() == 'task1'
         # the result can be shown by inspect
-        app.inspect(result, divider='*')
+        app.inspect(results[0], divider='*')
+
+
+def test_run_reports_a_missing_task_function():
+    """A task without a function of its name ends in a TokeoAutomateError result."""
+    test_defaults = init_defaults('automate')
+    test_defaults['automate']['tasks'] = dict(no_such_task=dict(module='tests.ext.automate.automate_tests_helper'))
+    with AutomateTest(config_defaults=test_defaults) as app:
+        results = app.automate.run(app.automate.tasks['no_such_task'])
+    assert [(r.exited, r.exception) for r in results] == [(-1, 'TokeoAutomateError')]
+    assert 'A function named "no_such_task" does not exist' in results[0].stderr
 
 
 def _connect_timeout(connect_timeout):

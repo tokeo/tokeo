@@ -7,18 +7,19 @@ from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
 
 
-def task1(app, connection, url=''):
-    app.log.info('Task1 started')
-    result = connection.run('uname -a', hide=True, warn=False)
-    return result
+def task1(runner, verbose=False, **kwargs):
+    # runs a command through the runner of the call
+    return runner('echo task1', hide=True, warn=False)
 
 
-def task2(app, connection, url=''):
-    app.log.info('Task2 start with url: ' + url)
+def task2(runner, verbose=False, url='', **kwargs):
+    # hands its url back
+    return dict(url=url)
 
 
-def task3(app, connection, url=''):
-    app.log.info('Task3 start with url: ' + url)
+def task3(runner, verbose=False, url='', **kwargs):
+    # hands its url back
+    return dict(url=url)
 
 
 def defaults_automate_hosts(validate=False):
