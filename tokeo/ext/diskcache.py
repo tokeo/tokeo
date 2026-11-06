@@ -1017,7 +1017,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         ### Returns
 
-        - **bool**: True if the cache was successfully purged
+        - **int**: The number of keys removed
 
         """
         retry = kw.get('retry', False)
