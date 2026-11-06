@@ -708,3 +708,19 @@ def test_temper_count_must_be_an_integer_greater_than_0(tmp, count):
     with DiskcacheTest(tmp.dir) as app:
         with pytest.raises(ValueError, match='count must be an integer greater than 0'):
             app.cache.locks.temper(count=count)
+
+
+@pytest.mark.parametrize('text, value', [('False', False), ('no', False), ('0', False), ('True', True), ('on', True)])
+def test_cache_set_reads_a_bool_by_its_words(tmp, text, value):
+    """cache set --value-type bool stores False for 'False', 'no' and '0'."""
+    with DiskcacheTest(tmp.dir, argv=['cache', 'set', 'flag', '--value', text, '--value-type', 'bool']) as app:
+        app.run()
+        assert app.cache.get('flag') is value
+
+
+def test_cache_set_refuses_a_bool_it_cannot_read(tmp):
+    """cache set --value-type bool with any other word stores nothing, exit 1."""
+    with DiskcacheTest(tmp.dir, argv=['cache', 'set', 'flag', '--value', 'maybe', '--value-type', 'bool']) as app:
+        app.run()
+        assert app.cache.get('flag') is None
+        assert app.exit_code == 1

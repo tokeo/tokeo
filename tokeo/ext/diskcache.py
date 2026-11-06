@@ -1632,7 +1632,14 @@ class TokeoDiskCacheController(Controller):
             elif value_type == 'float':
                 typed_value = float(value)
             elif value_type == 'bool':
-                typed_value = bool(value)
+                # bool() of any non-empty text is True, so read its words
+                text = value.strip().lower()
+                if text in ('true', 'yes', 'on', '1'):
+                    typed_value = True
+                elif text in ('false', 'no', 'off', '0'):
+                    typed_value = False
+                else:
+                    raise ValueError(f'{value!r} is no bool, give true or false')
             else:
                 typed_value = value
         except Exception as err:
