@@ -4,6 +4,7 @@ temper (concurrency limit) and throttle (rate limit), alone, across threads
 and across processes.
 """
 
+import re
 import time
 import sqlite3
 import threading
@@ -724,3 +725,24 @@ def test_cache_set_refuses_a_bool_it_cannot_read(tmp):
         app.run()
         assert app.cache.get('flag') is None
         assert app.exit_code == 1
+
+
+def test_cache_list_shows_the_whole_seconds_until_a_key_expires(tmp, capsys):
+    """cache list --with-expires shows the rest in whole seconds, or no expire."""
+    with DiskcacheTest(tmp.dir, argv=['cache', 'list', '--with-expires']) as app:
+        app.cache.set('short', 1, expire=60)
+        app.cache.set('kept', 1)
+        app.run()
+    lines = capsys.readouterr().out.splitlines()
+    assert 'short (60s)' in lines or 'short (59s)' in lines
+    assert 'kept (no expire)' in lines
+
+
+def test_cache_locks_lists_a_held_lock_with_its_expire(tmp, capsys):
+    """cache locks shows the lock tag and a held lock with its rest in seconds."""
+    with DiskcacheTest(tmp.dir, argv=['cache', 'locks']) as app:
+        assert app.cache.locks.acquire('job', expire=60)
+        app.run()
+    out = capsys.readouterr().out
+    assert f'Locks using the tag: {app.cache.locks._tag}' in out
+    assert re.search(r'job.* \((60|59)s\) \[', out)

@@ -1341,7 +1341,7 @@ class TokeoDiskCacheController(Controller):
                 if self.app.pargs.with_types:
                     out += ' |:{value_type}|'
                 if self.app.pargs.with_expires:
-                    out += ' ({expire_seconds})s'
+                    out += ' ({expire_str})'
                 if self.app.pargs.with_tags:
                     out += ' [{tag}]'
                 if out != '{key}' or self.app.pargs.tag is not None:
@@ -1349,10 +1349,8 @@ class TokeoDiskCacheController(Controller):
                     value, expire_time, tag = self.app.cache._cache.get(key, default=None, expire_time=True, tag=True, retry=False)
                     if value is None:
                         value = ''
-                    if expire_time is None:
-                        expire_seconds = 'no expire'
-                    else:
-                        expire_seconds = expire_time - time.time()
+                    # the whole seconds until the key expires
+                    expire_str = 'no expire' if expire_time is None else f'{max(0, round(expire_time - time.time()))}s'
                     if tag is None:
                         tag = ''
                     # check if need to compare with tag filter from command line
@@ -1363,11 +1361,11 @@ class TokeoDiskCacheController(Controller):
                             _show = tag == self.app.pargs.tag
                 else:
                     # just empty the values
-                    value, expire_seconds, tag = (None, None, None)
+                    value, expire_str, tag = (None, None, None)
 
             # show the line
             if _show:
-                self.app.print(out.format(key=key, value=value, value_type=type(value).__name__, expire_seconds=expire_seconds, tag=tag))
+                self.app.print(out.format(key=key, value=value, value_type=type(value).__name__, expire_str=expire_str, tag=tag))
 
     # ---- locks --------------------------------------------------------------
 
