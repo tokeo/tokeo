@@ -5,12 +5,12 @@ server. You write a small handler class; the server runs the SMTP conversation,
 calls your handler at each step, and turns your decisions into the correct SMTP
 responses.
 
-Note: Tokeo smtpd is based on MidiSmtpServer, a faithful, one-to-one port of
-the Ruby gem
+Note: Tokeo smtpd is based on MidiSmtpServer, a port of the Ruby gem
 [midi-smtp-server](https://github.com/4commerce-technologies-AG/midi-smtp-server):
 the events, the context object, the configuration options, the exceptions and the
-lifecycle all mirror the original, so existing handlers port over directly. You do
-not need to know the original to use the library.
+lifecycle follow the original wherever the principles of Tokeo allow, so existing
+handlers port over easily. You do not need to know the original to use the
+library.
 
 .. note::
 

@@ -235,7 +235,7 @@ class SmtpdSession:
 
     """
 
-    __slots__ = ('cmd_sequence', 'ctx', 'auth_challenge', 'processing', 'data_error', 'end_time')
+    __slots__ = ('cmd_sequence', 'ctx', 'auth_challenge', 'has_processing_slot', 'data_error', 'end_time')
 
     def __init__(self):
         #: @private Current position in the SMTP command sequence
@@ -247,7 +247,7 @@ class SmtpdSession:
         #: @private Pending AUTH LOGIN challenge state
         self.auth_challenge = {}
         #: @private True while this connection holds a processing slot
-        self.processing = False
+        self.has_processing_slot = False
         #: @private First exception within DATA, sent as output on the end of
         #: DATA
         self.data_error = None
@@ -441,7 +441,7 @@ class GlobalLimits:
         await self.slot_free.wait()
 
 
-def _tls_cert_names(cert_cn, cert_san, hosts, addresses):
+def _get_tls_cert_names(cert_cn, cert_san, hosts, addresses):
     """
     The CN and SAN for the self-signed certificate (reference parity).
 
@@ -474,8 +474,9 @@ class SmtpdServer:
     """
     The SMTP service: binds listeners and serves each client.
 
-    Option names are kept 1:1; ```data_size``` is a Tokeo-only option
-    (a hard limit of the message size while receiving DATA).
+    The option names follow MidiSmtpServer wherever the principles of Tokeo
+    allow; ```data_size``` is a Tokeo-only option (a hard limit of the message
+    size while receiving DATA).
 
     ### Args
 
@@ -526,7 +527,7 @@ class SmtpdServer:
             logger.setLevel(Severity[logger_severity or 'WARNING'].value)
         events_handler._logger_protected = logger
         #: The exposed logger; forwards to the handler's on_logging_event
-        self.logger = ForwardingLogger(self._log_bridge)
+        self.logger = ForwardingLogger(self._bridge_log)
         events_handler.log = self.logger
         # ports / hosts / addresses
         # bytes of randomness for the per-connection session id (ctx.id);
@@ -575,9 +576,9 @@ class SmtpdServer:
             self._spool_dir, self._spool_prefix = os.path.split(value)
             if not os.path.isdir(self._spool_dir):
                 raise ValueError(f'spool: directory does not exist: {self._spool_dir!r}')
-            self._spooling = True
+            self._is_spooling = True
         else:
-            self._spooling = False
+            self._is_spooling = False
         #: Whether SMTPUTF8 is announced
         self.internationalization_extensions = bool(options.get('internationalization_extensions', False))
         #: Whether the hostname of a client is looked up by reverse DNS
@@ -631,7 +632,7 @@ class SmtpdServer:
         if self.encrypt_mode is not EncryptMode.TLS_FORBIDDEN:
             # reference parity: without a configured common name the CN and
             # SAN of a self-signed certificate derive from hosts + addresses
-            tls_cert_cn, tls_cert_san = _tls_cert_names(
+            tls_cert_cn, tls_cert_san = _get_tls_cert_names(
                 options.get('tls_cert_cn'), options.get('tls_cert_san'), self.hosts, self._addresses
             )
             self.tls = TlsTransport(
@@ -643,7 +644,7 @@ class SmtpdServer:
                 methods=options.get('tls_methods'),
                 cert_cn=tls_cert_cn,
                 cert_san=tls_cert_san,
-                logger=lambda severity, msg: self._log_bridge(None, severity, msg),
+                logger=lambda severity, msg: self._bridge_log(None, severity, msg),
             )
         self._servers = []
         # connection/processing bookkeeping (one event loop: plain counters
@@ -655,8 +656,8 @@ class SmtpdServer:
         self._slot_free = global_limits.slot_free if global_limits is not None else asyncio.Event()
         self._slot_free.set()
         # graceful shutdown state
-        self._shutdown = False
-        self._stopped = True
+        self._is_shutdown = False
+        self._is_stopped = True
         self._sessions = set()
         self._asyncio_shutdown_signal = None
         self._serve_task = None
@@ -666,11 +667,11 @@ class SmtpdServer:
         """The bind addresses as ```'ip:port'``` strings."""
         return [f'{ip}:{port}' for ip, port in self._addresses]
 
-    def _default_listeners(self):
+    def _get_default_listeners(self):
         """Listener dicts derived from the configured ports/hosts."""
         return [{'host': ip, 'port': int(port)} for ip, port in self._addresses]
 
-    def _log_bridge(self, ctx, severity, msg):
+    def _bridge_log(self, ctx, severity, msg):
         """
         Sync entry point for logging: bridge into the async event dispatch.
 
@@ -709,12 +710,12 @@ class SmtpdServer:
 
     async def _bind(self, listeners):
         """Bind every listener and record it."""
-        self._shutdown = False
-        self._stopped = False
+        self._is_shutdown = False
+        self._is_stopped = False
         self._asyncio_running_loop = asyncio.get_running_loop()
         self._asyncio_shutdown_signal = self._asyncio_running_loop.create_future()
         if listeners is None:
-            listeners = self._default_listeners()
+            listeners = self._get_default_listeners()
         if self.crlf_data_mode is CrlfDataMode.CRLF_DATA_UNSAFE:
             self.logger.warning('Line breaks in DATA (crlf_data_mode) CRLF_DATA_UNSAFE allow SMTP smuggling!')
         if self.whitespace_mode is WhitespaceMode.WHITESPACE_UNSAFE:
@@ -749,7 +750,7 @@ class SmtpdServer:
             # cancelled by stop(); the listeners are already closed
             pass
         finally:
-            self._stopped = True
+            self._is_stopped = True
 
     async def serve(self, listeners=None):
         """
@@ -783,23 +784,23 @@ class SmtpdServer:
 
     def shutdown(self):
         """Schedule a graceful shutdown."""
-        self._shutdown = True
+        self._is_shutdown = True
         # signal to the dialogs that wait for input, from any thread
         if self._asyncio_running_loop is not None and not self._asyncio_running_loop.is_closed():
-            self._asyncio_running_loop.call_soon_threadsafe(self._shutdown_signal)
+            self._asyncio_running_loop.call_soon_threadsafe(self._send_shutdown_signal)
 
-    def _shutdown_signal(self):
+    def _send_shutdown_signal(self):
         """Send the shutdown signal once."""
         if self._asyncio_shutdown_signal is not None and not self._asyncio_shutdown_signal.done():
             self._asyncio_shutdown_signal.set_result(b'')
 
     def shutdown_requested(self):
         """True once a shutdown was scheduled."""
-        return self._shutdown
+        return self._is_shutdown
 
     def stopped(self):
         """True once serving has fully stopped."""
-        return self._stopped and not self._sessions
+        return self._is_stopped and not self._sessions
 
     @property
     def connections(self):
@@ -858,7 +859,7 @@ class SmtpdServer:
             if not self._sessions:
                 break
             await asyncio.sleep(0.01)
-        self._stopped = True
+        self._is_stopped = True
 
     async def join(self, poll_seconds=0.1):
         """Block until the server has fully stopped."""
@@ -902,13 +903,13 @@ class SmtpdServer:
             self._connections = max(0, self._connections - 1)
             if self.global_limits is not None:
                 self.global_limits.release()
-            if session.processing:
+            if session.has_processing_slot:
                 self._processings = max(0, self._processings - 1)
                 if self.global_limits is not None:
                     self.global_limits.end_processing()
             self._slot_free.set()
 
-    def _too_many_connections(self):
+    def _has_too_many_connections(self):
         """True when connections exceed max_connections (service or global)."""
         if self.max_connections is not None and self._connections > int(self.max_connections):
             return True
@@ -940,7 +941,7 @@ class SmtpdServer:
             # processes cannot both take the last slot
             if (max_processings is None or self._processings < max_processings) and (gl is None or gl.try_begin_processing()):
                 self._processings += 1
-                session.processing = True
+                session.has_processing_slot = True
                 return
             # arm the wake-up, then re-check once: a release between the failed
             # check above and clear() would otherwise be swallowed (lost wakeup)
@@ -955,7 +956,7 @@ class SmtpdServer:
             else:
                 await self._slot_free.wait()
 
-    def _auth_available(self, ctx):
+    def _is_auth_available(self, ctx):
         """
         True when AUTH may be offered and accepted on this channel right now.
 
@@ -982,7 +983,7 @@ class SmtpdServer:
         # False, in any other not matched case yet
         return False
 
-    def _greet_message(self, session):
+    def _build_greet_message(self, session):
         """
         To be done
         """
@@ -1037,14 +1038,14 @@ class SmtpdServer:
                     await self._emit(SmtpdEvent.ON_CONNECT_EVENT, ctx)
 
                 # drop connection (respond 421) if too busy
-                if self._too_many_connections():
+                if self._has_too_many_connections():
                     raise Smtpd421CloseException('Abort connection while too busy, exceeding max_connections!')
 
                 # when processings exceed the maximum allowed, wait for a free slot
                 await self._acquire_processing_slot(session)
 
                 # a graceful shutdown refuses a connection that was not greeted yet
-                if self._shutdown:
+                if self._is_shutdown:
                     raise Smtpd421CloseException('Abort connection while service is shutting down!')
 
                 # io_session_timeout limits the time a connection holds its slot
@@ -1056,7 +1057,7 @@ class SmtpdServer:
                 line_break_before_has_crlf = True
 
                 # greet on connect only when CMD_HELO and empty ctx.server.helo
-                output = self._greet_message(session)
+                output = self._build_greet_message(session)
 
                 while True:
                     if output:
@@ -1069,7 +1070,7 @@ class SmtpdServer:
                         break
 
                     # a graceful shutdown ends the dialog
-                    if self._shutdown:
+                    if self._is_shutdown:
                         break
 
                     if session.cmd_sequence is CMD_STARTTLS:
@@ -1089,7 +1090,7 @@ class SmtpdServer:
                         # immediate TLS greets only now, on the encrypted channel
                         if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
                             # send the server greeting next
-                            output = self._greet_message(session)
+                            output = self._build_greet_message(session)
                             # proceed with loop
                             continue
 
@@ -1103,7 +1104,7 @@ class SmtpdServer:
                     # a line) or from a shutdown that ended the wait in _wait_line
                     if raw == b'':
                         # a shutdown ends by 421, a closed peer gets no reply
-                        if self._shutdown:
+                        if self._is_shutdown:
                             break
                         # not by a shutdown: the client has closed the input
                         raise EOFError
@@ -1114,14 +1115,14 @@ class SmtpdServer:
                             (session.cmd_sequence is CMD_DATA)
                             or self.pipelining_extension
                             or (session.cmd_sequence is CMD_PROXY)
-                            or not self._buffered_line_lf(reader)
+                            or not self._has_buffered_line_lf(reader)
                         ):
                             raise Smtpd500PipeliningException
 
                         # test that <CRLF>.<CRLF> ends DATA (RFC 5321 4.1.1.4),
                         # CRLF_DATA_UNSAFE ignores it (SMTP smuggling)
                         # the last line ended by CRLF and this raw is b'.\r\n'
-                        data_dialog_end_rfc_conform = line_break_before_has_crlf and raw == b'.\r\n'
+                        is_data_dialog_end_rfc_conform = line_break_before_has_crlf and raw == b'.\r\n'
                         # renew the last line flag by this line (raw) or sequence
                         line_break_before_has_crlf = raw.endswith(b'\r\n') or session.cmd_sequence is not CMD_DATA
                         # in DATA the strict modes allow no other CR in the raw;
@@ -1156,7 +1157,7 @@ class SmtpdServer:
                         # dot-stuffed to keep its dot
                         if (
                             line == b'.'
-                            and not data_dialog_end_rfc_conform
+                            and not is_data_dialog_end_rfc_conform
                             and session.cmd_sequence is CMD_DATA
                             and self.crlf_data_mode is not CrlfDataMode.CRLF_DATA_UNSAFE
                         ):
@@ -1235,7 +1236,7 @@ class SmtpdServer:
             except asyncio.CancelledError:
                 # a stop drops the connection, after a last attempt to send 421
                 # (RFC 5321 3.8)
-                if self._shutdown:
+                if self._is_shutdown:
                     try:
                         # no drain: a client that does not read must not block
                         writer.write(REPLY_421_FOR_SHUTDOWN.encode() + b'\r\n')
@@ -1308,19 +1309,19 @@ class SmtpdServer:
 
         """
         # also a client that streams endless lines (NOOP or DATA) ends here
-        session_remaining = session_end_time - time.monotonic()
-        if session_remaining <= 0:
+        session_remaining_seconds = session_end_time - time.monotonic()
+        if session_remaining_seconds <= 0:
             raise SmtpdIOSessionTimeoutException('Abort connection while exceeding io_session_timeout!')
         try:
             # the timeout and the shutdown guard *waiting on the wire*: when a
             # complete line is already buffered, readuntil returns without
             # waiting; in pipelined/DATA bulk traffic that is nearly every line
-            if self._buffered_line_lf(reader):
+            if self._has_buffered_line_lf(reader):
                 raw = await reader.readuntil(b'\n')
             else:
-                raw = await self._wait_line(reader, min(io_timeout, session_remaining))
+                raw = await self._wait_line(reader, min(io_timeout, session_remaining_seconds))
         except asyncio.TimeoutError:
-            if session_remaining < io_timeout:
+            if session_remaining_seconds < io_timeout:
                 raise SmtpdIOSessionTimeoutException('Abort connection while exceeding io_session_timeout!')
             raise SmtpdIOCmdTimeoutException('Abort connection while no complete line within io timeout!')
         except asyncio.LimitOverrunError:
@@ -1362,7 +1363,7 @@ class SmtpdServer:
 
     async def _wait_line(self, reader, io_timeout):
         """Wait for the next line, b'' once a shutdown ends the wait."""
-        if self._shutdown:
+        if self._is_shutdown:
             return b''
         read = asyncio.ensure_future(reader.readuntil(b'\n'))
         # a server that was never started has no shutdown signal yet
@@ -1376,12 +1377,12 @@ class SmtpdServer:
         if read in done:
             # a line that arrived together with the shutdown is still served
             return read.result()
-        if self._shutdown:
+        if self._is_shutdown:
             return b''
         raise asyncio.TimeoutError
 
     @staticmethod
-    def _buffered_line_lf(reader):
+    def _has_buffered_line_lf(reader):
         """io_buffer_line_lf: is a further complete line already buffered?"""
         return getattr(reader, '_buffer', b'').find(b'\n') >= 0
 
@@ -1563,7 +1564,7 @@ class SmtpdServer:
                     # continue with the HELO sequence
                     session.cmd_sequence = CMD_HELO
                     # send the server greeting next
-                    return self._greet_message(session)
+                    return self._build_greet_message(session)
 
             elif self.proxy_extension and re.match(r'^PROXY(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # PROXY is only valid as first line, a later one is an abuse
@@ -1599,7 +1600,7 @@ class SmtpdServer:
                         lines += ['8BITMIME', 'SMTPUTF8']
                     if self.pipelining_extension:
                         lines.append('PIPELINING')
-                    if self._auth_available(ctx):
+                    if self._is_auth_available(ctx):
                         lines.append('AUTH LOGIN PLAIN')
                     if self.encrypt_mode is not EncryptMode.TLS_FORBIDDEN and not ctx.server.encrypted:
                         lines.append('STARTTLS')
@@ -1631,7 +1632,7 @@ class SmtpdServer:
                     raise Smtpd500Exception
                 if session.cmd_sequence is not CMD_RSET:
                     raise Smtpd503Exception
-                if not self._auth_available(ctx):
+                if not self._is_auth_available(ctx):
                     # TLS_WHEN_AUTH asks for encryption by AUTH (RFC 4954 6),
                     # TLS_REQUIRED by every command (RFC 3207 4)
                     raise Smtpd538Exception if self.encrypt_mode is EncryptMode.TLS_WHEN_AUTH else Tls530Exception
@@ -1741,7 +1742,7 @@ class SmtpdServer:
                         if value is not None:
                             raise Smtpd501Exception
                         ctx.envelope.encoding_utf8 = 'utf8'
-                    elif keyword == 'AUTH' and self._auth_available(ctx):
+                    elif keyword == 'AUTH' and self._is_auth_available(ctx):
                         # AUTH= of the original submitter (RFC 4954 section 5)
                         if value is None or not re.match(r'([\x21-\x2a\x2c-\x3c\x3e-\x7e]|\+[0-9A-Fa-f]{2})+$', value):
                             raise Smtpd501Exception
@@ -1909,7 +1910,7 @@ class SmtpdServer:
                         ctx.message.bytesize = len(ctx.message.data)
 
                     # create the spool file and handle if activated
-                    if self._spooling:
+                    if self._is_spooling:
                         # timestamp from the connection start
                         stamp = ctx.server.connected.strftime('%Y%m%d-%H%M%S')
                         # create the spooler for message spooling
@@ -2014,7 +2015,7 @@ class SmtpdServer:
     # ---- authentication -----------------------------------------------------
 
     @staticmethod
-    def _decode64(encoded):
+    def _decode_base64(encoded):
         """
         Decode a base64 response of the AUTH dialog (RFC 4954 section 4).
 
@@ -2062,7 +2063,7 @@ class SmtpdServer:
         """
         try:
             # extract auth id (and password)
-            auth_values = self._decode64(encoded_auth_response).split('\x00')
+            auth_values = self._decode_base64(encoded_auth_response).split('\x00')
             # authzid NUL authcid NUL passwd, authcid and passwd set (RFC 4616)
             if len(auth_values) != 3 or not auth_values[1] or not auth_values[2]:
                 raise Smtpd535Exception
@@ -2105,7 +2106,7 @@ class SmtpdServer:
         try:
             # save challenged auth_id
             session.auth_challenge['authorization_id'] = ''
-            session.auth_challenge['authentication_id'] = self._decode64(encoded_auth_response)
+            session.auth_challenge['authentication_id'] = self._decode_base64(encoded_auth_response)
         except SmtpdException:
             # an error of the decoding ends the AUTH exchange
             session.cmd_sequence = CMD_RSET
@@ -2134,7 +2135,7 @@ class SmtpdServer:
             auth_values = [
                 session.auth_challenge['authorization_id'],
                 session.auth_challenge['authentication_id'],
-                self._decode64(encoded_auth_response),
+                self._decode_base64(encoded_auth_response),
             ]
             # authentication id and password must be set
             if not auth_values[1] or not auth_values[2]:
@@ -2241,9 +2242,9 @@ class SmtpdServer:
             method = getattr(events_handler, name, None)
             if method is None:
                 continue
-            overridden = getattr(type(events_handler), name, None) is not getattr(SmtpdEvents, name, None)
+            is_overridden = getattr(type(events_handler), name, None) is not getattr(SmtpdEvents, name, None)
             # the defaults of these events carry behaviour and run without override
-            if not overridden and ev not in (
+            if not is_overridden and ev not in (
                 SmtpdEvent.ON_AUTH_EVENT,
                 SmtpdEvent.ON_LOGGING_EVENT,
                 SmtpdEvent.ON_CONNECT_EVENT,

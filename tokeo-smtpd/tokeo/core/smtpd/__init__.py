@@ -4,10 +4,10 @@ Receives mail as SMTP server on ```asyncio```: the SMTP receiving engine
 handler contract (```SmtpdEvents``` with ```def``` / ```async def``` /
 ```@threaded``` events), the SMTP exceptions and the sequence/mode enums.
 
-Tokeo smtpd is based on MidiSmtpServer, a faithful translation of
-midi-smtp-server (github.com/4commerce-technologies-AG/midi-smtp-server)
-from Ruby to Python, keeping its dialog, events, options and behavior. This is
-the single place stating that heritage.
+Tokeo smtpd is based on MidiSmtpServer, a translation of midi-smtp-server
+(github.com/4commerce-technologies-AG/midi-smtp-server) from Ruby to Python.
+It follows its dialog, events, options and behavior wherever the principles
+of Tokeo allow. This is the single place stating that heritage.
 
 The Tokeo extension ```tokeo.ext.smtpd``` is only the Cement glue on top of
 this library (config -> services, lifecycle, CLI).

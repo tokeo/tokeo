@@ -239,22 +239,22 @@ def _get_cert_names(certificate):
     return cn, sans.get_values_for_type(x509.DNSName)
 
 
-def test_tls_cert_names_derivation_rules():
+def test_get_tls_cert_names_derivation_rules():
     """CN and SAN come from the config, else from the first usable host."""
-    from tokeo.core.smtpd.server import _tls_cert_names
+    from tokeo.core.smtpd.server import _get_tls_cert_names
 
     # a configured cn wins unchanged
-    assert _tls_cert_names('mx.example.org', ['alt.example.org'], ['h'], []) == ('mx.example.org', ['alt.example.org'])
+    assert _get_tls_cert_names('mx.example.org', ['alt.example.org'], ['h'], []) == ('mx.example.org', ['alt.example.org'])
     # loopback first -> generic localhost.local (reference behaviour)
-    assert _tls_cert_names(None, None, ['127.0.0.1'], [('127.0.0.1', 2525)]) == ('localhost.local', ['127.0.0.1'])
-    assert _tls_cert_names(None, None, ['localhost', 'mx.example.org'], [])[0] == 'localhost.local'
+    assert _get_tls_cert_names(None, None, ['127.0.0.1'], [('127.0.0.1', 2525)]) == ('localhost.local', ['127.0.0.1'])
+    assert _get_tls_cert_names(None, None, ['localhost', 'mx.example.org'], [])[0] == 'localhost.local'
     # non-loopback first -> first name becomes the cn; '*' and empties drop,
     # the names of the local host follow for the wildcard
-    cn, sans = _tls_cert_names(None, None, ['*', 'mx.example.org'], [('10.0.0.5', 25)])
+    cn, sans = _get_tls_cert_names(None, None, ['*', 'mx.example.org'], [('10.0.0.5', 25)])
     assert cn == 'mx.example.org'
     assert sans[:2] == ['mx.example.org', '10.0.0.5'] and 'localhost' in sans
     # nothing usable left -> generic fallback
-    assert _tls_cert_names(None, None, [], []) == ('localhost.local', [])
+    assert _get_tls_cert_names(None, None, [], []) == ('localhost.local', [])
 
 
 def test_self_signed_derives_names_from_hosts():

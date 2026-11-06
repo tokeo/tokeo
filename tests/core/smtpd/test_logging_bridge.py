@@ -1,5 +1,5 @@
 """
-Tests for the logging bridge (SmtpdServer._log_bridge) and the handler's
+Tests for the logging bridge (SmtpdServer._bridge_log) and the handler's
 bound ```self.log```.
 
 ```on_logging_event``` is free to be a plain ```def```, an ```async def``` or a

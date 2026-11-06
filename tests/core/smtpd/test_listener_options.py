@@ -13,7 +13,7 @@ import asyncio
 
 import pytest
 
-from tokeo.core.smtpd.server import SmtpdServer, _resolve_host, _tls_cert_names, DEFAULT_IO_BUFFER_MAX_SIZE
+from tokeo.core.smtpd.server import SmtpdServer, _resolve_host, _get_tls_cert_names, DEFAULT_IO_BUFFER_MAX_SIZE
 from tokeo.core.smtpd.events import SmtpdEvents
 
 
@@ -25,7 +25,7 @@ def test_wildcard_host_resolves_to_the_wildcard_addresses():
 
 def test_wildcard_host_names_the_local_host_in_the_certificate():
     """With '*' the SAN names the local host, not the wildcard addresses."""
-    cn, sans = _tls_cert_names(None, None, ['*'], [('0.0.0.0', 2525), ('::', 2525)])
+    cn, sans = _get_tls_cert_names(None, None, ['*'], [('0.0.0.0', 2525), ('::', 2525)])
     assert cn == 'localhost.local'
     assert {'localhost', '127.0.0.1', '::1', socket.gethostname()} <= set(sans)
     assert '0.0.0.0' not in sans and '::' not in sans and '*' not in sans
@@ -113,7 +113,7 @@ def test_wildcard_names_survive_a_failing_lookup_of_the_local_host(monkeypatch):
         raise OSError('no lookup')
 
     monkeypatch.setattr(socket, 'getaddrinfo', fail)
-    cn, sans = _tls_cert_names(None, None, ['*'], [('0.0.0.0', 2525)])
+    cn, sans = _get_tls_cert_names(None, None, ['*'], [('0.0.0.0', 2525)])
     assert cn == 'localhost.local'
     assert {'localhost', '127.0.0.1', '::1'} <= set(sans)
 

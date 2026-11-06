@@ -1365,7 +1365,7 @@ def test_stop_without_start_and_with_a_slow_session_ends_stopped():
         await read_reply(reader)
         await srv.stop(gracefully=False)
         writer.close()
-        return srv._stopped
+        return srv._is_stopped
 
     assert asyncio.run(go()) is True
 
