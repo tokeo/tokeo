@@ -31,7 +31,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     stop_server,
     start_smtpd,
     insecure_tls_context,
-    TLS_SETTINGS,
+    TLS_SERVER_OPTIONS,
 )
 
 # ---- full delivery and events -----------------------------------------------
@@ -241,7 +241,7 @@ def test_handler_bug_contained_as_451(event):
         # a stripped string replaces it, also the empty one
         ('<b@x>', '250', '<b@x>'),
         ('', '250', ''),
-        # anything else is a fault of the handler
+        # anything else is an error of the handler
         (' <b@x>', '451', None),
         ('<b@x> ', '451', None),
         (1, '451', None),
@@ -358,7 +358,7 @@ def test_data_size_limit_552():
     assert ev.fired.count('mail') == 2
 
 
-class FaultInData(RecordingEvents):
+class ErrorInData(RecordingEvents):
     """Raises the given error on the first received data line."""
 
     def __init__(self, error):
@@ -384,16 +384,16 @@ class FaultInData(RecordingEvents):
     'error, code, kind',
     [(Smtpd550Exception(), '550', 'Smtpd550Exception'), (RuntimeError('broken'), '451', 'RuntimeError')],
 )
-def test_fault_in_data_is_answered_once_after_the_end(error, code, kind):
-    """A fault of the receiving event answers once after the end of DATA."""
-    ev = FaultInData(error)
+def test_error_in_data_is_answered_once_after_the_end(error, code, kind):
+    """An error of the receiving event answers once after the end of DATA."""
+    ev = ErrorInData(error)
     _, r = dialog(ev, {}, DATA_ENVELOPE + [b'Subject: t\r\n\r\nA\r\nB\r\n.\r\n', b'NOOP\r\n'])
     assert r[4][0].startswith(code)
-    # no more receiving events after the fault, no delivery
+    # no more receiving events after the error, no delivery
     assert ev.fired.count('recv') == 1
     assert ev.messages == []
     assert r[5] == ['250 OK']
-    # the fault is logged when it occurs with the real error, then at the end
+    # the error is logged when it occurs with the real exception, then at the end
     errors = [msg for severity, msg in ev.lines if severity.name == 'ERROR']
     assert errors[0] == f'Error within DATA, further DATA is ignored up to its end: {error} ({kind})'
     assert len(errors) == 2
@@ -402,7 +402,7 @@ def test_fault_in_data_is_answered_once_after_the_end(error, code, kind):
     assert ev.errors[0] is error or ev.errors[0].__cause__ is error
 
 
-def test_no_start_event_after_a_fault_before_the_first_line():
+def test_no_start_event_after_an_error_before_the_first_line():
     """A bare LF in the first DATA line keeps the start event silent."""
     ev = RecordingEvents()
     _, r = dialog(ev, {'crlf_data_mode': 'CRLF_DATA_STRICT'}, DATA_ENVELOPE + [b'A\nB\r\n.\r\n'])
@@ -411,7 +411,7 @@ def test_no_start_event_after_a_fault_before_the_first_line():
 
 
 def test_a_failing_start_event_runs_once():
-    """A fault of on_message_data_start_event does not run it again per line."""
+    """An error of on_message_data_start_event does not run it again per line."""
 
     class StartFails(RecordingEvents):
 
@@ -434,8 +434,8 @@ def test_spool_with_empty_first_line_starts_once_and_keeps_data_size(tmp_path):
     assert ev.fired.count('start') == 1
 
 
-def test_only_the_first_fault_in_data_counts():
-    """Several bare LF in DATA count as one fault of the connection."""
+def test_only_the_first_error_in_data_counts():
+    """Several bare LF in DATA count as one error of the connection."""
     seen = []
 
     class Count(RecordingEvents):
@@ -588,7 +588,7 @@ def test_body_param_rejected_without_intl():
         ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> PARAM="a', '555'),
         ({}, b'MAIL FROM:<a@x> SMTPUTF8', '555'),
         ({}, b'MAIL FROM:<a@x> AUTH=<>', '555'),
-        ({**TLS_SETTINGS, 'encrypt_mode': 'TLS_WHEN_AUTH', 'auth_mode': 'AUTH_OPTIONAL'}, b'MAIL FROM:<a@x> AUTH=<>', '555'),
+        ({**TLS_SERVER_OPTIONS, 'encrypt_mode': 'TLS_WHEN_AUTH', 'auth_mode': 'AUTH_OPTIONAL'}, b'MAIL FROM:<a@x> AUTH=<>', '555'),
         ({}, b'RCPT TO:<b@y> NOTIFY=NEVER', '555'),
         # malformed, wrong value or twice: 501
         ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> BODY=FOO', '501'),
@@ -1716,7 +1716,7 @@ def test_auth_without_returned_authzid_535(mechanism, authz_return):
 
 
 @pytest.mark.parametrize('authz_return', [' user', 'user ', '  '])
-def test_auth_not_stripped_authzid_is_a_handler_fault(authz_return):
+def test_auth_not_stripped_authzid_is_a_handler_error(authz_return):
     """A returned authorization id with surrounding whitespace answers 454."""
     ev = AuthEvents()
     ev.authz_return = authz_return
@@ -1826,7 +1826,7 @@ def test_starttls_full_flow_delivers_over_tls():
     ev = TlsEvents()
 
     async def go():
-        server, port, task = await start_server(ev, TLS_SETTINGS)
+        server, port, task = await start_server(ev, TLS_SERVER_OPTIONS)
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
@@ -1861,7 +1861,7 @@ def test_starttls_discards_a_plaintext_auth():
     plain = b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n'
 
     async def go():
-        server, port, task = await start_server(ev, {**TLS_SETTINGS, 'auth_mode': 'AUTH_OPTIONAL'})
+        server, port, task = await start_server(ev, {**TLS_SERVER_OPTIONS, 'auth_mode': 'AUTH_OPTIONAL'})
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
@@ -1891,7 +1891,7 @@ def test_starttls_forbidden_is_500():
 
 def test_starttls_before_helo_is_503():
     """STARTTLS before HELO answers 503."""
-    _, r = dialog(RecordingEvents(), TLS_SETTINGS, [b'STARTTLS\r\n'])
+    _, r = dialog(RecordingEvents(), TLS_SERVER_OPTIONS, [b'STARTTLS\r\n'])
     assert r[0][0].startswith('503')
 
 
@@ -1899,7 +1899,7 @@ def test_starttls_twice_already_encrypted_503():
     """STARTTLS on an encrypted connection answers 503."""
 
     async def go():
-        server, port, task = await start_server(RecordingEvents(), TLS_SETTINGS)
+        server, port, task = await start_server(RecordingEvents(), TLS_SERVER_OPTIONS)
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
@@ -1921,7 +1921,7 @@ def test_tls_required_gates_mail_until_starttls():
     """With TLS_REQUIRED MAIL answers 530 until STARTTLS."""
 
     async def go():
-        server, port, task = await start_server(RecordingEvents(), dict(TLS_SETTINGS, encrypt_mode='TLS_REQUIRED'))
+        server, port, task = await start_server(RecordingEvents(), dict(TLS_SERVER_OPTIONS, encrypt_mode='TLS_REQUIRED'))
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
@@ -1948,7 +1948,7 @@ def test_starttls_flushes_injected_plaintext():
     """
 
     async def go():
-        server, port, task = await start_server(RecordingEvents(), dict(TLS_SETTINGS, pipelining_extension=True))
+        server, port, task = await start_server(RecordingEvents(), dict(TLS_SERVER_OPTIONS, pipelining_extension=True))
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)

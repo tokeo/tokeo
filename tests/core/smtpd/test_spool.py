@@ -281,7 +281,7 @@ def test_manual_rename_takeover_still_safe(tmp_path):
         assert f.read() == events.seen[0]['file']
 
 
-# ---- aborts and caps --------------------------------------------------------
+# ---- aborts and limits ------------------------------------------------------
 
 
 def _abort_mid_data(tmp_path, debug):

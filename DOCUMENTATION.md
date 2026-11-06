@@ -50,9 +50,9 @@ with a verb, not a bold label:
 - Yes: ```- Runs commands locally or remotely over SSH```
 - No: ```- **Remote execution** via SSH or local shells```
 
-The text of a folder is the docstring of its ```__init__.py```, in a namespace
-package an ```__init__.md```. A guide next to the code (e.g. ```SMTPD.md```) is
-embedded there with ```.. include:: ./FILE.md```.
+The text of a directory is the docstring of its ```__init__.py```, in a
+namespace package an ```__init__.md```. A guide next to the code (e.g.
+```SMTPD.md```) is embedded there with ```.. include:: ./FILE.md```.
 
 ## Docstring Style
 
@@ -195,7 +195,7 @@ lazily.
    comment right above the assignment. pdoc shows the text at the value. Each
    key of ```Meta.config_defaults``` has a comment above it:
 
-        #: Dict with initial settings
+        #: Dict with the config defaults
         config_defaults = dict(
             # Default timeout for cache operations in seconds
             timeout=60,

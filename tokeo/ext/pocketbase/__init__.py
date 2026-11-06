@@ -16,7 +16,7 @@ anything beyond that surface.
 - Advanced querying, filtering, and sorting on lists
 - User and auth collections handled like any other via CRUD
 - Optional lazy service-account login (auto-refreshed, thread-safe) via the
-  auth_identity/auth_password settings, before every request of the client,
+  auth_identity/auth_password options, before every request of the client,
   confirmed on the server every auth_check_seconds
 - Clients that act as a user by impersonate(), their login kept the same way
 - With the nicegui extension the realtime data for pages as
@@ -122,7 +122,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         # Configuration section name in the application config
         config_section = 'pocketbase'
 
-        # Default configuration settings
+        # the defaults of the config section
         config_defaults = dict(
             # URL for the PocketBase server; use https:// to enable tls,
             # verified against the system ca store by default (the secure option)
@@ -149,7 +149,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             realtime_auth_check=60,
             # the longest delay in seconds before a channel connects again
             realtime_max_delay=30,
-            # cap on concurrent http connections per process (httpx
+            # max concurrent http connections per process (httpx
             # max_connections); unset uses the httpx default and excess
             # requests wait for a free connection
             max_connections=None,
@@ -196,7 +196,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             default; the tls options build a custom ssl context that is
             passed to the underlying httpx client
 
-        : ```max_connections``` caps concurrent http connections per process
+        : ```max_connections``` limits concurrent http connections per process
             via httpx; it is not a request-rate limit and does not span
             processes, so apply any rate or cross-process throttling in your
             application (e.g. the diskcache throttle recipe)
@@ -214,7 +214,7 @@ class TokeoPocketBaseHandler(MetaMixin):
                 self._config('tls_ca'),
             )
         # build the httpx client kwargs: a custom tls context (custom ca or
-        # relaxed verification) and an optional concurrency cap
+        # relaxed verification) and an optional max of concurrent connections
         client_kwargs = {}
         if context is not None:
             client_kwargs['verify'] = context

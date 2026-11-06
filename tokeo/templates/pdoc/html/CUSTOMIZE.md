@@ -221,8 +221,8 @@ Available in every template, on top of pdoc's own
 | ```has_config``` | bool | Whether a config page will be written |
 | ```tokeo_version```, ```pdoc_version``` | str | For the footer credit |
 | ```decorators(func)``` | callable | Decorator metadata for a function |
-| ```ancestors(cls, depth)``` | callable | MRO above a class, capped |
-| ```ancestors_max_depth``` | int | Configured cap |
+| ```ancestors(cls, depth)``` | callable | MRO above a class, at most depth levels |
+| ```ancestors_max_depth``` | int | Configured maximum of levels |
 | ```subclasses(cls)``` | callable | Loaded direct subclasses, sorted |
 | ```own_init(cls)``` | callable | The class's own ```__init__```, or None |
 | ```is_namespace(mod)``` | callable | True for PEP 420 namespace packages |
@@ -336,7 +336,7 @@ In practice, prefer a reserved class name or plain CSS in ```tokeo.theme.css```.
 ### Build setup
 
 The build tooling is development-only and not part of the installable package.
-Create a ```pdoc-theme/``` folder next to your package with these two files.
+Create a ```pdoc-theme/``` directory next to your package with these two files.
 
 #### ```pdoc-theme/package.json```
 
@@ -364,7 +364,7 @@ Adjust the two output paths if your package is not called ```tokeo```.
 
 The ```@source``` globs must point at the real template files; if they do not
 match, only the ```@source inline(...)``` reserve ends up in the output and every
-bracket value used in the templates silently stops working. Verify after a
+bracket value used in the templates silently stops working. Check after a
 rebuild that a known bracket class such as ```.pl-\[2\.4rem\]``` is still present.
 
 ```css

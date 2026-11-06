@@ -279,7 +279,7 @@ class LiveHub:
     ### Keyword Args
 
     - **channel_kwargs**: Options of each ```AsyncRealtime```, over the
-        ```realtime_*``` settings of the pocketbase config
+        ```realtime_*``` options of the pocketbase config
 
     ### Notes
 

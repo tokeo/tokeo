@@ -237,7 +237,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         # take care of kwargs
         TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs)
 
-        # check for sudo config and settings
+        # check for sudo config and options
         sudo_config = self.config.get('sudo')
         sudo_pass = sudo_config.get('password') if sudo_config else None
 
@@ -245,7 +245,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         if sudo_pass:
             # sudo almost always requires a PTY to prompt properly over SSH
             kwargs['pty'] = True
-            # local proxy values for sudo config settings
+            # local proxy values for sudo config options
             sudo_mode = sudo_config.get('mode')
             if sudo_mode == 'env':
                 sudo_match = TokeoInvokeLocalContext.generate_sudo_env_match_token(self)
@@ -416,7 +416,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         # get encoding
         encoding = kwargs.get('encoding', None)
 
-        # check for sudo config and settings
+        # check for sudo config and options
         sudo_config = self.config.get('sudo')
         sudo_pass = sudo_config.get('password') if sudo_config else None
 
@@ -424,7 +424,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         if sudo_pass:
             # sudo almost always requires a PTY to prompt properly over SSH
             kwargs['pty'] = True
-            # local proxy values for sudo config settings
+            # local proxy values for sudo config options
             sudo_mode = sudo_config.get('mode')
             sudo_tail = sudo_config.get('tail')
             if sudo_mode == 'env':
@@ -660,7 +660,7 @@ class TokeoAutomate(MetaMixin):
         #: Id for config
         config_section = 'automate'
 
-        #: Dict with initial settings
+        #: Dict with the config defaults
         config_defaults = dict(
             hosts={},
             hostgroups={},
@@ -692,13 +692,13 @@ class TokeoAutomate(MetaMixin):
         self._tasks = None
         # refernces for imported modules
         self._imported_modules = {}
-        # configured hosts list with settings per host
+        # configured hosts list with options per host
         self._hosts = None
         # counter of created host entries, also used as unique id
         self._hosts_cnt = 0
         # configured groups with hosts references
         self._hostgroups = None
-        # configured named connections and access settings
+        # configured named connections and access options
         self._connections = None
         # counter of created connections, also used as unique id
         self._connections_cnt = 0
@@ -890,7 +890,7 @@ class TokeoAutomate(MetaMixin):
         ### Args
 
         - **base** (dict): Base host configuration dictionary
-        - **overrule** (dict): Dictionary with values to override base settings
+        - **overrule** (dict): Dictionary with values to override base options
 
         ### Returns
 
@@ -982,12 +982,12 @@ class TokeoAutomate(MetaMixin):
 
         1. Connection Reference Resolution:
             - If 'use' parameter is specified, merges with the referenced connection
-            - Applies connection-specific settings on top of the reference
+            - Applies connection-specific options on top of the reference
 
-        2. Default Settings Application:
-            - Applies default connection settings from Meta.config_defaults
-            - Put user-defined default connection settings into a ['_defaults'] dict
-            - Ensures connection-specific settings override defaults
+        2. Default Options Application:
+            - Applies default connection options from Meta.config_defaults
+            - Put user-defined default connection options into a ['_defaults'] dict
+            - Ensures connection-specific options override defaults
 
         3. Host Resolution Process:
             - Supports various host specification formats (string, dict, reference)
@@ -1015,7 +1015,7 @@ class TokeoAutomate(MetaMixin):
 
         ### Returns
 
-        - **dict**: A fully resolved connection dictionary with all settings
+        - **dict**: A fully resolved connection dictionary with all options
             merged according to precedence rules and all hosts fully resolved
 
         ### Raises
@@ -1190,7 +1190,7 @@ class TokeoAutomate(MetaMixin):
         Dictionary of configured connections for accessing hosts.
 
         Connections define how to access hosts, including authentication details,
-        SSH configuration, timeout settings, and other connection parameters.
+        SSH configuration, timeout options, and other connection parameters.
         The connection config includes a default connection and can be extended
         with additional named connections.
 
@@ -1228,15 +1228,15 @@ class TokeoAutomate(MetaMixin):
 
     def _get_tasks(self):
         """
-        Process and build the task configuration dictionary from settings.
+        Process and build the task configuration dictionary from the config.
 
         This method performs the complex process of analyzing task configurations
-        from the config settings and building a fully-resolved task dictionary.
+        from the config and building a fully-resolved task dictionary.
         It handles:
 
         1. Dynamic task module loading:
             - Imports Python modules containing task implementation functions
-            - Supports a default module for all tasks via the 'module' setting
+            - Supports a default module for all tasks via the 'module' option
             - Caches imported modules for performance
 
         2. Task function resolution:
@@ -1245,7 +1245,7 @@ class TokeoAutomate(MetaMixin):
             - Proper exception handling for import and lookup errors
 
         3. Connection configuration with priority rules:
-            - Explicit 'connection' setting takes precedence
+            - Explicit 'connection' option takes precedence
             - Reference via 'use' parameter is second priority
             - Direct 'hosts' configuration is third priority
             - Default to 'local' host if no connection is specified
@@ -1256,7 +1256,7 @@ class TokeoAutomate(MetaMixin):
             - Function reference
             - Module path and name
             - ID and name
-            - Timeout settings
+            - Timeout options
             - Additional keyword arguments
             - Fully-resolved connection information
 
@@ -1289,7 +1289,7 @@ class TokeoAutomate(MetaMixin):
         _default_module = _defaults.get('module', None)
         if _default_module is not None and not is_filled_str(_default_module):
             raise TokeoAutomateError('A default module for tasks must be defined by a string')
-        # get some global config settings for all tasks
+        # get some global config options for all tasks
         _default_task_protect = _defaults.get('protect', 'strict')
         _default_task_sanitize = _defaults.get('sanitize', True)
         _default_task_timeout = _defaults.get('timeout', None)
@@ -1355,7 +1355,7 @@ class TokeoAutomate(MetaMixin):
                 kwargs=kwargs,
                 kwprotected=kwprotected,
             )
-            # Check for connection settings. The rule follows
+            # Check for connection options. The rule follows
             # first if 'connections' exist, second a ```use```
             # relation, third a 'hosts' section, last fallback
             # is local command
@@ -1445,7 +1445,7 @@ class TokeoAutomate(MetaMixin):
                     )
                 )
             else:
-                # define some settings per default
+                # define some options per default
                 connect_kwargs['look_for_keys'] = False
                 connect_kwargs['allow_agent'] = False
                 connect_args['forward_agent'] = False

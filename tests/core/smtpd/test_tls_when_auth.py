@@ -21,7 +21,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     send_command,
     stop_server,
     insecure_tls_context,
-    TLS_SETTINGS,
+    TLS_SERVER_OPTIONS,
 )
 
 
@@ -56,7 +56,7 @@ def test_when_auth_on_plain_hides_auth_but_offers_starttls():
 def test_when_auth_after_starttls_offers_and_accepts_auth():
     """After STARTTLS AUTH is offered and accepted by 235."""
     ev = AuthEvents()
-    options = dict(TLS_SETTINGS)
+    options = dict(TLS_SERVER_OPTIONS)
     options.update({'encrypt_mode': 'TLS_WHEN_AUTH', 'auth_mode': 'AUTH_OPTIONAL'})
 
     async def go():

@@ -23,9 +23,9 @@ numbers that count are always the ones measured on the own system.
 ## What a tokeo app runs
 
 Each service of an app is its own process tree. The table shows what one
-service runs at most at the same moment and which setting controls it.
+service runs at most at the same moment and which option controls it.
 
-| Service | Processes | Threads per process | Setting, default |
+| Service | Processes | Threads per process | Option, default |
 |---|---|---|---|
 | scheduler | 1 | jobs of the thread pool | ```scheduler.max_concurrent_jobs```, 10 |
 | dramatiq | 1 master + ```worker_processes``` | ```worker_threads``` | tokeo: 2 processes, 1 thread; app template: 2 and 2 |

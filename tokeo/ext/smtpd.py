@@ -10,7 +10,7 @@ lists, process topology with pre-forked workers and machine-wide limits.
 
 - ```smtpd list``` prints the configured services
 
-- Per-service worker groups via the ```pre_fork``` setting, sharing their
+- Per-service worker groups via the ```pre_fork``` option, sharing their
     listeners with SO_REUSEPORT
 
 - Machine-wide ```max_connections``` / ```max_processings``` across all
@@ -44,9 +44,9 @@ tokeo smtpd serve mx1 mx3
     process without forking, ```pre_fork: N > 1``` runs the main process as
     worker #1 plus N-1 forks
 
-: With a global cap set and any forked worker, the counters live in shared
-    memory and the caps are exact across all processes OF THIS INVOCATION.
-    Per-service caps of a multi-worker group count per worker: for a group
+: With a global max set and any forked worker, the counters live in shared
+    memory and the limits are exact across all processes OF THIS INVOCATION.
+    Per-service limits of a multi-worker group count per worker: for a group
     total of X over N workers configure X/N. Services started by separate
     invocations do not share limits
 
@@ -155,7 +155,7 @@ def _plan(services, has_global_limit):
     ### Args
 
     - **services** (list): The service config dicts to start
-    - **has_global_limit** (bool): Whether a global cap is configured
+    - **has_global_limit** (bool): Whether a global limit is configured
 
     ### Returns
 
@@ -244,14 +244,14 @@ class SharedGlobalLimits(GlobalLimits):
     Global limits with counters shared across worker processes.
 
     Created in the master BEFORE the workers fork, so every process inherits
-    the same shared-memory counters and the caps are exact machine-wide for
+    the same shared-memory counters and the limits are exact machine-wide for
     the invocation.
 
     ### Args
 
-    - **max_processings** (int|None): Global concurrent-processing cap
+    - **max_processings** (int|None): Global max of concurrent processings
         (None/0 = unlimited)
-    - **max_connections** (int|None): Global open-connection cap
+    - **max_connections** (int|None): Global max of open connections
         (None/0 = unlimited)
 
     ### Notes
@@ -297,11 +297,11 @@ class SharedGlobalLimits(GlobalLimits):
 
     def try_begin_processing(self):
         """
-        Count one in-progress dialog if the cap allows it, under one lock.
+        Count one in-progress dialog if max_processings allows it, under one lock.
 
         ### Returns
 
-        - **bool**: True when the dialog was counted, False at the cap
+        - **bool**: True when the dialog was counted, False at max_processings
 
         ### Notes
 

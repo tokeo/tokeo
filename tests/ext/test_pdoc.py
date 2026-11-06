@@ -2,7 +2,7 @@
 Tests for tokeo.ext.pdoc, on what it adds on top of pdoc, not on pdoc itself:
 
 - ```#:``` variable comments, which pdoc3 understood and pdoc 16 does not
-- the yaml config page: comment extraction, per-setting slicing, masked
+- the yaml config page: comment extraction, per-section slicing, masked
   ```!vault:``` values and the block boundaries
 - namespace-aware module discovery, which pkgutil-based walking misses
 - ```serve()```, including the daemon thread it starts for the watch monitor
@@ -39,7 +39,7 @@ class PdocTest(TokeoTest):
     A TokeoTest app with the pdoc extension loaded.
 
     Its pdoc section is pinned to a temp dir and a free port, ```overrides```
-    change single settings. ```port=0``` lets the kernel pick a free one, so
+    change single options. ```port=0``` lets the kernel pick a free one, so
     parallel runs never collide. The watch timings are shortened so the
     monitor reacts inside a test.
     """
@@ -418,7 +418,7 @@ def test_render_keeps_test_functions_of_other_modules_under_functions(tmp_path, 
     assert 'test_box_opens' in _section(html, 'h2', 'Functions')
 
 
-# ---- config page: per-setting slicing and redaction -------------------------
+# ---- config page: per-section slicing and redaction -------------------------
 
 
 BASE_YAML = """### **Main Configuration**
@@ -466,7 +466,7 @@ def local_sections(app):
 
 
 def test_config_sections_extracts_intro_and_source(base_sections):
-    """Each setting gets the comment above as intro and its yaml as source."""
+    """Each section gets the comment above as intro and its yaml as source."""
     assert base_sections['smtp']['intro'] == ('Outgoing mail.\nSecond line of the intro.')
     assert base_sections['smtp']['source'] == ('smtp:\n  host: localhost\n  port: 25')
 
@@ -1674,10 +1674,10 @@ def test_both_config_switches_are_a_contradiction(tmp_path, monkeypatch):
         assert 'exclude each other' in str(excinfo.value)
 
 
-def test_config_switches_leave_the_setting_alone_when_unused(tmp_path, monkeypatch):
+def test_config_switches_leave_the_option_alone_when_unused(tmp_path, monkeypatch):
     """Without a switch show_config stays as configured."""
     # both switches are always offered, so the one matching the current
-    # setting must simply do nothing
+    # option must simply do nothing
     with PdocTest(tmp_path, show_config=True) as booted:
         monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
         monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render'])

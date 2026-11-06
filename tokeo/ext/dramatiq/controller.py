@@ -328,11 +328,11 @@ class TokeoDramatiqController(Controller):
     )
     def serve(self):
         """
-        Start Dramatiq workers with customizable settings.
+        Start Dramatiq workers with customizable options.
 
         This command starts Dramatiq worker processes that process tasks from the
         message queues. It applies configuration from the application config while
-        allowing CLI arguments to override specific settings.
+        allowing CLI arguments to override specific options.
 
         ### Args
 
@@ -356,7 +356,7 @@ class TokeoDramatiqController(Controller):
         ### Notes
 
         : Worker configuration includes process count, thread count, shutdown
-            timeout, restart delay, and queue prefetch settings
+            timeout, restart delay, and queue prefetch options
 
         : Each worker switch replaces its config value
 
@@ -398,7 +398,7 @@ class TokeoDramatiqController(Controller):
         # caller's argv afterwards so internal dramatiq restarts (which
         # re-exec the python process) see the original command line
         argv = [sys.argv[0]]
-        # append some worker settings, without --processes dramatiq takes the cpus
+        # append some worker options, without --processes dramatiq takes the cpus
         if processes != 'auto':
             argv.extend(
                 ['--processes', str(processes)],

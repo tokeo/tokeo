@@ -54,7 +54,7 @@ automation, web, secrets and the AI alike.
 
 ### Everything is configuration, in YAML
 
-Tasks, automations, agents, profiles, schedules and secrets are declared in
+Tasks, automations, agents, profiles, schedules and secrets are configured in
 ```config/```, with ENV overrides on top. A system you can read is one you can
 audit, diff, review and reproduce. That is why the agents and profiles of the AI
 are plain YAML too and use no separate concept.
@@ -106,7 +106,7 @@ together*; it replaces none of them.
 
 Tokeo is opinionated, and it matters to be exact about *where*. Your domain,
 your tasks, your tools, your models and your workflows are yours, and Tokeo has
-no opinion on them. It is opinionated about the shape: how a thing is declared,
+no opinion on them. It is opinionated about the shape: how a thing is defined,
 configured, made visible and governed.
 
 The framework gives you one way to do the structural things, on purpose:
@@ -119,7 +119,7 @@ The framework gives you one way to do the structural things, on purpose:
 - One development cycle (```make fmt```, ```lint```, ```test```, ```doc```,
   ```sdist```), so the inner loop is the same across projects.
 - One way to add a building block, a named entry with a ```type``` and its
-  settings, whether it is a task, an agent, a guard or a tool.
+  options, whether it is a task, an agent, a guard or a tool.
 
 These opinions are deliberately narrow: they make the *scaffolding* uniform so
 the *substance* is entirely yours.
@@ -180,12 +180,12 @@ and the traceability and verifiability of the results.
 
 A tool, a skill or a request is reviewed, pinned, audited and run under
 containment instead of being trusted because it loaded. This is why skills are
-declared and never discovered: a skill is part of the delivered application,
-named in the config, and never picked up by dropping a folder on disk. Discovery
-would make the capabilities of the agent depend on filesystem state instead of
-the config, and break the auditability and determinism the whole framework is
-built on. Tokeo adopts the portable agentskills.io format, mirrors it into its
-own config and runs it through the same guards and sandbox.
+configured and never discovered: a skill is part of the delivered application,
+named in the config, and never picked up by dropping a directory on disk.
+Discovery would make the capabilities of the agent depend on filesystem state
+instead of the config, and break the auditability and determinism the whole
+framework is built on. Tokeo adopts the portable agentskills.io format, mirrors
+it into its own config and runs it through the same guards and sandbox.
 
 
 ## Framework versus application
@@ -249,7 +249,7 @@ time.
   serves as a memory aid for the author.
 - Tests check actual system behaviour and edge cases, never an idealized state,
   and are never written just to satisfy a coverage metric.
-- Read twice, question the premise and verify before reporting. Nothing is
+- Read twice, question the premise and check before reporting. Nothing is
   called "done" until the checks pass.
 
 

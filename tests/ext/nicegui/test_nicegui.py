@@ -1,6 +1,6 @@
 """
 Tests for tokeo.ext.nicegui without a running web server: the config and its
-checks, the routes, apis and openapi docs set up by startup, the settings
+checks, the routes, apis and openapi docs set up by startup, the options
 handed to ```ui.run```, the hotload by watchdog, the serve command, the ux
 helper and the pdoc hook.
 
@@ -39,7 +39,7 @@ ROUTES = dict(routes=f'{__name__}:_pages')
 
 
 class NiceguiTest(TokeoTest):
-    """A test app with the nicegui extension and the given nicegui settings."""
+    """A test app with the nicegui extension and the given nicegui config."""
 
     class Meta:
         extensions = ['tokeo.ext.print', 'tokeo.ext.nicegui']
@@ -103,9 +103,9 @@ def no_process_replacement(monkeypatch):
 
 @pytest.fixture
 def runs(monkeypatch):
-    """The settings of each call of ui.run, recorded instead of serving."""
+    """The options of each call of ui.run, recorded instead of serving."""
     calls = []
-    monkeypatch.setattr(ui, 'run', lambda **settings: calls.append(settings))
+    monkeypatch.setattr(ui, 'run', lambda **options: calls.append(options))
     return calls
 
 
@@ -119,16 +119,16 @@ def test_setup_gives_ui_fastapi_app_and_ux():
         assert isinstance(app.nicegui.ux, NiceguiElementHelper)
 
 
-def test_setup_fills_the_defaults_and_keeps_given_settings():
-    """A given port stays, the other settings get their defaults."""
+def test_setup_fills_the_defaults_and_keeps_given_config():
+    """A given port stays, the other options get their defaults."""
     with NiceguiTest(port='8080') as app:
-        settings = app.config.get_section_dict('nicegui')
-    assert (settings['port'], settings['host'], settings['title']) == ('8080', '127.0.0.1', 'Tokeo NiceGUI')
-    assert (settings['hotload_includes'], settings['routes'], settings['storage_secret']) == ('*.py', None, None)
+        nicegui_config = app.config.get_section_dict('nicegui')
+    assert (nicegui_config['port'], nicegui_config['host'], nicegui_config['title']) == ('8080', '127.0.0.1', 'Tokeo NiceGUI')
+    assert (nicegui_config['hotload_includes'], nicegui_config['routes'], nicegui_config['storage_secret']) == ('*.py', None, None)
 
 
 @pytest.mark.parametrize(
-    'settings, message',
+    'nicegui_config, message',
     [
         ({}, 'Tokeo NiceGUI ready to go on'),
         (dict(title='Shop'), 'Shop ready to go on'),
@@ -136,9 +136,9 @@ def test_setup_fills_the_defaults_and_keeps_given_settings():
     ],
     ids=['default', 'title', 'own'],
 )
-def test_setup_welcome_message(settings, message):
+def test_setup_welcome_message(nicegui_config, message):
     """Without welcome_message the title makes the message."""
-    with NiceguiTest(**settings) as app:
+    with NiceguiTest(**nicegui_config) as app:
         assert app.nicegui._welcome_message == message
 
 
@@ -192,8 +192,10 @@ def test_startup_registers_the_pages_and_apis_of_the_route_handler(runs):
 
 def test_startup_runs_nicegui_with_the_config(runs):
     """ui.run gets the config as numbers where needed, never shows or reloads."""
-    settings = dict(host='0.0.0.0', port='5000', binding_refresh_interval='0.2', message_history_length='10', storage_secret='s3cret')
-    with NiceguiTest(**settings) as app:
+    nicegui_config = dict(
+        host='0.0.0.0', port='5000', binding_refresh_interval='0.2', message_history_length='10', storage_secret='s3cret'
+    )
+    with NiceguiTest(**nicegui_config) as app:
         app.nicegui.startup()
     (run,) = runs
     assert (run['host'], run['port'], run['binding_refresh_interval'], run['message_history_length']) == ('0.0.0.0', 5000, 0.2, 10)
@@ -212,7 +214,7 @@ def test_startup_runs_nicegui_with_the_config(runs):
     'run_kwargs, port', [(dict(port=9000, ssl_keyfile='key.pem'), 9000), ('port=9000', 4123)], ids=['dict', 'not_a_dict']
 )
 def test_startup_run_kwargs_win_over_the_config(runs, run_kwargs, port):
-    """run_kwargs as dict replace and add settings of ui.run, else not."""
+    """run_kwargs as dict replace and add options of ui.run, else not."""
     with NiceguiTest(run_kwargs=run_kwargs) as app:
         app.nicegui.startup()
     (run,) = runs
@@ -236,7 +238,7 @@ def test_startup_welcome_message_logged_when_nicegui_starts(monkeypatch):
 
 @pytest.fixture
 def openapi(monkeypatch):
-    """The openapi settings of the fastapi app of nicegui, startup sets them."""
+    """The openapi options of the fastapi app of nicegui, startup sets them."""
     monkeypatch.setattr(nicegui_app, 'openapi_url', nicegui_app.openapi_url)
     monkeypatch.setattr(nicegui_app, 'openapi', nicegui_app.openapi)
     return dict(openapi_documentation='page', openapi_url='/openapi.json', openapi_swagger_url='/docs', openapi_redoc_url='/redoc')
@@ -323,8 +325,8 @@ def test_startup_hotload_dir_defaults_to_the_site_dir_of_the_app(runs, tmp_path)
 @pytest.mark.parametrize('configured', [True, False], ids=['config', 'site'])
 def test_startup_hotload_without_the_dir_warns_and_serves(runs, tmp_path, monkeypatch, configured):
     """A missing dir to watch warns, no watchdog runs and nicegui serves anyway."""
-    settings = dict(hotload_dir=str(tmp_path / 'missing')) if configured else {}
-    with NiceguiTest(**settings) as app:
+    nicegui_config = dict(hotload_dir=str(tmp_path / 'missing')) if configured else {}
+    with NiceguiTest(**nicegui_config) as app:
         app._meta.main_dir = str(tmp_path)
         warnings = []
         monkeypatch.setattr(app.log, 'warning', lambda msg, **kw: warnings.append(msg))
@@ -407,7 +409,7 @@ def test_serve_starts_nicegui(runs):
 
 
 def test_serve_hotload_switches(runs, tmp_path):
-    """nicegui serve --hotload --hotload-dir watches the given folder."""
+    """nicegui serve --hotload --hotload-dir watches the given directory."""
     with NiceguiTest(['nicegui', 'serve', '--hotload', '--hotload-dir', str(tmp_path)]) as app:
         app.run()
         assert app.nicegui._hotload_dir == str(tmp_path) and app.nicegui._watchdog_observer.is_alive()

@@ -60,7 +60,7 @@ def token_interceptors():
 
 
 class GrpcTest(TokeoTest):
-    """A test app serving the echo service by grpc, with further settings."""
+    """A test app serving the echo service by grpc, with further grpc config."""
 
     class Meta:
         extensions = [
@@ -68,8 +68,8 @@ class GrpcTest(TokeoTest):
             'tokeo.ext.grpc',
         ]
 
-    def __init__(self, settings=None, **kw):
+    def __init__(self, grpc_config=None, **kw):
         config = init_defaults('grpc')
         config['grpc'].update(proto_add_servicer_to_server=ADD_SERVICER, grpc_servicer=SERVICER)
-        config['grpc'].update(settings or {})
+        config['grpc'].update(grpc_config or {})
         super().__init__(config_defaults=config, **kw)

@@ -1,15 +1,15 @@
-### **The Tokeo Main Configuration Settings**<br/>
+### **The Tokeo Main Configuration**<br/>
 ### <p>
 ### The tokeo.ext.appenv module handles the configuration loading and overriding mechanism for
 ### Tokeo and derivated applications. Each configuration file is based on YAML files with a
-### hierarchical structure that supports environment-specific settings and local overrides.
+### hierarchical structure that supports environment-specific config and local overrides.
 ### </p>
 ###
 ### ### Configuration File Hierarchy:
 ###
 ### <p>
 ### The configuration is loaded in the following order, with each file overriding
-### settings from the previous ones:
+### options from the previous ones:
 ### </p>
 ###
 ### 1. Base configuration: ```config/tokeo/base.yaml```, then ```config/tokeo/base.d/*.yaml```
@@ -30,9 +30,9 @@
 ### ### Overloading Configuration:
 ###
 ### <p>
-### The overloading mechanism allows for partial settings to be defined in environment-specific
-### or local configuration files. Only the specified settings will be overridden, while all other
-### settings will be inherited from the base configuration.
+### The overloading mechanism allows for partial config to be defined in environment-specific
+### or local configuration files. Only the specified options will be overridden, while all other
+### options will be inherited from the base configuration.
 ### </p>
 ###
 ### <p>
@@ -42,13 +42,13 @@
 ### - Base config.yaml defines ```smtp.host: localhost```
 ### - Production config.yaml defines ```smtp.host: production.host.domain```
 ### - When running in production mode, ```smtp.host``` will be ```production.host.domain```
-### - All other smtp settings from the base config.yaml remain unchanged
+### - All other smtp options from the base config.yaml remain unchanged
 ###
 ### ### Extend Local Configuration Files:
 ###
 ### <p>
 ### Local configuration files (ending with ```.local.yaml```) are used for environment-specific
-### secrets and settings that should not be checked into source control. These files should
+### secrets and options that should not be checked into source control. These files should
 ### be left added to ```.gitignore```.
 ### </p>
 ---
@@ -57,7 +57,7 @@
 
 ### ### Core Application Configuration
 ###
-### Main Tokeo application settings including debugging, plugins, and template locations
+### Main Tokeo application config including debugging, plugins, and template locations
 tokeo:
   ### Toggle application level debug (does not toggle framework debugging)
   # debug: false
@@ -72,7 +72,7 @@ tokeo:
 
 ### ### Jinja2 Template Configuration
 ###
-### Settings for Jinja2 templating engine behavior and template locations
+### Options for Jinja2 templating engine behavior and template locations
 jinja2:
   # preserve the trailing newline when rendering templates.
   keep_trailing_newline: true
@@ -87,7 +87,7 @@ jinja2:
 
 ### ### PDoc Documentation Generator Configuration
 ###
-### Settings for the PDoc Python documentation generator and server
+### Options for the PDoc Python documentation generator and server
 pdoc:
   ### modules to render (str | list), app and test as default
   modules: null
@@ -107,7 +107,7 @@ pdoc:
 
 ### ### Logging Configuration
 ###
-### Settings for application logging using the colorlog package
+### Options for application logging using the colorlog package
 log.colorlog:
   ### Where the log file lives (no log file by default)
   file: null

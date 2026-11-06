@@ -3,7 +3,7 @@ Tests for a handler without any event method.
 
 The server dispatches only the events a handler has. A bare handler, not
 derived from ```SmtpdEvents```, still gets the full dialog: the greeting, a
-delivered message, the answers to faults also within DATA, the 421 of a busy
+delivered message, the answers to errors also within DATA, the 421 of a busy
 server and the end of a connection by the client, by FIN or by RST.
 """
 
@@ -19,7 +19,7 @@ class BareEvents:
 
 
 def test_a_bare_handler_runs_the_full_dialog():
-    """Without events a message is delivered, faults are answered by their code."""
+    """Without events a message is delivered, errors are answered by their code."""
     commands = [
         b'EHLO me\r\n',
         b'FOO\r\n',

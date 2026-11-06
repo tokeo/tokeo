@@ -27,14 +27,14 @@ class DramatiqTest(TokeoTest):
 
 
 class DramatiqBrokerTest(DramatiqTest):
-    """A test app with the given rabbitmq settings of the broker."""
+    """A test app with the given rabbitmq options of the broker."""
 
     def __init__(self, tmp, rabbitmq=None):
         super().__init__(tmp, **({} if rabbitmq is None else dict(rabbitmq=rabbitmq)))
 
 
 class DramatiqMiddlewareTest(DramatiqTest):
-    """A test app with the given dramatiq settings, e.g. of the middleware."""
+    """A test app with the given dramatiq config, e.g. of the middleware."""
 
     def __init__(self, tmp, argv=None, **config):
         super().__init__(tmp, argv, **config)

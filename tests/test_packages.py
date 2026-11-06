@@ -38,11 +38,11 @@ def _pyproject(package):
 
 def _imports(package):
     # (file, module) of every absolute import in the sources of a package
-    for folder, _, files in os.walk(os.path.join(ROOT, package, 'tokeo')):
+    for sub_dir, _, files in os.walk(os.path.join(ROOT, package, 'tokeo')):
         for name in files:
             if not name.endswith('.py'):
                 continue
-            path = os.path.join(folder, name)
+            path = os.path.join(sub_dir, name)
             with open(path, encoding='utf-8') as f:
                 tree = ast.parse(f.read(), path)
             for node in ast.walk(tree):

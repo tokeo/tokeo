@@ -9,7 +9,7 @@ The exceptions and the small dependency-free helpers of [Tokeo](https://github.c
 - Exceptions with ```TokeoError``` and ```TokeoBaseException``` as the bases of all errors of Tokeo
 - Checks of values like ```is_int_gt```, ```is_number_between``` or ```is_filled_str```, and defaults for missing values
 - Dates in UTC, read from and written to ISO strings the same way on each Python version
-- Deep merge of settings, and redaction of values before they are logged
+- Deep merge of config, and redaction of values before they are logged
 - Keywords stripped to safe characters and strings quoted for the shell
 - Time limits of functions by the decorator ```@timelimit```
 - TLS contexts, urls with credentials, JSON encoders, random ids and the expiry of a JWT
@@ -36,11 +36,11 @@ from tokeo.core.utils.sort import sort_key_by_lex_and_num_ordered
 from tokeo.core.utils.timelimit import timelimit
 from tokeo.core.utils.validate import is_number_gt
 
-# merge the settings of a file into the defaults
-settings = deep_merge({'retries': 3, 'smtp': {'host': 'localhost', 'port': 25}}, {'smtp': {'port': 2525}})
-print(settings)
+# merge the config of a file into the defaults
+config = deep_merge({'retries': 3, 'smtp': {'host': 'localhost', 'port': 25}}, {'smtp': {'port': 2525}})
+print(config)
 
-if not is_number_gt(settings['retries'], 0):
+if not is_number_gt(config['retries'], 0):
     raise TokeoError('retries must be above 0')
 
 # sort names with numbers as people read them

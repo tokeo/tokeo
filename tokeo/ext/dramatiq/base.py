@@ -261,7 +261,7 @@ class TokeoDramatiq(MetaMixin):
         #: Id for config
         config_section = 'dramatiq'
 
-        #: Dict with initial settings
+        #: Dict with the config defaults
         config_defaults = dict(
             # Entry point method for the workers
             serve='main:method',
@@ -303,7 +303,7 @@ class TokeoDramatiq(MetaMixin):
             monitoring_with_details='debug',
             # Broker type (currently only rabbitmq supported)
             broker='rabbitmq',
-            # RabbitMQ connection settings
+            # RabbitMQ connection options
             rabbitmq=dict(
                 # connection url; use amqps:// to enable tls, verified against
                 # the system ca store by default (the secure option)
@@ -417,7 +417,7 @@ class TokeoDramatiq(MetaMixin):
         Register the Dramatiq broker and middleware.
 
         Sets up the Dramatiq middleware stack and creates the RabbitMQ broker
-        instance with the configured settings. This method is called during
+        instance with the configured options. This method is called during
         initialization and configures Dramatiq for use within the application.
 
         ### Raises
@@ -446,7 +446,8 @@ class TokeoDramatiq(MetaMixin):
             raise TokeoDramatiqConfigError('config', 'notify_shutdown', notify_shutdown, 'true or false')
         max_retries = _number('config', 'max_retries', self._config('max_retries'), min_value=0)
         min_backoff = _number('config', 'min_backoff', self._config('min_backoff'))
-        # dramatiq caps the retry delay at 7 days, a longer one has no effect
+        # dramatiq limits the retry delay to at most 7 days, a longer one has
+        # no effect
         max_backoff = _number('config', 'max_backoff', self._config('max_backoff'), max_value=604_800_000)
         # re-build set of middlewares to use
         use_middleware = [

@@ -7,7 +7,7 @@ that on_logging_event passes context and error through. The default
 on_logging_event writes to the server logger: the given one or an own stderr
 logger with logger_severity. The log lines of the server and the default events
 follow the reference: connect, disconnect, auth denial, start, command lines and
-faults outside the dialog.
+errors outside the dialog.
 """
 
 import re
@@ -306,8 +306,8 @@ def test_start_notes_at_debug_that_the_dialog_shows_the_credentials(auth_mode, n
     assert (note in events.lines) is noted
 
 
-def test_disconnect_fault_is_logged_critical_and_closes_the_connection():
-    """A fault of on_disconnect_event is logged CRITICAL, the connection closes."""
+def test_disconnect_error_is_logged_critical_and_closes_the_connection():
+    """An error of on_disconnect_event is logged CRITICAL, the connection closes."""
 
     class Broken(LinesEvents):
 

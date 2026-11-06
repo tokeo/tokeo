@@ -114,9 +114,9 @@ def start_grpc():
     """Starts test apps on a free localhost port, stops and closes them after."""
     with contextlib.ExitStack() as stack:
 
-        def start(settings=None, startup=True):
+        def start(grpc_config=None, startup=True):
             port = free_port()
-            app = stack.enter_context(GrpcTest(settings={'url': f'localhost:{port}', **(settings or {})}))
+            app = stack.enter_context(GrpcTest(grpc_config={'url': f'localhost:{port}', **(grpc_config or {})}))
             # the stack runs this before it closes the app
             stack.callback(_stop, app)
             if startup:
@@ -129,9 +129,9 @@ def start_grpc():
 # _setup
 
 
-def test_setup_merges_the_defaults_below_the_settings():
+def test_setup_merges_the_defaults_below_the_config():
     """The defaults fill the grpc section, a given url and max_workers stay."""
-    with GrpcTest(settings={'url': 'localhost:1234', 'max_workers': 3}) as app:
+    with GrpcTest(grpc_config={'url': 'localhost:1234', 'max_workers': 3}) as app:
         assert app.config.get('grpc', 'url') == 'localhost:1234'
         assert app.config.get('grpc', 'max_workers') == 3
         assert app.config.get('grpc', 'tls_enabled') is False
@@ -140,9 +140,9 @@ def test_setup_merges_the_defaults_below_the_settings():
         assert app.config.get('grpc', 'tls_valid_days') == 90
 
 
-def test_setup_keeps_each_module_attr_setting():
-    """Each module:attr setting is kept as given, resolved later by the server."""
-    with GrpcTest(settings={'grpc_interceptor': INTERCEPTORS}) as app:
+def test_setup_keeps_each_module_attr_option():
+    """Each module:attr option is kept as given, resolved later by the server."""
+    with GrpcTest(grpc_config={'grpc_interceptor': INTERCEPTORS}) as app:
         ext = app.grpc
         assert (ext._proto_add_servicer_to_server, ext._grpc_servicer, ext._grpc_interceptor) == (ADD_SERVICER, SERVICER, INTERCEPTORS)
 
@@ -154,10 +154,10 @@ def test_setup_without_interceptor_leaves_it_unset():
 
 
 @pytest.mark.parametrize('key', ['proto_add_servicer_to_server', 'grpc_servicer'])
-def test_setup_mandatory_setting_missing_raises(key):
-    """An unset mandatory setting stops the setup with TokeoGrpcError."""
-    with pytest.raises(TokeoGrpcError, match=f'Missing mandatory {key} setting in config'):
-        with GrpcTest(settings={key: None}):
+def test_setup_mandatory_option_missing_raises(key):
+    """An unset mandatory option stops the setup with TokeoGrpcError."""
+    with pytest.raises(TokeoGrpcError, match=f'Missing mandatory {key} option in config'):
+        with GrpcTest(grpc_config={key: None}):
             pass
 
 
@@ -165,9 +165,9 @@ def test_setup_mandatory_setting_missing_raises(key):
     'value', ['tests.ext.grpc.grpc_tests_helper:', 'tests.ext.grpc.no_such_module:echo'], ids=['no_attr', 'no_module']
 )
 @pytest.mark.parametrize('key', ['proto_add_servicer_to_server', 'grpc_servicer', 'grpc_interceptor'])
-def test_server_with_a_setting_that_does_not_resolve_raises(key, value):
-    """A setting without attr or with a missing module raises with its value."""
-    with GrpcTest(settings={key: value}) as app:
+def test_server_with_an_option_that_does_not_resolve_raises(key, value):
+    """An option without attr or with a missing module raises with its value."""
+    with GrpcTest(grpc_config={key: value}) as app:
         with pytest.raises(TokeoModulesLoadError, match=re.escape(repr(value))):
             app.grpc.server
 
@@ -235,7 +235,7 @@ def test_server_on_an_address_that_does_not_bind_raises_and_ends_its_pool(start_
 def test_close_shuts_a_started_server_down():
     """Closing the app stops a server started by startup, its port is free again."""
     port = free_port()
-    with GrpcTest(settings={'url': f'localhost:{port}'}) as app:
+    with GrpcTest(grpc_config={'url': f'localhost:{port}'}) as app:
         app.grpc.startup()
         assert _call(port) == b'echo hi'
         threads = list(app.grpc._executor._threads)
@@ -316,9 +316,9 @@ def test_controller_grpc_serve_runs_serve(monkeypatch):
 # _generate_self_signed_cert
 
 
-def _auto_cert(settings=None):
-    # the key and the parsed certificate the auto cert path makes for settings
-    with GrpcTest(settings={'url': 'localhost:50051', **(settings or {})}) as app:
+def _auto_cert(grpc_config=None):
+    # the key and the parsed certificate the auto cert path makes for grpc_config
+    with GrpcTest(grpc_config={'url': 'localhost:50051', **(grpc_config or {})}) as app:
         key_pem, cert_pem = app.grpc._generate_self_signed_cert()
     return serialization.load_pem_private_key(key_pem, password=None), x509.load_pem_x509_certificate(cert_pem)
 
@@ -392,7 +392,7 @@ def test_generate_self_signed_cert_tls_valid_days():
 
 
 @pytest.mark.parametrize(
-    'settings, message',
+    'grpc_config, message',
     [
         ({'tls_key_type': 'dsa'}, "tls_key_type 'dsa' is not supported"),
         ({'tls_key_type': None}, "tls_key_type must be set to 'rsa' or 'ec', not None"),
@@ -422,10 +422,10 @@ def test_generate_self_signed_cert_tls_valid_days():
         'valid_days_zero',
     ],
 )
-def test_generate_self_signed_cert_invalid_settings_raise(settings, message):
+def test_generate_self_signed_cert_invalid_config_raise(grpc_config, message):
     """A bad key type, key size or number of days raises TokeoGrpcError."""
     with pytest.raises(TokeoGrpcError, match=message):
-        _auto_cert(settings)
+        _auto_cert(grpc_config)
 
 
 # tls with the auto certificate
@@ -495,9 +495,9 @@ def test_tls_failed_setup_fails_again_on_the_next_startup(start_grpc, certs):
 # tls with a client ca (mutual tls)
 
 
-def _custom_tls(certs, **settings):
-    # the settings for tls by the custom server cert of certs plus settings
-    return {'tls_enabled': True, 'tls_certificate': certs.server_cert_file, 'tls_key': certs.server_key_file, **settings}
+def _custom_tls(certs, **grpc_config):
+    # the grpc config for tls by the custom server cert of certs plus grpc_config
+    return {'tls_enabled': True, 'tls_certificate': certs.server_cert_file, 'tls_key': certs.server_key_file, **grpc_config}
 
 
 def _client(certs, pair=None):

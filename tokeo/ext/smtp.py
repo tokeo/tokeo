@@ -284,7 +284,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # Basic text email with configuration defaults
         app.mail.send('This is my message body')
 
-        # Text and HTML multipart email with custom settings
+        # Text and HTML multipart email with custom options
         app.mail.send(
             (
               'Plain text version',
@@ -309,7 +309,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         """
         params = self._get_params(**kw)
 
-        # build before connecting, so a bad CA setting fails without network
+        # build before connecting, so a bad CA option fails without network
         context = self._host_cert_context(**params)
         # an empty value means "not set", smtplib would announce an empty EHLO
         local_hostname = params['local_hostname'] or None
@@ -404,7 +404,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         - **value** (str, optional): The header value to encode
         - **_charset** (Charset): Character set for encoding
-        - **params**: Parameter dictionary containing encoding settings
+        - **params**: Parameter dictionary containing encoding options
 
         ### Returns
 

@@ -152,7 +152,7 @@ Two conventions matter:
   decide by their result: ```True``` accepts the address as sent, a stripped string
   accepts it as the replaced address (also ```''```), ```None``` or ```False```
   refuses it by ```550```. Any other result, a string with surrounding whitespace or
-  an exception other than an ```Smtpd*Exception``` is a fault of the handler and
+  an exception other than an ```Smtpd*Exception``` is an error of the handler and
   answered by ```451```. Not overriding the event accepts every address.
   ```on_process_line_unknown_event``` answers an unknown line by a returned single
   reply line with its code (e.g. ```'250 OK'```), by ```500``` on ```None``` or
@@ -172,12 +172,12 @@ Two conventions matter:
     the hot path. Keep it fast and do not decorate it with ```@threaded```; the
     library rejects that at import time.
 
-    A fault within DATA (raised by ```on_message_data_start_event```,
+    An error within DATA (raised by ```on_message_data_start_event```,
     ```on_message_data_headers_event``` or ```on_message_data_receiving_event```,
     or a message over ```data_size```) is answered once after the end of DATA;
     the server discards the rest of the message without further events
     (RFC 1870). Any other error than an ```Smtpd*Exception``` answers 451,
-    the original error is its ```__cause__```. The fault is logged as ERROR
+    the original error is its ```__cause__```. The error is logged as ERROR
     when it occurs (```Error within DATA, further DATA is ignored up to its
     end: ...```); at the end it is counted once and logged with its reply.
 
@@ -298,7 +298,7 @@ raw ```data``` body), which is handy for logging or enqueuing a job.
 You decide who may authenticate in ```on_auth_event```. Return the
 ```authorization_id``` as a non-empty string to grant access; raise
 ```Smtpd535Exception``` to deny. Any other result is denied by 535 as well.
-The string must be stripped. Leading or trailing whitespace is a fault of
+The string must be stripped. Leading or trailing whitespace is an error of
 the handler and answered by ```454 Temporary authentication failure```, like
 any exception of ```on_auth_event``` other than an ```SmtpdException```.
 A client may send an ```authorization_id``` to act as another identity
@@ -472,18 +472,18 @@ class MailHandler(SmtpdEvents):
 
     def __init__(self, options=None):
         super().__init__(options)
-        self.blocked = set()
+        self.denied_ips = set()
 
     def on_connect_event(self, ctx):
         super().on_connect_event(ctx)
         # refuse a client that ran into the session timeout before
-        if ctx.server.remote_ip in self.blocked:
+        if ctx.server.remote_ip in self.denied_ips:
             raise Smtpd554CloseException
 
     def on_disconnect_event(self, ctx):
         super().on_disconnect_event(ctx)
         if any(isinstance(e, SmtpdIOSessionTimeoutException) for e in ctx.server.errors):
-            self.blocked.add(ctx.server.remote_ip)
+            self.denied_ips.add(ctx.server.remote_ip)
 ```
 
 The server reads the standard on 521 and 554 by practice: RFC 7504 lets the
@@ -758,8 +758,8 @@ safe modes and runs into ```io_cmd_timeout```. With ```crlf_mode```
 
 ### Sharing limits across services
 
-```max_processings``` and ```max_connections``` are per-server. To cap several
-servers against one shared budget (for example when running several listeners in
+```max_processings``` and ```max_connections``` are per-server. To limit several
+servers by one shared maximum (for example when running several listeners in
 one process), pass a shared ```GlobalLimits``` to each:
 
 ```python
@@ -785,7 +785,7 @@ the file only. At ```on_message_data_event``` the file holds the complete
 de-dot-stuffed, chomped message while ```ctx.message.data``` carries ONLY
 the headers (no separator line). ```ctx.message.bytesize``` always counts
 the whole message and equals the final file size. Header lines added by the
-handler change it too and count against a ```data_size``` cap.
+handler change it too and count against a ```data_size``` limit.
 
 ```ctx.message.spooler``` is the owning ```MessageSpooler``` (None without
 spooling, and None for a message that ends before a header/body separator).

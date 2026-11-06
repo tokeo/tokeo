@@ -3,7 +3,7 @@ Shared helpers of the tests of tokeo.core.smtpd: the events of the tests
 (```RecordingEvents```, ```AuthEvents```), the client dialog against a live
 server, the dialog-engine driver (```run_line```, which calls the async
 ```process_line``` synchronously) and the integration helpers: read an RFC
-message from the data folder, generate certificates with ```cryptography```,
+message from the data directory, generate certificates with ```cryptography```,
 and send mail with Python's ```smtplib``` (with optional STARTTLS and AUTH
 PLAIN/LOGIN), plus a runner that starts the async server, runs the blocking
 client(s) in a thread, and stops the server, and a delivery of raw wire bytes.
@@ -380,7 +380,7 @@ def auth_plain(authzid, authcid, password):
 # ---- tls client and raw wire ------------------------------------------------
 
 
-TLS_SETTINGS = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
+TLS_SERVER_OPTIONS = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
 
 
 def run_wire(events, options, wire_body):

@@ -153,7 +153,7 @@ class TokeoAppEnv:
 
         Builds the file list for the given environment: the top-level
         <env> config first, then any partial configs found recursively in
-        the <env>.d folder (ordered lexicographically and with numbers
+        the <env>.d directory (ordered lexicographically and with numbers
         respected). .local files are appended last and are skipped entirely
         for the base environment.
 

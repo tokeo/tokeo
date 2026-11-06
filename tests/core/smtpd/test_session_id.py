@@ -1,7 +1,7 @@
 """
 The per-connection session id: created once in ```serve_client``` as
 ```ctx.id``` (write-once), sized by the keyword-only ```session_id_bytes```
-of the server, never by a service setting.
+of the server, never by a service option.
 """
 
 import re
@@ -79,8 +79,8 @@ def test_session_id_format_uniqueness_and_persistence():
     assert mails == [connects[0], connects[0], connects[1], connects[1]]
 
 
-def test_session_id_bytes_is_keyword_only_not_a_service_setting():
-    """session_id_bytes sizes the id as keyword, the setting is ignored."""
+def test_session_id_bytes_is_keyword_only_not_a_service_option():
+    """session_id_bytes sizes the id as keyword, the option is ignored."""
     events = IdCaptureEvents()
     # the keyword sizes the id; the same key in options must stay ignored
     _run(events, _session, options={'session_id_bytes': 12}, session_id_bytes=4)

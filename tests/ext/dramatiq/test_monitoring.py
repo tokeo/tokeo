@@ -101,7 +101,7 @@ def test_monitoring_adds_the_heartbeat(tmp):
     ],
 )
 def test_monitoring_config_checked(tmp, config, error):
-    """Invalid monitoring settings raise the config error."""
+    """Invalid monitoring options raise the config error."""
     with pytest.raises(TokeoDramatiqConfigError, match=error):
         with DramatiqMiddlewareTest(tmp, **config):
             pass

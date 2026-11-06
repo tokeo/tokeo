@@ -74,7 +74,7 @@ with smtplib.SMTP('127.0.0.1', 2525) as client:
 <br/>
 <br/>
 
-It depends only on tokeo-base, the cryptography package is needed only to generate a self-signed test certificate. The guide [SMTPD.md](https://github.com/tokeo/tokeo/blob/master-2.x/tokeo-smtpd/tokeo/core/smtpd/SMTPD.md) explains the events, modes and settings. Within a Tokeo app use the smtpd extension ```tokeo.ext.smtpd```.
+It depends only on tokeo-base, the cryptography package is needed only to generate a self-signed test certificate. The guide [SMTPD.md](https://github.com/tokeo/tokeo/blob/master-2.x/tokeo-smtpd/tokeo/core/smtpd/SMTPD.md) explains the events, modes and options. Within a Tokeo app use the smtpd extension ```tokeo.ext.smtpd```.
 
 <br/>
 <br/>

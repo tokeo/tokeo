@@ -27,7 +27,7 @@ needs_tls_immediate = pytest.mark.skipif(
     reason=f'TLS_IMMEDIATE requires Python 3.13.13+ or 3.14.4+ (gh-142352), running {platform.python_version()}',
 )
 
-_SETTINGS = {'encrypt_mode': 'TLS_IMMEDIATE', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
+_SERVER_OPTIONS = {'encrypt_mode': 'TLS_IMMEDIATE', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
 
 
 class ImmediateEvents(RecordingEvents):
@@ -63,7 +63,7 @@ def test_delivers_over_tls():
     ev = ImmediateEvents()
 
     async def go():
-        server, port, task = await start_server(ev, _SETTINGS)
+        server, port, task = await start_server(ev, _SERVER_OPTIONS)
         try:
             # the client speaks TLS from the first byte on
             reader, writer = await asyncio.open_connection('127.0.0.1', port, ssl=insecure_tls_context())
@@ -91,7 +91,7 @@ def test_behind_proxy():
     ev = ImmediateEvents()
 
     async def go():
-        server, port, task = await start_server(ev, dict(_SETTINGS, proxy_extension=True))
+        server, port, task = await start_server(ev, dict(_SERVER_OPTIONS, proxy_extension=True))
         try:
             # PROXY header and ClientHello are buffered together by the server,
             # the handshake must still see the whole ClientHello
@@ -128,10 +128,10 @@ def test_required_python_version(monkeypatch, version, supported):
     """Below 3.13.13 or 3.14.4 a TLS_IMMEDIATE server raises ValueError."""
     monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', version + ('final', 0))
     if supported:
-        assert SmtpdServer(RecordingEvents(), options=_SETTINGS).tls is not None
+        assert SmtpdServer(RecordingEvents(), options=_SERVER_OPTIONS).tls is not None
     else:
         with pytest.raises(ValueError, match='requires Python 3.13.13\\+ or 3.14.4\\+'):
-            SmtpdServer(RecordingEvents(), options=_SETTINGS)
+            SmtpdServer(RecordingEvents(), options=_SERVER_OPTIONS)
 
 
 @pytest.mark.parametrize(

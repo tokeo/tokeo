@@ -13,7 +13,7 @@ and configuration management.
 - Manages the server lifecycle with clean startup and shutdown
 - Adds CLI commands to run and control the gRPC server
 - Logs through the application's logging system
-- Reads workers, TLS, and interceptor settings from the extension config
+- Reads workers, TLS, and interceptor options from the extension config
 - Generates gRPC scaffolding for new Tokeo projects
 
 """
@@ -86,7 +86,7 @@ class TokeoGrpc(MetaMixin):
         #: Id for config
         config_section = 'grpc'
 
-        #: Dict with initial settings
+        #: Dict with the config defaults
         config_defaults = dict(
             # address and port to run the service on
             url='localhost:50051',
@@ -123,7 +123,7 @@ class TokeoGrpc(MetaMixin):
         self._server = None
         # the thread pool of the server, freed again by shutdown
         self._executor = None
-        # the module:attr settings, resolved when the server is built
+        # the module:attr options, resolved when the server is built
         self._proto_add_servicer_to_server = None
         self._grpc_servicer = None
         self._grpc_interceptor = None
@@ -136,10 +136,10 @@ class TokeoGrpc(MetaMixin):
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
         self._proto_add_servicer_to_server = self._config('proto_add_servicer_to_server')
         if not self._proto_add_servicer_to_server:
-            raise TokeoGrpcError('Missing mandatory proto_add_servicer_to_server setting in config')
+            raise TokeoGrpcError('Missing mandatory proto_add_servicer_to_server option in config')
         self._grpc_servicer = self._config('grpc_servicer')
         if not self._grpc_servicer:
-            raise TokeoGrpcError('Missing mandatory grpc_servicer setting in config')
+            raise TokeoGrpcError('Missing mandatory grpc_servicer option in config')
         # optional interceptor chain factory (module:method), None when unset
         self._grpc_interceptor = self._config('grpc_interceptor')
 

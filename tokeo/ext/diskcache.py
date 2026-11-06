@@ -810,7 +810,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         #: Id for config
         config_section = 'diskcache'
 
-        #: Dict with initial settings
+        #: Dict with the config defaults
         config_defaults = dict(
             # Directory where cache db files are stored. When using
             # diskcache to synchronize processes, make sure that all
@@ -1029,7 +1029,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         Check the cache's database integrity.
 
-        Verifies integrity and optionally fixes any corruption in the database.
+        Checks integrity and optionally fixes any corruption in the database.
 
         ### Args
 
@@ -1214,13 +1214,13 @@ class TokeoDiskCacheController(Controller):
     # ---- check --------------------------------------------------------------
 
     @ex(
-        help='verify the cache',
-        description='Maintain and verify the diskcache cache.',
+        help='check the cache',
+        description='Maintain and check the diskcache cache.',
         epilog=f'Use "{basename(sys.argv[0])} cache check" to drop expired items and check the cache.',
     )
     def check(self):
         """
-        Verify and maintain the cache database.
+        Check and maintain the cache database.
 
         Performs a series of maintenance operations:
         - Checks and fixes database integrity

@@ -18,7 +18,7 @@ The shell and its lists build on the extensions ```tokeo.ext.tui.input``` and
 - Background or blocking scheduler modes
 - Configuration-driven task setup
 - Runtime task manipulation (pause, resume, remove, fire)
-- Declarative task definition via application configuration
+- Task definition via application configuration
 - Control over maximum concurrent job execution
 
 """
@@ -239,7 +239,7 @@ class TokeoScheduler(MetaMixin):
         # Configuration section in the application config
         config_section = 'scheduler'
 
-        # Default configuration settings
+        # the defaults of the config section
         config_defaults = dict(
             # Maximum number of concurrent job executions
             max_concurrent_jobs=10,
@@ -308,7 +308,7 @@ class TokeoScheduler(MetaMixin):
         Get the APScheduler instance.
 
         Lazily creates and configures the appropriate scheduler instance
-        (background or blocking) based on the interactive mode setting.
+        (background or blocking) based on the interactive mode.
 
         ### Returns
 
@@ -467,7 +467,7 @@ class TokeoScheduler(MetaMixin):
 
         ### Raises
 
-        - **ValueError**: If an unsupported coalesce setting is used
+        - **ValueError**: If an unsupported coalesce option is used
 
         ### Notes
 
@@ -510,7 +510,7 @@ class TokeoScheduler(MetaMixin):
             elif coalesce == 'all':
                 coalesce = False
             else:
-                raise ValueError(f'Unsupported value "{coalesce}" for coalesce setting')
+                raise ValueError(f'Unsupported value "{coalesce}" for coalesce option')
             # iterate crontab
             for entry in crontab:
                 self.add_crontab_task(

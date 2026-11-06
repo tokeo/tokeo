@@ -1,7 +1,7 @@
 """
 Ported from the reference suite's test/stress/thread_safety_test.rb.
 
-Runs many simultaneous authenticated deliveries and verifies the per-connection
+Runs many simultaneous authenticated deliveries and checks the per-connection
 context is never cross-contaminated: for each connection the envelope sender must
 equal ```<authentication_id>``` and the first recipient. With one session/ctx per
 connection task, the fail counter must stay zero.

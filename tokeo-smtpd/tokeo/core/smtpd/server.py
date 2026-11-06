@@ -325,16 +325,16 @@ def _build_addresses(ports, hosts):
 
 class GlobalLimits:
     """
-    Process-wide caps shared across all services in one event loop.
+    Process-wide limits shared across all services in one event loop.
 
     Plain counters (one loop, no threads): ```active``` open connections and
-    ```active_processings``` in-progress dialogs, checked against the caps.
+    ```active_processings``` in-progress dialogs, checked against the limits.
 
     ### Args
 
-    - **max_processings** (int|None): Global concurrent-processing cap
+    - **max_processings** (int|None): Global max of concurrent processings
         (None/0 = unlimited)
-    - **max_connections** (int|None): Global open-connection cap
+    - **max_connections** (int|None): Global max of open connections
         (None/0 = unlimited)
 
     """
@@ -364,11 +364,11 @@ class GlobalLimits:
 
     def try_begin_processing(self):
         """
-        Count one more in-progress dialog if the cap allows it.
+        Count one more in-progress dialog if max_processings allows it.
 
         ### Returns
 
-        - **bool**: True when the dialog was counted, False at the cap
+        - **bool**: True when the dialog was counted, False at max_processings
 
         """
         if self.max_processings is not None and self.active_processings >= self.max_processings:
@@ -430,13 +430,13 @@ class SmtpdServer:
     The SMTP service: binds listeners and serves each client.
 
     Option names are kept 1:1; ```data_size``` is a Tokeo-only option
-    (a hard cap on the message size while receiving DATA).
+    (a hard limit of the message size while receiving DATA).
 
     ### Args
 
     - **events_handler** (SmtpdEvents): The bound handler implementation instance
     - **options** (dict): The options of the server
-    - **global_limits** (GlobalLimits, optional): Shared caps across services
+    - **global_limits** (GlobalLimits, optional): Shared limits across services
     - **logger** (optional): Target of the default ```on_logging_event```, any
         logger with ```debug```/```info```/```warning```/```error```/```critical```;
         when not given an own stderr logger with ```logger_severity``` is used
@@ -554,7 +554,7 @@ class SmtpdServer:
                     'Number of concurrent connections (max_connections) is lower than '
                     'number of simultaneous processings (max_processings)!'
                 )
-        # Tokeo-only option: hard cap on the message size during DATA
+        # Tokeo-only option: hard limit of the message size during DATA
         self.data_size = options.get('data_size', None)
         #: TLS transport, built when encryption is allowed (else None and
         #: STARTTLS answers 500)
@@ -763,7 +763,7 @@ class SmtpdServer:
 
         ### Notes
 
-        : Stop accepting first, then either drain within the time budget
+        : Stop accepting first, then either drain within wait_seconds_before_close
             or force the remaining sessions down by cancelling their tasks,
             each after a last attempt to send 421
 
@@ -773,7 +773,7 @@ class SmtpdServer:
         # signal every active dialog to end
         self.shutdown()
         if gracefully:
-            # wait for active sessions to finish, up to the time budget
+            # wait for active sessions to finish, at most wait_seconds_before_close
             loop = asyncio.get_running_loop()
             end_time = loop.time() + max(0.0, wait_seconds_before_close)
             while self._sessions and loop.time() < end_time:
@@ -824,7 +824,7 @@ class SmtpdServer:
         except asyncio.CancelledError:
             # service shutdown / forced drop: end this connection
             pass
-        # a fault outside the dialog, e.g. of on_disconnect_event
+        # an error outside the dialog, e.g. of on_disconnect_event
         except Exception as e:  # noqa: B902
             await self._emit(SmtpdEvent.ON_LOGGING_EVENT, None, Severity.CRITICAL, f'{e} ({type(e).__name__})', e)
         finally:
@@ -840,7 +840,7 @@ class SmtpdServer:
             self._slot_free.set()
 
     def _too_many_connections(self):
-        """True when connections exceed max_connections (service or global cap)."""
+        """True when connections exceed max_connections (service or global)."""
         if self.max_connections is not None and self._connections > int(self.max_connections):
             return True
         gl = self.global_limits
@@ -867,7 +867,7 @@ class SmtpdServer:
             return has_service_slot and has_global_slot
 
         while True:
-            # the global cap is checked and counted in one step, so two
+            # the global max is checked and counted in one step, so two
             # processes cannot both take the last slot
             if (max_processings is None or self._processings < max_processings) and (gl is None or gl.try_begin_processing()):
                 self._processings += 1
@@ -895,7 +895,7 @@ class SmtpdServer:
         : On an unencrypted channel ```TLS_WHEN_AUTH``` and ```TLS_REQUIRED```
             refuse AUTH command (530) and EHLO does not advertise it. After
             STARTTLS or without TLS enforcement, the advertising just follows
-            ```auth_mode``` setting.
+            ```auth_mode``` option.
 
         """
         # False if we don't want to support AUTH
@@ -963,7 +963,7 @@ class SmtpdServer:
                 ctx.server.local_response = f'{local_name} says welcome!'
                 ctx.server.helo_response = f'{local_name} at your service!'
 
-                # check if we want to let this remote station connect us
+                # check if we want to let this remote client connect us
                 if SmtpdEvent.ON_CONNECT_EVENT in self.emit_events:
                     await self._emit(SmtpdEvent.ON_CONNECT_EVENT, ctx)
 
@@ -1478,7 +1478,7 @@ class SmtpdServer:
                         SmtpdEvent.ON_PROXY_EVENT, ctx, proxy_data, error_cls=Smtpd421CloseException
                     )
                     # None keeps the parsed data, a dict updates its fields (also
-                    # {}), else a fault of the handler
+                    # {}), else an error of the handler
                     if isinstance(return_value, dict):
                         deep_merge(proxy_data, return_value)
                     elif return_value is not None:
@@ -1750,7 +1750,7 @@ class SmtpdServer:
                     raise Smtpd501Exception
                 return_value = await self._emit_and_return_value(SmtpdEvent.ON_VRFY_EVENT, ctx, cmd_data)
                 # a single reply line answers, None/False leaves the answer to
-                # the server, anything else is a fault of the handler
+                # the server, anything else is an error of the handler
                 if isinstance(return_value, str) and self._RE_REPLY_LINE.fullmatch(return_value):
                     return return_value
                 if return_value is not None and return_value is not False:
@@ -1769,7 +1769,7 @@ class SmtpdServer:
                     raise Smtpd501Exception
                 return_value = await self._emit_and_return_value(SmtpdEvent.ON_EXPN_EVENT, ctx, cmd_data)
                 # a single reply line answers, None/False leaves the answer to
-                # the server, anything else is a fault of the handler
+                # the server, anything else is an error of the handler
                 if isinstance(return_value, str) and self._RE_REPLY_LINE.fullmatch(return_value):
                     return return_value
                 if return_value is not None and return_value is not False:
@@ -1785,7 +1785,7 @@ class SmtpdServer:
                 cmd_data = re.sub(r'^HELP\ ?', '', line, flags=self._RE_CMD_FLAGS)
                 return_value = await self._emit_and_return_value(SmtpdEvent.ON_HELP_EVENT, ctx, cmd_data)
                 # a single reply line answers, None/False leaves the answer to
-                # the server, anything else is a fault of the handler
+                # the server, anything else is an error of the handler
                 if isinstance(return_value, str) and self._RE_REPLY_LINE.fullmatch(return_value):
                     return return_value
                 if return_value is not None and return_value is not False:
@@ -1798,7 +1798,7 @@ class SmtpdServer:
                 # allow handling of unknown command line
                 return_value = await self._emit_and_return_value(SmtpdEvent.ON_PROCESS_LINE_UNKNOWN_EVENT, ctx, line)
                 # a single reply line answers, None/False leaves the answer to
-                # the server, anything else is a fault of the handler
+                # the server, anything else is an error of the handler
                 if isinstance(return_value, str) and self._RE_REPLY_LINE.fullmatch(return_value):
                     return return_value
                 if return_value is not None and return_value is not False:
@@ -1863,7 +1863,7 @@ class SmtpdServer:
                 # update bytesize
                 ctx.message.bytesize += len(chunk)
 
-                # Tokeo-only option: enforce a hard data_size cap
+                # Tokeo-only option: enforce a hard data_size limit
                 if self.data_size and ctx.message.bytesize > int(self.data_size):
                     raise Smtpd552Exception
 
@@ -1938,7 +1938,7 @@ class SmtpdServer:
             return await self._emit(event, ctx, *args)
         except SmtpdException:
             raise
-        # any other handler fault is answered by the given exception
+        # any other handler error is answered by the given exception
         except Exception as e:  # noqa: B902
             raise error_cls(f'{e} ({type(e).__name__})') from e
 
@@ -1998,7 +1998,7 @@ class SmtpdServer:
             if len(auth_values) != 3 or not auth_values[1] or not auth_values[2]:
                 raise Smtpd535Exception
             # call event function to test credentials
-            # any other handler fault is a temporary failure (RFC 4954 section 6)
+            # any other handler error is a temporary failure (RFC 4954 section 6)
             return_value = await self._emit_and_return_value(
                 SmtpdEvent.ON_AUTH_EVENT, session.ctx, *auth_values, error_cls=Smtpd454Exception
             )
@@ -2038,7 +2038,7 @@ class SmtpdServer:
             session.auth_challenge['authorization_id'] = ''
             session.auth_challenge['authentication_id'] = self._decode64(encoded_auth_response)
         except SmtpdException:
-            # a fault of the decoding ends the AUTH exchange
+            # an error of the decoding ends the AUTH exchange
             session.cmd_sequence = CMD_RSET
             session.auth_challenge = {}
             raise
@@ -2071,7 +2071,7 @@ class SmtpdServer:
             if not auth_values[1] or not auth_values[2]:
                 raise Smtpd535Exception
             # check for valid credentials
-            # any other handler fault is a temporary failure (RFC 4954 section 6)
+            # any other handler error is a temporary failure (RFC 4954 section 6)
             return_value = await self._emit_and_return_value(
                 SmtpdEvent.ON_AUTH_EVENT, session.ctx, *auth_values, error_cls=Smtpd454Exception
             )

@@ -79,7 +79,7 @@ class TokeoTest(TestApp, Tokeo):
 
     This class extends both TestApp from the Cement framework and the Tokeo
     application class to provide a testing environment for Tokeo applications.
-    It modifies various settings to be more suitable for automated testing.
+    It modifies various config values to be more suitable for automated testing.
 
     ### Example
 

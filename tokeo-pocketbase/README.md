@@ -141,7 +141,7 @@ with PocketBase('http://127.0.0.1:8090') as pb:
 <br/>
 <br/>
 
-It depends on tokeo-base and httpx. The guide [POCKETBASE.md](https://github.com/tokeo/tokeo/blob/master-2.x/tokeo-pocketbase/tokeo/core/pocketbase/POCKETBASE.md) explains logins and the silent guest, realtime, the times of the server with the hook file ```pb_hooks/realtime.pb.js```, pages of nicegui with live data, a backend that acts as its users, and the limits and settings. Within a Tokeo app use the pocketbase extension ```tokeo.ext.pocketbase```, its handler ```app.db``` logs in a service identity before each request.
+It depends on tokeo-base and httpx. The guide [POCKETBASE.md](https://github.com/tokeo/tokeo/blob/master-2.x/tokeo-pocketbase/tokeo/core/pocketbase/POCKETBASE.md) explains logins and the silent guest, realtime, the times of the server with the hook file ```pb_hooks/realtime.pb.js```, pages of nicegui with live data, a backend that acts as its users, and the limits and options. Within a Tokeo app use the pocketbase extension ```tokeo.ext.pocketbase```, its handler ```app.db``` logs in a service identity before each request.
 
 <br/>
 <br/>

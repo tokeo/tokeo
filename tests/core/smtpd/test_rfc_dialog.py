@@ -6,7 +6,7 @@ rule of RFC 5321, 3207 or 4954 that is not part of the full delivery tests:
 RSET at any time, a later EHLO, the address literal of the server, VRFY, EXPN
 and HELP with and without a handler, the 538 for AUTH without TLS, STARTTLS
 within a transaction, the trace header written by the handler and the reply
-of a handler fault in AUTH LOGIN.
+of a handler error in AUTH LOGIN.
 """
 
 import asyncio
@@ -28,7 +28,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     start_server,
     stop_server,
     insecure_tls_context,
-    TLS_SETTINGS,
+    TLS_SERVER_OPTIONS,
 )
 
 # ---- RSET and a later EHLO --------------------------------------------------
@@ -45,14 +45,14 @@ def test_rset_before_helo_answers_250_and_still_needs_the_greeting():
 
 def test_helo_without_tls_on_tls_required_answers_530():
     """With TLS_REQUIRED a plaintext HELO answers 530, EHLO offers STARTTLS."""
-    _, r = dialog(RecordingEvents(), {**TLS_SETTINGS, 'encrypt_mode': 'TLS_REQUIRED'}, [b'HELO me\r\n', b'EHLO me\r\n'])
+    _, r = dialog(RecordingEvents(), {**TLS_SERVER_OPTIONS, 'encrypt_mode': 'TLS_REQUIRED'}, [b'HELO me\r\n', b'EHLO me\r\n'])
     assert r[0][0].startswith('530')
     assert r[1][-1] == '250 STARTTLS'
 
 
 def test_rset_without_tls_on_tls_required_answers_530():
     """With TLS_REQUIRED a RSET on the plaintext channel answers 530."""
-    _, r = dialog(RecordingEvents(), {**TLS_SETTINGS, 'encrypt_mode': 'TLS_REQUIRED'}, [b'EHLO me\r\n', b'RSET\r\n'])
+    _, r = dialog(RecordingEvents(), {**TLS_SERVER_OPTIONS, 'encrypt_mode': 'TLS_REQUIRED'}, [b'EHLO me\r\n', b'RSET\r\n'])
     assert r[1][0].startswith('530')
 
 
@@ -168,7 +168,7 @@ def test_vrfy_expn_and_help_take_the_reply_of_the_handler():
     assert ev.args == ['postmaster', 'team', 'list', '']
 
 
-class FaultyReplyEvents(RecordingEvents):
+class ErrorReplyEvents(RecordingEvents):
     """Answers by the argument: a wrong result, an error or a reject."""
 
     def _answer(self, data):
@@ -189,17 +189,17 @@ class FaultyReplyEvents(RecordingEvents):
 
 
 @pytest.mark.parametrize('verb', [b'VRFY', b'EXPN', b'HELP'])
-def test_vrfy_expn_and_help_answer_a_fault_of_the_handler(verb):
+def test_vrfy_expn_and_help_answer_an_error_of_the_handler(verb):
     """Another result or an exception answers 451, an SmtpdException its code."""
     commands = [b'EHLO me\r\n'] + [verb + b' ' + data + b'\r\n' for data in (b'result', b'error', b'reject')]
-    _, r = dialog(FaultyReplyEvents(), {}, commands)
+    _, r = dialog(ErrorReplyEvents(), {}, commands)
     assert [reply[0][:3] for reply in r[1:]] == ['451', '451', '550']
 
 
 def test_vrfy_expn_and_help_without_tls_on_tls_required_answer_530():
     """With TLS_REQUIRED VRFY, EXPN and HELP on the plaintext channel answer 530."""
     commands = [b'EHLO me\r\n', b'VRFY x\r\n', b'EXPN x\r\n', b'HELP\r\n']
-    _, r = dialog(RecordingEvents(), {**TLS_SETTINGS, 'encrypt_mode': 'TLS_REQUIRED'}, commands)
+    _, r = dialog(RecordingEvents(), {**TLS_SERVER_OPTIONS, 'encrypt_mode': 'TLS_REQUIRED'}, commands)
     assert [reply[0][:3] for reply in r[1:]] == ['530', '530', '530']
 
 
@@ -208,7 +208,7 @@ def test_vrfy_expn_and_help_without_tls_on_tls_required_answer_530():
 
 def test_starttls_with_an_argument_answers_501():
     """STARTTLS takes no argument, one answers 501."""
-    _, r = dialog(RecordingEvents(), TLS_SETTINGS, [b'EHLO me\r\n', b'STARTTLS now\r\n'])
+    _, r = dialog(RecordingEvents(), TLS_SERVER_OPTIONS, [b'EHLO me\r\n', b'STARTTLS now\r\n'])
     assert r[1][0].startswith('501')
 
 
@@ -216,7 +216,7 @@ def test_starttls_within_a_transaction_drops_it():
     """STARTTLS after MAIL drops the transaction, RCPT then answers 503."""
 
     async def go():
-        server, port, task = await start_server(RecordingEvents(), TLS_SETTINGS)
+        server, port, task = await start_server(RecordingEvents(), TLS_SERVER_OPTIONS)
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)

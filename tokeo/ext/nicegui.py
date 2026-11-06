@@ -314,7 +314,7 @@ class TokeoNicegui(MetaMixin):
         # Id for config
         config_section = 'nicegui'
 
-        # Dict with initial settings
+        # Dict with the config defaults
         config_defaults = dict(
             host='127.0.0.1',
             port='4123',
@@ -461,7 +461,7 @@ class TokeoNicegui(MetaMixin):
 
         ### Notes
 
-        - Uses configuration settings to determine which files to watch
+        - Uses the config to determine which files to watch
         - Sets up a callback that will trigger a hotload when changes are detected
         - Starts the observer in a separate thread to monitor for changes
 
@@ -556,7 +556,7 @@ class TokeoNicegui(MetaMixin):
         - Starts the NiceGUI server with configuration from the application
 
         """
-        # a misconfigured routes setting cannot be fixed
+        # a misconfigured routes option cannot be fixed
         # validate before start and always raise
         if self._routes is not None and not isinstance(self._routes, str):
             raise TokeoNiceguiError(
@@ -616,7 +616,7 @@ class TokeoNicegui(MetaMixin):
             fastapi_app.openapi_url = self._openapi_url
             # setup openapi
             fastapi_app.setup()
-            # customize get_openapi settings
+            # customize get_openapi options
             fastapi_app.openapi = get_openapi_custom
             # launch swagger doc
             if swagger_ui_html:

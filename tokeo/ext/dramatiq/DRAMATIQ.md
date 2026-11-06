@@ -167,7 +167,7 @@ values from the config apply (section 7):
 <tbody>
 <tr><td>max_retries</td><td>20</td><td>retries after a failure; 0 sends a failed message to the dead letters at once</td></tr>
 <tr><td>min_backoff</td><td>15_000 ms</td><td>delay of the first retry; it about doubles with each retry (with jitter)</td></tr>
-<tr><td>max_backoff</td><td>604_800_000 ms</td><td>longest delay of a retry; dramatiq caps it at 7 days</td></tr>
+<tr><td>max_backoff</td><td>604_800_000 ms</td><td>longest delay of a retry; dramatiq allows at most 7 days</td></tr>
 <tr><td>retry_when</td><td>-</td><td>callable(retries, exception) -> bool, decides instead of max_retries</td></tr>
 <tr><td>throws</td><td>-</td><td>exception class(es) that are expected: no retry, logged as info</td></tr>
 <tr><td>on_retry_exhausted</td><td>-</td><td>name of an actor called with the message once the retries are used up</td></tr>
@@ -412,7 +412,7 @@ when RabbitMQ limits the connections.
 
 ### Environment variables
 
-dramatiq reads some settings from the environment when it is imported. The
+dramatiq reads some options from the environment when it is imported. The
 extension sets most of them from the config for the workers; two are worth
 knowing:
 

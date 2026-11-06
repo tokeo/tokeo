@@ -86,7 +86,7 @@ pip install tokeo tokeo-smtpd
 # Or add the PocketBase driver for the pocketbase extension
 pip install tokeo tokeo-pocketbase
 
-# Verify installation
+# Check the installation
 tokeo --help
 ```
 
@@ -135,7 +135,7 @@ make dev
 # If using feature gRPC, generate code from proto files
 make proto
 
-# Verify your application is working
+# Check that your application is working
 your_app --help
 ```
 

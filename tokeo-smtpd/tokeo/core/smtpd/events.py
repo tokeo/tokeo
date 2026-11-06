@@ -281,7 +281,7 @@ class SmtpdEvents:
             the handler; only a returned non-empty string grants the access and
             is used as the authorization id, any other result is denied by 535
         : The returned string must be stripped, leading or trailing whitespace
-            is a fault of the handler and answered by 454 like any exception
+            is an error of the handler and answered by 454 like any exception
             other than an SmtpdException
         : Return the authorization_id sent by the client only after checking
             that the authentication_id may act as it
@@ -346,7 +346,7 @@ class SmtpdEvents:
 
         : Header lines appended to ```ctx.message.data``` here become part
             of the message: they change ```bytesize``` (and count against a
-            ```data_size``` cap) and reach the spool file when spooling
+            ```data_size``` limit) and reach the spool file when spooling
 
         """
         pass

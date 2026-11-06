@@ -93,11 +93,11 @@ def test_a_pickled_key_is_never_loaded(cache, tmp_path):
 
 
 def test_directories_are_only_for_the_owner(cache):
-    """The cache directory and the folders of value files deny group and others."""
+    """The cache directory and the value directories deny group and others."""
     cache.set('key', {'big': 'x' * 100})
     ((filename,),) = cache._sql('SELECT filename FROM Cache WHERE key = ?', ('key',)).fetchall()
-    folder = os.path.dirname(os.path.join(cache.directory, filename))
-    for path in (cache.directory, folder):
+    value_dir = os.path.dirname(os.path.join(cache.directory, filename))
+    for path in (cache.directory, value_dir):
         assert stat.S_IMODE(os.stat(path).st_mode) & 0o077 == 0
 
 

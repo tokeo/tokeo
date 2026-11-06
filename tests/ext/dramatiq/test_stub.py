@@ -32,7 +32,7 @@ from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqM
 
 class _RabbitmqStub(StubBroker):
     # takes the place of ExtendedRabbitmqBroker in register: keeps the
-    # middleware built from the config, drops the rabbitmq settings
+    # middleware built from the config, drops the rabbitmq options
     def __init__(self, *, middleware=None, **rabbitmq):
         super().__init__(middleware=middleware)
 

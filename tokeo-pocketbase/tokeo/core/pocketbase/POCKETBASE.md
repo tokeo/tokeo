@@ -270,7 +270,7 @@ Sensible values:
   below 300 seconds costs more in reloads than it wins
 - **Idle below 60 seconds** gains little, many proxies end idle connections
   after 60 seconds anyway, e.g. nginx by its ```proxy_read_timeout```
-- **Max** bounds clients that do not confirm their login, e.g. browsers with
+- **Max** limits clients that do not confirm their login, e.g. browsers with
   the JavaScript SDK; the channels of tokeo-pocketbase confirm theirs anyway
 - The times hold for **all clients** of the server
 
@@ -308,7 +308,7 @@ pocketbase:
 - ```app.db.impersonate('users', user_id)``` gives a client acting as the
   user, its login kept by a new impersonation; the service identity must
   be a superuser
-- ```app.db.realtime_options``` are the ```realtime_*``` settings as options
+- ```app.db.realtime_options``` are the ```realtime_*``` config as options
   of a channel: ```Realtime(app.db.pb, **app.db.realtime_options)```
 
 ## 8. Pages of nicegui with live data
@@ -440,7 +440,7 @@ async def my_orders(user_id: str = Depends(current_user)):     # your own login
   stop it and close its client when done
 - The service identity must be a superuser; keep its password in the vault
 
-## 10. Limits and settings
+## 10. Limits and options
 
 Measured against PocketBase 0.40.6:
 
@@ -458,7 +458,7 @@ Measured against PocketBase 0.40.6:
 | Batch api | off; when on 50 requests, 3 s, about 128 MB | settings |
 | A text field with ```max``` 0 | at most 5000 characters | each field |
 
-The settings of a channel, within a Tokeo app the ```realtime_*``` settings:
+The options of a channel, within a Tokeo app the ```realtime_*``` config:
 
 | Option | Config of Tokeo | Default | Meaning |
 |---|---|---|---|
@@ -473,7 +473,7 @@ The settings of a channel, within a Tokeo app the ```realtime_*``` settings:
   service logging in often can hit ```*:auth``` with 2 logins in 3 seconds.
   A superuser is exempt
 - **Behind a proxy** turn the buffering of the realtime path off and allow
-  the read timeout of your idle setting; PocketBase sends
+  the read timeout of your idle option; PocketBase sends
   ```X-Accel-Buffering: no``` for nginx. The subscriptions must come from the
   ip of the connection, so all requests of one service leave by one address
 - **Reload in ```on_connect```**, events between two connections are lost

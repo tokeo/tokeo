@@ -26,11 +26,11 @@ from tokeo.core.utils.modules.override import TokeoModulesOverrideFinder, overri
 def pkg(tmp_path, monkeypatch):
     """A package per test, its __init__ loads inner, broken misses a dependency."""
     name = f'tokeo_tests_modules_{uuid.uuid4().hex[:8]}'
-    folder = tmp_path / name
-    folder.mkdir()
-    (folder / '__init__.py').write_text('from . import inner  # noqa: F401\n')
-    (folder / 'inner.py').write_text("VALUE = 'installed'\n\n\nclass Thing:\n    def method(self):\n        return 'method'\n")
-    (folder / 'broken.py').write_text('import tokeo_tests_not_installed  # noqa: F401\n')
+    pkg_dir = tmp_path / name
+    pkg_dir.mkdir()
+    (pkg_dir / '__init__.py').write_text('from . import inner  # noqa: F401\n')
+    (pkg_dir / 'inner.py').write_text("VALUE = 'installed'\n\n\nclass Thing:\n    def method(self):\n        return 'method'\n")
+    (pkg_dir / 'broken.py').write_text('import tokeo_tests_not_installed  # noqa: F401\n')
     monkeypatch.syspath_prepend(str(tmp_path))
     yield name
     for module in [m for m in sys.modules if m == name or m.startswith(name + '.')]:

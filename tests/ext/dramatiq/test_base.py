@@ -287,7 +287,7 @@ def test_register_dead_message_ttl_config_wins_over_env(tmp, monkeypatch):
 # ---- locks ------------------------------------------------------------------
 
 
-def test_locks_sleep_time_is_an_own_setting_of_dramatiq(tmp):
+def test_locks_sleep_time_is_an_own_option_of_dramatiq(tmp):
     """The dramatiq locks wait 0.1 seconds or locks_sleep_time of dramatiq."""
     with DramatiqTest(tmp) as app:
         assert app.dramatiq.locks._sleep_time == 0.1

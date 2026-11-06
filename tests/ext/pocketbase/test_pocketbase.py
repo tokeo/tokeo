@@ -45,7 +45,7 @@ _ROUTE = re.compile(r'^/api/collections/([^/]+)/(auth-with-password|auth-refresh
 
 
 class PocketbaseTest(TokeoTest):
-    """A test app with the pocketbase extension and the given settings."""
+    """A test app with the pocketbase extension and the given pocketbase config."""
 
     class Meta:
         extensions = [
@@ -53,9 +53,9 @@ class PocketbaseTest(TokeoTest):
             'tokeo.ext.pocketbase',
         ]
 
-    def __init__(self, settings=None, **kw):
+    def __init__(self, pocketbase_config=None, **kw):
         config = init_defaults('pocketbase')
-        config['pocketbase'].update(dict(url=URL), **(settings or {}))
+        config['pocketbase'].update(dict(url=URL), **(pocketbase_config or {}))
         super().__init__(config_defaults=config, **kw)
 
 
@@ -213,8 +213,8 @@ def test_load_extends_the_app_with_the_handler_as_db(server):
         assert app.db.pb.url == URL
 
 
-def test_setup_fills_the_missing_settings_with_the_defaults(server):
-    """Settings not given take the defaults, given ones stay."""
+def test_setup_fills_the_missing_options_with_the_defaults(server):
+    """Options not given take the defaults, given ones stay."""
     with PocketbaseTest(dict(auth_token_min_valid_seconds=5)) as app:
         assert app.config.get_dict()['pocketbase'] == dict(
             url=URL,
@@ -234,7 +234,7 @@ def test_setup_fills_the_missing_settings_with_the_defaults(server):
 
 
 def test_setup_gives_the_realtime_options_of_the_config(server):
-    """The realtime_* settings become the options of a channel, as numbers."""
+    """The realtime_* config becomes the options of a channel, as numbers."""
     with PocketbaseTest(dict(realtime_read_timeout='90', realtime_max_pending='50')) as app:
         assert app.db.realtime_options == dict(read_timeout=90.0, max_pending=50, auth_check=60.0, max_delay=30.0)
 
@@ -258,20 +258,20 @@ def test_setup_max_connections_limit_the_connections(server):
         assert server.client_kwargs['limits'].max_connections == 5
 
 
-def test_setup_http_url_ignores_the_tls_settings(server):
+def test_setup_http_url_ignores_the_tls_options(server):
     """A http url builds no tls context, even with verification switched off."""
     with PocketbaseTest(dict(tls_verify_cert=False, tls_verify_hostname=False)):
         assert 'verify' not in server.client_kwargs
 
 
 def test_setup_https_url_with_secure_defaults_keeps_the_httpx_default(server):
-    """A https url with the default tls settings hands no context of its own."""
+    """A https url with the default tls options hands no context of its own."""
     with PocketbaseTest(dict(url='https://pocketbase.test')):
         assert 'verify' not in server.client_kwargs
 
 
 @pytest.mark.parametrize(
-    'settings, verify_mode, check_hostname',
+    'tls_options, verify_mode, check_hostname',
     [
         (dict(tls_verify_cert=False), ssl.CERT_NONE, False),
         (dict(tls_verify_hostname=False), ssl.CERT_REQUIRED, False),
@@ -279,9 +279,9 @@ def test_setup_https_url_with_secure_defaults_keeps_the_httpx_default(server):
     ],
     ids=['no_cert_check', 'no_hostname_check', 'own_ca'],
 )
-def test_setup_https_url_hands_the_tls_settings_as_context(server, settings, verify_mode, check_hostname):
-    """A https url turns the tls settings into the ssl context of httpx."""
-    with PocketbaseTest(dict(url='https://pocketbase.test', **settings)):
+def test_setup_https_url_hands_the_tls_options_as_context(server, tls_options, verify_mode, check_hostname):
+    """A https url turns the tls options into the ssl context of httpx."""
+    with PocketbaseTest(dict(url='https://pocketbase.test', **tls_options)):
         context = server.client_kwargs['verify']
         assert isinstance(context, ssl.SSLContext)
         assert (context.verify_mode, context.check_hostname) == (verify_mode, check_hostname)

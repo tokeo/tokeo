@@ -1,9 +1,9 @@
 """
 Tests for the shared GlobalLimits wake-up (cross-service and cross-process).
 
-The global processing cap makes admission WAIT. The wake event lives on
+The global max_processings makes admission WAIT. The wake event lives on
 ```GlobalLimits``` and is shared by every server bound to it, so a slot released
-on any service wakes waiters on every service. When the cap may also be
+on any service wakes waiters on every service. When a slot may also be
 released by another process (shared counters under pre_fork), the waiter
 additionally re-checks the counters at a short interval.
 """
@@ -118,8 +118,8 @@ def test_external_counter_release_is_seen_via_slot_wait_override():
     asyncio.run(go())
 
 
-def test_try_begin_processing_counts_up_to_the_cap():
-    """try_begin_processing counts until the cap, then refuses without counting."""
+def test_try_begin_processing_counts_up_to_the_max():
+    """try_begin_processing counts until the max, then refuses without counting."""
     gl = GlobalLimits(max_processings=2)
     assert [gl.try_begin_processing() for _ in range(3)] == [True, True, False]
     assert gl.active_processings == 2

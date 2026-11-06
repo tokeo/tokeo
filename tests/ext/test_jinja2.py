@@ -19,16 +19,16 @@ BLOCK = '{% if x %}\nyes\n{% endif %}\nend\n'
 
 
 class Jinja2Test(TokeoTest):
-    """A test app with tokeo.ext.jinja2 and the given jinja2 settings."""
+    """A test app with tokeo.ext.jinja2 and the given jinja2 config."""
 
     class Meta:
         extensions = [
             'tokeo.ext.jinja2',
         ]
 
-    def __init__(self, settings=None, **kw):
+    def __init__(self, jinja2_config=None, **kw):
         config = init_defaults('jinja2')
-        config['jinja2'].update(settings or {})
+        config['jinja2'].update(jinja2_config or {})
         super().__init__(config_defaults=config, **kw)
 
 
@@ -153,7 +153,7 @@ def test_template_handler_merges_its_defaults_into_jinja2():
 
 
 @pytest.mark.parametrize(
-    'settings, expected',
+    'jinja2_config, expected',
     [
         ({}, (True, True)),
         ({'trim_blocks': False}, (False, True)),
@@ -162,9 +162,9 @@ def test_template_handler_merges_its_defaults_into_jinja2():
     ],
     ids=['defaults', 'trim_blocks_off', 'keep_trailing_newline_off', 'both_off'],
 )
-def test_template_handler_setup_applies_the_config_to_the_env(settings, expected):
+def test_template_handler_setup_applies_the_config_to_the_env(jinja2_config, expected):
     """trim_blocks and keep_trailing_newline of the env follow the config."""
-    with Jinja2Test(settings) as app:
+    with Jinja2Test(jinja2_config) as app:
         assert (app.template.env.trim_blocks, app.template.env.keep_trailing_newline) == expected
 
 

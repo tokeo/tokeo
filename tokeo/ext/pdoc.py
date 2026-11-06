@@ -183,8 +183,8 @@ class TokeoPdoc(Handler):
         #: config section this extension reads
         config_section = 'pdoc'
 
-        #: default settings, merged (non-overriding) at setup so the section
-        #: always exists even when the app config does not declare it
+        #: config defaults, merged (non-overriding) at setup so the section
+        #: always exists even when the app config does not set it
         config_defaults = dict(
             modules=None,
             exclude=[],
@@ -241,7 +241,7 @@ class TokeoPdoc(Handler):
         """Read a value from the extension's config section, never raising.
 
         Returns ```default``` when the section or key is absent so the renderer
-        works even in an app that has not declared a ```pdoc``` section.
+        works even in an app that has not configured a ```pdoc``` section.
         """
         try:
             val = self.app.config.get(self._meta.config_section, key)
@@ -405,7 +405,7 @@ class TokeoPdoc(Handler):
         """Set whether the yaml config page is rendered.
 
         Called once at setup from the config and again from the CLI for
-        ```--config``` / ```--no-config```, which override the setting for one run
+        ```--config``` / ```--no-config```, which override the option for one run
         without writing it back to the config.
 
         ### Args
@@ -581,7 +581,7 @@ class TokeoPdoc(Handler):
         pdoc.render.env.globals['is_namespace'] = _is_namespace
 
         # ancestors: the MRO above this class (excluding the class itself and
-        # ``object``), capped at ``depth`` levels. pdoc only exposes the direct
+        # ``object``), at most ``depth`` levels. pdoc only exposes the direct
         # bases; this restores the fuller chain the previous docs showed.
         def _ancestors(cls, depth):
             out = []
@@ -1079,7 +1079,7 @@ class TokeoPdoc(Handler):
     def _excludes(self):
         """Module prefixes to skip during discovery (from the ```exclude```
         config key). Submodule-level exclusion is additionally driven by each
-        package's own ```__pdoc__``` declaration (see ```_discover```)."""
+        package's own ```__pdoc__``` overrides (see ```_discover```)."""
         ex = self._config('exclude')
         if isinstance(ex, str):
             ex = [ex]
@@ -1461,7 +1461,7 @@ class TokeoPdoc(Handler):
 
         ### Notes
 
-        - Uses configuration settings to determine which files to watch
+        - Uses the config to determine which files to watch
         - Starts the observer in a separate thread to monitor for changes
 
         """
@@ -1532,7 +1532,7 @@ class TokeoPdoc(Handler):
         """
         dirs, outside = self._watch_dirs()
         if not dirs:
-            raise TokeoPdocError('pdoc --watch: nothing to watch. Check the "modules" setting in the [pdoc] config section.')
+            raise TokeoPdocError('pdoc --watch: nothing to watch. Check the "modules" option in the [pdoc] config section.')
 
         self._watchdog_lock = Lock()
         self._watchdog_stop = Event()
@@ -1781,7 +1781,7 @@ class TokeoPdocController(Controller):
     def render(self):
         # both switches are always offered, whatever `show_config` says, so a
         # command line keeps working when the config default is flipped. They
-        # override the setting for this run only; the config stays untouched
+        # override the option for this run only; the config stays untouched
         if self.app.pargs.config and self.app.pargs.no_config:
             raise TokeoPdocError('pdoc render: --config and --no-config exclude each other')
         if self.app.pargs.config:

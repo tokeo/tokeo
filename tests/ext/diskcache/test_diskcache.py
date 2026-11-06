@@ -245,7 +245,7 @@ def test_locks_lock_waits_by_locks_sleep_time(tmp, monkeypatch):
     with DiskcacheTest(tmp.dir) as app:
         assert _sleeps_of_a_waiting_lock(app, monkeypatch) == [0.1]
         assert _sleeps_of_a_waiting_lock(app, monkeypatch, sleep_time=0.01) == [0.01]
-    with DiskcacheTest(tmp.dir, settings={'locks_sleep_time': 0.2}) as app:
+    with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_time': 0.2}) as app:
         assert _sleeps_of_a_waiting_lock(app, monkeypatch) == [0.2]
 
 
@@ -257,7 +257,7 @@ def test_temper_waits_by_locks_sleep_time(tmp):
         slept.append(seconds)
         raise RuntimeError('stop waiting')
 
-    with DiskcacheTest(tmp.dir, settings={'locks_sleep_time': 0.2}) as app:
+    with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_time': 0.2}) as app:
 
         @app.cache.locks.temper(count=1, name='busy', sleep_func=sleep, verbose=False)
         def inner():
@@ -277,7 +277,7 @@ def test_temper_waits_by_locks_sleep_time(tmp):
 def test_locks_sleep_time_must_be_a_number_greater_than_0(tmp, sleep_time):
     """A locks_sleep_time not greater than 0 stops the setup of the cache."""
     with pytest.raises(ValueError, match='sleep_time must be a number of seconds greater than 0'):
-        with DiskcacheTest(tmp.dir, settings={'locks_sleep_time': sleep_time}):
+        with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_time': sleep_time}):
             pass
 
 
@@ -352,7 +352,7 @@ def test_temper_releases_on_exception(tmp):
         assert job() == 'ran'
 
 
-def test_temper_thread_concurrency_cap(tmp):
+def test_temper_thread_max_concurrency(tmp):
     """Of 8 threads with count 2 never more than 2 run at once."""
     count = 2
     workers = 8
@@ -381,7 +381,7 @@ def test_temper_thread_concurrency_cap(tmp):
         assert max_overlap(intervals) <= count
 
 
-def test_temper_process_concurrency_cap(tmp):
+def test_temper_process_max_concurrency(tmp):
     """Of 6 processes with count 2 never more than 2 run at once."""
     count = 2
     workers = 6
@@ -466,7 +466,7 @@ def test_throttle_blocking_delays(tmp):
         assert elapsed >= 1.8
 
 
-def test_throttle_thread_rate_cap(tmp):
+def test_throttle_thread_max_rate(tmp):
     """Of 10 threads with count 3 exactly 3 run, 7 get the callback."""
     count = 3
     workers = 10
@@ -489,7 +489,7 @@ def test_throttle_thread_rate_cap(tmp):
         assert results.count('locked') == workers - count
 
 
-def test_throttle_process_rate_cap(tmp):
+def test_throttle_process_max_rate(tmp):
     """Of 10 processes with count 3 exactly 3 run, 7 get the callback."""
     count = 3
     workers = 10

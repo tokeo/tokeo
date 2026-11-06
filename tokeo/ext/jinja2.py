@@ -110,7 +110,7 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
     This class implements the Template Handler interface from Cement with
     additional configuration options and enhanced directory handling for
     Tokeo applications. It provides a configurable Jinja2 environment
-    with settings controlled through the application's configuration.
+    with options controlled through the application's configuration.
 
     ### Notes
 
