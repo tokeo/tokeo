@@ -16,7 +16,7 @@ When the rate limit is exceeded, the decorator will either:
 - **count** (int): Number of calls allowed in the specified time period
 - **per_seconds** (float): Time period in seconds over which to limit calls
 - **name** (str, optional): Custom cache key name for this throttle
-- **name_f** (str, optional): Format string to generate key name based on function
+- **name_format** (str, optional): Format string to generate key name based on function
     arguments
 - **expire** (float, optional): Seconds without a call after which the throttle key
     expires, not below per_seconds. Defaults to per_seconds plus 10.
@@ -45,7 +45,7 @@ def limited_api_call(resource_id):
 ### Notes
 
 : The throttle state persists in the cache based on the function name
-    or custom name/name_f parameter
+    or custom name/name_format parameter
 
 : When rate-limited, execution will be delayed unless cb_on_locked
     is provided

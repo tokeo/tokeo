@@ -39,7 +39,7 @@ import threading
 from contextlib import contextmanager, nullcontext
 from cement.core.exc import CaughtSignal
 from cement.core.foundation import SIGNALS
-from tokeo.ext.tui import register, require
+from tokeo.ext.tui import register, import_library
 
 
 class TokeoTuiInput:
@@ -124,7 +124,7 @@ class TokeoTuiInput:
             on_tty = False
         line = ''
         # raw keeps the colors; sys.stdout is the proxy of patch_stdout for the logs
-        with own_stdin or nullcontext(), patch_stdout(raw=True), _logs_to(sys.stdout, consoles), _ends_by_signals(prompt_session):
+        with own_stdin or nullcontext(), patch_stdout(raw=True), _logs_to(sys.stdout, consoles), _end_by_signals(prompt_session):
             while True:
                 try:
                     try:
@@ -172,12 +172,12 @@ def _logs_to(stream, consoles):
     try:
         yield
     finally:
-        for handler, original in moved:
-            handler.setStream(original)
+        for handler, previous_stream in moved:
+            handler.setStream(previous_stream)
 
 
 @contextmanager
-def _ends_by_signals(prompt_session):
+def _end_by_signals(prompt_session):
     """End the shell by SIGTERM and SIGHUP, also while the prompt waits."""
     # signal handlers are set by the main thread only
     if threading.current_thread() is not threading.main_thread():
@@ -188,12 +188,12 @@ def _ends_by_signals(prompt_session):
         try:
             # the handler of the app, e.g. cement runs its signal hooks and raises
             previous[signum](signum, frame)
-        except CaughtSignal as caught:
+        except CaughtSignal as err:
             # raised in the event loop of the prompt, prompt_toolkit would catch
             # it and ask for ENTER, so the prompt ends with it instead
             if not prompt_session.app.is_running:
                 raise
-            prompt_session.app.exit(exception=caught)
+            prompt_session.app.exit(exception=err)
 
     # only signals the app handles, a default or ignored signal stays as it is
     previous = {signum: signal.getsignal(signum) for signum in SIGNALS if signum != signal.SIGINT}
@@ -220,5 +220,5 @@ def load(app):
     - **TokeoTuiError**: If the package prompt_toolkit is not installed
 
     """
-    require('prompt_toolkit', 'prompt_toolkit', 'tokeo.ext.tui.input')
+    import_library('prompt_toolkit', 'prompt_toolkit', 'tokeo.ext.tui.input')
     register(app, 'input', TokeoTuiInput(app))

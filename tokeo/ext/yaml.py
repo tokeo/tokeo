@@ -35,8 +35,8 @@ def _coerce_env_value(raw, env_var=None):
     # env injects plain values only and never a typed/constructed node such as
     # an encrypted secret; quoting the value forces a plain string, as in yaml
     if raw.lstrip().startswith('!'):
-        where = f' {env_var}' if env_var else ''
-        raise TokeoYamlConfigError(f'a yaml tag is not allowed in the environment override{where}')
+        env_var_str = f' {env_var}' if env_var else ''
+        raise TokeoYamlConfigError(f'a yaml tag is not allowed in the environment override{env_var_str}')
     try:
         return yaml.safe_load(raw)
     except yaml.YAMLError:
@@ -166,9 +166,9 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
             changed = False
             result = {}
             for k, v in value.items():
-                rv = self._resolve_value(v, (path + [k]) if path is not None else None)
-                result[k] = rv
-                changed = changed or rv is not v
+                res = self._resolve_value(v, (path + [k]) if path is not None else None)
+                result[k] = res
+                changed = changed or res is not v
             # keep the stored object when nothing changed, so a plain read is
             # identical to before (same reference, no copy)
             return result if changed else value
@@ -176,9 +176,9 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
             changed = False
             result = []
             for v in value:
-                rv = self._resolve_value(v, None)
-                result.append(rv)
-                changed = changed or rv is not v
+                res = self._resolve_value(v, None)
+                result.append(res)
+                changed = changed or res is not v
             return result if changed else value
         # scalar leaf: an env override wins, else hand it to the leaf hook
         if path is not None:

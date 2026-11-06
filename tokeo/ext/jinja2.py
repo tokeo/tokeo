@@ -244,10 +244,10 @@ def tokeo_jinja2_config(app):
     template_handler = app.handler.resolve('template', TokeoJinja2TemplateHandler.Meta.label, setup=True)
 
     # add template dirs
-    t_dirs = template_handler._config('template_dirs', fallback=None)
-    if t_dirs is not None:
-        for t_dir in [t_dirs] if isinstance(t_dirs, str) else t_dirs:
-            app.add_template_dir(t_dir)
+    template_dirs = template_handler._config('template_dirs', fallback=None)
+    if template_dirs is not None:
+        for template_dir in [template_dirs] if isinstance(template_dirs, str) else template_dirs:
+            app.add_template_dir(template_dir)
 
 
 def load(app):

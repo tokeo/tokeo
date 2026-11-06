@@ -100,14 +100,14 @@ _ERR_INT_GT_0 = '{} must be an integer greater than 0, not {!r}'
 class _ThreadConnection:
     """Holds the connection of one thread and closes it when the thread ends."""
 
-    __slots__ = ('con', 'ident')
+    __slots__ = ('con', 'thread_id')
 
     def __init__(self, con):
-        self.con, self.ident = con, threading.get_ident()
+        self.con, self.thread_id = con, threading.get_ident()
 
     def __del__(self):
         # sqlite closes only in the own thread, else it closes on its release
-        if threading.get_ident() == self.ident:
+        if threading.get_ident() == self.thread_id:
             self.con.close()
 
 
@@ -351,7 +351,7 @@ class TokeoDiskCacheLocksHandler:
         count=1,
         per_seconds=1,
         name=None,
-        name_f=None,
+        name_format=None,
         expire=None,
         time_func=time.time,
         sleep_func=time.sleep,
@@ -382,7 +382,7 @@ class TokeoDiskCacheLocksHandler:
             limit calls. Defaults to 1.
         - **name** (str, optional): Custom cache key name for this
             throttle.
-        - **name_f** (str, optional): Format string to build the key name
+        - **name_format** (str, optional): Format string to build the key name
             from the function arguments.
         - **expire** (float, optional): Seconds without a call after which
             the throttle key expires and the bucket starts full again. Must
@@ -421,7 +421,7 @@ class TokeoDiskCacheLocksHandler:
         ### Notes
 
         : The throttle state persists in the cache under the key derived
-            from name, name_f or the function full name.
+            from name, name_format or the function full name.
 
         : When rate-limited, execution is delayed unless cb_on_locked is
             provided.
@@ -460,9 +460,9 @@ class TokeoDiskCacheLocksHandler:
                 if is_filled_str(name):
                     # just use the name
                     key = self._key_prefix + name
-                elif is_filled_str(name_f):
-                    # expand the string in name_f with dict from args
-                    key = self._key_prefix + name_f.format(**arguments)
+                elif is_filled_str(name_format):
+                    # expand the string in name_format with dict from args
+                    key = self._key_prefix + name_format.format(**arguments)
                 else:
                     # use full_name as key
                     key = self._key_prefix + func_full_name
@@ -547,7 +547,7 @@ class TokeoDiskCacheLocksHandler:
         self,
         count=1,
         name=None,
-        name_f=None,
+        name_format=None,
         expire=3600,
         sleep_func=time.sleep,
         sleep_time=None,
@@ -579,7 +579,7 @@ class TokeoDiskCacheLocksHandler:
             least 1. Defaults to 1.
         - **name** (str, optional): Custom cache key name for this temper
             instance.
-        - **name_f** (str, optional): Format string to build the key name
+        - **name_format** (str, optional): Format string to build the key name
             from the function arguments.
         - **expire** (float, optional): Seconds a call holds its slot at
             most, also when it was killed. Defaults to 3600.
@@ -618,7 +618,7 @@ class TokeoDiskCacheLocksHandler:
         ### Notes
 
         : The temper state persists in the cache under the key derived
-            from name, name_f or the function full name.
+            from name, name_format or the function full name.
 
         : A slot is only released by a call that actually acquired one;
             the cb_on_locked path never changes the deadlines.
@@ -679,9 +679,9 @@ class TokeoDiskCacheLocksHandler:
                 if is_filled_str(name):
                     # just use the name
                     key = self._key_prefix + name
-                elif is_filled_str(name_f):
-                    # expand the string in name_f with dict from args
-                    key = self._key_prefix + name_f.format(**arguments)
+                elif is_filled_str(name_format):
+                    # expand the string in name_format with dict from args
+                    key = self._key_prefix + name_format.format(**arguments)
                 else:
                     # use full_name as key
                     key = self._key_prefix + func_full_name
@@ -1326,8 +1326,8 @@ class TokeoDiskCacheController(Controller):
             # check for keys parameter and try to match regex
             if self.app.pargs.keys:
                 _show = False
-                for s_key in self.app.pargs.keys:
-                    if re.search(s_key, key):
+                for key_pattern in self.app.pargs.keys:
+                    if re.search(key_pattern, key):
                         _show = True
                         break
             # show entry
@@ -1528,8 +1528,8 @@ class TokeoDiskCacheController(Controller):
         # iter over all keys stored in cache
         for key in self.app.cache._cache.iterkeys():
             _delete = False
-            for s_key in self.app.pargs.keys:
-                if re.search(s_key, key):
+            for key_pattern in self.app.pargs.keys:
+                if re.search(key_pattern, key):
                     _delete = True
                     break
 
@@ -1705,8 +1705,8 @@ def tokeo_diskcache_pdoc_render_decorator(app, func, decorator, args, kwargs):
             try:
                 if 'name' in kwargs:
                     params = f'name="{kwargs["name"].value}"'
-                elif 'name_f' in kwargs:
-                    params = f'name_f="{kwargs["name_f"].value}"'
+                elif 'name_format' in kwargs:
+                    params = f'name_format="{kwargs["name_format"].value}"'
                 else:
                     params = f'name="{func.name}"'
 
@@ -1729,8 +1729,8 @@ def tokeo_diskcache_pdoc_render_decorator(app, func, decorator, args, kwargs):
             try:
                 if 'name' in kwargs:
                     params = f'name="{kwargs["name"].value}"'
-                elif 'name_f' in kwargs:
-                    params = f'name_f="{kwargs["name_f"].value}"'
+                elif 'name_format' in kwargs:
+                    params = f'name_format="{kwargs["name_format"].value}"'
                 else:
                     params = f'name="{func.name}"'
 

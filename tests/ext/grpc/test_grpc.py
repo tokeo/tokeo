@@ -130,10 +130,10 @@ def start_grpc():
 
 
 def test_setup_merges_the_defaults_below_the_settings():
-    """The defaults fill the grpc section, a given url and max_worker stay."""
-    with GrpcTest(settings={'url': 'localhost:1234', 'max_worker': 3}) as app:
+    """The defaults fill the grpc section, a given url and max_workers stay."""
+    with GrpcTest(settings={'url': 'localhost:1234', 'max_workers': 3}) as app:
         assert app.config.get('grpc', 'url') == 'localhost:1234'
-        assert app.config.get('grpc', 'max_worker') == 3
+        assert app.config.get('grpc', 'max_workers') == 3
         assert app.config.get('grpc', 'tls_enabled') is False
         assert app.config.get('grpc', 'tls_key_type') == 'ec'
         assert app.config.get('grpc', 'tls_key_size') == 384
@@ -192,7 +192,7 @@ def test_server_is_built_lazily_and_once(start_grpc):
 
 
 def test_server_uses_max_worker_threads(start_grpc, monkeypatch):
-    """The thread pool of the server gets max_worker 3 as max_workers."""
+    """The thread pool of the server gets the configured max_workers 3."""
     pools = []
 
     def pool(max_workers):
@@ -202,7 +202,7 @@ def test_server_uses_max_worker_threads(start_grpc, monkeypatch):
 
     # only the name futures of the extension is replaced, not the module
     monkeypatch.setattr('tokeo.ext.grpc.futures', SimpleNamespace(ThreadPoolExecutor=pool))
-    _, port = start_grpc({'max_worker': 3})
+    _, port = start_grpc({'max_workers': 3})
     assert pools == [3]
     assert _call(port) == b'echo hi'
 

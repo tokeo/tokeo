@@ -29,7 +29,7 @@ import io
 import time
 from cement.core.exc import CaughtSignal
 from cement.core.foundation import SIGNALS
-from tokeo.ext.tui import register, require
+from tokeo.ext.tui import register, import_library
 
 #: Width a column with long values may shrink to in a narrow terminal
 SHRINK_WIDTH = 12
@@ -264,5 +264,5 @@ def load(app):
     - **TokeoTuiError**: If the package rich is not installed
 
     """
-    require('rich', 'rich', 'tokeo.ext.tui.output')
+    import_library('rich', 'rich', 'tokeo.ext.tui.output')
     register(app, 'output', TokeoTuiOutput(app))

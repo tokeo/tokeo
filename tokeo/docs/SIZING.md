@@ -31,7 +31,7 @@ service runs at most at the same moment and which setting controls it.
 | dramatiq | 1 master + ```worker_processes``` | ```worker_threads``` | tokeo: 2 processes, 1 thread; app template: 2 and 2 |
 | smtpd | 1, or 1 master + ```pre_fork``` workers | one event loop | ```pre_fork```, ```max_connections```, ```max_processings``` (4) |
 | nicegui, FastAPI | 1 | event loop + thread pool for ```def``` endpoints | anyio thread pool, 40 |
-| grpc | 1 | thread pool | ```grpc.max_worker```, 1 |
+| grpc | 1 | thread pool | ```grpc.max_workers```, 1 |
 | automate | 1 | one thread per host in parallel runs | the hosts of a task |
 | ```@timelimit``` | | one timer thread per running call | |
 

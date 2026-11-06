@@ -85,7 +85,7 @@ def register(app, name, part):
     app.tui._parts[name] = part
 
 
-def require(module, package, extension):
+def import_library(module, package, extension):
     """
     Import the library of a tui extension.
 

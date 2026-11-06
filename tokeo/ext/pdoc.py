@@ -1095,7 +1095,7 @@ class TokeoPdoc(Handler):
                 return True
         return False
 
-    def _discover(self, root, excludes=None):
+    def _discover(self, module_name, excludes=None):
         """Filesystem-based, namespace-aware module discovery.
 
         pdoc's walk_specs (and pkgutil.iter_modules) skip namespace
@@ -1114,15 +1114,15 @@ class TokeoPdoc(Handler):
 
         if excludes is None:
             excludes = self._excludes()
-        if self._is_excluded(root, excludes):
+        if self._is_excluded(module_name, excludes):
             return set()
 
         found = set()
         try:
-            mod = importlib.import_module(root)
+            mod = importlib.import_module(module_name)
         except Exception:
-            return {root}
-        found.add(root)
+            return {module_name}
+        found.add(module_name)
 
         # honour the package's own `__pdoc__` overrides: an entry mapped to
         # False hides that submodule (pdoc's native mechanism). This is how a
@@ -1139,7 +1139,7 @@ class TokeoPdoc(Handler):
                 if '{{' in entry or '}}' in entry:
                     continue
                 name = entry[:-3] if entry.endswith('.py') else entry
-                spec = f'{root}.{name}'
+                spec = f'{module_name}.{name}'
                 if pdoc_over.get(name) is False or pdoc_over.get(spec) is False:
                     continue
                 full = os.path.join(base, entry)
@@ -1333,13 +1333,13 @@ class TokeoPdoc(Handler):
             return re.sub(r'(?<!\S)@(public|private)\b[ \t]*', '', text)
 
         # bind the current module's directory for include resolution
-        state = {'module_dir': None}
+        md_state = {'module_dir': None}
 
         import markupsafe
 
         def tokeo_to_html(text, *args, **kwargs):
             text = text or ''
-            text = resolve_includes(text, state['module_dir'])
+            text = resolve_includes(text, md_state['module_dir'])
             text = convert_admonitions(text)
             text = strip_note_markers(text)
             text = strip_visibility_markers(text)
@@ -1350,7 +1350,7 @@ class TokeoPdoc(Handler):
 
         pdoc.render.env.filters['to_html'] = tokeo_to_html
         # expose the state so render() can set the current module dir
-        self._md_state = state
+        self._md_state = md_state
 
     # ---- watching -----------------------------------------------------------
 
@@ -1711,9 +1711,9 @@ class TokeoPdoc(Handler):
             # binding failed (port taken, address not assignable, privileged
             # port, …); report it as a tokeo error so the CLI prints a clean
             # message instead of a socket traceback
-            reason = err.strerror or str(err)
+            error = err.strerror or str(err)
             raise TokeoPdocError(
-                f'cannot serve the documentation on {host}:{port}: {reason}. '
+                f'cannot serve the documentation on {host}:{port}: {error}. '
                 f'Another process may already use that port; stop it or set a '
                 f'different "port" in the [pdoc] config section.'
             ) from err

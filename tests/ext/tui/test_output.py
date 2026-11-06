@@ -11,7 +11,7 @@ import pytest
 from rich.console import Console
 from cement.core.exc import CaughtSignal
 from tokeo.main import TokeoTest
-from tokeo.ext.tui import TokeoTuiError, require
+from tokeo.ext.tui import TokeoTuiError, import_library
 from tokeo.ext.tui.output import TokeoTuiOutput
 
 
@@ -40,10 +40,10 @@ def test_extension_registers_output_only():
             app.tui.input
 
 
-def test_require_names_the_missing_package():
-    """require raises TokeoTuiError naming the missing package."""
+def test_import_library_names_the_missing_package():
+    """import_library raises TokeoTuiError naming the missing package."""
     with pytest.raises(TokeoTuiError, match='The extension tokeo.ext.tui.output needs the package nope, add it'):
-        require('tokeo_no_such_module', 'nope', 'tokeo.ext.tui.output')
+        import_library('tokeo_no_such_module', 'nope', 'tokeo.ext.tui.output')
 
 
 def test_table(output):

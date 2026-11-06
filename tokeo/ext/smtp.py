@@ -420,38 +420,38 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
     def _build_charsets(self, **params):
         """Build charset objects for header and body encoding."""
-        cs_header = Charset(params['charset'])
+        header_charset = Charset(params['charset'])
         if params['header_encoding'] == 'base64':
-            cs_header.header_encoding = BASE64
+            header_charset.header_encoding = BASE64
         elif params['header_encoding'] == 'qp' or params['header_encoding'] == 'quoted-printable':
-            cs_header.header_encoding = QP
+            header_charset.header_encoding = QP
 
-        cs_body = Charset(params['charset'])
+        body_charset = Charset(params['charset'])
         if params['body_encoding'] == 'base64':
-            cs_body.body_encoding = BASE64
+            body_charset.body_encoding = BASE64
         elif params['body_encoding'] == 'qp' or params['body_encoding'] == 'quoted-printable':
-            cs_body.body_encoding = QP
+            body_charset.body_encoding = QP
 
-        return cs_header, cs_body
+        return header_charset, body_charset
 
-    def _build_body_parts(self, body, cs_body):
+    def _build_body_parts(self, body, body_charset):
         """Parse body into text and html MIME parts."""
         part_text = None
         part_html = None
 
         # str.strip() keeps the TypeError for a non str value
         if isinstance(body, str):
-            part_text = MIMEText(body, 'plain', _charset=cs_body)
+            part_text = MIMEText(body, 'plain', _charset=body_charset)
         elif isinstance(body, tuple):
             if len(body) >= 1 and body[0] and str.strip(body[0]) != '':
-                part_text = MIMEText(str.strip(body[0]), 'plain', _charset=cs_body)
+                part_text = MIMEText(str.strip(body[0]), 'plain', _charset=body_charset)
             if len(body) >= 2 and body[1] and str.strip(body[1]) != '':
-                part_html = MIMEText(str.strip(body[1]), 'html', _charset=cs_body)
+                part_html = MIMEText(str.strip(body[1]), 'html', _charset=body_charset)
         elif isinstance(body, dict):
             if 'text' in body and str.strip(body['text']) != '':
-                part_text = MIMEText(str.strip(body['text']), 'plain', _charset=cs_body)
+                part_text = MIMEText(str.strip(body['text']), 'plain', _charset=body_charset)
             if 'html' in body and str.strip(body['html']) != '':
-                part_html = MIMEText(str.strip(body['html']), 'html', _charset=cs_body)
+                part_html = MIMEText(str.strip(body['html']), 'html', _charset=body_charset)
         else:
             raise TypeError(
                 # fmt: off
@@ -463,7 +463,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         return part_text, part_html
 
-    def _build_mime_structure(self, part_text, part_html, cs_body, **params):
+    def _build_mime_structure(self, part_text, part_html, body_charset, **params):
         """Select the correct MIME container based on content and attachments."""
         # If only "text" exists => text/plain, if only
         # "html" exists => text/html, if "text" and
@@ -477,14 +477,14 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             msg.set_charset(params['charset'])
         elif part_html:
             msg = MIMEBase('text', 'html')
-            msg.set_charset(cs_body)
+            msg.set_charset(body_charset)
         else:
             msg = MIMEBase('text', 'plain')
-            msg.set_charset(cs_body)
+            msg.set_charset(body_charset)
 
         return msg
 
-    def _set_headers(self, msg, cs_header, **params):
+    def _set_headers(self, msg, header_charset, **params):
         """Set all message headers including addresses, dates, and X-headers."""
         msg['From'] = params['from_addr']
         msg['To'] = ', '.join(params['to'])
@@ -493,9 +493,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         if params['bcc']:
             msg['Bcc'] = ', '.join(params['bcc'])
         if params['subject_prefix'] not in [None, '']:
-            msg['Subject'] = self._header(f"{params['subject_prefix']} {params['subject']}", _charset=cs_header, **params)
+            msg['Subject'] = self._header(f"{params['subject_prefix']} {params['subject']}", _charset=header_charset, **params)
         else:
-            msg['Subject'] = self._header(params['subject'], _charset=cs_header, **params)
+            msg['Subject'] = self._header(params['subject'], _charset=header_charset, **params)
 
         # auto-generate date and message-id if enforced and not provided
         if is_true(params['date_enforce']) and not params.get('date', None):
@@ -515,9 +515,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # X-headers
         for item in params.keys():
             if item.startswith('X-'):
-                msg[item] = self._header(f'{params[item]}', _charset=cs_header, **params)
+                msg[item] = self._header(f'{params[item]}', _charset=header_charset, **params)
 
-    def _attach_body(self, msg, part_text, part_html, cs_body, **params):
+    def _attach_body(self, msg, part_text, part_html, body_charset, **params):
         """Attach body parts to the message with correct MIME structure."""
         rel = None
         if params['files']:
@@ -545,9 +545,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
                 msg.attach(part_html)
             else:
                 if part_text:
-                    msg.set_payload(part_text.get_payload(), charset=cs_body)
+                    msg.set_payload(part_text.get_payload(), charset=body_charset)
                 elif part_html:
-                    msg.set_payload(part_html.get_payload(), charset=cs_body)
+                    msg.set_payload(part_html.get_payload(), charset=body_charset)
                 else:
                     # no body no files = empty message = just headers
                     pass
@@ -646,11 +646,11 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             - multipart/related: For HTML emails with inline images
 
         """
-        cs_header, cs_body = self._build_charsets(**params)
-        part_text, part_html = self._build_body_parts(body, cs_body)
-        msg = self._build_mime_structure(part_text, part_html, cs_body, **params)
-        self._set_headers(msg, cs_header, **params)
-        rel = self._attach_body(msg, part_text, part_html, cs_body, **params)
+        header_charset, body_charset = self._build_charsets(**params)
+        part_text, part_html = self._build_body_parts(body, body_charset)
+        msg = self._build_mime_structure(part_text, part_html, body_charset, **params)
+        self._set_headers(msg, header_charset, **params)
+        rel = self._attach_body(msg, part_text, part_html, body_charset, **params)
         self._attach_files(msg, rel, **params)
         return msg
 

@@ -19,7 +19,7 @@ deadline, now plus expire, and removes it when the function completes.
 
 - **count** (int): Maximum number of concurrent calls allowed, at least 1
 - **name** (str, optional): Custom cache key name for this temper instance
-- **name_f** (str, optional): Format string to generate key name based on function
+- **name_format** (str, optional): Format string to generate key name based on function
     arguments
 - **expire** (float, optional): Seconds a call holds its slot at most, longer than
     the longest call. Defaults to 3600.
@@ -47,7 +47,7 @@ def resource_intensive_operation(data):
 ### Notes
 
 : The temper state persists in the cache based on the function
-    name or custom name/name_f parameter
+    name or custom name/name_format parameter
 
 : If a process crashes while holding a slot, the slot is released at
     its own deadline, preventing permanent deadlock

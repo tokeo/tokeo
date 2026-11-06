@@ -91,7 +91,7 @@ class TokeoGrpc(MetaMixin):
             # address and port to run the service on
             url='localhost:50051',
             # number of concurrent workers
-            max_worker=1,
+            max_workers=1,
             # modules and methods for server, interceptor and service
             proto_add_servicer_to_server=None,
             grpc_servicer=None,
@@ -183,7 +183,7 @@ class TokeoGrpc(MetaMixin):
         : The initialization process follows these steps:
 
             - Creates a server with ThreadPoolExecutor using configured
-                max_worker count
+                max_workers count
             - Dynamically imports the protocol buffer module containing the
                 add_servicer_to_server function
             - Dynamically imports the servicer class module
@@ -209,7 +209,7 @@ class TokeoGrpc(MetaMixin):
             proto_add_servicer_to_server = resolve_object(self._proto_add_servicer_to_server)
             grpc_servicer = resolve_object(self._grpc_servicer)
             # create the server
-            self._executor = futures.ThreadPoolExecutor(max_workers=self._config('max_worker'))
+            self._executor = futures.ThreadPoolExecutor(max_workers=self._config('max_workers'))
             try:
                 server = grpc.server(self._executor, interceptors=interceptors)
                 # bind the listen port; tls is opt-in and only that branch pulls
