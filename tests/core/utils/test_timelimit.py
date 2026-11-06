@@ -34,8 +34,8 @@ needs_python_313 = pytest.mark.skipif(
 
 def _run_busy(seconds):
     # python steps only, so the exception arrives at once
-    end = time.monotonic() + seconds
-    while time.monotonic() < end:
+    end_time = time.monotonic() + seconds
+    while time.monotonic() < end_time:
         pass
 
 
@@ -81,10 +81,10 @@ def test_call_past_its_limit_is_aborted_with_a_message():
     def job():
         _run_busy(10)
 
-    started = time.monotonic()
+    start_time = time.monotonic()
     with pytest.raises(TokeoTimelimitExceeded, match='job exceeded its time limit of 0.2 s'):
         job()
-    assert 0.2 <= time.monotonic() - started < 0.5
+    assert 0.2 <= time.monotonic() - start_time < 0.5
     assert not _has_stray_exception()
 
 
@@ -209,10 +209,10 @@ def test_coroutine_is_cancelled_at_its_next_await():
     async def page():
         await asyncio.sleep(10)
 
-    started = time.monotonic()
+    start_time = time.monotonic()
     with pytest.raises(TokeoTimelimitExceeded, match='page exceeded its time limit of 0.2 s'):
         asyncio.run(page())
-    assert time.monotonic() - started < 0.5
+    assert time.monotonic() - start_time < 0.5
 
 
 def test_coroutine_within_its_limit_and_its_own_timeout_error():
@@ -294,10 +294,10 @@ def test_nested_limits_running_off_together_do_not_lose_the_outer_one():
         return 'ran on'
 
     for _ in range(200):
-        started = time.monotonic()
+        start_time = time.monotonic()
         with pytest.raises(TokeoTimelimitExceeded):
             outer(random.uniform(0.0, 0.05))
-        assert time.monotonic() - started < 0.5
+        assert time.monotonic() - start_time < 0.5
         assert not _has_stray_exception()
 
 
@@ -320,11 +320,11 @@ def test_many_threads_running_off_at_once_are_all_aborted():
                 aborted.append(True)
 
     threads = [threading.Thread(target=run) for _ in range(50)]
-    started = time.monotonic()
+    start_time = time.monotonic()
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join(10)
     assert len(aborted) == 50
-    assert time.monotonic() - started < 10
+    assert time.monotonic() - start_time < 10
     assert threading.active_count() == 1

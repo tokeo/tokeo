@@ -337,11 +337,11 @@ def test_realtime_connects_again_at_once_only_after_a_connection_that_served(rea
     """
     monkeypatch.setattr('tokeo.core.pocketbase.realtime.STABLE_SECONDS', stable)
     server.connections = [[_make_connect_event('c1')], [_make_connect_event('c2')]]
-    connects = []
-    realtime.on_connect = lambda: connects.append(time.monotonic())
+    connect_times = []
+    realtime.on_connect = lambda: connect_times.append(time.monotonic())
     realtime.subscribe('posts/*', print).start()
-    assert wait_until(lambda: len(connects) == 2)
-    assert (connects[1] - connects[0] < 0.3) is at_once
+    assert wait_until(lambda: len(connect_times) == 2)
+    assert (connect_times[1] - connect_times[0] < 0.3) is at_once
 
 
 def test_realtime_retries_after_a_doubling_delay_up_to_max_delay(realtime, server, caplog):
@@ -655,17 +655,17 @@ def test_async_realtime_connects_again_at_once_only_after_a_connection_that_serv
     """After STABLE_SECONDS c2 comes at once, else after 0.5 seconds."""
     monkeypatch.setattr('tokeo.core.pocketbase.realtime.STABLE_SECONDS', stable)
     async_server.connections = [[_make_connect_event('c1')], [_make_connect_event('c2')]]
-    connects = []
+    connect_times = []
 
     async def go():
         realtime = AsyncRealtime(async_pb).subscribe('posts/*', print)
-        realtime.on_connect = lambda: connects.append(time.monotonic())
+        realtime.on_connect = lambda: connect_times.append(time.monotonic())
         asyncio.create_task(realtime.run())
-        assert await wait_until_async(lambda: len(connects) == 2)
+        assert await wait_until_async(lambda: len(connect_times) == 2)
         await realtime.stop()
 
     asyncio.run(go())
-    assert (connects[1] - connects[0] < 0.3) is at_once
+    assert (connect_times[1] - connect_times[0] < 0.3) is at_once
 
 
 def test_async_realtime_retries_after_a_doubling_delay_and_subscribes_again(async_pb, async_server, caplog):

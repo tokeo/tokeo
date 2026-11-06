@@ -199,7 +199,7 @@ def test_heartbeat_shows_running_tasks(worker, with_details):
         release.set()
         w.stop()
     assert (task['actor'], task['queue'], task['retries']) == ('waits', 'default', 0)
-    assert task['runtime_ms'] >= 0 and 'started' not in task
+    assert task['runtime_ms'] >= 0 and 'start_time' not in task
     assert ('args' in task) is with_details
     if with_details:
         assert task['args'] == "(('anna@example.com',), {})"
@@ -514,10 +514,10 @@ def test_command_follow_ends_on_ctrl_c_in_a_terminal(tmp):
         shown = terminal.wait_for(lambda lines: any('every 1 s  (Ctrl-C to quit)' in line for line in lines))
         assert shown is not None, terminal.raw.decode(errors='replace')[-2000:]
         terminal.send(b'\x03')
-        sent = time.monotonic()
+        sent_time = time.monotonic()
         code = terminal.wait()
     assert shown[0].startswith('probe dramatiq monitor') and any(line.split() == ['total', '0', '0', '0', '1'] for line in shown)
     # Ctrl-C ends the display at once and cleanly, the former screen is back
-    assert code == 0 and time.monotonic() - sent < 5
+    assert code == 0 and time.monotonic() - sent_time < 5
     assert b'\x1b[?1049h' in terminal.raw and b'\x1b[?1049l' in terminal.raw and b'Traceback' not in terminal.raw
     assert not any('dramatiq monitor' in line for line in terminal.screen.display)

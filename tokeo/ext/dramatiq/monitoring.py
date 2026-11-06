@@ -95,7 +95,7 @@ class TokeoDramatiqHeartbeat(Middleware):
         self._running = {}
         self._totals = dict(done=0, failed=0, dead=0)
         self._since = {}
-        self._since_start = time.monotonic()
+        self._since_start_time = time.monotonic()
         self._worker = None
         self._started_at = None
         self._parameters = None
@@ -134,7 +134,7 @@ class TokeoDramatiqHeartbeat(Middleware):
             queue=message.queue_name,
             retries=message.options.get('retries', 0),
             started_at=_get_now_ms(),
-            started=time.monotonic(),
+            start_time=time.monotonic(),
         )
         if self.with_details:
             task['args'] = _cut(repr((message.args, message.kwargs)))
@@ -144,9 +144,9 @@ class TokeoDramatiqHeartbeat(Middleware):
     def after_process_message(self, broker, message, *, result=None, exception=None):
         with self._lock:
             task = self._running.pop(message.message_id, None)
-            runtime = int((time.monotonic() - task['started']) * 1000) if task else 0
+            runtime_ms = int((time.monotonic() - task['start_time']) * 1000) if task else 0
             actor = self._since.setdefault(message.actor_name, dict(done=0, failed=0, max_runtime_ms=0))
-            actor['max_runtime_ms'] = max(actor['max_runtime_ms'], runtime)
+            actor['max_runtime_ms'] = max(actor['max_runtime_ms'], runtime_ms)
             if exception is None:
                 self._totals['done'] += 1
                 actor['done'] += 1
@@ -187,12 +187,13 @@ class TokeoDramatiqHeartbeat(Middleware):
         now = time.monotonic()
         with self._lock:
             running = [
-                {key: value for key, value in task.items() if key != 'started'} | dict(runtime_ms=int((now - task['started']) * 1000))
+                {key: value for key, value in task.items() if key != 'start_time'}
+                | dict(runtime_ms=int((now - task['start_time']) * 1000))
                 for task in self._running.values()
             ]
             totals = dict(self._totals)
-            since_last = dict(ms=int((now - self._since_start) * 1000), actors=self._since)
-            self._since, self._since_start = {}, now
+            since_last = dict(ms=int((now - self._since_start_time) * 1000), actors=self._since)
+            self._since, self._since_start_time = {}, now
         return dict(
             type=HEARTBEAT_TYPE,
             version=HEARTBEAT_VERSION,

@@ -393,7 +393,7 @@ class AuthKeeper:
         #: Held while the login is checked or renewed
         self.lock = threading.Lock()
         # when the server confirmed the login last, by time.monotonic()
-        self._last_check = None
+        self._last_check_time = None
         # the logins of the client at the last check
         self._logins = None
 
@@ -402,9 +402,9 @@ class AuthKeeper:
             # a login since the last check, e.g. a new impersonation, comes
             # just from the server; a token from elsewhere is no login
             if self.client.logins and self.client.logins != self._logins:
-                self._logins, self._last_check = self.client.logins, time.monotonic()
-            fresh = self._last_check is not None and time.monotonic() - self._last_check < self.check_seconds
-            if fresh and self.client.is_token_valid(self.min_valid_seconds):
+                self._logins, self._last_check_time = self.client.logins, time.monotonic()
+            is_fresh = self._last_check_time is not None and time.monotonic() - self._last_check_time < self.check_seconds
+            if is_fresh and self.client.is_token_valid(self.min_valid_seconds):
                 return
             if self.client.is_token_valid(0) and self.client.auth_collection:
                 token = self.client.token
@@ -418,7 +418,7 @@ class AuthKeeper:
                     # an impersonation answers with its same token, near its
                     # expiry only a new login renews it
                     if self.client.token != token or self.client.is_token_valid(self.min_valid_seconds):
-                        self._last_check = time.monotonic()
+                        self._last_check_time = time.monotonic()
                         return
             self.login()
-            self._logins, self._last_check = self.client.logins, time.monotonic()
+            self._logins, self._last_check_time = self.client.logins, time.monotonic()

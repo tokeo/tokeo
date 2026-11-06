@@ -250,7 +250,7 @@ class TokeoPdoc(Handler):
         self._watchdog_observer = None
         self._watchdog_handler = None
         self._watchdog_render_requested = False
-        self._watchdog_last_event = 0.0
+        self._watchdog_last_event_time = 0.0
         self._watchdog_last_path = None
         self._watchdog_lock = None
         self._watchdog_stop = None
@@ -1524,7 +1524,7 @@ class TokeoPdoc(Handler):
         path = getattr(event, 'dest_path', None) or event.src_path
         with self._watchdog_lock:
             self._watchdog_render_requested = True
-            self._watchdog_last_event = monotonic()
+            self._watchdog_last_event_time = monotonic()
             self._watchdog_last_path = path
 
     def _watch(self, restarted=False):
@@ -1558,7 +1558,7 @@ class TokeoPdoc(Handler):
         self._watchdog_lock = Lock()
         self._watchdog_stop = Event()
         self._watchdog_render_requested = False
-        self._watchdog_last_event = 0.0
+        self._watchdog_last_event_time = 0.0
         self._watchdog_last_path = None
         self._watchdog_restart_requested = False
 
@@ -1610,7 +1610,7 @@ class TokeoPdoc(Handler):
                     if not self._watchdog_render_requested:
                         continue
                     # an editor writes in bursts; wait for quiet first
-                    if monotonic() - self._watchdog_last_event < settle:
+                    if monotonic() - self._watchdog_last_event_time < settle:
                         continue
                     path = self._watchdog_last_path
                     self._watchdog_render_requested = False

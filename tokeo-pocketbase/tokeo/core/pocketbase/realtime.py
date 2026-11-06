@@ -529,10 +529,10 @@ class Realtime:
 
     def _dispatch(self, stop, pending):
         # dispatcher: hand each event to its callbacks, check the login
-        last_check = time.monotonic()
+        last_check_time = time.monotonic()
         while not stop.is_set():
-            if self.connected.is_set() and time.monotonic() - last_check >= self.auth_check:
-                last_check = time.monotonic()
+            if self.connected.is_set() and time.monotonic() - last_check_time >= self.auth_check:
+                last_check_time = time.monotonic()
                 try:
                     with self._lock:
                         if stop.is_set():
@@ -554,7 +554,7 @@ class Realtime:
             if stop.is_set():
                 return
             if item is _CONNECTED:
-                last_check = time.monotonic()
+                last_check_time = time.monotonic()
                 if self.on_connect:
                     self._call(self.on_connect)
             elif item is not None:
@@ -818,10 +818,10 @@ class AsyncRealtime:
 
     async def _dispatch(self, pending):
         # dispatcher: hand each event to its callbacks, check the login
-        last_check = time.monotonic()
+        last_check_time = time.monotonic()
         while True:
-            if self.connected.is_set() and time.monotonic() - last_check >= self.auth_check:
-                last_check = time.monotonic()
+            if self.connected.is_set() and time.monotonic() - last_check_time >= self.auth_check:
+                last_check_time = time.monotonic()
                 try:
                     await asyncio.to_thread(confirm_login, self.client)
                     # a new login: PocketBase dropped the old one
@@ -838,7 +838,7 @@ class AsyncRealtime:
             except TimeoutError:
                 continue
             if item is _CONNECTED:
-                last_check = time.monotonic()
+                last_check_time = time.monotonic()
                 if self.on_connect:
                     await self._call(self.on_connect)
             else:

@@ -621,11 +621,11 @@ def test_temper_holds_its_slot_by_an_expire_time(tmp):
         def job():
             return app.cache.get('dc_expire_time'), _get_expire_seconds(app, 'dc_expire_time')
 
-        started = time.time()
-        expire_times, expires_in = job()
+        start_time = time.time()
+        expire_times, expire_seconds = job()
         assert len(expire_times) == 1
-        assert started + 60 <= expire_times[0] <= time.time() + 60
-        assert 59 < expires_in <= 60
+        assert start_time + 60 <= expire_times[0] <= time.time() + 60
+        assert 59 < expire_seconds <= 60
 
 
 def test_temper_drops_an_expired_holder_while_others_run(tmp, monkeypatch):

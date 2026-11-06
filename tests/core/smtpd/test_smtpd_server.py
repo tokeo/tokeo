@@ -1178,15 +1178,15 @@ def test_graceful_stop_ends_early_when_all_dialogs_ended():
         await read_reply(reader)
         await send_command(reader, writer, b'EHLO me\r\n')
         loop = asyncio.get_running_loop()
-        t0 = loop.time()
+        start_time = loop.time()
         await srv.stop(wait_seconds_before_close=5)
-        took = loop.time() - t0
+        took_seconds = loop.time() - start_time
         reply = await asyncio.wait_for(read_reply(reader), timeout=2)
         writer.close()
-        return took, reply
+        return took_seconds, reply
 
-    took, reply = asyncio.run(go())
-    assert took < 2
+    took_seconds, reply = asyncio.run(go())
+    assert took_seconds < 2
     assert reply[0].startswith('421')
 
 

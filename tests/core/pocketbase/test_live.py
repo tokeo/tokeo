@@ -244,9 +244,9 @@ def test_live_realtime_stop_ends_a_waiting_channel_at_once(pb):
     """stop() of a channel waiting for events ends its thread within a second."""
     channel = Realtime(pb).subscribe('posts/*', print).start()
     assert channel.connected.wait(5)
-    thread, started = channel._thread, time.monotonic()
+    thread, start_time = channel._thread, time.monotonic()
     channel.stop()
-    assert (thread.is_alive(), time.monotonic() - started < 1) == (False, True)
+    assert (thread.is_alive(), time.monotonic() - start_time < 1) == (False, True)
 
 
 @pytest.mark.skipif(not os.path.isdir('/proc/self/fd'), reason='needs /proc to count the open sockets')
@@ -445,12 +445,12 @@ def short(tmp_path_factory):
 def test_live_hook_file_ends_silent_connections_and_the_channel_comes_back(short, monkeypatch):
     """Without events each connection ends after 1 s, the channel comes back."""
     monkeypatch.setattr('tokeo.core.pocketbase.realtime.STABLE_SECONDS', 0.5)
-    connects = []
+    connect_times = []
     with PocketBase(short) as client, Realtime(client) as channel:
-        channel.on_connect = lambda: connects.append(time.monotonic())
+        channel.on_connect = lambda: connect_times.append(time.monotonic())
         channel.subscribe('ticks/*', print)
-        assert wait_until(lambda: len(connects) >= 4, timeout=10)
-    gaps = [b - a for a, b in zip(connects, connects[1:])]
+        assert wait_until(lambda: len(connect_times) >= 4, timeout=10)
+    gaps = [b - a for a, b in zip(connect_times, connect_times[1:])]
     assert all(0.9 < gap < 1.5 for gap in gaps)
 
 

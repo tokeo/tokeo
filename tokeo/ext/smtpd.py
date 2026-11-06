@@ -479,7 +479,7 @@ class TokeoSmtpd(MetaMixin):
 
         """
         servers = []
-        ended_workers = []
+        worker_errors = []
         try:
             # the stop handlers come first, a stop during the start is kept
             stop = asyncio.Event()
@@ -506,7 +506,7 @@ class TokeoSmtpd(MetaMixin):
                     except ChildProcessError:
                         continue
                     if worker_pid:
-                        ended_workers.append(f"worker {pid} of service '{name}' ended with {os.waitstatus_to_exitcode(status)}")
+                        worker_errors.append(f"worker {pid} of service '{name}' ended with {os.waitstatus_to_exitcode(status)}")
                         stop.set()
 
             if workers:
@@ -523,8 +523,8 @@ class TokeoSmtpd(MetaMixin):
             # a failed start must not leave already started services bound
             for server in servers:
                 await server.stop(wait_seconds_before_close=2.0)
-        if ended_workers:
-            raise TokeoSmtpdError(f'smtpd: {", ".join(ended_workers)}, all services stopped')
+        if worker_errors:
+            raise TokeoSmtpdError(f'smtpd: {", ".join(worker_errors)}, all services stopped')
 
     def _run_worker(self, svc, global_limits, reuse):
         """Run one forked worker serving exactly one service."""

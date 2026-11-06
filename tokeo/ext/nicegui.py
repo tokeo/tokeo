@@ -446,7 +446,7 @@ class TokeoNicegui(MetaMixin):
         # watchdog files components
         self._hotload_dir = None
         self._watchdog_hotload_requested = False
-        self._watchdog_last_event = 0.0
+        self._watchdog_last_event_time = 0.0
         self._watchdog_observer = None
         self._watchdog_handler = None
 
@@ -526,7 +526,7 @@ class TokeoNicegui(MetaMixin):
 
         """
         self._watchdog_hotload_requested = True
-        self._watchdog_last_event = monotonic()
+        self._watchdog_last_event_time = monotonic()
 
     async def _watch_file_changes(self):
         """
@@ -544,7 +544,7 @@ class TokeoNicegui(MetaMixin):
         interval = float(self._config('hotload_interval'))
         settle = float(self._config('hotload_settle'))
         while True:
-            if self._watchdog_hotload_requested and monotonic() - self._watchdog_last_event >= settle:
+            if self._watchdog_hotload_requested and monotonic() - self._watchdog_last_event_time >= settle:
                 fastapi_app.shutdown()
                 break
             await asyncio_sleep(interval)

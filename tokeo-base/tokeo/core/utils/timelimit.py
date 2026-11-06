@@ -126,10 +126,10 @@ def timelimit(seconds):
         def wrapper(*args, **kwargs):
             # the thread of the call gets the exception
             thread_id = ctypes.c_ulong(threading.get_ident())
-            timeouts = []
+            timeout_event = threading.Event()
 
             def abort():
-                timeouts.append(True)
+                timeout_event.set()
                 ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(TokeoTimelimitExceeded))
 
             # an own timer for each call
@@ -141,7 +141,7 @@ def timelimit(seconds):
                 return func(*args, **kwargs)
             except TokeoTimelimitExceeded:
                 # raised by the own limit, give it the message
-                if timeouts:
+                if timeout_event.is_set():
                     raise TokeoTimelimitExceeded(message) from None
                 # raised by the limit of an outer call, let it go on
                 raise
@@ -150,7 +150,7 @@ def timelimit(seconds):
                 timer.cancel()
                 timer.join()
                 # the call ended before the exception arrived, drop it
-                if timeouts:
+                if timeout_event.is_set():
                     ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, None)
 
         return wrapper

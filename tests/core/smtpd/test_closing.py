@@ -208,18 +208,18 @@ def test_session_timeout_ends_a_noop_loop():
 
     async def run_client(reader, writer):
         await read_reply(reader)
-        started = time.monotonic()
+        start_time = time.monotonic()
         replies = []
         while not replies or replies[-1] == '250':
             await asyncio.sleep(0.2)
             reply = await asyncio.wait_for(send_command(reader, writer, b'NOOP\r\n'), 5)
             replies.append(reply[0][:3])
-        return replies, time.monotonic() - started
+        return replies, time.monotonic() - start_time
 
-    replies, elapsed = _run(events, {'io_session_timeout': 1}, run_client)
+    replies, elapsed_seconds = _run(events, {'io_session_timeout': 1}, run_client)
     assert replies[-1] == '421'
     assert len(replies) > 2
-    assert elapsed < 2
+    assert elapsed_seconds < 2
     assert events.errors == [SmtpdIOSessionTimeoutException]
 
 
@@ -255,19 +255,19 @@ def test_session_timeout_is_not_renewed_by_a_message():
 
     async def run_client(reader, writer):
         await read_reply(reader)
-        started = time.monotonic()
+        start_time = time.monotonic()
         await asyncio.sleep(0.7)
         for command in ENVELOPE:
             await send_command(reader, writer, command)
         accepted = await send_command(reader, writer, b'Subject: t\r\n\r\nA\r\n.\r\n')
         # the server closes on its own at the end of the session
         reply = await asyncio.wait_for(read_reply(reader), 5)
-        return accepted, reply, time.monotonic() - started
+        return accepted, reply, time.monotonic() - start_time
 
-    accepted, reply, elapsed = _run(events, {'io_session_timeout': 1}, run_client)
+    accepted, reply, elapsed_seconds = _run(events, {'io_session_timeout': 1}, run_client)
     assert accepted[0].startswith('250')
     assert reply[0].startswith('421')
-    assert elapsed < 1.5
+    assert elapsed_seconds < 1.5
     assert len(events.messages) == 1
 
 
@@ -301,18 +301,18 @@ def test_client_that_does_not_read_is_dropped_after_io_cmd_timeout():
         sock.setblocking(False)
         reader, writer = await asyncio.open_connection(sock=sock)
         try:
-            started = time.monotonic()
+            start_time = time.monotonic()
             # the client sends EHLO and reads nothing
             writer.write(b'EHLO a\r\n')
             await writer.drain()
             assert await wait_until_async(lambda: 'disconnect' in events.fired)
-            return time.monotonic() - started
+            return time.monotonic() - start_time
         finally:
             writer.transport.abort()
             server.close()
 
-    elapsed = asyncio.run(go())
-    assert elapsed < 3
+    elapsed_seconds = asyncio.run(go())
+    assert elapsed_seconds < 3
     assert events.errors == [SmtpdIOCmdTimeoutException]
 
 
