@@ -189,8 +189,8 @@ your_app automate run uname --verbose --as-json
 ### Receive Emails with the SMTPD Service
 
 ```bash
-# Start the configured mail services (STARTTLS ready out of the box)
-your_app smtpd serve
+# Start all configured mail services (STARTTLS ready out of the box)
+your_app smtpd serve --all
 ```
 
 ### Create Web Interfaces
