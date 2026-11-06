@@ -525,9 +525,9 @@ class SmtpdServer:
             handler.setFormatter(logging.Formatter('%(asctime)s: [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
             logger.addHandler(handler)
             logger.setLevel(Severity[logger_severity or 'WARNING'].value)
-        events_handler._logger_protected = logger
+        events_handler._server_logger = logger
         #: The exposed logger; forwards to the handler's on_logging_event
-        self.logger = ForwardingLogger(self._bridge_log)
+        self.logger = ForwardingLogger(self._emit_log_event)
         events_handler.log = self.logger
         # ports / hosts / addresses
         # bytes of randomness for the per-connection session id (ctx.id);
@@ -644,7 +644,7 @@ class SmtpdServer:
                 methods=options.get('tls_methods'),
                 cert_cn=tls_cert_cn,
                 cert_san=tls_cert_san,
-                logger=lambda severity, msg: self._bridge_log(None, severity, msg),
+                logger=lambda severity, msg: self._emit_log_event(None, severity, msg),
             )
         self._servers = []
         # connection/processing bookkeeping (one event loop: plain counters
@@ -671,7 +671,7 @@ class SmtpdServer:
         """Listener dicts derived from the configured ports/hosts."""
         return [{'host': ip, 'port': int(port)} for ip, port in self._addresses]
 
-    def _bridge_log(self, ctx, severity, msg):
+    def _emit_log_event(self, ctx, severity, msg):
         """
         Sync entry point for logging: bridge into the async event dispatch.
 
@@ -983,9 +983,19 @@ class SmtpdServer:
         # False, in any other not matched case yet
         return False
 
-    def _build_greet_message(self, session):
+    def _format_greet_message(self, session):
         """
-        To be done
+        The 220 greet message from ```ctx.server.local_response```.
+
+        ### Args
+
+        - **session** (SmtpdSession): The session of the connection
+
+        ### Returns
+
+        - **str**: The greet message while the session is in ```CMD_HELO```,
+            else an empty text
+
         """
         # return greet response when in CMD_HELO sequence
         # like Ruby to_s, None is an empty text
@@ -1057,7 +1067,7 @@ class SmtpdServer:
                 line_break_before_has_crlf = True
 
                 # greet on connect only when CMD_HELO and empty ctx.server.helo
-                output = self._build_greet_message(session)
+                output = self._format_greet_message(session)
 
                 while True:
                     if output:
@@ -1090,7 +1100,7 @@ class SmtpdServer:
                         # immediate TLS greets only now, on the encrypted channel
                         if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
                             # send the server greeting next
-                            output = self._build_greet_message(session)
+                            output = self._format_greet_message(session)
                             # proceed with loop
                             continue
 
@@ -1564,7 +1574,7 @@ class SmtpdServer:
                     # continue with the HELO sequence
                     session.cmd_sequence = CMD_HELO
                     # send the server greeting next
-                    return self._build_greet_message(session)
+                    return self._format_greet_message(session)
 
             elif self.proxy_extension and re.match(r'^PROXY(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # PROXY is only valid as first line, a later one is an abuse
@@ -1689,11 +1699,11 @@ class SmtpdServer:
                 if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
                     raise Tls530Exception
                 # continue with CMD_HELO when in it
-                was_cmd_helo = session.cmd_sequence is CMD_HELO
+                previous_cmd_sequence = session.cmd_sequence
                 # always clean session on RSET
                 self.process_reset_session(session)
                 # need to restore CMD_HELO state
-                if was_cmd_helo:
+                if previous_cmd_sequence is CMD_HELO:
                     session.cmd_sequence = CMD_HELO
                 return '250 OK'
 

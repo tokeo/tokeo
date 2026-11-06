@@ -189,7 +189,7 @@ class SmtpdEvents:
         #: levels go to on_logging_event
         self.log = None
         #: Target of the default on_logging_event, bound by the server
-        self._logger_protected = None
+        self._server_logger = None
 
     @staticmethod
     def authenticated(ctx):
@@ -452,7 +452,7 @@ class SmtpdEvents:
             CRITICAL error is followed by its traceback
 
         """
-        getattr(self._logger_protected, severity.name.lower())(msg.rstrip('\r\n'))
+        getattr(self._server_logger, severity.name.lower())(msg.rstrip('\r\n'))
         if severity is Severity.CRITICAL and err is not None:
             for line in ''.join(traceback.format_exception(err)).splitlines():
-                self._logger_protected.critical(line)
+                self._server_logger.critical(line)

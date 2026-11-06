@@ -212,7 +212,7 @@ def test_extension_loads_into_cement_app():
         # the global smtpd config sizes the session id for every service
         assert server.session_id_bytes == 8
         # the default on_logging_event writes to the application log
-        assert server.events_handler._logger_protected is app.log
+        assert server.events_handler._server_logger is app.log
 
 
 @pytest.mark.parametrize(
@@ -255,7 +255,7 @@ def test_build_server_hands_the_server_options_to_the_server():
 def test_build_server_leaves_out_logger_severity():
     """A logger_severity of a service is left out, the server logs to app.log."""
     app, server = _build({'server_options': {'logger_severity': 'DEBUG'}})
-    assert server.events_handler._logger_protected is app.log
+    assert server.events_handler._server_logger is app.log
 
 
 def test_services_need_a_configured_service():

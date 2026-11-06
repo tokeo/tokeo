@@ -153,12 +153,12 @@ def test_logger_severity_is_validated(value):
 def test_given_logger_is_the_target_and_replaces_a_preset_one():
     """A given logger receives the lines, a value set on the handler is replaced."""
     events = SmtpdEvents()
-    events._logger_protected = Recorder()
+    events._server_logger = Recorder()
     target = Recorder()
     server = SmtpdServer(events, logger=target)
     server.logger.error('boom')
     assert target.lines == [('error', 'boom')]
-    assert events._logger_protected is target
+    assert events._server_logger is target
 
 
 def test_forwarding_logger_is_refused_as_target():
