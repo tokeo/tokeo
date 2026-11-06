@@ -69,7 +69,7 @@ def _pages():
         return dict(pong=True)
 
 
-def _module(monkeypatch, name, **attributes):
+def _make_module(monkeypatch, name, **attributes):
     # a module the config can name, importable during the test only
     module = types.ModuleType(name)
     vars(module).update(attributes)
@@ -77,7 +77,7 @@ def _module(monkeypatch, name, **attributes):
     return name
 
 
-def _paths():
+def _get_paths():
     # the paths the fastapi app of nicegui serves
     return {getattr(route, 'path', None) for route in nicegui_app.routes}
 
@@ -186,7 +186,7 @@ def test_startup_registers_the_pages_and_apis_of_the_route_handler(runs):
     """The route handler adds the page / and the api /api/ping before ui.run."""
     with NiceguiTest(**ROUTES) as app:
         app.nicegui.startup()
-    assert '/' in Client.page_routes.values() and '/api/ping' in _paths()
+    assert '/' in Client.page_routes.values() and '/api/ping' in _get_paths()
     assert len(runs) == 1
 
 
@@ -246,7 +246,7 @@ def openapi(monkeypatch):
 
 def test_startup_openapi_with_custom_module(runs, openapi, monkeypatch):
     """A custom module gives the openapi schema and the swagger and redoc pages."""
-    module = _module(
+    module = _make_module(
         monkeypatch,
         'tokeo_tests_openapi',
         get_openapi_custom=lambda: dict(openapi='3.1.0', info=dict(title='Shop', version='1')),
@@ -256,7 +256,7 @@ def test_startup_openapi_with_custom_module(runs, openapi, monkeypatch):
     with NiceguiTest(openapi_custom_module=module, **openapi) as app:
         app.nicegui.startup()
     assert nicegui_app.openapi() == dict(openapi='3.1.0', info=dict(title='Shop', version='1'))
-    assert {'/openapi.json', '/docs', '/redoc'} <= _paths()
+    assert {'/openapi.json', '/docs', '/redoc'} <= _get_paths()
     assert runs[0]['endpoint_documentation'] == 'page'
 
 
@@ -281,7 +281,7 @@ def test_startup_openapi_without_custom_module_raises(runs, openapi):
 )
 def test_startup_openapi_with_an_unfit_custom_module_raises(runs, openapi, monkeypatch, attributes, missing):
     """A module that does not import or lacks a function raises, nothing set up."""
-    name = 'tokeo_tests_openapi_missing' if attributes is None else _module(monkeypatch, 'tokeo_tests_openapi_unfit', **attributes)
+    name = 'tokeo_tests_openapi_missing' if attributes is None else _make_module(monkeypatch, 'tokeo_tests_openapi_unfit', **attributes)
     with NiceguiTest(openapi_custom_module=name, **openapi) as app:
         with pytest.raises(TokeoNiceguiError, match=f"openapi_custom_module '{name}' cannot serve the openapi: .*{missing}"):
             app.nicegui.startup()
@@ -294,7 +294,7 @@ def test_startup_openapi_needs_documentation_and_url(runs, openapi, documentatio
     """Without openapi_documentation or openapi_url no schema is served."""
     with NiceguiTest(openapi_documentation=documentation, openapi_url=url) as app:
         app.nicegui.startup()
-    assert nicegui_app.openapi_url is None and '/openapi.json' not in _paths()
+    assert nicegui_app.openapi_url is None and '/openapi.json' not in _get_paths()
 
 
 # hotload
@@ -392,7 +392,7 @@ def test_hotload_loop_shuts_nicegui_down_after_the_settle_time(monkeypatch):
     with NiceguiTest(hotload_interval=0.01, hotload_settle=0.2) as app:
         app.nicegui._watchdog_on_event()
         changed = time.monotonic()
-        asyncio.run(app.nicegui._watchdog_file_changes())
+        asyncio.run(app.nicegui._watch_file_changes())
     (shutdown,) = shutdowns
     assert shutdown - changed >= 0.2
 

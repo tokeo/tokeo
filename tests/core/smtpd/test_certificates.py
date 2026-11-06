@@ -23,8 +23,8 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     read_message,
     send_mail,
     run_server_client,
-    insecure_tls_context,
-    verifying_tls_context,
+    make_insecure_tls_context,
+    make_verifying_tls_context,
     make_cert,
     start_smtpd,
 )
@@ -44,38 +44,38 @@ def certs(tmp_path_factory):
     """Generate the test certificates once for the module with cryptography."""
     tmp = tmp_path_factory.mktemp('certs')
 
-    def path(name):
+    def get_path(name):
         return os.path.join(tmp, name)
 
     # a self-signed server certificate valid for 127.0.0.1
     _, _, simple_cert, simple_key = make_cert('127.0.0.1', san_ips=['127.0.0.1'])
-    _write(path('srv.simple.pem'), simple_cert)
-    _write(path('srv.key.pem'), simple_key)
+    _write(get_path('srv.simple.pem'), simple_cert)
+    _write(get_path('srv.key.pem'), simple_key)
     # a CA and a server certificate signed by it (for the chain cases)
     ca_cert_obj, ca_key_obj, ca_pem, _ = make_cert('Tokeo Test CA', is_ca=True)
     _, _, chain_cert, chain_key = make_cert('127.0.0.1', san_ips=['127.0.0.1'], issuer_cert=ca_cert_obj, issuer_key=ca_key_obj)
-    _write(path('ca.pem'), ca_pem)
-    _write(path('chain.key.pem'), chain_key)
+    _write(get_path('ca.pem'), ca_pem)
+    _write(get_path('chain.key.pem'), chain_key)
     # chain file = server cert + CA cert; and a combined chain + key file
-    _write(path('chain.pem'), chain_cert, ca_pem)
-    _write(path('chain-and-key.pem'), chain_cert, ca_pem, chain_key)
+    _write(get_path('chain.pem'), chain_cert, ca_pem)
+    _write(get_path('chain-and-key.pem'), chain_cert, ca_pem, chain_key)
     # an invalid certificate whose name does not match 127.0.0.1
     _, _, invalid_cert, invalid_key = make_cert('invalid.hostname', san_dns=['invalid.hostname'])
-    _write(path('invalid.pem'), invalid_cert)
-    _write(path('invalid.key.pem'), invalid_key)
+    _write(get_path('invalid.pem'), invalid_cert)
+    _write(get_path('invalid.key.pem'), invalid_key)
     return dict(
-        simple_cert=path('srv.simple.pem'),
-        simple_key=path('srv.key.pem'),
-        chain_cert=path('chain.pem'),
-        chain_key=path('chain.key.pem'),
-        chain_and_key=path('chain-and-key.pem'),
-        ca=path('ca.pem'),
-        invalid_cert=path('invalid.pem'),
-        invalid_key=path('invalid.key.pem'),
+        simple_cert=get_path('srv.simple.pem'),
+        simple_key=get_path('srv.key.pem'),
+        chain_cert=get_path('chain.pem'),
+        chain_key=get_path('chain.key.pem'),
+        chain_and_key=get_path('chain-and-key.pem'),
+        ca=get_path('ca.pem'),
+        invalid_cert=get_path('invalid.pem'),
+        invalid_key=get_path('invalid.key.pem'),
     )
 
 
-def _tls_options(cert_path, key_path):
+def _make_tls_options(cert_path, key_path):
     return {
         'max_processings': 1,
         'do_dns_reverse_lookup': False,
@@ -111,8 +111,8 @@ def _deliver(events, options, tls_context):
 def test_self_signed_simple_certificate(certs):
     """A self-signed certificate from files delivers to a verifying client."""
     ev = CaptureSmtpdEvents()
-    options = _tls_options(certs['simple_cert'], certs['simple_key'])
-    mail = _deliver(ev, options, verifying_tls_context(certs['simple_cert']))
+    options = _make_tls_options(certs['simple_cert'], certs['simple_key'])
+    mail = _deliver(ev, options, make_verifying_tls_context(certs['simple_cert']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -121,10 +121,10 @@ def test_self_signed_simple_certificate(certs):
 def test_legacy_tls_preset_still_delivers(certs):
     """The LEGACY preset, down to TLS 1.0, still delivers to a modern client."""
     ev = CaptureSmtpdEvents()
-    options = _tls_options(certs['simple_cert'], certs['simple_key'])
+    options = _make_tls_options(certs['simple_cert'], certs['simple_key'])
     options['tls_methods'] = TLS_METHODS_LEGACY
     options['tls_ciphers'] = TLS_CIPHERS_LEGACY
-    mail = _deliver(ev, options, verifying_tls_context(certs['simple_cert']))
+    mail = _deliver(ev, options, make_verifying_tls_context(certs['simple_cert']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -139,8 +139,8 @@ def test_unknown_minimum_tls_version_raises(methods):
 def test_self_signed_chain_certificate(certs):
     """A certificate with its chain delivers to a client trusting the CA."""
     ev = CaptureSmtpdEvents()
-    options = _tls_options(certs['chain_cert'], certs['chain_key'])
-    mail = _deliver(ev, options, verifying_tls_context(certs['ca']))
+    options = _make_tls_options(certs['chain_cert'], certs['chain_key'])
+    mail = _deliver(ev, options, make_verifying_tls_context(certs['ca']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -148,8 +148,8 @@ def test_self_signed_chain_certificate(certs):
 def test_self_signed_chain_and_key_certificate(certs):
     """A chain file with the key in it delivers without a key file."""
     ev = CaptureSmtpdEvents()
-    options = _tls_options(certs['chain_and_key'], None)
-    mail = _deliver(ev, options, verifying_tls_context(certs['ca']))
+    options = _make_tls_options(certs['chain_and_key'], None)
+    mail = _deliver(ev, options, make_verifying_tls_context(certs['ca']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -167,7 +167,7 @@ def test_memory_only_certificate():
         'pipelining_extension': False,
         'internationalization_extensions': True,
     }
-    mail = _deliver(ev, options, insecure_tls_context())
+    mail = _deliver(ev, options, make_insecure_tls_context())
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -175,9 +175,9 @@ def test_memory_only_certificate():
 def test_invalid_certificate_name(certs):
     """A certificate not naming 127.0.0.1 fails the handshake by SSLError."""
     ev = CaptureSmtpdEvents()
-    options = _tls_options(certs['invalid_cert'], certs['invalid_key'])
+    options = _make_tls_options(certs['invalid_cert'], certs['invalid_key'])
     with pytest.raises(ssl.SSLError):
-        _deliver(ev, options, verifying_tls_context(certs['invalid_cert']))
+        _deliver(ev, options, make_verifying_tls_context(certs['invalid_cert']))
 
 
 def test_in_memory_certificate_string(certs):
@@ -197,7 +197,7 @@ def test_in_memory_certificate_string(certs):
         'pipelining_extension': False,
         'internationalization_extensions': True,
     }
-    mail = _deliver(ev, options, verifying_tls_context(certs['simple_cert']))
+    mail = _deliver(ev, options, make_verifying_tls_context(certs['simple_cert']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -205,7 +205,7 @@ def test_in_memory_certificate_string(certs):
 # ---- self-signed CN/SAN: derivation and configured override -----------------
 
 
-def _peer_certificate(options, hosts=None):
+def _get_peer_certificate(options, hosts=None):
     """Serve with a self-signed cert and return the certificate from the wire."""
     import asyncio
     import smtplib
@@ -215,22 +215,22 @@ def _peer_certificate(options, hosts=None):
         srv, port = await start_smtpd(CaptureSmtpdEvents(), options=options, hosts=hosts)
         loop = asyncio.get_event_loop()
 
-        def client():
+        def run_client():
             client = smtplib.SMTP('127.0.0.1', port, timeout=10)
-            client.starttls(context=insecure_tls_context())
+            client.starttls(context=make_insecure_tls_context())
             der = client.sock.getpeercert(binary_form=True)
             client.close()
             return der
 
         try:
-            return await loop.run_in_executor(None, client)
+            return await loop.run_in_executor(None, run_client)
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
     return x509.load_der_x509_certificate(asyncio.run(go()))
 
 
-def _names(certificate):
+def _get_cert_names(certificate):
     from cryptography import x509
     from cryptography.x509.oid import NameOID
 
@@ -259,22 +259,22 @@ def test_tls_cert_names_derivation_rules():
 
 def test_self_signed_derives_names_from_hosts():
     """Bound to 127.0.0.1 the certificate is localhost.local with the ip."""
-    certificate = _peer_certificate({'encrypt_mode': 'TLS_OPTIONAL'}, hosts=['127.0.0.1'])
-    cn, dns = _names(certificate)
+    certificate = _get_peer_certificate({'encrypt_mode': 'TLS_OPTIONAL'}, hosts=['127.0.0.1'])
+    cn, dns = _get_cert_names(certificate)
     assert cn == 'localhost.local'
     assert '127.0.0.1' in dns and 'localhost.local' in dns
 
 
 def test_self_signed_uses_configured_names():
     """tls_cert_cn and tls_cert_san become the CN and the SAN."""
-    certificate = _peer_certificate(
+    certificate = _get_peer_certificate(
         {
             'encrypt_mode': 'TLS_OPTIONAL',
             'tls_cert_cn': 'mx.tokeo.test',
             'tls_cert_san': 'alt.tokeo.test',
         }
     )
-    cn, dns = _names(certificate)
+    cn, dns = _get_cert_names(certificate)
     assert cn == 'mx.tokeo.test'
     assert set(dns) == {'mx.tokeo.test', 'alt.tokeo.test'}
 

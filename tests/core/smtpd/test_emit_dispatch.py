@@ -42,7 +42,7 @@ class MixedEvents(SmtpdEvents):
         pass
 
 
-def _ctx():
+def _make_ctx():
     from tokeo.core.smtpd.context import SmtpdContext
 
     ctx = SmtpdContext()
@@ -90,7 +90,7 @@ def test_auth_default_deny_stays_dispatchable():
 
     async def go():
         with pytest.raises(Smtpd535Exception):
-            await srv._emit(SmtpdEvent.ON_AUTH_EVENT, _ctx(), '', 'user', 'secret')
+            await srv._emit(SmtpdEvent.ON_AUTH_EVENT, _make_ctx(), '', 'user', 'secret')
 
     asyncio.run(go())
 
@@ -100,7 +100,7 @@ def test_emit_returns_none_for_skipped_event():
     srv = SmtpdServer(BareEvents())
 
     async def go():
-        assert await srv._emit(SmtpdEvent.ON_HELO_EVENT, _ctx(), 'x') is None
+        assert await srv._emit(SmtpdEvent.ON_HELO_EVENT, _make_ctx(), 'x') is None
 
     asyncio.run(go())
 

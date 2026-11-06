@@ -16,7 +16,7 @@ from cement import ex
 from tokeo.core.utils.json import json_dump
 from dramatiq import cli
 from tokeo.ext.argparse import Controller
-from tokeo.ext.dramatiq.base import _number
+from tokeo.ext.dramatiq.base import _check_number
 from tokeo.core.utils.validate import is_bool
 from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError
 
@@ -46,7 +46,7 @@ class TokeoDramatiqController(Controller):
         """Cement controller setup hook; delegates to the parent."""
         super(TokeoDramatiqController, self)._setup(app)
 
-    def _worker_option(self, option, key, allow_auto=False, config_min_value=1):
+    def _get_worker_option(self, option, key, allow_auto=False, config_min_value=1):
         """
         Get a worker option from its switch or else from the config.
 
@@ -72,8 +72,8 @@ class TokeoDramatiqController(Controller):
         # a given switch replaces the config value
         value = getattr(self.app.pargs, option)
         if value is not None:
-            return _number('switch', f'--{option.replace("_", "-")}', value, allow_auto=allow_auto)
-        value = _number('config', key, self.app.dramatiq.config(key), min_value=config_min_value, allow_auto=allow_auto)
+            return _check_number('switch', f'--{option.replace("_", "-")}', value, allow_auto=allow_auto)
+        value = _check_number('config', key, self.app.dramatiq.config(key), min_value=config_min_value, allow_auto=allow_auto)
         # 0 stays valid in the config for prefetch and means auto as before
         return 'auto' if value == 0 else value
 
@@ -156,11 +156,11 @@ class TokeoDramatiqController(Controller):
         names = pargs.names or None
         actions = [action for action in ('purge', 'delete', 'recreate', 'requeue_dead') if getattr(pargs, action)]
         if len(actions) > 1:
-            raise TokeoDramatiqError(f'Use only one of {", ".join(_switch(a) for a in actions)}!')
+            raise TokeoDramatiqError(f'Use only one of {", ".join(_format_switch(a) for a in actions)}!')
         if pargs.dead_only and actions != ['purge']:
             raise TokeoDramatiqError('Use --dead-only together with --purge!')
         if actions and not pargs.yes:
-            raise TokeoDramatiqError(f'{_switch(actions[0])} changes queues or messages, confirm it by --yes!')
+            raise TokeoDramatiqError(f'{_format_switch(actions[0])} changes queues or messages, confirm it by --yes!')
         if (pargs.requeue_dead or pargs.dead is not None) and not names:
             raise TokeoDramatiqError('Name the queues for --dead or --requeue-dead!')
         if actions == ['purge']:
@@ -173,18 +173,18 @@ class TokeoDramatiqController(Controller):
             result = queues.recreate(names, force=pargs.force)
             lines = [f'{r["name"]}: recreated with {r["arguments"]}' for r in result]
         elif actions == ['requeue_dead']:
-            max_messages = _number('switch', '--limit', pargs.limit, allow_none=True)
+            max_messages = _check_number('switch', '--limit', pargs.limit, allow_none=True)
             result = [queues.requeue_dead(name, max_messages) for name in names]
             lines = [f'{r["name"]}: requeued {r["requeued"]} dead letters' for r in result]
         else:
             result = queues.state(names)
             if pargs.dead is not None:
-                max_messages = _number('switch', '--dead', pargs.dead)
+                max_messages = _check_number('switch', '--dead', pargs.dead)
                 for state in result:
                     state['dead_letters'] = queues.peek_dead(state['name'], max_messages)
             if not pargs.json:
                 output = self.app.tui.output
-                output.print(_queue_table(output, result), *_dead_letter_tables(output, result))
+                output.print(_format_queue_table(output, result), *_format_dead_letter_tables(output, result))
                 return
         self.app.print(json_dump(result, indent=2) if pargs.json else '\n'.join(lines))
 
@@ -212,7 +212,7 @@ class TokeoDramatiqController(Controller):
         """
         pargs = self.app.pargs
         monitor = self.app.dramatiq.monitor
-        interval = monitor.interval if pargs.interval is None else _number('switch', '--interval', pargs.interval)
+        interval = monitor.interval if pargs.interval is None else _check_number('switch', '--interval', pargs.interval)
         if pargs.json and not pargs.follow:
             self.app.print(json_dump(monitor.snapshot(), indent=2))
             return
@@ -378,15 +378,17 @@ class TokeoDramatiqController(Controller):
         """
         self.app.log.info('Spin up the dramatiq service workers')
         # check all values before sys.argv gets changed
-        processes = self._worker_option('processes', 'worker_processes', allow_auto=True)
-        threads = self._worker_option('threads', 'worker_threads')
-        shutdown_timeout = self._worker_option('worker_shutdown_timeout', 'worker_shutdown_timeout')
-        queue_prefetch = self._worker_option('queue_prefetch', 'queue_prefetch', allow_auto=True, config_min_value=0)
-        delay_queue_prefetch = self._worker_option('delay_queue_prefetch', 'delay_queue_prefetch', allow_auto=True, config_min_value=0)
-        worker_poll_interval = _number('config', 'worker_poll_interval', self.app.dramatiq.config('worker_poll_interval'), allow_none=True)
+        processes = self._get_worker_option('processes', 'worker_processes', allow_auto=True)
+        threads = self._get_worker_option('threads', 'worker_threads')
+        shutdown_timeout = self._get_worker_option('worker_shutdown_timeout', 'worker_shutdown_timeout')
+        queue_prefetch = self._get_worker_option('queue_prefetch', 'queue_prefetch', allow_auto=True, config_min_value=0)
+        delay_queue_prefetch = self._get_worker_option('delay_queue_prefetch', 'delay_queue_prefetch', allow_auto=True, config_min_value=0)
+        worker_poll_interval = _check_number(
+            'config', 'worker_poll_interval', self.app.dramatiq.config('worker_poll_interval'), allow_none=True
+        )
         if worker_poll_interval is None and 'dramatiq_worker_timeout' in os.environ:
             # dramatiq takes the env then, check it before the workers start
-            _number('env', 'dramatiq_worker_timeout', os.environ['dramatiq_worker_timeout'])
+            _check_number('env', 'dramatiq_worker_timeout', os.environ['dramatiq_worker_timeout'])
         use_spawn = self.app.pargs.use_spawn
         if use_spawn is None:
             use_spawn = self.app.dramatiq.config('use_spawn')
@@ -411,7 +413,7 @@ class TokeoDramatiqController(Controller):
         )
         # restart_delay and prefetch are env-only on dramatiq's side, no
         # cli flags exist, so pass them via the environment
-        restart_delay = _number('config', 'restart_delay', self.app.dramatiq.config('restart_delay'), min_value=0)
+        restart_delay = _check_number('config', 'restart_delay', self.app.dramatiq.config('restart_delay'), min_value=0)
         queue_prefetch = 0 if queue_prefetch == 'auto' else queue_prefetch
         delay_queue_prefetch = 0 if delay_queue_prefetch == 'auto' else delay_queue_prefetch
         os.environ['dramatiq_restart_delay'] = str(restart_delay)
@@ -483,7 +485,7 @@ class TokeoDramatiqController(Controller):
         self.app.exit_code = result
 
 
-def _switch(action):
+def _format_switch(action):
     """Name the switch of a queues action."""
     return '--' + action.replace('_', '-')
 
@@ -497,7 +499,7 @@ QUEUE_FLAGS = (
 )
 
 
-def _queue_table(output, states):
+def _format_queue_table(output, states):
     """Format the state of queues as table with their hints and a total."""
     keys = ('ready', 'delayed', 'dead', 'consumers')
     rows = []
@@ -511,7 +513,7 @@ def _queue_table(output, states):
     return output.table([('queue', 'left', 'full'), *((key, 'right') for key in keys), 'flags'], rows, title='queues')
 
 
-def _dead_letter_tables(output, states):
+def _format_dead_letter_tables(output, states):
     """Format the dead letters of queues as one table per queue."""
     # a cut message id is of no use, json shows errors and args in full
     columns = [('message_id', 'left', 'full'), 'actor', ('retries', 'right'), 'error', 'args']
@@ -526,7 +528,7 @@ def _dead_letter_tables(output, states):
     ]
 
 
-def _duration(ms):
+def _format_duration(ms):
     """Format milliseconds short, e.g. 850 ms, 1.4 s, 3m 5s or 1h 2m."""
     if ms < 1000:
         return f'{ms} ms'
@@ -571,7 +573,7 @@ def _monitor_view(output, snapshot, label, follow=None):
             rows.append(
                 [
                     name,
-                    _duration(at - beat['worker']['started_at']),
+                    _format_duration(at - beat['worker']['started_at']),
                     worker['state'],
                     f'{len(beat["running"])}/{beat["worker"]["threads"]}',
                     beat['totals']['done'],
@@ -585,7 +587,7 @@ def _monitor_view(output, snapshot, label, follow=None):
             for task in beat['running']:
                 args = task.get('args', '' if beat['worker']['with_details'] else 'details off')
                 tasks.append(
-                    [name, task['actor'], task['queue'], _duration(task['runtime_ms'] + since_heartbeat_ms), task['retries'], args]
+                    [name, task['actor'], task['queue'], _format_duration(task['runtime_ms'] + since_heartbeat_ms), task['retries'], args]
                 )
         columns = [
             ('worker', 'left', 'full'),
@@ -603,8 +605,8 @@ def _monitor_view(output, snapshot, label, follow=None):
             view.append(output.table(columns, tasks, title='running'))
     if snapshot['actors']:
         actors = snapshot['actors'].items()
-        rows = [[name, a['done'], a['failed'], _duration(a['max_runtime_ms']), a.get('last_error', '')] for name, a in actors]
+        rows = [[name, a['done'], a['failed'], _format_duration(a['max_runtime_ms']), a.get('last_error', '')] for name, a in actors]
         columns = ['actor', ('done', 'right'), ('failed', 'right'), ('longest', 'right'), 'last error']
         view.append(output.table(columns, rows, title='actors (last heartbeat of each worker)'))
-    view.append(_queue_table(output, snapshot['queues']))
+    view.append(_format_queue_table(output, snapshot['queues']))
     return view

@@ -42,7 +42,7 @@ class Jinja2YamlTest(Jinja2Test):
         ]
 
 
-def _templates(path, **files):
+def _write_templates(path, **files):
     # a directory at path with the given files, the name of a file with
     # .jinja2 as suffix; returns the directory as str for the config
     path.mkdir()
@@ -90,21 +90,21 @@ def test_output_handler_renders_by_the_template_handler_of_tokeo():
 
 def test_output_handler_renders_a_template_of_template_dirs(tmp_path):
     """hello.jinja2 renders with its data and the part it includes."""
-    templates = _templates(tmp_path / 'templates', hello='Hello {{ name }}! {% include "part.jinja2" %}', part='[part]\n')
+    templates = _write_templates(tmp_path / 'templates', hello='Hello {{ name }}! {% include "part.jinja2" %}', part='[part]\n')
     with Jinja2Test({'template_dirs': templates}) as app:
         assert app.render({'name': 'World'}, 'hello.jinja2', out=None) == 'Hello World! [part]\n'
 
 
 def test_output_handler_takes_the_config_of_jinja2(tmp_path):
     """With trim_blocks off the template of app.render keeps its newlines."""
-    templates = _templates(tmp_path / 'templates', block=BLOCK)
+    templates = _write_templates(tmp_path / 'templates', block=BLOCK)
     with Jinja2Test({'template_dirs': templates, 'trim_blocks': False}) as app:
         assert app.render({'x': 1}, 'block.jinja2', out=None) == '\nyes\n\nend\n'
 
 
 def test_output_handler_escapes_the_values_for_html(tmp_path):
     """app.render escapes the values, those of an included template too."""
-    templates = _templates(tmp_path / 'templates', page='{{ v }} {% include "part.jinja2" %}', part='{{ v }}')
+    templates = _write_templates(tmp_path / 'templates', page='{{ v }} {% include "part.jinja2" %}', part='{{ v }}')
     with Jinja2Test({'template_dirs': templates}) as app:
         escaped = '&lt;a href=&#39;x&#39;&gt;&amp;'
         assert app.render({'v': "<a href='x'>&"}, 'page.jinja2', out=None) == f'{escaped} {escaped}'
@@ -112,14 +112,14 @@ def test_output_handler_escapes_the_values_for_html(tmp_path):
 
 def test_output_handler_without_autoescape_keeps_the_values(tmp_path):
     """autoescape=False renders the values as they are, e.g. for a text."""
-    templates = _templates(tmp_path / 'templates', text='{{ v }}')
+    templates = _write_templates(tmp_path / 'templates', text='{{ v }}')
     with Jinja2Test({'template_dirs': templates}) as app:
         assert app.render({'v': "O'Neil & <Söhne>"}, 'text.jinja2', out=None, autoescape=False) == "O'Neil & <Söhne>"
 
 
 def test_output_handler_safe_keeps_one_value(tmp_path):
     """|safe renders one value as it is, the others stay escaped."""
-    templates = _templates(tmp_path / 'templates', page='{{ html|safe }}{{ v }}')
+    templates = _write_templates(tmp_path / 'templates', page='{{ html|safe }}{{ v }}')
     with Jinja2Test({'template_dirs': templates}) as app:
         assert app.render({'html': '<b>ok</b>', 'v': '<b>'}, 'page.jinja2', out=None) == '<b>ok</b>&lt;b&gt;'
 
@@ -243,14 +243,14 @@ def test_config_passes_the_fallback_on():
 
 def test_tokeo_jinja2_config_adds_a_template_dir_given_as_str(tmp_path):
     """A str in jinja2.template_dirs is added as template dir."""
-    templates = _templates(tmp_path / 'templates')
+    templates = _write_templates(tmp_path / 'templates')
     with Jinja2Test({'template_dirs': templates}) as app:
         assert app._meta.template_dirs == [templates]
 
 
 def test_tokeo_jinja2_config_adds_template_dirs_given_as_list(tmp_path):
     """The dirs of a list in jinja2.template_dirs are added in their order."""
-    templates = [_templates(tmp_path / 'one'), _templates(tmp_path / 'two')]
+    templates = [_write_templates(tmp_path / 'one'), _write_templates(tmp_path / 'two')]
     with Jinja2Test({'template_dirs': templates}) as app:
         assert app._meta.template_dirs == templates
 
@@ -263,8 +263,8 @@ def test_tokeo_jinja2_config_adds_no_template_dir_for_none():
 
 def test_tokeo_jinja2_config_dirs_come_after_the_template_dirs_of_the_app(tmp_path):
     """A template of the app's own template_dirs wins over one of jinja2."""
-    own = _templates(tmp_path / 'own', hello='own')
-    configured = _templates(tmp_path / 'configured', hello='configured')
+    own = _write_templates(tmp_path / 'own', hello='own')
+    configured = _write_templates(tmp_path / 'configured', hello='configured')
     with Jinja2Test({'template_dirs': configured}, template_dirs=[own]) as app:
         assert app._meta.template_dirs == [own, configured]
         assert app.render({}, 'hello.jinja2', out=None) == 'own'
@@ -272,7 +272,7 @@ def test_tokeo_jinja2_config_dirs_come_after_the_template_dirs_of_the_app(tmp_pa
 
 def test_tokeo_jinja2_config_takes_template_dirs_of_a_yaml_file(tmp_path):
     """A yaml list in jinja2.template_dirs is added as template dirs."""
-    templates = [_templates(tmp_path / 'one'), _templates(tmp_path / 'two')]
+    templates = [_write_templates(tmp_path / 'one'), _write_templates(tmp_path / 'two')]
     config = tmp_path / 'config.yaml'
     config.write_text('jinja2:\n  template_dirs:\n' + ''.join(f'    - {t}\n' for t in templates))
     with Jinja2YamlTest(config_files=[str(config)]) as app:

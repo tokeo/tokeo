@@ -22,7 +22,7 @@ def task3(runner, verbose=False, url='', **kwargs):
     return dict(url=url)
 
 
-def defaults_automate_hosts(validate=False):
+def make_automate_hosts(validate=False):
     d = dict(
         host1=dict(
             host='ip_address1',
@@ -61,7 +61,7 @@ def defaults_automate_hosts(validate=False):
     return d
 
 
-def defaults_automate_hostgroups(validate=False):
+def make_automate_hostgroups(validate=False):
     if not validate:
         # the config as given
         d = dict(
@@ -93,7 +93,7 @@ def defaults_automate_hostgroups(validate=False):
         )
     else:
         # the hosts the extension puts in place of the names
-        hosts = defaults_automate_hosts(validate=True)
+        hosts = make_automate_hosts(validate=True)
         d = dict(
             group1=tuple(
                 (
@@ -134,7 +134,7 @@ def defaults_automate_hostgroups(validate=False):
     return d
 
 
-def defaults_automate_connections(validate=False):
+def make_automate_connections(validate=False):
     b = dict(
         port=22,
         user='user_connect_base',
@@ -205,7 +205,7 @@ def defaults_automate_connections(validate=False):
     return d
 
 
-def defaults_automate_tasks(validate=False):
+def make_automate_tasks(validate=False):
     if not validate:
         # the config as given
         d = dict(
@@ -398,10 +398,10 @@ def defaults_automate_tasks(validate=False):
 
 
 DEFAULTS = init_defaults('automate')
-DEFAULTS['automate']['hosts'] = defaults_automate_hosts()
-DEFAULTS['automate']['hostgroups'] = defaults_automate_hostgroups()
-DEFAULTS['automate']['connections'] = defaults_automate_connections()
-DEFAULTS['automate']['tasks'] = defaults_automate_tasks()
+DEFAULTS['automate']['hosts'] = make_automate_hosts()
+DEFAULTS['automate']['hostgroups'] = make_automate_hostgroups()
+DEFAULTS['automate']['connections'] = make_automate_connections()
+DEFAULTS['automate']['tasks'] = make_automate_tasks()
 
 
 class AutomateTest(TokeoTest):

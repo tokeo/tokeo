@@ -34,7 +34,7 @@ from tokeo.ext.smtpd import (
     TokeoSmtpdError,
     SharedGlobalLimits,
     _resolve_events_handler,
-    _plan,
+    _build_plan,
 )
 from tests.utils import free_port, isolated, wait_until, wait_process_group_ended
 from tests.utils.process import SubProcess
@@ -75,7 +75,7 @@ def test_events_handler_carries_the_app():
 # ---- unit: topology planning ------------------------------------------------
 
 
-def _svc(name, pre_fork=0):
+def _make_svc(name, pre_fork=0):
     svc = {'name': name, 'server_options': {}}
     if pre_fork:
         svc['server_options']['pre_fork'] = pre_fork
@@ -85,30 +85,30 @@ def _svc(name, pre_fork=0):
 def test_plan_single_service_stays_in_main_process():
     """One service with pre_fork up to 1 runs in the main process."""
     for pre_fork in (0, 1):
-        plan = _plan([_svc('mx1', pre_fork)], has_global_limit=True)
-        assert plan['inloop'] == [_svc('mx1', pre_fork)]
+        plan = _build_plan([_make_svc('mx1', pre_fork)], has_global_limit=True)
+        assert plan['inloop'] == [_make_svc('mx1', pre_fork)]
         assert plan['forks'] == [] and plan['shared'] is False
 
 
 def test_plan_single_service_prefork_main_is_worker_one():
     """One service with pre_fork 3 runs in main plus 2 forks on one port."""
-    plan = _plan([_svc('mx1', 3)], has_global_limit=True)
+    plan = _build_plan([_make_svc('mx1', 3)], has_global_limit=True)
     assert plan['inloop'][0]['name'] == 'mx1'  # main process serves
-    assert plan['forks'] == [(_svc('mx1', 3), 2)]  # plus N-1 workers
+    assert plan['forks'] == [(_make_svc('mx1', 3), 2)]  # plus N-1 workers
     assert plan['reuse'] == {'mx1'}
     assert plan['shared'] is True
 
 
 def test_plan_multi_services_rules():
     """Of several services only pre_fork 0 stays in main, all others fork."""
-    services = [_svc('mx1', 5), _svc('mx2'), _svc('mx3', 1)]
-    plan = _plan(services, has_global_limit=True)
+    services = [_make_svc('mx1', 5), _make_svc('mx2'), _make_svc('mx3', 1)]
+    plan = _build_plan(services, has_global_limit=True)
     assert [svc['name'] for svc in plan['inloop']] == ['mx2']
     assert [(svc['name'], count) for svc, count in plan['forks']] == [('mx1', 5), ('mx3', 1)]
     assert plan['reuse'] == {'mx1'}  # only groups > 1 share a port
     assert plan['shared'] is True
     # all services forked: the master only supervises
-    plan = _plan([_svc('mx1', 2), _svc('mx2', 1)], has_global_limit=False)
+    plan = _build_plan([_make_svc('mx1', 2), _make_svc('mx2', 1)], has_global_limit=False)
     assert plan['inloop'] == [] and plan['shared'] is False
 
 
@@ -116,7 +116,7 @@ def test_plan_multi_services_rules():
 def test_plan_refuses_a_pre_fork_that_is_no_count(pre_fork):
     """A pre_fork that is no integer of 0 or more names the service, none starts."""
     with pytest.raises(TokeoSmtpdError, match=f"smtpd: service 'mx1': pre_fork must be an integer of 0 or more, not {pre_fork!r}"):
-        _plan([_svc('mx1', pre_fork)], has_global_limit=False)
+        _build_plan([_make_svc('mx1', pre_fork)], has_global_limit=False)
 
 
 # ---- unit: shared limits ----------------------------------------------------
@@ -129,14 +129,14 @@ def test_shared_limits_count_across_processes():
     assert isinstance(limits, GlobalLimits)
     assert limits.max_processings == 5 and limits.max_connections == 7
 
-    def child(shared):
+    def run_child(shared):
         shared.admit()
         shared.admit()
         shared.begin_processing()
 
     # the extension inherits the counters via os.fork; mirror that in the
-    # test (the spawn default on macOS would also have to pickle 'child')
-    proc = multiprocessing.get_context('fork').Process(target=child, args=(limits,))
+    # test (the spawn default on macOS would also have to pickle 'run_child')
+    proc = multiprocessing.get_context('fork').Process(target=run_child, args=(limits,))
     proc.start()
     proc.join(5)
     assert limits.active == 2 and limits.active_processings == 1
@@ -155,13 +155,13 @@ def test_shared_limits_give_the_last_slot_to_one_process_only():
     start = context.Barrier(8)
     taken = context.Value('i', 0)
 
-    def child():
+    def run_child():
         start.wait()
         if limits.try_begin_processing():
             with taken.get_lock():
                 taken.value += 1
 
-    procs = [context.Process(target=child) for _ in range(8)]
+    procs = [context.Process(target=run_child) for _ in range(8)]
     for proc in procs:
         proc.start()
     for proc in procs:
@@ -267,7 +267,7 @@ def test_services_need_a_configured_service():
 
 def test_services_pick_the_named_ones_in_their_order():
     """Named services come back in the order of the names."""
-    config = dict(smtpd=dict(services=[_service('mx-a', 2525), _service('mx-b', 2526)]))
+    config = dict(smtpd=dict(services=[_make_service('mx-a', 2525), _make_service('mx-b', 2526)]))
     with SmtpdTest(config_defaults=config) as app:
         assert [svc['name'] for svc in app.smtpd.services(['mx-b', 'mx-a'])] == ['mx-b', 'mx-a']
 
@@ -282,7 +282,7 @@ def test_services_pick_the_named_ones_in_their_order():
 )
 def test_serve_command_needs_names_or_all(argv, reason):
     """The serve command takes service names or --all, exactly one of both."""
-    config = dict(smtpd=dict(services=[_service('mx-a', 2525)]))
+    config = dict(smtpd=dict(services=[_make_service('mx-a', 2525)]))
     with SmtpdTest(argv=argv, config_defaults=config) as app:
         with pytest.raises(TokeoSmtpdError, match=reason):
             app.run()
@@ -290,7 +290,7 @@ def test_serve_command_needs_names_or_all(argv, reason):
 
 def test_list_command_prints_the_services(capsys):
     """The list command prints the configured services."""
-    config = dict(smtpd=dict(services=[_service('mx-a', 2525)]))
+    config = dict(smtpd=dict(services=[_make_service('mx-a', 2525)]))
     with SmtpdTest(argv=['smtpd', 'list'], config_defaults=config) as app:
         app.run()
     assert 'mx-a' in capsys.readouterr().out
@@ -302,7 +302,7 @@ def test_list_command_prints_the_services(capsys):
 PROBE = 'tests.ext.smtpd.smtpd_tests_serve_probe'
 
 
-def _service(name, port, pre_fork=0):
+def _make_service(name, port, pre_fork=0):
     svc = {
         'name': name,
         'events_handler': 'tokeo.ext.smtpd:TokeoSmtpdEvents',
@@ -318,7 +318,7 @@ def _serve(config, names=None):
     return SubProcess.probe(PROBE, json.dumps(config), json.dumps(names), timeout=8)
 
 
-def _banner(port):
+def _has_banner(port):
     """Readiness: the SMTP banner answers on the port."""
     try:
         with socket.create_connection(('127.0.0.1', port), timeout=1) as sock:
@@ -327,13 +327,13 @@ def _banner(port):
         return False
 
 
-def _child_pids(pid):
+def _get_child_pids(pid):
     """The forked workers of the master (Linux process tree)."""
     with open(f'/proc/{pid}/task/{pid}/children') as f:
         return [int(child) for child in f.read().split()]
 
 
-def _ehlo_ok(port):
+def _check_ehlo(port):
     client = smtplib.SMTP('127.0.0.1', port, timeout=5)
     code, _ = client.ehlo('probe')
     client.quit()
@@ -349,9 +349,9 @@ def _assert_port_free(port):
 def test_term_single_service_in_main_process():
     """SIGTERM ends one service in main with 0, the port is free again."""
     port = free_port()
-    with _serve({'services': [_service('mx1', port)]}) as process:
-        process.wait_for(lambda: _banner(port))
-        _ehlo_ok(port)
+    with _serve({'services': [_make_service('mx1', port)]}) as process:
+        process.wait_for(lambda: _has_banner(port))
+        _check_ehlo(port)
         process.signal(signal.SIGTERM)
         assert process.wait(8) == 0
         assert wait_process_group_ended(process.pid)
@@ -361,9 +361,9 @@ def test_term_single_service_in_main_process():
 def test_term_single_service_with_global_limits():
     """A single service with global limits serves unforked and ends by SIGTERM."""
     port = free_port()
-    with _serve({'max_processings': 2, 'services': [_service('mx1', port)]}) as process:
-        process.wait_for(lambda: _banner(port))
-        _ehlo_ok(port)
+    with _serve({'max_processings': 2, 'services': [_make_service('mx1', port)]}) as process:
+        process.wait_for(lambda: _has_banner(port))
+        _check_ehlo(port)
         process.signal(signal.SIGTERM)
         assert process.wait(8) == 0
         assert wait_process_group_ended(process.pid)
@@ -372,11 +372,11 @@ def test_term_single_service_with_global_limits():
 def test_term_single_service_prefork_group():
     """SIGTERM ends main and its 2 forks with 0, the port is free again."""
     port = free_port()
-    with _serve({'services': [_service('mx1', port, pre_fork=3)]}) as process:
-        process.wait_for(lambda: _banner(port))
+    with _serve({'services': [_make_service('mx1', port, pre_fork=3)]}) as process:
+        process.wait_for(lambda: _has_banner(port))
         if sys.platform.startswith('linux'):
-            assert len(_child_pids(process.pid)) == 2
-        _ehlo_ok(port)
+            assert len(_get_child_pids(process.pid)) == 2
+        _check_ehlo(port)
         process.signal(signal.SIGTERM)
         assert process.wait(8) == 0
         assert wait_process_group_ended(process.pid)
@@ -387,9 +387,9 @@ def test_term_single_service_prefork_group():
 def test_kill_master_takes_workers_down():
     """After SIGKILL of the master its workers end by the parent death signal."""
     port = free_port()
-    with _serve({'services': [_service('mx1', port, pre_fork=3)]}) as process:
-        process.wait_for(lambda: _banner(port))
-        assert len(_child_pids(process.pid)) == 2
+    with _serve({'services': [_make_service('mx1', port, pre_fork=3)]}) as process:
+        process.wait_for(lambda: _has_banner(port))
+        assert len(_get_child_pids(process.pid)) == 2
         process.signal(signal.SIGKILL)
         process.wait(8)
         assert wait_process_group_ended(process.pid)
@@ -400,13 +400,13 @@ def test_term_mixed_services_with_shared_limits():
     port_a, port_b = free_port(), free_port()
     config = {
         'max_connections': 10,
-        'services': [_service('mx1', port_a, pre_fork=2), _service('mx2', port_b)],
+        'services': [_make_service('mx1', port_a, pre_fork=2), _make_service('mx2', port_b)],
     }
     with _serve(config) as process:
-        process.wait_for(lambda: _banner(port_a))
-        process.wait_for(lambda: _banner(port_b))
-        _ehlo_ok(port_a)
-        _ehlo_ok(port_b)
+        process.wait_for(lambda: _has_banner(port_a))
+        process.wait_for(lambda: _has_banner(port_b))
+        _check_ehlo(port_a)
+        _check_ehlo(port_b)
         process.signal(signal.SIGTERM)
         assert process.wait(8) == 0
         assert wait_process_group_ended(process.pid)
@@ -414,7 +414,7 @@ def test_term_mixed_services_with_shared_limits():
         _assert_port_free(port_b)
 
 
-def _broken_service(name, pre_fork=0):
+def _make_broken_service(name, pre_fork=0):
     """A service whose listener cannot bind (TEST-NET address)."""
     svc = {
         'name': name,
@@ -429,7 +429,7 @@ def _broken_service(name, pre_fork=0):
 def test_failed_service_start_aborts_and_stops_started_ones():
     """A service that cannot bind ends the run with an error, ports free."""
     port_a = free_port()
-    with _serve({'services': [_service('mx1', port_a), _broken_service('mx2')]}) as process:
+    with _serve({'services': [_make_service('mx1', port_a), _make_broken_service('mx2')]}) as process:
         assert process.wait() != 0
         assert wait_process_group_ended(process.pid)
         _assert_port_free(port_a)
@@ -439,7 +439,7 @@ def test_failed_start_terminates_forked_workers():
     """A failed start in main also ends the forked workers, before their SIGKILL."""
     port_a = free_port()
     started = time.monotonic()
-    with _serve({'services': [_service('mx1', port_a, pre_fork=2), _broken_service('mx2')]}) as process:
+    with _serve({'services': [_make_service('mx1', port_a, pre_fork=2), _make_broken_service('mx2')]}) as process:
         assert process.wait() != 0
         # the workers stop on the SIGTERM of the master; a lost one costs the
         # 5 s until the SIGKILL of the bounded wait
@@ -451,9 +451,9 @@ def test_failed_start_terminates_forked_workers():
 def test_broken_config_of_a_worker_stops_before_the_fork():
     """A worker service with a broken config ends the start before any fork."""
     port_a, port_b = free_port(), free_port()
-    broken = _service('mx2', port_b, pre_fork=1)
+    broken = _make_service('mx2', port_b, pre_fork=1)
     broken['server_options']['encrypt_mode'] = 'TLS_NOPE'
-    with _serve({'services': [_service('mx1', port_a), broken]}) as process:
+    with _serve({'services': [_make_service('mx1', port_a), broken]}) as process:
         assert process.wait() != 0
         assert wait_process_group_ended(process.pid)
         log = process.output
@@ -465,7 +465,7 @@ def test_broken_config_of_a_worker_stops_before_the_fork():
 def test_failed_worker_stops_all_services():
     """A worker that cannot bind logs why and ends all services, ports free."""
     port_a = free_port()
-    with _serve({'services': [_service('mx1', port_a), _broken_service('mx2', pre_fork=1)]}) as process:
+    with _serve({'services': [_make_service('mx1', port_a), _make_broken_service('mx2', pre_fork=1)]}) as process:
         assert process.wait() != 0
         assert wait_process_group_ended(process.pid)
         log = process.output
@@ -477,9 +477,9 @@ def test_failed_worker_stops_all_services():
 # ---- process tests: services in the forked workers --------------------------
 
 
-def _tagged_service(name, port, pre_fork, server_options=None):
+def _make_tagged_service(name, port, pre_fork, server_options=None):
     """A service whose handler answers EHLO with its tag and pid."""
-    svc = _service(name, port, pre_fork=pre_fork)
+    svc = _make_service(name, port, pre_fork=pre_fork)
     svc['events_handler'] = 'tests.ext.smtpd.smtpd_tests_helper:TaggedSmtpdEvents'
     svc['options'] = {'tag': 'opt-42'}
     svc['server_options'].update(server_options or {})
@@ -499,8 +499,8 @@ def _open_dialogs(port, count):
 def test_prefork_workers_hand_the_options_to_their_handler():
     """Every process of a group of 3 answers EHLO with the tag of the options."""
     port = free_port()
-    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3)]}) as process:
-        process.wait_for(lambda: _banner(port))
+    with _serve({'services': [_make_tagged_service('mx1', port, pre_fork=3)]}) as process:
+        process.wait_for(lambda: _has_banner(port))
         pids = set()
         for _ in range(40):
             client = smtplib.SMTP('127.0.0.1', port, timeout=5)
@@ -512,14 +512,14 @@ def test_prefork_workers_hand_the_options_to_their_handler():
         # SO_REUSEPORT spreads 40 connections over more than one process
         assert len(pids) > 1
         if sys.platform.startswith('linux'):
-            assert pids <= {process.pid, *_child_pids(process.pid)}
+            assert pids <= {process.pid, *_get_child_pids(process.pid)}
 
 
 def test_prefork_workers_apply_the_server_options():
     """Open dialogs of a group of 3 end by 421 after io_session_timeout of 1 s."""
     port = free_port()
-    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3, server_options={'io_session_timeout': 1})]}) as process:
-        process.wait_for(lambda: _banner(port))
+    with _serve({'services': [_make_tagged_service('mx1', port, pre_fork=3, server_options={'io_session_timeout': 1})]}) as process:
+        process.wait_for(lambda: _has_banner(port))
         socks = _open_dialogs(port, 6)
         for sock in socks:
             assert sock.recv(1024).startswith(b'421')
@@ -530,9 +530,9 @@ def test_term_prefork_group_ends_open_dialogs_with_421():
     """SIGTERM ends the waiting dialogs of all processes of a group of 3 by 421."""
     port = free_port()
     # SO_REUSEPORT may hand all 6 dialogs to one process, it needs a slot for each
-    service = _tagged_service('mx1', port, pre_fork=3, server_options={'max_processings': 6})
+    service = _make_tagged_service('mx1', port, pre_fork=3, server_options={'max_processings': 6})
     with _serve({'services': [service]}) as process:
-        process.wait_for(lambda: _banner(port))
+        process.wait_for(lambda: _has_banner(port))
         socks = _open_dialogs(port, 6)
         process.signal(signal.SIGTERM)
         for sock in socks:
@@ -546,9 +546,9 @@ def test_term_prefork_group_ends_open_dialogs_with_421():
 def test_prefork_logs_the_started_service_of_every_process():
     """The master logs its workers, every process its started service and pid."""
     port = free_port()
-    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3)]}) as process:
-        process.wait_for(lambda: _banner(port))
-        pids = [process.pid, *_child_pids(process.pid)]
+    with _serve({'services': [_make_tagged_service('mx1', port, pre_fork=3)]}) as process:
+        process.wait_for(lambda: _has_banner(port))
+        pids = [process.pid, *_get_child_pids(process.pid)]
         assert len(pids) == 3
         started = [f"smtpd: service 'mx1' started (pid {pid})" for pid in pids]
         assert wait_until(lambda: all(line in process.output for line in started))
@@ -587,8 +587,8 @@ def test_prefork_workers_present_the_configured_certificate(cert_files):
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
-    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3, server_options=server_options)]}) as process:
-        process.wait_for(lambda: _banner(port))
+    with _serve({'services': [_make_tagged_service('mx1', port, pre_fork=3, server_options=server_options)]}) as process:
+        process.wait_for(lambda: _has_banner(port))
         pids, fingerprints = set(), set()
         for _ in range(40):
             client = smtplib.SMTP('127.0.0.1', port, timeout=5)

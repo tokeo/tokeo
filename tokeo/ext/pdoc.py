@@ -54,7 +54,7 @@ def _strip_comment_markers(text):
     return _RE_COMMENT_MARKER.sub('', text or '')
 
 
-def _yaml_header_end(lines):
+def _get_yaml_header_end(lines):
     """Index of the ```---``` document marker, or 0 when there is no header."""
     try:
         return lines.index('---')
@@ -436,7 +436,7 @@ class TokeoPdoc(Handler):
         else:
             self._show_config = is_true(show)
 
-    def _template_dirs(self):
+    def _get_template_dirs(self):
         """Resolve configured template modules/paths to filesystem dirs.
 
         Accepts dotted module paths (e.g. ```tokeo.templates.pdoc.html```) or
@@ -517,7 +517,7 @@ class TokeoPdoc(Handler):
             shutil.rmtree(self._output_dir)
         os.makedirs(self._output_dir, exist_ok=True)
 
-        template_dirs = self._template_dirs()
+        template_dirs = self._get_template_dirs()
         primary_tpl = Path(template_dirs[0]) if template_dirs else None
 
         # the favicon, a path in the project, is copied into the root of the
@@ -600,7 +600,7 @@ class TokeoPdoc(Handler):
         # ancestors: the MRO above this class (excluding the class itself and
         # ``object``), at most ``depth`` levels. pdoc only exposes the direct
         # bases; this restores the fuller chain the previous docs showed.
-        def _ancestors(cls, depth):
+        def _get_ancestors(cls, depth):
             out = []
             for k in list(getattr(cls.obj, '__mro__', []))[1:]:
                 if k is object:
@@ -612,13 +612,13 @@ class TokeoPdoc(Handler):
                     break
             return out
 
-        pdoc.render.env.globals['ancestors'] = _ancestors
+        pdoc.render.env.globals['ancestors'] = _get_ancestors
 
         # subclasses: the loaded direct subclasses (type.__subclasses__()).
         # Because the render imports every module first, subclasses defined in
         # other modules are present by the time a class is rendered, mirroring
         # the previous behaviour. Returned sorted by name.
-        def _subclasses(cls):
+        def _get_subclasses(cls):
             out = []
             try:
                 subs = cls.obj.__subclasses__()
@@ -630,7 +630,7 @@ class TokeoPdoc(Handler):
                 out.append((mod, qual, f'{mod}.{qual}' if mod else qual))
             return sorted(out, key=lambda t: t[1].lower())
 
-        pdoc.render.env.globals['subclasses'] = _subclasses
+        pdoc.render.env.globals['subclasses'] = _get_subclasses
 
         pdoc.render.env.globals['ancestors_max_depth'] = int(self._config('ancestors_max_depth'))
 
@@ -638,14 +638,14 @@ class TokeoPdoc(Handler):
         # actually defines one (not an inherited/generic constructor). Lets the
         # template show a meaningful constructor signature in the class header
         # while hiding the noise of inherited ``(*args, **kw)`` constructors.
-        def _own_init(cls):
+        def _find_own_init(cls):
             if '__init__' in getattr(cls.obj, '__dict__', {}):
                 for mem in cls.members.values():
                     if mem.name == '__init__':
                         return mem
             return None
 
-        pdoc.render.env.globals['own_init'] = _own_init
+        pdoc.render.env.globals['own_init'] = _find_own_init
 
         def _is_enum(cls):
             # true when the documented class derives from enum.Enum, so the
@@ -728,7 +728,7 @@ class TokeoPdoc(Handler):
             # point the markdown filter at this module's directory so its
             # docstring's `.. include:: ./FILE.md` resolves relative to it
             if getattr(self, '_md_state', None) is not None:
-                self._md_state['module_dir'] = self._module_source_dir(mod)
+                self._md_state['module_dir'] = self._get_module_source_dir(mod)
             html = pdoc.render.html_module(mod, all_modules)
             # pdoc's native flat convention: every module renders to
             # `dotted/name.html`. This keeps output paths consistent with
@@ -873,7 +873,7 @@ class TokeoPdoc(Handler):
                     configdict[config_file] = {
                         'content': lines,
                         'yaml': parsed,
-                        'description': _strip_comment_markers('\n'.join(lines[: _yaml_header_end(lines)])),
+                        'description': _strip_comment_markers('\n'.join(lines[: _get_yaml_header_end(lines)])),
                         'sections': self._config_sections(
                             config_file,
                             lines,
@@ -953,7 +953,7 @@ class TokeoPdoc(Handler):
             return {}
         lines = source.split('\n')
 
-        def comment_above(lineno):
+        def get_comment_above(lineno):
             """Join the ```#:``` block sitting directly above line ```lineno```."""
             out = []
             i = lineno - 2  # 0-based index of the line above
@@ -965,7 +965,7 @@ class TokeoPdoc(Handler):
                 i -= 1
             return '\n'.join(reversed(out))
 
-        def comment_behind(lineno):
+        def get_comment_behind(lineno):
             """Read a trailing ```#:``` comment off the assignment line itself."""
             try:
                 line = lines[lineno - 1]
@@ -980,7 +980,7 @@ class TokeoPdoc(Handler):
                 return ''
             return tail.strip()
 
-        def names_of(node):
+        def get_target_names(node):
             """Target names of an assignment, ignoring attributes and tuples."""
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             return [t.id for t in targets if isinstance(t, ast.Name)]
@@ -993,7 +993,7 @@ class TokeoPdoc(Handler):
                 if not isinstance(node, (ast.Assign, ast.AnnAssign)):
                     continue
                 targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-                text = comment_above(node.lineno) or comment_behind(node.lineno)
+                text = get_comment_above(node.lineno) or get_comment_behind(node.lineno)
                 if not text:
                     continue
                 # a tuple target gives its text to every attribute in it
@@ -1012,10 +1012,10 @@ class TokeoPdoc(Handler):
                     continue
                 if not isinstance(node, (ast.Assign, ast.AnnAssign)):
                     continue
-                text = comment_above(node.lineno) or comment_behind(node.lineno)
+                text = get_comment_above(node.lineno) or get_comment_behind(node.lineno)
                 if not text:
                     continue
-                for name in names_of(node):
+                for name in get_target_names(node):
                     docs[f'{prefix}{name}'] = text
 
         walk(tree.body)
@@ -1093,7 +1093,7 @@ class TokeoPdoc(Handler):
                     module.__dict__['docstring'] = f.read()
                 break
 
-    def _excludes(self):
+    def _get_excludes(self):
         """Module prefixes to skip during discovery (from the ```exclude```
         config key). Submodule-level exclusion is additionally driven by each
         package's own ```__pdoc__``` overrides (see ```_discover```)."""
@@ -1130,7 +1130,7 @@ class TokeoPdoc(Handler):
         """
 
         if excludes is None:
-            excludes = self._excludes()
+            excludes = self._get_excludes()
         if self._is_excluded(module_name, excludes):
             return set()
 
@@ -1187,7 +1187,7 @@ class TokeoPdoc(Handler):
         written into the instance ```__dict__``` to take effect.
         """
 
-        def keep(origin_module):
+        def is_documented(origin_module):
             return any(origin_module == d or origin_module.startswith(d + '.') or d.startswith(origin_module + '.') for d in documented)
 
         def walk(members):
@@ -1198,7 +1198,7 @@ class TokeoPdoc(Handler):
                     inherited = member.inherited_members
                 except Exception:
                     continue
-                filtered = {origin: mems for origin, mems in inherited.items() if keep(origin[0])}
+                filtered = {origin: mems for origin, mems in inherited.items() if is_documented(origin[0])}
                 if len(filtered) != len(inherited):
                     member.__dict__['inherited_members'] = filtered
                 # recurse into nested classes
@@ -1208,7 +1208,7 @@ class TokeoPdoc(Handler):
         if hasattr(mod, 'members'):
             walk(mod.members)
 
-    def _module_source_dir(self, mod):
+    def _get_module_source_dir(self, mod):
         """Directory that holds a module's source, for include resolution.
 
         For a package this is the package directory (where sibling guide files
@@ -1292,7 +1292,7 @@ class TokeoPdoc(Handler):
         }
 
         def convert_admonitions(text):
-            def repl(m):
+            def replace_admonition(m):
                 indent, kind, arg = m.group(1), m.group(2), m.group(3).strip()
                 if kind in version_titles and arg:
                     title = version_titles[kind].format(arg)
@@ -1304,13 +1304,13 @@ class TokeoPdoc(Handler):
             # `.. note::` (optionally with a title) -> `!!! note`
             return re.sub(
                 rf'^([ \t]*)\.\.[ \t]+({kinds})::[ \t]*(.*)$',
-                repl,
+                replace_admonition,
                 text,
                 flags=re.MULTILINE,
             )
 
         def resolve_includes(text, module_dir, depth=0):
-            def repl(m):
+            def replace_include(m):
                 indent, rel, options = m.group(1), m.group(2).strip(), m.group(3)
                 # past 3 levels nothing more is included, so a circle ends
                 if not module_dir or depth >= 3:
@@ -1333,7 +1333,7 @@ class TokeoPdoc(Handler):
 
             return re.sub(
                 r'^([ \t]*)\.\.[ \t]+include::[ \t]+(\S+)[ \t]*$((?:\n\1[ \t]+:[\w-]+:.*$)*)',
-                repl,
+                replace_include,
                 text,
                 flags=re.MULTILINE,
             )
@@ -1354,7 +1354,7 @@ class TokeoPdoc(Handler):
 
         import markupsafe
 
-        def tokeo_to_html(text, *args, **kwargs):
+        def convert_to_html(text, *args, **kwargs):
             text = text or ''
             text = resolve_includes(text, md_state['module_dir'])
             text = convert_admonitions(text)
@@ -1365,13 +1365,13 @@ class TokeoPdoc(Handler):
             # markup (admonition divs, code blocks) is not HTML-escaped
             return markupsafe.Markup(html)
 
-        pdoc.render.env.filters['to_html'] = tokeo_to_html
+        pdoc.render.env.filters['to_html'] = convert_to_html
         # expose the state so render() can set the current module dir
         self._md_state = md_state
 
     # ---- watching -----------------------------------------------------------
 
-    def _module_dirs(self):
+    def _get_module_dirs(self):
         """Filesystem roots of the packages that get documented."""
 
         dirs = []
@@ -1397,7 +1397,7 @@ class TokeoPdoc(Handler):
                     continue
         return dirs
 
-    def _documented(self):
+    def _get_documented_names(self):
         """Readable names of everything this render documents.
 
         The module specs exactly as configured, plus ```config``` when the yaml
@@ -1421,7 +1421,7 @@ class TokeoPdoc(Handler):
             documented.append('config')
         return documented
 
-    def _watch_dirs(self):
+    def _get_watch_dirs(self):
         """Every directory whose contents can change and be edited here.
 
         Modules, external docstring snippets and, when appenv is loaded,
@@ -1445,7 +1445,7 @@ class TokeoPdoc(Handler):
           ones dropped for sitting outside the project
 
         """
-        candidates = list(self._module_dirs())
+        candidates = list(self._get_module_dirs())
         candidates.extend(self._resolve_docstrings_dirs() or [])
         env = getattr(self.app, 'env', None)
         config_dir = getattr(env, 'APP_CONFIG_DIR', None) if env else None
@@ -1547,7 +1547,7 @@ class TokeoPdoc(Handler):
         - **TokeoPdocError**: When watchdog is missing or nothing to watch
 
         """
-        dirs, outside = self._watch_dirs()
+        dirs, outside = self._get_watch_dirs()
         if not dirs:
             raise TokeoPdocError('pdoc --watch: nothing to watch. Check the "modules" option in the [pdoc] config section.')
 
@@ -1578,7 +1578,7 @@ class TokeoPdoc(Handler):
         """Wait for a settled change, then stop the server.
 
         Runs as a daemon thread started by ```serve()```. Mirrors nicegui's
-        ```_watchdog_file_changes```, which polls the same flag and calls
+        ```_watch_file_changes```, which polls the same flag and calls
         ```fastapi_app.shutdown()```.
 
         Ends on its own in three cases: a settled change, the stop event set
@@ -1736,7 +1736,7 @@ class TokeoPdoc(Handler):
             ) from err
         if not restarted:
             self.app.log.info(f'pdoc serving at http://{host}:{port}')
-            self.app.log.info(f'pdoc explaining modules: {", ".join(self._documented())}')
+            self.app.log.info(f'pdoc explaining modules: {", ".join(self._get_documented_names())}')
         # the monitor needs the running server to stop it later, so the
         # observer can only be set up once `httpd` exists. Consequence worth
         # knowing: a failing `_watch()` (watchdog missing, nothing to watch)

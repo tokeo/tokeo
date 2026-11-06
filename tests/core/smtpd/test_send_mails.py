@@ -10,7 +10,7 @@ import smtplib
 import pytest
 
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
-from tests.core.smtpd.lib.smtpd_tests_helper import read_message, send_mail, run_server_client, insecure_tls_context
+from tests.core.smtpd.lib.smtpd_tests_helper import read_message, send_mail, run_server_client, make_insecure_tls_context
 
 ENVELOPE_FROM = 'integration@local.local'
 ENVELOPE_TO = 'out@local.local'
@@ -42,11 +42,11 @@ def test_net_smtp_simple_send_10_mails():
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
 
-    def client(port):
+    def run_client(port):
         for _ in range(10):
             send_mail(port, ENVELOPE_FROM, ENVELOPE_TO, mail)
 
-    run_server_client(ev, OPTIONS, client)
+    run_server_client(ev, OPTIONS, run_client)
     assert ev.ev_message_data == mail.encode()
 
 
@@ -110,7 +110,7 @@ def test_simple_send_1_mail_starttls():
             password='password',
             auth_type='login',
             tls_enabled=True,
-            tls_context=insecure_tls_context(),
+            tls_context=make_insecure_tls_context(),
         ),
     )
     assert ev.ev_message_data == mail.encode()

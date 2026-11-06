@@ -99,7 +99,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         label = 'tokeo.yaml'
         """The unique string identifier of this handler in the application."""
 
-    def _env_var_for_path(self, path):
+    def _build_env_var_name(self, path):
         """
         Build the environment variable name overriding a config path.
 
@@ -127,7 +127,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
 
     def _get_env_var(self, section, key):
         # keep cement's section/key entry point, routed through the path form
-        return self._env_var_for_path([section, key])
+        return self._build_env_var_name([section, key])
 
     def _resolve_leaf(self, value, path):
         # hook for subclasses to transform a scalar leaf (for example the
@@ -182,7 +182,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
             return result if changed else value
         # scalar leaf: an env override wins, else hand it to the leaf hook
         if path is not None:
-            env_var = self._env_var_for_path(path)
+            env_var = self._build_env_var_name(path)
             if env_var in os.environ:
                 return _coerce_env_value(os.environ[env_var], env_var)
         return self._resolve_leaf(value, path)

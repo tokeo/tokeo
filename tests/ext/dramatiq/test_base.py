@@ -32,7 +32,7 @@ def keep_dead_message_ttl(monkeypatch):
     return dramatiq_rabbitmq.DEAD_MESSAGE_TTL
 
 
-def _ca_cert(name):
+def _make_ca_cert(name):
     # a self-signed certificate in pem, enough as ca file of the broker
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)])
@@ -101,7 +101,7 @@ def test_register_confirm_delivery_with_tls_parameters(tmp):
     """amqps with a ca builds pika parameters with ssl, confirm stays on."""
     rabbitmq = dict(url='amqps://localhost:5671/', tls_ca=os.path.join(tmp.dir, 'ca.pem'))
     with open(rabbitmq['tls_ca'], 'w') as f:
-        f.write(_ca_cert('localhost'))
+        f.write(_make_ca_cert('localhost'))
     with DramatiqBrokerTest(tmp, rabbitmq):
         broker = dramatiq.get_broker()
         assert broker.parameters[0].ssl_options is not None
@@ -113,7 +113,7 @@ def test_register_tls_parameters_keep_the_options_of_the_url(tmp):
     url = 'amqps://u:p@localhost:5671/vh?heartbeat=30&connection_attempts=3&blocked_connection_timeout=10'
     rabbitmq = dict(url=url, tls_ca=os.path.join(tmp.dir, 'ca.pem'))
     with open(rabbitmq['tls_ca'], 'w') as f:
-        f.write(_ca_cert('localhost'))
+        f.write(_make_ca_cert('localhost'))
     with DramatiqBrokerTest(tmp, rabbitmq):
         (params,) = dramatiq.get_broker().parameters
     assert (params.heartbeat, params.connection_attempts, params.blocked_connection_timeout) == (30, 3, 10)
@@ -195,7 +195,7 @@ def test_register_invalid_queue_arguments(tmp, keep_dead_message_ttl, key, value
 # ---- middleware defaults ----------------------------------------------------
 
 
-def _middleware_of(kind):
+def _get_middleware(kind):
     return [m for m in dramatiq.get_broker().middleware if isinstance(m, kind)][0]
 
 
@@ -205,10 +205,10 @@ def test_register_middleware_defaults(tmp):
 
     with DramatiqMiddlewareTest(tmp):
         # the defaults are the ones of dramatiq, so nothing changes for apps
-        assert _middleware_of(middleware.TimeLimit).time_limit == 600_000
-        assert _middleware_of(middleware.AgeLimit).max_age is None
-        assert _middleware_of(middleware.ShutdownNotifications).notify_shutdown is False
-        retries = _middleware_of(middleware.Retries)
+        assert _get_middleware(middleware.TimeLimit).time_limit == 600_000
+        assert _get_middleware(middleware.AgeLimit).max_age is None
+        assert _get_middleware(middleware.ShutdownNotifications).notify_shutdown is False
+        retries = _get_middleware(middleware.Retries)
         assert (retries.max_retries, retries.min_backoff, retries.max_backoff) == (20, 15_000, 604_800_000)
 
 
@@ -218,10 +218,10 @@ def test_register_middleware_from_config(tmp):
 
     config = dict(time_limit=5000, max_age='60000', notify_shutdown=True, max_retries=0, min_backoff=200, max_backoff=1000)
     with DramatiqMiddlewareTest(tmp, **config):
-        assert _middleware_of(middleware.TimeLimit).time_limit == 5000
-        assert _middleware_of(middleware.AgeLimit).max_age == 60000
-        assert _middleware_of(middleware.ShutdownNotifications).notify_shutdown is True
-        retries = _middleware_of(middleware.Retries)
+        assert _get_middleware(middleware.TimeLimit).time_limit == 5000
+        assert _get_middleware(middleware.AgeLimit).max_age == 60000
+        assert _get_middleware(middleware.ShutdownNotifications).notify_shutdown is True
+        retries = _get_middleware(middleware.Retries)
         assert (retries.max_retries, retries.min_backoff, retries.max_backoff) == (0, 200, 1000)
 
 

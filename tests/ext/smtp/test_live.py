@@ -95,7 +95,7 @@ class BackgroundSmtpd:
         self.loop.close()
 
 
-def _tls_options(mode, cert):
+def _make_tls_options(mode, cert):
     return {'encrypt_mode': mode, 'tls_cert': cert[0], 'tls_key': cert[1]}
 
 
@@ -126,7 +126,7 @@ def test_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
         with open(verify['host_cert_ca'], 'w') as f:
             f.write(cert[0])
 
-    with BackgroundSmtpd(_tls_options(mode, cert)) as smtpd:
+    with BackgroundSmtpd(_make_tls_options(mode, cert)) as smtpd:
         with SmtpTest(host='127.0.0.1', port=smtpd.port, timeout=5, **client, **verify) as app:
             if delivered:
                 assert app.mail.send('body over tls') == {}

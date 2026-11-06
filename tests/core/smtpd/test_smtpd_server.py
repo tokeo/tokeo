@@ -23,14 +23,14 @@ from tests.utils import wait_until_async
 from tests.core.smtpd.lib.smtpd_tests_helper import (
     RecordingEvents,
     AuthEvents,
-    dialog,
-    auth_plain,
+    run_dialog,
+    make_auth_plain,
     read_reply,
     send_command,
     start_server,
     stop_server,
     start_smtpd,
-    insecure_tls_context,
+    make_insecure_tls_context,
     TLS_SERVER_OPTIONS,
 )
 
@@ -40,7 +40,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
 def test_full_delivery_and_events():
     """A full dialog delivers the body byte-exact and fires every event."""
     ev = RecordingEvents()
-    greeting, r = dialog(
+    greeting, r = run_dialog(
         ev,
         {},
         [
@@ -68,14 +68,14 @@ def test_full_delivery_and_events():
 
 def test_helo_gets_single_line_250():
     """HELO answers one line of 250."""
-    _, r = dialog(RecordingEvents(), {}, [b'HELO me\r\n'])
+    _, r = run_dialog(RecordingEvents(), {}, [b'HELO me\r\n'])
     assert r[0][0].startswith('250 ') and len(r[0]) == 1
 
 
 def test_ehlo_advertises_extensions_when_enabled():
     """EHLO lists 8BITMIME, SMTPUTF8 and PIPELINING when enabled."""
     options = {'internationalization_extensions': True, 'pipelining_extension': True}
-    _, r = dialog(RecordingEvents(), options, [b'EHLO me\r\n'])
+    _, r = run_dialog(RecordingEvents(), options, [b'EHLO me\r\n'])
     text = '\n'.join(r[0])
     assert '8BITMIME' in text and 'SMTPUTF8' in text and 'PIPELINING' in text
     assert r[0][-1] == '250 PIPELINING'
@@ -86,14 +86,14 @@ def test_ehlo_advertises_extensions_when_enabled():
 
 def test_null_sender_accepted():
     """MAIL FROM:<> answers "250 OK"."""
-    _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'MAIL FROM:<>\r\n'])
+    _, r = run_dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'MAIL FROM:<>\r\n'])
     assert r[1] == ['250 OK']
 
 
 def test_de_dot_stuffing_and_byte_exact_body():
     """One leading dot per line is removed, the final CRLF chomped."""
     ev = RecordingEvents()
-    dialog(
+    run_dialog(
         ev,
         {},
         [
@@ -111,7 +111,7 @@ def test_de_dot_stuffing_and_byte_exact_body():
 def test_multiple_transactions_with_rset():
     """After RSET only the second transaction is delivered."""
     ev = RecordingEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {},
         [
@@ -135,7 +135,7 @@ def test_mail_from_rewrite_by_handler():
     ev = RecordingEvents()
     ev.rewrite_from = '<rewritten@x>'
     ev.messages.clear()
-    dialog(
+    run_dialog(
         ev,
         {},
         [
@@ -151,7 +151,7 @@ def test_mail_from_rewrite_by_handler():
 
 def test_noop_and_unknown_command():
     """NOOP answers "250 OK", an unknown command 500."""
-    _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'NOOP\r\n', b'FOOBAR\r\n'])
+    _, r = run_dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'NOOP\r\n', b'FOOBAR\r\n'])
     assert r[1] == ['250 OK']
     assert r[2][0].startswith('500')
 
@@ -161,19 +161,19 @@ def test_noop_and_unknown_command():
 
 def test_sequence_rcpt_before_mail_is_503():
     """RCPT before MAIL answers 503."""
-    _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'RCPT TO:<x>\r\n'])
+    _, r = run_dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'RCPT TO:<x>\r\n'])
     assert r[1][0].startswith('503')
 
 
 def test_sequence_data_before_rcpt_is_503():
     """DATA before RCPT answers 503."""
-    _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'DATA\r\n'])
+    _, r = run_dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'DATA\r\n'])
     assert r[2][0].startswith('503')
 
 
 def test_mail_before_helo_is_503():
     """MAIL before HELO answers 503."""
-    _, r = dialog(RecordingEvents(), {}, [b'MAIL FROM:<a@x>\r\n'])
+    _, r = run_dialog(RecordingEvents(), {}, [b'MAIL FROM:<a@x>\r\n'])
     assert r[0][0].startswith('503')
 
 
@@ -181,7 +181,7 @@ def test_handler_reject_maps_to_550():
     """Smtpd550Exception of a handler answers 550."""
     ev = RecordingEvents()
     ev.reject_rcpt = {'deny'}
-    _, r = dialog(ev, {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<deny@x>\r\n'])
+    _, r = run_dialog(ev, {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<deny@x>\r\n'])
     assert r[2][0].startswith('550')
 
 
@@ -193,7 +193,7 @@ def test_handler_reject_transient_450():
         def on_rcpt_to_event(self, ctx, rcpt_to):
             raise Smtpd450Exception
 
-    _, r = dialog(E(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n'])
+    _, r = run_dialog(E(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n'])
     assert r[2][0].startswith('450')
 
 
@@ -207,7 +207,7 @@ def test_handler_reject_parameter_555():
                 raise Smtpd555Exception
 
     options = {'internationalization_extensions': True}
-    _, r = dialog(E(), options, [b'EHLO me\r\n', b'MAIL FROM:<a@x> SMTPUTF8\r\n'])
+    _, r = run_dialog(E(), options, [b'EHLO me\r\n', b'MAIL FROM:<a@x> SMTPUTF8\r\n'])
     assert r[1] == ['555 MAIL FROM/RCPT TO parameters not recognized or not implemented']
 
 
@@ -225,7 +225,7 @@ def test_handler_bug_contained_as_451(event):
         def on_rcpt_to_event(self, ctx, rcpt_to):
             raise RuntimeError('boom')
 
-    _, r = dialog(E(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'NOOP\r\n'])
+    _, r = run_dialog(E(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'NOOP\r\n'])
     assert r[1 if event == 'mail' else 2][0].startswith('451')
     assert r[3] == ['250 OK']
 
@@ -271,7 +271,7 @@ def test_mail_rcpt_event_results(event, result, reply, address):
     else:
         commands = [b'MAIL FROM:<m@x>\r\n', b'RCPT TO:<a@x>\r\n', b'RCPT TO:<probe@y>\r\n']
     ev = E()
-    _, r = dialog(ev, {}, [b'EHLO me\r\n', *commands])
+    _, r = run_dialog(ev, {}, [b'EHLO me\r\n', *commands])
     assert r[-2][0].startswith(reply)
     if event == 'mail':
         # a refused MAIL leaves no transaction for the probe
@@ -329,13 +329,13 @@ def test_pipelining_allowed_when_enabled():
 
 def test_crlf_strict_rejects_bare_lf():
     """CRLF_STRICT answers a command with bare LF by 500."""
-    _, r = dialog(RecordingEvents(), {'crlf_mode': 'CRLF_STRICT'}, [b'EHLO me\n'])
+    _, r = run_dialog(RecordingEvents(), {'crlf_mode': 'CRLF_STRICT'}, [b'EHLO me\n'])
     assert r[0][0].startswith('500')
 
 
 def test_crlf_strict_rejects_a_cr_within_a_command():
     """CRLF_STRICT answers a command with a further CR by 500."""
-    _, r = dialog(RecordingEvents(), {'crlf_mode': 'CRLF_STRICT'}, [b'EHLO me\r\n', b'NOOP a\rb\r\n'])
+    _, r = run_dialog(RecordingEvents(), {'crlf_mode': 'CRLF_STRICT'}, [b'EHLO me\r\n', b'NOOP a\rb\r\n'])
     assert r[1][0].startswith('500')
 
 
@@ -345,7 +345,7 @@ DATA_ENVELOPE = [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b
 def test_data_size_limit_552():
     """A body over data_size answers 552 after the end of DATA, then goes on."""
     ev = RecordingEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'data_size': 50},
         DATA_ENVELOPE + [b'X' * 200 + b'\r\nMAIL FROM:<c@x>\r\n.\r\n', b'MAIL FROM:<d@x>\r\n'],
@@ -387,7 +387,7 @@ class ErrorInData(RecordingEvents):
 def test_error_in_data_is_answered_once_after_the_end(error, code, kind):
     """An error of the receiving event answers once after the end of DATA."""
     ev = ErrorInData(error)
-    _, r = dialog(ev, {}, DATA_ENVELOPE + [b'Subject: t\r\n\r\nA\r\nB\r\n.\r\n', b'NOOP\r\n'])
+    _, r = run_dialog(ev, {}, DATA_ENVELOPE + [b'Subject: t\r\n\r\nA\r\nB\r\n.\r\n', b'NOOP\r\n'])
     assert r[4][0].startswith(code)
     # no more receiving events after the error, no delivery
     assert ev.fired.count('recv') == 1
@@ -405,7 +405,7 @@ def test_error_in_data_is_answered_once_after_the_end(error, code, kind):
 def test_no_start_event_after_an_error_before_the_first_line():
     """A bare LF in the first DATA line keeps the start event silent."""
     ev = RecordingEvents()
-    _, r = dialog(ev, {'crlf_data_mode': 'CRLF_DATA_STRICT'}, DATA_ENVELOPE + [b'A\nB\r\n.\r\n'])
+    _, r = run_dialog(ev, {'crlf_data_mode': 'CRLF_DATA_STRICT'}, DATA_ENVELOPE + [b'A\nB\r\n.\r\n'])
     assert r[4][0].startswith('554')
     assert 'start' not in ev.fired
 
@@ -420,7 +420,7 @@ def test_a_failing_start_event_runs_once():
             raise Smtpd550Exception
 
     ev = StartFails()
-    _, r = dialog(ev, {}, DATA_ENVELOPE + [b'A\r\nB\r\nC\r\n.\r\n'])
+    _, r = run_dialog(ev, {}, DATA_ENVELOPE + [b'A\r\nB\r\nC\r\n.\r\n'])
     assert r[4][0].startswith('550')
     assert ev.fired.count('start') == 1
 
@@ -429,7 +429,7 @@ def test_spool_with_empty_first_line_starts_once_and_keeps_data_size(tmp_path):
     """Spooling with an empty first DATA line starts once, data_size holds."""
     ev = RecordingEvents()
     options = {'spool': str(tmp_path) + '/', 'data_size': 100}
-    _, r = dialog(ev, options, DATA_ENVELOPE + [b'\r\n' + b'X' * 60 + b'\r\n' + b'Y' * 60 + b'\r\n.\r\n'])
+    _, r = run_dialog(ev, options, DATA_ENVELOPE + [b'\r\n' + b'X' * 60 + b'\r\n' + b'Y' * 60 + b'\r\n.\r\n'])
     assert r[4][0].startswith('552')
     assert ev.fired.count('start') == 1
 
@@ -443,14 +443,14 @@ def test_only_the_first_error_in_data_counts():
         def on_disconnect_event(self, ctx):
             seen.append(ctx.server.exceptions)
 
-    _, r = dialog(Count(), {'crlf_data_mode': 'CRLF_DATA_STRICT'}, DATA_ENVELOPE + [b'A\nB\nC\nD\r\n.\r\n'])
+    _, r = run_dialog(Count(), {'crlf_data_mode': 'CRLF_DATA_STRICT'}, DATA_ENVELOPE + [b'A\nB\nC\nD\r\n.\r\n'])
     assert r[4][0].startswith('554')
     assert seen == [1]
 
 
 def test_buffer_overrun_554():
     """A line over io_buffer_max_size answers 554 and drops the connection."""
-    _, r = dialog(RecordingEvents(), {'io_buffer_max_size': 100}, [b'EHLO ' + b'a' * 300 + b'\r\n'])
+    _, r = run_dialog(RecordingEvents(), {'io_buffer_max_size': 100}, [b'EHLO ' + b'a' * 300 + b'\r\n'])
     assert r[0][0].startswith('554')
 
 
@@ -559,7 +559,7 @@ def test_read_line_refuses_a_buffered_line_over_io_buffer_max_size():
 def test_body_and_smtputf8_params_stripped():
     """BODY and SMTPUTF8 are stripped, the handler gets the address only."""
     ev = RecordingEvents()
-    dialog(
+    run_dialog(
         ev,
         {'internationalization_extensions': True},
         [
@@ -576,7 +576,7 @@ def test_body_and_smtputf8_params_stripped():
 
 def test_body_param_rejected_without_intl():
     """BODY is not announced without internationalization_extensions: 555."""
-    _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x> BODY=8BITMIME\r\n'])
+    _, r = run_dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'MAIL FROM:<a@x> BODY=8BITMIME\r\n'])
     assert r[1][0].startswith('555')
 
 
@@ -609,7 +609,7 @@ def test_mail_rcpt_parameters_are_checked_strictly(options, command, reply):
     """Only announced parameters in valid form are accepted at MAIL and RCPT."""
     ev = RecordingEvents()
     commands = [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n'] if command.startswith(b'RCPT') else [b'EHLO me\r\n']
-    _, r = dialog(ev, options, commands + [command + b'\r\n'])
+    _, r = run_dialog(ev, options, commands + [command + b'\r\n'])
     assert r[-1][0].startswith(reply)
     # a refused MAIL does not reach the handler
     assert ev.fired.count('mail') == (1 if command.startswith(b'RCPT') else 0)
@@ -636,7 +636,7 @@ def test_mail_from_hands_the_address_as_sent(command, address):
             return True
 
     ev = E()
-    _, r = dialog(ev, {'internationalization_extensions': True}, [b'EHLO me\r\n', command + b'\r\n'])
+    _, r = run_dialog(ev, {'internationalization_extensions': True}, [b'EHLO me\r\n', command + b'\r\n'])
     assert r[1] == ['250 OK']
     params = b'8bitmime' in command
     assert ev.mail == (address, '8bitmime' if params else '', 'utf8' if params else '')
@@ -661,7 +661,7 @@ def test_rejected_mail_leaves_no_envelope_behind():
             self.encodings.append(('data', ctx.envelope.encoding_body, ctx.envelope.encoding_utf8))
 
     ev = E()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'internationalization_extensions': True},
         [
@@ -741,7 +741,7 @@ def test_threaded_event_runs_off_loop():
             self.messages.append((bytes(ctx.message.data), ctx.envelope.mail_from, list(ctx.envelope.rcpt_tos)))
 
     ev = E()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {},
         [
@@ -761,7 +761,7 @@ def test_threaded_event_runs_off_loop():
 def test_delivery_works_in_all_crlf_modes(mode):
     """A plain message delivers in every crlf_mode."""
     ev = RecordingEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'crlf_mode': mode},
         [
@@ -852,7 +852,7 @@ class ProxyEvents(RecordingEvents):
         self.proxy_on_ctx = ctx.server.proxy
 
 
-async def _dialog_raw(events, options, steps, has_server_greeting=True):
+async def _run_dialog_raw(events, options, steps, has_server_greeting=True):
     """
     Run a dialog where each step says whether to read a reply.
 
@@ -895,7 +895,7 @@ async def _dialog_raw(events, options, steps, has_server_greeting=True):
 
 def test_proxy_disabled_is_unknown_command():
     """Without proxy_extension a PROXY line answers 500."""
-    _, r = dialog(RecordingEvents(), {}, [b'PROXY TCP4 1.2.3.4 5.6.7.8 111 222\r\n'])
+    _, r = run_dialog(RecordingEvents(), {}, [b'PROXY TCP4 1.2.3.4 5.6.7.8 111 222\r\n'])
     assert r[0][0].startswith('500')
 
 
@@ -911,7 +911,7 @@ def test_unknown_command_counts_and_allows_abuse_abort():
             if ctx.server.exceptions >= 2:
                 raise Smtpd421CloseException
 
-    _, r = dialog(AbuseGuard(), {}, [b'FOO one\r\n', b'BAR two\r\n', b'BAZ three\r\n'])
+    _, r = run_dialog(AbuseGuard(), {}, [b'FOO one\r\n', b'BAR two\r\n', b'BAZ three\r\n'])
     assert r[0][0].startswith('500')
     assert r[1][0].startswith('500')
     assert any(line.startswith('421') for line in r[2])
@@ -923,7 +923,7 @@ def test_proxy_tcp4_fills_ctx_and_fires_event():
 
     async def go():
         # no greeting on connect, the PROXY header is answered by it
-        greeting, replies, closed = await _dialog_raw(
+        greeting, replies, closed = await _run_dialog_raw(
             ev,
             {'proxy_extension': True},
             [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1111 2222\r\n', True), (b'EHLO me\r\n', True)],
@@ -947,7 +947,7 @@ def test_proxy_unknown_is_accepted():
     ev = ProxyEvents()
 
     async def go():
-        return await _dialog_raw(
+        return await _run_dialog_raw(
             ev,
             {'proxy_extension': True},
             [(b'PROXY UNKNOWN\r\n', True), (b'EHLO me\r\n', True)],
@@ -966,7 +966,7 @@ def test_proxy_event_can_rewrite():
     ev.proxy_rewrite = {'proto': 'TCP4', 'source_ip': '9.9.9.9'}
 
     async def go():
-        return await _dialog_raw(
+        return await _run_dialog_raw(
             ev,
             {'proxy_extension': True},
             [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1111 2222\r\n', True), (b'EHLO me\r\n', True)],
@@ -984,7 +984,7 @@ def test_proxy_not_first_aborts_421():
     """With proxy_extension a first line other than PROXY gets 421."""
 
     async def go():
-        return await _dialog_raw(
+        return await _run_dialog_raw(
             ProxyEvents(),
             {'proxy_extension': True},
             [(b'EHLO me\r\n', True)],
@@ -1000,7 +1000,7 @@ def test_proxy_illegal_command_aborts_421():
     """An illegal PROXY line gets 421 and the connection closes."""
 
     async def go():
-        return await _dialog_raw(
+        return await _run_dialog_raw(
             ProxyEvents(),
             {'proxy_extension': True},
             [(b'PROXY GARBAGE\r\n', True)],
@@ -1016,7 +1016,7 @@ def test_proxy_bad_params_abort_421():
     """TCP4 with IPv6 addresses gets 421 and the connection closes."""
 
     async def go():
-        return await _dialog_raw(
+        return await _run_dialog_raw(
             ProxyEvents(),
             {'proxy_extension': True},
             [(b'PROXY TCP4 ::1 ::2 1 2\r\n', True)],
@@ -1032,7 +1032,7 @@ def test_proxy_twice_aborts_421():
     """A second PROXY line gets 421 and the connection closes."""
 
     async def go():
-        return await _dialog_raw(
+        return await _run_dialog_raw(
             ProxyEvents(),
             {'proxy_extension': True},
             [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1 2\r\n', True), (b'PROXY TCP4 9.9.9.9 8.8.8.8 3 4\r\n', True)],
@@ -1073,7 +1073,7 @@ def test_proxy_event_error_aborts_421():
             raise Smtpd550Exception
 
     async def go():
-        return await _dialog_raw(
+        return await _run_dialog_raw(
             RejectingProxyEvents(),
             {'proxy_extension': True},
             [(b'PROXY TCP4 1.2.3.4 5.6.7.8 1 2\r\n', True)],
@@ -1389,31 +1389,31 @@ def test_join_waits_until_the_server_has_stopped():
 # ---- AUTH (PLAIN / LOGIN) ---------------------------------------------------
 
 
-def _b64(text):
+def _encode_b64(text):
     return base64.b64encode(text.encode()).decode()
 
 
 def test_auth_forbidden_by_default_is_500():
     """By default AUTH answers 500."""
-    _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'AUTH PLAIN ' + auth_plain('', 'u', 'p').encode() + b'\r\n'])
+    _, r = run_dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'AUTH PLAIN ' + make_auth_plain('', 'u', 'p').encode() + b'\r\n'])
     assert r[1][0].startswith('500')
 
 
 def test_ehlo_advertises_auth_when_enabled():
     """With AUTH_OPTIONAL EHLO lists "AUTH LOGIN PLAIN"."""
-    _, r = dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n'])
+    _, r = run_dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n'])
     assert any('AUTH LOGIN PLAIN' in ln for ln in r[0])
 
 
 def test_auth_plain_inline_success_and_ctx():
     """AUTH PLAIN inline answers 235, the ctx carries the auth info."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n',
             b'MAIL FROM:<a@x>\r\n',
         ],
     )
@@ -1430,12 +1430,12 @@ def test_auth_plain_inline_success_and_ctx():
 def test_auth_plain_wrong_credentials_535():
     """AUTH PLAIN with a wrong password answers 535."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + auth_plain('', 'user', 'WRONG').encode() + b'\r\n',
+            b'AUTH PLAIN ' + make_auth_plain('', 'user', 'WRONG').encode() + b'\r\n',
         ],
     )
     assert r[1][0].startswith('535')
@@ -1444,13 +1444,13 @@ def test_auth_plain_wrong_credentials_535():
 def test_auth_plain_prompt_form():
     """AUTH PLAIN without data prompts by "334 ", then answers 235."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
             b'AUTH PLAIN\r\n',
-            auth_plain('', 'user', 'secret').encode() + b'\r\n',
+            make_auth_plain('', 'user', 'secret').encode() + b'\r\n',
         ],
     )
     # the bare AUTH PLAIN is answered with '334 ' (space included)
@@ -1461,18 +1461,18 @@ def test_auth_plain_prompt_form():
 def test_auth_login_challenge_full():
     """AUTH LOGIN asks for user and password in base64, then 235."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
             b'AUTH LOGIN\r\n',
-            _b64('user').encode() + b'\r\n',
-            _b64('secret').encode() + b'\r\n',
+            _encode_b64('user').encode() + b'\r\n',
+            _encode_b64('secret').encode() + b'\r\n',
         ],
     )
-    assert r[1][0] == '334 ' + _b64('Username:')
-    assert r[2][0] == '334 ' + _b64('Password:')
+    assert r[1][0] == '334 ' + _encode_b64('Username:')
+    assert r[2][0] == '334 ' + _encode_b64('Password:')
     assert r[3][0] == '235 OK'
     assert ev.auth_calls == [('', 'user', 'secret')]
 
@@ -1480,27 +1480,27 @@ def test_auth_login_challenge_full():
 def test_auth_login_with_inline_user():
     """AUTH LOGIN with the user inline asks for the password only."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH LOGIN ' + _b64('user').encode() + b'\r\n',
-            _b64('secret').encode() + b'\r\n',
+            b'AUTH LOGIN ' + _encode_b64('user').encode() + b'\r\n',
+            _encode_b64('secret').encode() + b'\r\n',
         ],
     )
-    assert r[1][0] == '334 ' + _b64('Password:')
+    assert r[1][0] == '334 ' + _encode_b64('Password:')
     assert r[2][0] == '235 OK'
 
 
 def test_auth_default_handler_denies_535():
     """The default handler denies every AUTH by 535."""
-    _, r = dialog(
+    _, r = run_dialog(
         RecordingEvents(),
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + auth_plain('', 'any', 'thing').encode() + b'\r\n',
+            b'AUTH PLAIN ' + make_auth_plain('', 'any', 'thing').encode() + b'\r\n',
         ],
     )
     assert r[1][0].startswith('535')
@@ -1509,7 +1509,7 @@ def test_auth_default_handler_denies_535():
 def test_auth_garbage_base64_501_and_recovers():
     """A response that is not base64 answers 501, MAIL works after it."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
@@ -1531,7 +1531,7 @@ def test_auth_garbage_base64_501_and_recovers():
 def test_auth_broken_base64_answers_501(response):
     """Base64 with foreign chars, inner padding or a bad length answers 501."""
     ev = AuthEvents()
-    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN\r\n', response.encode() + b'\r\n'])
+    _, r = run_dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN\r\n', response.encode() + b'\r\n'])
     assert r[2][0].startswith('501')
     assert ev.auth_calls == []
 
@@ -1539,8 +1539,8 @@ def test_auth_broken_base64_answers_501(response):
 def test_auth_base64_without_padding_is_accepted():
     """A missing padding of the base64 is tolerated."""
     ev = AuthEvents()
-    response = auth_plain('', 'user', 'secret').rstrip('=')
-    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN ' + response.encode() + b'\r\n'])
+    response = make_auth_plain('', 'user', 'secret').rstrip('=')
+    _, r = run_dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN ' + response.encode() + b'\r\n'])
     assert r[1][0] == '235 OK'
 
 
@@ -1553,7 +1553,7 @@ def test_auth_plain_invalid_message_answers_535_without_event(message):
     """AUTH PLAIN needs authcid and passwd set (RFC 4616), else 535."""
     ev = AuthEvents()
     response = base64.b64encode(message.encode()).decode()
-    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN ' + response.encode() + b'\r\n'])
+    _, r = run_dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN ' + response.encode() + b'\r\n'])
     assert r[1][0].startswith('535')
     assert ev.auth_calls == []
 
@@ -1561,7 +1561,7 @@ def test_auth_plain_invalid_message_answers_535_without_event(message):
 def test_auth_plain_empty_initial_response_answers_535():
     """A single "=" is an empty initial response, AUTH PLAIN answers 535."""
     ev = AuthEvents()
-    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN =\r\n'])
+    _, r = run_dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN =\r\n'])
     assert r[1][0].startswith('535')
     assert ev.auth_calls == []
 
@@ -1569,7 +1569,7 @@ def test_auth_plain_empty_initial_response_answers_535():
 def test_auth_login_broken_username_ends_the_exchange():
     """A username that is not base64 answers 501, then commands follow."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
         [b'EHLO me\r\n', b'AUTH LOGIN\r\n', b'!!!\r\n', b'RSET\r\n', b'MAIL FROM:<a@x>\r\n'],
@@ -1585,10 +1585,10 @@ def test_auth_login_broken_username_ends_the_exchange():
 def test_auth_login_empty_value_answers_535_without_event(user, password):
     """An empty username or password of AUTH LOGIN answers 535."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
-        [b'EHLO me\r\n', b'AUTH LOGIN\r\n', _b64(user).encode() + b'\r\n', _b64(password).encode() + b'\r\n'],
+        [b'EHLO me\r\n', b'AUTH LOGIN\r\n', _encode_b64(user).encode() + b'\r\n', _encode_b64(password).encode() + b'\r\n'],
     )
     assert r[3][0].startswith('535')
     assert ev.auth_calls == []
@@ -1599,14 +1599,14 @@ def test_auth_login_empty_value_answers_535_without_event(user, password):
     [
         [b'AUTH PLAIN\r\n'],
         [b'AUTH LOGIN\r\n'],
-        [b'AUTH LOGIN\r\n', _b64('user').encode() + b'\r\n'],
+        [b'AUTH LOGIN\r\n', _encode_b64('user').encode() + b'\r\n'],
     ],
     ids=['plain', 'login-user', 'login-password'],
 )
 def test_auth_cancel_answers_501_and_recovers(steps):
     """A single "*" cancels the AUTH exchange with 501, the dialog goes on."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
         [b'EHLO me\r\n', *steps, b'*\r\n', b'MAIL FROM:<a@x>\r\n'],
@@ -1620,20 +1620,20 @@ def test_auth_plain_inline_with_plus_and_slash():
     """An initial response whose base64 holds "+" and "/" is accepted."""
     ev = AuthEvents()
     # the authzid '>>>???' encodes to 'Pj4+Pz8/' at the start of the base64
-    response = auth_plain('>>>???', 'user', 'secret')
+    response = make_auth_plain('>>>???', 'user', 'secret')
     assert '+' in response and '/' in response
-    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN ' + response.encode() + b'\r\n'])
+    _, r = run_dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH PLAIN ' + response.encode() + b'\r\n'])
     assert r[1][0] == '235 OK'
     assert ev.auth_calls == [('>>>???', 'user', 'secret')]
 
 
 def test_auth_before_helo_503():
     """AUTH before HELO answers 503."""
-    _, r = dialog(
+    _, r = run_dialog(
         AuthEvents(),
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
-            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n',
         ],
     )
     assert r[0][0].startswith('503')
@@ -1642,13 +1642,13 @@ def test_auth_before_helo_503():
 def test_auth_twice_503():
     """A second AUTH answers 503."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
-            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n',
         ],
     )
     assert r[1][0] == '235 OK'
@@ -1658,20 +1658,20 @@ def test_auth_twice_503():
 @pytest.mark.parametrize('mechanism', [b'CRAM-MD5', b'DIGEST-MD5', b'XPLAINX'])
 def test_auth_unsupported_mechanism_504(mechanism):
     """AUTH with a mechanism the server does not support answers 504."""
-    _, r = dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH ' + mechanism + b'\r\n'])
+    _, r = run_dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', b'AUTH ' + mechanism + b'\r\n'])
     assert r[1][0].startswith('504')
 
 
 def test_auth_required_gates_mail():
     """With AUTH_REQUIRED MAIL answers 530 until AUTH succeeded."""
     ev = AuthEvents()
-    _, r = dialog(
+    _, r = run_dialog(
         ev,
         {'auth_mode': 'AUTH_REQUIRED'},
         [
             b'EHLO me\r\n',
             b'MAIL FROM:<a@x>\r\n',  # not authenticated -> 530
-            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n',
             b'MAIL FROM:<a@x>\r\n',  # authenticated -> 250
         ],
     )
@@ -1684,12 +1684,12 @@ def test_auth_authzid_returned_by_handler():
     """The id returned by on_auth_event becomes the authorization id."""
     ev = AuthEvents()
     ev.authz_return = 'boss'
-    dialog(
+    run_dialog(
         ev,
         {'auth_mode': 'AUTH_OPTIONAL'},
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n',
             b'MAIL FROM:<a@x>\r\n',
         ],
     )
@@ -1705,10 +1705,10 @@ def test_auth_without_returned_authzid_535(mechanism, authz_return):
     ev.authz_return = authz_return
     if mechanism == 'plain':
         # the authzid of the client is never taken over on its own
-        auth = [b'AUTH PLAIN ' + auth_plain('boss', 'user', 'secret').encode() + b'\r\n']
+        auth = [b'AUTH PLAIN ' + make_auth_plain('boss', 'user', 'secret').encode() + b'\r\n']
     else:
-        auth = [b'AUTH LOGIN ' + _b64('user').encode() + b'\r\n', _b64('secret').encode() + b'\r\n']
-    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', *auth, b'MAIL FROM:<a@x>\r\n'])
+        auth = [b'AUTH LOGIN ' + _encode_b64('user').encode() + b'\r\n', _encode_b64('secret').encode() + b'\r\n']
+    _, r = run_dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', *auth, b'MAIL FROM:<a@x>\r\n'])
     assert r[-2][0].startswith('535')
     # not authenticated, MAIL still possible with AUTH_OPTIONAL
     assert r[-1][0] == '250 OK'
@@ -1720,8 +1720,8 @@ def test_auth_not_stripped_authzid_is_a_handler_error(authz_return):
     """A returned authorization id with surrounding whitespace answers 454."""
     ev = AuthEvents()
     ev.authz_return = authz_return
-    auth = b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n'
-    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', auth, b'MAIL FROM:<a@x>\r\n'])
+    auth = b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n'
+    _, r = run_dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', auth, b'MAIL FROM:<a@x>\r\n'])
     assert r[1][0].startswith('454')
     assert r[2][0] == '250 OK'
     assert ev.ctx_auth == ('', '', '')
@@ -1740,11 +1740,11 @@ def test_auth_handler_crash_454(mechanism):
             return super().on_auth_event(ctx, authorization_id, authentication_id, authentication)
 
     if mechanism == 'plain':
-        auth = [b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n']
+        auth = [b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n']
     else:
-        auth = [b'AUTH LOGIN ' + _b64('user').encode() + b'\r\n', _b64('secret').encode() + b'\r\n']
+        auth = [b'AUTH LOGIN ' + _encode_b64('user').encode() + b'\r\n', _encode_b64('secret').encode() + b'\r\n']
     ev = E()
-    _, r = dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', *auth, *auth])
+    _, r = run_dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', *auth, *auth])
     assert r[len(auth)][0] == '454 Temporary authentication failure'
     assert r[-1][0] == '235 OK'
 
@@ -1761,15 +1761,15 @@ class AuthForEvents(AuthEvents):
         return super().on_mail_from_event(ctx, mail_from)
 
 
-def _auth_for(trusted, login, mails):
+def _run_auth_for(trusted, login, mails):
     """Runs the MAILs, logged in as "user" or not, and returns them recorded."""
     ev = AuthForEvents()
-    auth = [b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n'] if login else []
+    auth = [b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n'] if login else []
     options = {'auth_mode': 'AUTH_OPTIONAL', 'trusted_relay_auth_ids': trusted}
     commands = [b'EHLO me\r\n', *auth]
     for mail in mails:
         commands += [b'MAIL FROM:' + mail + b'\r\n', b'RSET\r\n']
-    _, r = dialog(ev, options, commands)
+    _, r = run_dialog(ev, options, commands)
     # every MAIL and RSET is accepted
     assert [line[0] for line in r].count('250 OK') == 2 * len(mails)
     return ev.mails
@@ -1796,13 +1796,13 @@ def _auth_for(trusted, login, mails):
 )
 def test_mail_from_auth_parameter(trusted, login, param, auth_for_id, auth_for_id_raw):
     """AUTH= leaves the sender, auth_for_id carries it only from a trusted relay."""
-    mails = _auth_for(trusted, login, [b'<a@x> ' + param])
+    mails = _run_auth_for(trusted, login, [b'<a@x> ' + param])
     assert mails == [('<a@x>', auth_for_id, auth_for_id_raw)]
 
 
 def test_mail_from_auth_parameter_ends_with_the_transaction():
     """A next MAIL without AUTH= starts with empty auth_for_id fields."""
-    mails = _auth_for(['user'], True, [b'<a@x> AUTH=s@example.com', b'<b@x>'])
+    mails = _run_auth_for(['user'], True, [b'<a@x> AUTH=s@example.com', b'<b@x>'])
     assert mails == [('<a@x>', 's@example.com', 's@example.com'), ('<b@x>', '', '')]
 
 
@@ -1832,7 +1832,7 @@ def test_starttls_full_flow_delivers_over_tls():
             await read_reply(reader)
             ehlo1 = await send_command(reader, writer, b'EHLO me\r\n')
             tls_reply = await send_command(reader, writer, b'STARTTLS\r\n')
-            await writer.start_tls(insecure_tls_context())
+            await writer.start_tls(make_insecure_tls_context())
             ehlo2 = await send_command(reader, writer, b'EHLO secure\r\n')
             for cmd in (b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n'):
                 await send_command(reader, writer, cmd)
@@ -1858,7 +1858,7 @@ def test_starttls_full_flow_delivers_over_tls():
 def test_starttls_discards_a_plaintext_auth():
     """STARTTLS drops an AUTH of the plaintext channel, AUTH works again."""
     ev = AuthEvents()
-    plain = b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n'
+    plain = b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n'
 
     async def go():
         server, port, task = await start_server(ev, {**TLS_SERVER_OPTIONS, 'auth_mode': 'AUTH_OPTIONAL'})
@@ -1868,7 +1868,7 @@ def test_starttls_discards_a_plaintext_auth():
             await send_command(reader, writer, b'EHLO me\r\n')
             first = await send_command(reader, writer, plain)
             await send_command(reader, writer, b'STARTTLS\r\n')
-            await writer.start_tls(insecure_tls_context())
+            await writer.start_tls(make_insecure_tls_context())
             await send_command(reader, writer, b'EHLO secure\r\n')
             second = await send_command(reader, writer, plain)
             writer.close()
@@ -1885,13 +1885,13 @@ def test_starttls_discards_a_plaintext_auth():
 
 def test_starttls_forbidden_is_500():
     """By default STARTTLS answers 500."""
-    _, r = dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'STARTTLS\r\n'])
+    _, r = run_dialog(RecordingEvents(), {}, [b'EHLO me\r\n', b'STARTTLS\r\n'])
     assert r[1][0].startswith('500')
 
 
 def test_starttls_before_helo_is_503():
     """STARTTLS before HELO answers 503."""
-    _, r = dialog(RecordingEvents(), TLS_SERVER_OPTIONS, [b'STARTTLS\r\n'])
+    _, r = run_dialog(RecordingEvents(), TLS_SERVER_OPTIONS, [b'STARTTLS\r\n'])
     assert r[0][0].startswith('503')
 
 
@@ -1905,7 +1905,7 @@ def test_starttls_twice_already_encrypted_503():
             await read_reply(reader)
             await send_command(reader, writer, b'EHLO me\r\n')
             await send_command(reader, writer, b'STARTTLS\r\n')
-            await writer.start_tls(insecure_tls_context())
+            await writer.start_tls(make_insecure_tls_context())
             await send_command(reader, writer, b'EHLO secure\r\n')
             second = await send_command(reader, writer, b'STARTTLS\r\n')
             writer.close()
@@ -1928,7 +1928,7 @@ def test_tls_required_gates_mail_until_starttls():
             await send_command(reader, writer, b'EHLO me\r\n')
             before = await send_command(reader, writer, b'MAIL FROM:<a@x>\r\n')
             await send_command(reader, writer, b'STARTTLS\r\n')
-            await writer.start_tls(insecure_tls_context())
+            await writer.start_tls(make_insecure_tls_context())
             await send_command(reader, writer, b'EHLO secure\r\n')
             after = await send_command(reader, writer, b'MAIL FROM:<a@x>\r\n')
             writer.close()
@@ -1957,7 +1957,7 @@ def test_starttls_flushes_injected_plaintext():
             writer.write(b'STARTTLS\r\nQUIT\r\n')
             await writer.drain()
             tls_reply = await read_reply(reader)
-            await writer.start_tls(insecure_tls_context())
+            await writer.start_tls(make_insecure_tls_context())
             ehlo = await send_command(reader, writer, b'EHLO secure\r\n')
             writer.close()
             return tls_reply, ehlo

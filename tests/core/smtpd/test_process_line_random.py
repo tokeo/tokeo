@@ -21,7 +21,7 @@ _SMTPD = SmtpdServer(
 )
 
 
-def _session():
+def _make_session():
     session = SmtpdSession()
     _SMTPD.process_reset_session(session, connection_initialize=True)
     session.ctx.server.helo_response = 'Process line test - Greeting'
@@ -30,7 +30,7 @@ def _session():
 
 def test_helo():
     """HELO answers 250 with the greeting and stores the name."""
-    session = _session()
+    session = _make_session()
     result = run_line(_SMTPD, session, 'HELO Process line unit test')
     assert result == '250 Process line test - Greeting'
     assert session.ctx.server.helo == 'Process line unit test'
@@ -38,7 +38,7 @@ def test_helo():
 
 def test_helo_no_case_strip():
     """HELO in any case works, the name is stored without blanks."""
-    session = _session()
+    session = _make_session()
     helo_str = '  Process line unit test   '
     result = run_line(_SMTPD, session, f'hElO {helo_str}')
     assert result == '250 Process line test - Greeting'
@@ -47,7 +47,7 @@ def test_helo_no_case_strip():
 
 def test_ehlo_no_case_strip():
     """EHLO in any case lists 8BITMIME, SMTPUTF8, PIPELINING and AUTH."""
-    session = _session()
+    session = _make_session()
     helo_str = '  Process line unit test   '
     result = run_line(_SMTPD, session, f'eHlO {helo_str}')
     assert result == ('250-Process line test - Greeting\r\n' '250-8BITMIME\r\n250-SMTPUTF8\r\n250-PIPELINING\r\n' '250 AUTH LOGIN PLAIN')

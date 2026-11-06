@@ -133,7 +133,7 @@ def test_get_module_path_gives_the_dir_of_a_module_and_a_package(pkg):
 # override_module
 
 
-def _local(tmp_path, text):
+def _write_local(tmp_path, text):
     # a local file to override a module with
     path = tmp_path / 'local.py'
     path.write_text(text)
@@ -142,14 +142,14 @@ def _local(tmp_path, text):
 
 def test_override_module_serves_the_local_file(pkg, tmp_path):
     """The overridden module is the local file, also on the parent package."""
-    module = override_module(f'{pkg}.inner', _local(tmp_path, "VALUE = 'local'\n"))
+    module = override_module(f'{pkg}.inner', _write_local(tmp_path, "VALUE = 'local'\n"))
     assert module.VALUE == 'local'
     assert getattr(sys.modules[pkg], 'inner') is module
 
 
 def test_override_module_works_for_a_module_its_package_loads_itself(pkg, tmp_path):
     """The __init__ of the package imports inner itself and gets the local file."""
-    override_module(f'{pkg}.inner', _local(tmp_path, "VALUE = 'local'\n"))
+    override_module(f'{pkg}.inner', _write_local(tmp_path, "VALUE = 'local'\n"))
     assert resolve_object(f'{pkg}:inner.VALUE') == 'local'
 
 
@@ -157,7 +157,7 @@ def test_override_module_refuses_an_imported_module(pkg, tmp_path):
     """A module imported already is refused, its users would keep the old one."""
     resolve_module(pkg)
     with pytest.raises(TokeoModulesLoadError, match='is imported already'):
-        override_module(f'{pkg}.inner', _local(tmp_path, "VALUE = 'local'\n"))
+        override_module(f'{pkg}.inner', _write_local(tmp_path, "VALUE = 'local'\n"))
 
 
 def test_override_module_refuses_a_missing_file(pkg, tmp_path):
@@ -170,6 +170,6 @@ def test_override_module_refuses_a_missing_file(pkg, tmp_path):
 def test_override_module_failing_load_leaves_nothing_behind(pkg, tmp_path):
     """A local file that fails leaves neither the finder nor the module."""
     with pytest.raises(ZeroDivisionError):
-        override_module(f'{pkg}.inner', _local(tmp_path, 'VALUE = 1 / 0\n'))
+        override_module(f'{pkg}.inner', _write_local(tmp_path, 'VALUE = 1 / 0\n'))
     assert f'{pkg}.inner' not in sys.modules
     assert not any(isinstance(f, TokeoModulesOverrideFinder) for f in sys.meta_path)

@@ -64,13 +64,13 @@ def write_config(directory, text=''):
     return path
 
 
-def fernet_token(key, plaintext):
+def make_fernet_token(key, plaintext):
     # encrypt plaintext with plain Fernet, as the master profile would
     return Fernet(key.encode()).encrypt(plaintext.encode()).decode()
 
 
-def scrypt_token(plaintext):
+def make_scrypt_token(plaintext):
     # encrypt plaintext with a key derived by the scrypt of hashlib from
     # PASSPHRASE and SALT, as the human profile would
     raw = hashlib.scrypt(PASSPHRASE.encode(), salt=base64.b64decode(SALT), n=SCRYPT_COST, r=8, p=1, dklen=32)
-    return fernet_token(base64.urlsafe_b64encode(raw).decode(), plaintext)
+    return make_fernet_token(base64.urlsafe_b64encode(raw).decode(), plaintext)

@@ -58,7 +58,7 @@ class LiveTest(TokeoTest):
         LiveTest.running = self
 
 
-async def _orders_page(feed, filter=None):
+async def _show_orders_page(feed, filter=None):
     # the orders the feed lets the page see, as text, with the badge
     orders = feed.pb.collection('orders')
     titles = {}
@@ -90,19 +90,19 @@ def _pages():
 
     @ui.page('/dashboard')
     async def dashboard():
-        await _orders_page(live.service())
+        await _show_orders_page(live.service())
 
     @ui.page('/mine/{user_id}')
     async def mine(user_id: str):
-        await _orders_page(await live.user('users', user_id))
+        await _show_orders_page(await live.user('users', user_id))
 
     @ui.page('/split/{user_id}')
     async def split(user_id: str):
         feed = live.service()
-        await _orders_page(feed, filter=feed.pb.filter('owner = {:id}', {'id': user_id}))
+        await _show_orders_page(feed, filter=feed.pb.filter('owner = {:id}', {'id': user_id}))
 
 
-def _healthy(url):
+def _is_healthy(url):
     # whether the server answers its health check
     try:
         with PocketBase(url) as pb:
@@ -118,7 +118,7 @@ def server(tmp_path_factory):
     subprocess.run([POCKETBASE_BIN, 'superuser', 'upsert', *SUPERUSER, '--dir', data], check=True, capture_output=True)
     url = f'http://127.0.0.1:{free_port()}'
     with SubProcess.run(POCKETBASE_BIN, 'serve', '--dir', data, '--http', url.removeprefix('http://'), timeout=15) as process:
-        process.wait_for(lambda: _healthy(url))
+        process.wait_for(lambda: _is_healthy(url))
         with PocketBase(url) as su:
             su.auth_with_password('_superusers', *SUPERUSER)
             su.send(
@@ -155,12 +155,12 @@ def su(server):
             client.collection('orders').delete(order.id)
 
 
-def _order(su, title, owner):
+def _create_order(su, title, owner):
     # create an order of the owner by the superuser
     return su.collection('orders').create({'title': title, 'owner': owner})
 
 
-async def _sees(user, text):
+async def _wait_for_text(user, text):
     # wait until the page shows the text, a realtime event may take a moment
     await user.should_see(text, retries=50)
 
@@ -170,19 +170,19 @@ async def _sees(user, text):
 
 def test_live_dashboard_shows_all_orders_and_follows_their_changes(server, su):
     """The dashboard loads A-1, then follows a create, change and delete."""
-    a1 = _order(su, 'A-1', server['anna'])
+    a1 = _create_order(su, 'A-1', server['anna'])
     with LiveTest(server['url']) as app:
 
         async def visit(simulation):
             user = simulation.user()
             await user.open('/dashboard')
-            await _sees(user, 'orders: [A-1]')
-            await _sees(user, 'live')
-            b1 = await asyncio.to_thread(_order, su, 'B-1', server['bert'])
-            await _sees(user, 'orders: [A-1,B-1]')
+            await _wait_for_text(user, 'orders: [A-1]')
+            await _wait_for_text(user, 'live')
+            b1 = await asyncio.to_thread(_create_order, su, 'B-1', server['bert'])
+            await _wait_for_text(user, 'orders: [A-1,B-1]')
             await asyncio.to_thread(su.collection('orders').update, a1.id, {'title': 'A-1x'})
             await asyncio.to_thread(su.collection('orders').delete, b1.id)
-            await _sees(user, 'orders: [A-1x]')
+            await _wait_for_text(user, 'orders: [A-1x]')
 
         NiceguiSimulation(app).run(visit)
 
@@ -213,17 +213,17 @@ def test_live_pages_share_a_channel_and_leave_nothing_behind(server, su):
 
 def test_live_user_page_gets_only_what_the_rules_let_the_user_see(server, su):
     """anna's page loads A-1 but not B-1, and of B-2 and A-2 it gets A-2 only."""
-    _order(su, 'A-1', server['anna'])
-    _order(su, 'B-1', server['bert'])
+    _create_order(su, 'A-1', server['anna'])
+    _create_order(su, 'B-1', server['bert'])
     with LiveTest(server['url']) as app:
 
         async def visit(simulation):
             user = simulation.user()
             await user.open(f'/mine/{server["anna"]}')
-            await _sees(user, 'orders: [A-1]')
-            await asyncio.to_thread(_order, su, 'B-2', server['bert'])
-            await asyncio.to_thread(_order, su, 'A-2', server['anna'])
-            await _sees(user, 'orders: [A-1,A-2]')
+            await _wait_for_text(user, 'orders: [A-1]')
+            await asyncio.to_thread(_create_order, su, 'B-2', server['bert'])
+            await asyncio.to_thread(_create_order, su, 'A-2', server['anna'])
+            await _wait_for_text(user, 'orders: [A-1,A-2]')
 
         NiceguiSimulation(app).run(visit)
 
@@ -261,9 +261,9 @@ def test_live_user_page_shows_offline_once_the_user_is_deleted(server, su):
         async def visit(simulation):
             user = simulation.user()
             await user.open(f'/mine/{gone.id}')
-            await _sees(user, 'live')
+            await _wait_for_text(user, 'live')
             await asyncio.to_thread(su.collection('users').delete, gone.id)
-            await _sees(user, 'offline')
+            await _wait_for_text(user, 'offline')
             feed = next(iter(app.nicegui.pb.live._users.values()))
             assert feed.state == 'offline' and '404' in feed.error
 
@@ -275,17 +275,17 @@ def test_live_user_page_shows_offline_once_the_user_is_deleted(server, su):
 
 def test_live_split_page_gets_only_the_orders_of_its_filter(server, su):
     """The page split for anna loads A-1, and of B-2 and A-2 it gets A-2 only."""
-    _order(su, 'A-1', server['anna'])
-    _order(su, 'B-1', server['bert'])
+    _create_order(su, 'A-1', server['anna'])
+    _create_order(su, 'B-1', server['bert'])
     with LiveTest(server['url']) as app:
 
         async def visit(simulation):
             user = simulation.user()
             await user.open(f'/split/{server["anna"]}')
-            await _sees(user, 'orders: [A-1]')
-            await asyncio.to_thread(_order, su, 'B-2', server['bert'])
-            await asyncio.to_thread(_order, su, 'A-2', server['anna'])
-            await _sees(user, 'orders: [A-1,A-2]')
+            await _wait_for_text(user, 'orders: [A-1]')
+            await asyncio.to_thread(_create_order, su, 'B-2', server['bert'])
+            await asyncio.to_thread(_create_order, su, 'A-2', server['anna'])
+            await _wait_for_text(user, 'orders: [A-1,A-2]')
 
         NiceguiSimulation(app).run(visit)
 
@@ -302,8 +302,8 @@ def test_live_feed_opens_another_channel_beyond_max_subscriptions(server, su):
             await bert.open(f'/split/{server["bert"]}')
             assert len(feed.channels) == 2
             assert await wait_until_async(lambda: feed.state == 'live')
-            await asyncio.to_thread(_order, su, 'B-1', server['bert'])
-            await _sees(bert, 'orders: [B-1]')
+            await asyncio.to_thread(_create_order, su, 'B-1', server['bert'])
+            await _wait_for_text(bert, 'orders: [B-1]')
             await anna.should_see('orders: []')
 
         NiceguiSimulation(app).run(visit)

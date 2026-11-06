@@ -112,7 +112,7 @@ class TokeoDramatiqQueues:
 
     # ---- names --------------------------------------------------------------
 
-    def _actors(self):
+    def _get_actors(self):
         broker = self._dramatiq.broker
         # the cli knows no actors until their module is imported
         if not broker.get_declared_actors():
@@ -135,9 +135,9 @@ class TokeoDramatiqQueues:
         - **list**: The sorted queue names
 
         """
-        return sorted(self._actors())
+        return sorted(self._get_actors())
 
-    def _names(self, names):
+    def _get_queue_names(self, names):
         if names is None:
             return self.names()
         return [q_name(name) for name in ([names] if isinstance(names, str) else names)]
@@ -166,8 +166,8 @@ class TokeoDramatiqQueues:
         : ```delayed``` misses the messages workers have prefetched already
 
         """
-        actors = self._actors()
-        names = self._names(names)
+        actors = self._get_actors()
+        names = self._get_queue_names(names)
         key = tuple(names)
         # one lock for check and query, waiting callers get the fresh state
         with self._lock:
@@ -226,7 +226,7 @@ class TokeoDramatiqQueues:
             if method is None:
                 break
             tag = method.delivery_tag
-            result.append(_dead_letter(Message.decode(body)))
+            result.append(_build_dead_letter(Message.decode(body)))
         if tag is not None:
             # give all back at once, so the loop never reads one twice
             channel.basic_nack(delivery_tag=tag, multiple=True, requeue=True)
@@ -309,7 +309,7 @@ class TokeoDramatiqQueues:
             ```purged```
 
         """
-        return self._call(self._purge, self._names(names), dead_only)
+        return self._call(self._purge, self._get_queue_names(names), dead_only)
 
     def _purge(self, names, dead_only):
         self._cache.clear()
@@ -343,7 +343,7 @@ class TokeoDramatiqQueues:
             force is not set
 
         """
-        return self._call(self._delete, self._names(names), force)
+        return self._call(self._delete, self._get_queue_names(names), force)
 
     def _delete(self, names, force):
         self._cache.clear()
@@ -383,7 +383,7 @@ class TokeoDramatiqQueues:
             consumers and force is not set
 
         """
-        names = self._names(names)
+        names = self._get_queue_names(names)
         known = self.names()
         for name in names:
             if name not in known:
@@ -405,7 +405,7 @@ class TokeoDramatiqQueues:
         return result
 
 
-def _dead_letter(message):
+def _build_dead_letter(message):
     """Describe a dead letter by its message."""
     options = message.options
     traceback = (options.get('traceback') or '').strip().splitlines()

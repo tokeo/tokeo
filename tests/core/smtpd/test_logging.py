@@ -19,7 +19,7 @@ from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.tls import TlsTransport
 from tokeo.core.smtpd.events import SmtpdEvents, SmtpdEvent
 from tokeo.core.smtpd.logger import Severity
-from tests.core.smtpd.lib.smtpd_tests_helper import dialog, auth_plain
+from tests.core.smtpd.lib.smtpd_tests_helper import run_dialog, make_auth_plain
 
 
 class LoggingEvents(SmtpdEvents):
@@ -39,7 +39,7 @@ class LoggingEvents(SmtpdEvents):
         self.log_err = err
 
 
-def _server():
+def _make_server():
     events = LoggingEvents()
     return SmtpdServer(events), events
 
@@ -53,42 +53,42 @@ def _expect(events, severity, msg):
 
 def test_log_info():
     """logger.info reaches on_logging_event with INFO and no ctx."""
-    smtpd, events = _server()
+    smtpd, events = _make_server()
     smtpd.logger.info('A simple info message.')
     _expect(events, Severity.INFO, 'A simple info message.')
 
 
 def test_log_warning():
     """logger.warning reaches on_logging_event with WARNING and no ctx."""
-    smtpd, events = _server()
+    smtpd, events = _make_server()
     smtpd.logger.warning('A simple warning message.')
     _expect(events, Severity.WARNING, 'A simple warning message.')
 
 
 def test_log_error():
     """logger.error reaches on_logging_event with ERROR and no ctx."""
-    smtpd, events = _server()
+    smtpd, events = _make_server()
     smtpd.logger.error('A simple error message.')
     _expect(events, Severity.ERROR, 'A simple error message.')
 
 
 def test_log_critical():
     """logger.critical reaches on_logging_event with CRITICAL and no ctx."""
-    smtpd, events = _server()
+    smtpd, events = _make_server()
     smtpd.logger.critical('A simple critical message.')
     _expect(events, Severity.CRITICAL, 'A simple critical message.')
 
 
 def test_log_debug():
     """logger.debug reaches on_logging_event with DEBUG and no ctx."""
-    smtpd, events = _server()
+    smtpd, events = _make_server()
     smtpd.logger.debug('A simple debug message.')
     _expect(events, Severity.DEBUG, 'A simple debug message.')
 
 
 def test_on_logging_event_with_context_and_err():
     """on_logging_event passes ctx and err through."""
-    _, events = _server()
+    _, events = _make_server()
     events.on_logging_event({'ctx': True}, Severity.CRITICAL, 'A simple critical message.', err={'err': 1})
     assert events.log_ctx['ctx'] is True
     assert events.log_severity is Severity.CRITICAL
@@ -226,7 +226,7 @@ def test_forwarding_logger_passes_a_ctx():
 def test_default_connect_and_disconnect_are_logged_with_ctx():
     """The default connect and disconnect events log their line with the ctx."""
     events = LinesEvents()
-    dialog(events, {}, [b'QUIT\r\n'])
+    run_dialog(events, {}, [b'QUIT\r\n'])
     connect = [line for line in events.lines if line[2].startswith('Client connect from 127.0.0.1:')]
     disconnect = [line for line in events.lines if line[2].startswith('Client disconnect from 127.0.0.1:')]
     assert len(connect) == len(disconnect) == 1
@@ -242,7 +242,7 @@ def test_connect_override_without_super_logs_no_line():
             pass
 
     events = Own()
-    dialog(events, {}, [b'QUIT\r\n'])
+    run_dialog(events, {}, [b'QUIT\r\n'])
     assert not any(msg.startswith('Client connect') for msg in events.messages())
     assert any(msg.startswith('Client disconnect') for msg in events.messages())
 
@@ -250,7 +250,11 @@ def test_connect_override_without_super_logs_no_line():
 def test_default_auth_deny_logs_without_the_password():
     """The default on_auth_event logs the denial without the password."""
     events = LinesEvents()
-    dialog(events, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO a\r\n', b'AUTH PLAIN ' + auth_plain('', 'user', 'pa55word').encode() + b'\r\n'])
+    run_dialog(
+        events,
+        {'auth_mode': 'AUTH_OPTIONAL'},
+        [b'EHLO a\r\n', b'AUTH PLAIN ' + make_auth_plain('', 'user', 'pa55word').encode() + b'\r\n'],
+    )
     deny = [msg for msg in events.messages() if msg.startswith('Deny access from')]
     assert deny and deny[0].endswith('for user')
     assert not any('pa55word' in msg for msg in events.messages())
@@ -267,7 +271,7 @@ def test_default_auth_deny_logs_without_the_password():
 def test_command_lines_are_logged_as_text(crlf_mode, line, logged):
     """A command line is logged as text, a CR as [\\r] and bad bytes escaped."""
     events = LinesEvents()
-    dialog(events, {'crlf_mode': crlf_mode}, [b'EHLO a\r\n', line])
+    run_dialog(events, {'crlf_mode': crlf_mode}, [b'EHLO a\r\n', line])
     assert logged in events.messages()
 
 
@@ -315,7 +319,7 @@ def test_disconnect_error_is_logged_critical_and_closes_the_connection():
             raise RuntimeError('cleanup failed')
 
     events = Broken()
-    dialog(events, {}, [b'QUIT\r\n'])
+    run_dialog(events, {}, [b'QUIT\r\n'])
     critical = [line for line in events.lines if line[1] is Severity.CRITICAL]
     assert critical[0][2] == 'cleanup failed (RuntimeError)'
     assert isinstance(critical[0][3], RuntimeError)

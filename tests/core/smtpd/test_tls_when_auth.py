@@ -13,25 +13,25 @@ import asyncio
 import pytest
 
 from tests.core.smtpd.lib.smtpd_tests_helper import (
-    dialog,
+    run_dialog,
     AuthEvents,
-    auth_plain,
+    make_auth_plain,
     start_server,
     read_reply,
     send_command,
     stop_server,
-    insecure_tls_context,
+    make_insecure_tls_context,
     TLS_SERVER_OPTIONS,
 )
 
 
-def _ehlo_auth_and_authcmd(options):
-    greeting, r = dialog(
+def _run_ehlo_and_auth(options):
+    greeting, r = run_dialog(
         AuthEvents(),
         options,
         [
             b'EHLO me\r\n',
-            b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
+            b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n',
         ],
     )
     ehlo_lines = r[0]
@@ -42,7 +42,7 @@ def _ehlo_auth_and_authcmd(options):
 
 def test_when_auth_on_plain_hides_auth_but_offers_starttls():
     """On plaintext AUTH is hidden and refused by 538, STARTTLS offered."""
-    advertised, starttls, reply = _ehlo_auth_and_authcmd(
+    advertised, starttls, reply = _run_ehlo_and_auth(
         {
             'auth_mode': 'AUTH_OPTIONAL',
             'encrypt_mode': 'TLS_WHEN_AUTH',
@@ -66,9 +66,9 @@ def test_when_auth_after_starttls_offers_and_accepts_auth():
             await read_reply(reader)
             ehlo1 = await send_command(reader, writer, b'EHLO me\r\n')
             await send_command(reader, writer, b'STARTTLS\r\n')
-            await writer.start_tls(insecure_tls_context())
+            await writer.start_tls(make_insecure_tls_context())
             ehlo2 = await send_command(reader, writer, b'EHLO secure\r\n')
-            auth_reply = await send_command(reader, writer, b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n')
+            auth_reply = await send_command(reader, writer, b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n')
             writer.close()
             await writer.wait_closed()
             return ehlo1, ehlo2, auth_reply
@@ -83,7 +83,7 @@ def test_when_auth_after_starttls_offers_and_accepts_auth():
 
 def test_tls_optional_keeps_reference_plaintext_auth():
     """TLS_OPTIONAL offers and accepts AUTH on plaintext, as the reference."""
-    advertised, _, reply = _ehlo_auth_and_authcmd(
+    advertised, _, reply = _run_ehlo_and_auth(
         {
             'auth_mode': 'AUTH_OPTIONAL',
             'encrypt_mode': 'TLS_OPTIONAL',
@@ -95,7 +95,7 @@ def test_tls_optional_keeps_reference_plaintext_auth():
 
 def test_tls_required_on_plain_refuses_auth():
     """TLS_REQUIRED hides AUTH on plaintext and refuses it by 530."""
-    advertised, _, reply = _ehlo_auth_and_authcmd(
+    advertised, _, reply = _run_ehlo_and_auth(
         {
             'auth_mode': 'AUTH_OPTIONAL',
             'encrypt_mode': 'TLS_REQUIRED',
@@ -107,7 +107,7 @@ def test_tls_required_on_plain_refuses_auth():
 
 def test_tls_forbidden_offers_plain_auth():
     """TLS_FORBIDDEN offers AUTH on plaintext and no STARTTLS."""
-    advertised, starttls, reply = _ehlo_auth_and_authcmd(
+    advertised, starttls, reply = _run_ehlo_and_auth(
         {
             'auth_mode': 'AUTH_OPTIONAL',
             'encrypt_mode': 'TLS_FORBIDDEN',

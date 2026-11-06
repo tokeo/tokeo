@@ -24,7 +24,7 @@ async def _start_limited():
     return await start_smtpd(CaptureSmtpdEvents(), options=OPTIONS)
 
 
-async def _welcome(reader):
+async def _read_welcome(reader):
     return (await reader.readuntil(b'\n')).decode()
 
 
@@ -35,7 +35,7 @@ def test_010_tcp_1_connect():
         srv, port = await _start_limited()
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            greeting = await _welcome(reader)
+            greeting = await _read_welcome(reader)
             writer.close()
             return greeting
         finally:
@@ -51,18 +51,18 @@ def test_020_tcp_2_simultan_connects():
         srv, port = await _start_limited()
         try:
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
-            b1 = await _welcome(r1)
+            b1 = await _read_welcome(r1)
             r2, w2 = await asyncio.open_connection('127.0.0.1', port)
             assert await wait_until_async(lambda: srv.connections == 2)
             # channel 2 waits for a processing slot -> no welcome yet
             blocked = False
             try:
-                await asyncio.wait_for(_welcome(r2), timeout=0.5)
+                await asyncio.wait_for(_read_welcome(r2), timeout=0.5)
             except asyncio.TimeoutError:
                 blocked = True
             # free the slot; channel 2 then gets its welcome
             w1.close()
-            b2 = await asyncio.wait_for(_welcome(r2), timeout=2)
+            b2 = await asyncio.wait_for(_read_welcome(r2), timeout=2)
             w2.close()
             return b1, blocked, b2
         finally:
@@ -81,12 +81,12 @@ def test_030_tcp_3_simultan_connects_and_1_abort():
         srv, port = await _start_limited()
         try:
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
-            b1 = await _welcome(r1)
+            b1 = await _read_welcome(r1)
             r2, w2 = await asyncio.open_connection('127.0.0.1', port)
             assert await wait_until_async(lambda: srv.connections == 2)
             r3, w3 = await asyncio.open_connection('127.0.0.1', port)
             # channel 3 exceeds max_connections -> abort message + close
-            b3 = await asyncio.wait_for(_welcome(r3), timeout=2)
+            b3 = await asyncio.wait_for(_read_welcome(r3), timeout=2)
             closed3 = (await r3.read(1)) == b''
             w1.close()
             w2.close()

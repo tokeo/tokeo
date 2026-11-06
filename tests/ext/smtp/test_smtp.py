@@ -48,7 +48,7 @@ def test_qp_message(tmp):
 PNG = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==')
 
 
-def _parts(msg):
+def _get_parts(msg):
     """All leaf parts of a message as list of (content type, part)."""
     return [(part.get_content_type(), part) for part in msg.walk() if not part.is_multipart()]
 
@@ -116,7 +116,7 @@ def test_host_cert_context(tmp):
         f.write(cert_pem)
 
     with SmtpTest() as app:
-        context = app.mail._host_cert_context
+        context = app.mail._build_host_cert_context
         # verify off keeps the smtplib default
         assert context(host_cert_verify=False, host_cert_ca=cert_pem) is None
         # verify on without CA trusts the system CAs
@@ -165,7 +165,7 @@ def test_attachment_names(tmp):
         files = [('docs/2026/q3.pdf', pdf), (None, pdf), {'path': pdf}]
         msg = app.mail._make_message('body', **app.mail._get_params(files=files))
 
-    names = [part.get_filename() for _, part in _parts(msg) if part.get_filename()]
+    names = [part.get_filename() for _, part in _get_parts(msg) if part.get_filename()]
     # an alternative name is used as given, without one the file name applies
     assert names == ['docs/2026/q3.pdf', 'invoice.pdf', 'invoice.pdf']
 
@@ -204,7 +204,7 @@ def test_inline_image(tmp):
     assert image.get_all('Content-Transfer-Encoding') == ['base64']
     assert image.get_payload(decode=True) == PNG
     # without html the file is a plain attachment
-    attachment = [p for _, p in _parts(text) if p.get_filename()][0]
+    attachment = [p for _, p in _get_parts(text) if p.get_filename()][0]
     assert attachment.get_content_type() == 'application/octet-stream'
     assert attachment['Content-Disposition'] == 'attachment; filename="logo.png"'
     assert attachment['Content-ID'] is None

@@ -1028,10 +1028,10 @@ class TokeoScheduler(MetaMixin):
 
         """
 
-        def prompt():
+        def get_prompt():
             return 'Scheduler> ' if self._scheduler.state == STATE_RUNNING else '(not running) Scheduler> '
 
-        def command(line):
+        def run_command(line):
             # an empty line between two commands
             try:
                 return self.command(line)
@@ -1039,7 +1039,9 @@ class TokeoScheduler(MetaMixin):
                 print('')
 
         self.app.log.info('Welcome to scheduler interactive shell.')
-        self.app.tui.input.shell(command, prompt=prompt, completer=self.shell_completion(), history=self.shell_history(), **session)
+        self.app.tui.input.shell(
+            run_command, prompt=get_prompt, completer=self.shell_completion(), history=self.shell_history(), **session
+        )
         self.app.log.info('bye bye using scheduler...')
 
 

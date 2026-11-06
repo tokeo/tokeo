@@ -35,7 +35,7 @@ class EncVault(Vault):
 
     """
 
-    def _key(self, profile):
+    def _get_key(self, profile):
         # the key lives in the environment, never in the config, so an
         # encrypted file alone is useless without the runtime secret
         name = profile.get('env')
@@ -46,9 +46,9 @@ class EncVault(Vault):
         except KeyError:
             raise TokeoVaultError(f'environment variable {name!r} is not set')
 
-    def _fernet(self, profile):
+    def _build_fernet(self, profile):
         # the key of the profile reports its own errors
-        key = self._key(profile)
+        key = self._get_key(profile)
         try:
             return Fernet(key)
         except (ValueError, TypeError):
@@ -68,7 +68,7 @@ class EncVault(Vault):
         - **str**: The Fernet token to store as a ```!vault``` value
 
         """
-        return self._fernet(profile).encrypt(plaintext.encode()).decode()
+        return self._build_fernet(profile).encrypt(plaintext.encode()).decode()
 
     def decrypt(self, profile, ciphertext):
         """
@@ -89,7 +89,7 @@ class EncVault(Vault):
 
         """
         try:
-            return self._fernet(profile).decrypt(ciphertext.encode()).decode()
+            return self._build_fernet(profile).decrypt(ciphertext.encode()).decode()
         except InvalidToken:
             raise TokeoVaultError('vault payload could not be decrypted (wrong key or corrupt data)')
 
@@ -110,7 +110,7 @@ class EncVault(Vault):
         - **dict**: The profile fields and the env variable holding the key
 
         """
-        env = self._env_name(name, 'KEY')
+        env = self._build_env_name(name, 'KEY')
         return {
             'profile': {'type': 'enc', 'env': env},
             'secrets': [{'name': env, 'value': generate_fernet_key(), 'quote': False}],

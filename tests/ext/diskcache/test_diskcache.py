@@ -14,8 +14,8 @@ from tokeo.ext.diskcache import TokeoDiskCacheError, _ThreadConnection
 from tests.ext.diskcache.diskcache_tests_helper import (
     DiskcacheTest,
     Connections,
-    in_threads,
-    max_overlap,
+    run_in_threads,
+    get_max_overlap,
     spawn_context,
     collect_results,
     stop_processes,
@@ -82,7 +82,7 @@ def test_connections_of_threads_close_when_they_end(tmp, monkeypatch):
         thread = threading.Thread(target=app.cache.get, args=('key',))
         thread.start()
         thread.join()
-        assert in_threads(lambda: app.cache.get('key')) == ['value'] * 4
+        assert run_in_threads(lambda: app.cache.get('key')) == ['value'] * 4
         # only the connection of the app is still open
         assert len(connections.unclosed) == 1
     assert connections.unclosed == []
@@ -101,8 +101,8 @@ def test_connections_of_threads_close_after_temper_and_throttle(tmp, monkeypatch
         def throttled():
             return 'ran'
 
-        assert in_threads(tempered) == ['ran'] * 4
-        assert in_threads(throttled) == ['ran'] * 4
+        assert run_in_threads(tempered) == ['ran'] * 4
+        assert run_in_threads(throttled) == ['ran'] * 4
         # the app itself never accessed the cache after its setup
         assert len(connections.opened) > 1
         assert connections.unclosed == []
@@ -119,7 +119,7 @@ def test_connections_close_by_hand_and_reopen(tmp, monkeypatch):
         assert app.cache.get('key') == 'value'
         assert len(connections.unclosed) == 1
         # also by hand inside a thread as diskcache describes it
-        assert in_threads(lambda: (app.cache.get('key'), app.cache.close())[0]) == ['value'] * 4
+        assert run_in_threads(lambda: (app.cache.get('key'), app.cache.close())[0]) == ['value'] * 4
         assert len(connections.unclosed) == 1
     assert connections.unclosed == []
 
@@ -134,7 +134,7 @@ def test_connections_of_threads_close_after_transactions(tmp, monkeypatch):
                 app.cache.set('key', 'value')
                 return app.cache.get('key')
 
-        assert in_threads(transact) == ['value'] * 4
+        assert run_in_threads(transact) == ['value'] * 4
         assert app.cache.get('key') == 'value'
         assert len(connections.unclosed) == 1
     assert connections.unclosed == []
@@ -143,7 +143,7 @@ def test_connections_of_threads_close_after_transactions(tmp, monkeypatch):
 def test_connections_stay_open_when_released_in_another_thread():
     """A holder released in another thread leaves the connection open."""
     con = sqlite3.connect(':memory:', check_same_thread=False)
-    holder = in_threads(lambda: _ThreadConnection(con), workers=1)[0]
+    holder = run_in_threads(lambda: _ThreadConnection(con), workers=1)[0]
     del holder
     assert con.execute('SELECT 1').fetchone() == (1,)
     con.close()
@@ -161,7 +161,7 @@ def test_locks_acquire_returns_true(tmp):
         assert app.cache.locks.locked('acquire') is False
 
 
-def _warnings_of(app, monkeypatch):
+def _collect_warnings(app, monkeypatch):
     # collect the warnings the app logs
     logged = []
     monkeypatch.setattr(app.log, 'warning', lambda msg, **kw: logged.append(msg))
@@ -171,7 +171,7 @@ def _warnings_of(app, monkeypatch):
 def test_locks_lock_releases_its_own_lock(tmp, monkeypatch):
     """lock() holds the lock in the block and frees it after, no warning."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _warnings_of(app, monkeypatch)
+        logged = _collect_warnings(app, monkeypatch)
         with app.cache.locks.lock('own'):
             assert app.cache.locks.locked('own') is True
         assert app.cache.locks.locked('own') is False
@@ -181,7 +181,7 @@ def test_locks_lock_releases_its_own_lock(tmp, monkeypatch):
 def test_locks_lock_lost_by_purge_warns(tmp, monkeypatch):
     """A lock purged in the block warns "... lost before release (missing)"."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _warnings_of(app, monkeypatch)
+        logged = _collect_warnings(app, monkeypatch)
         with app.cache.locks.lock('lost'):
             app.cache.locks.purge()
         assert logged == ['lock dc_lost was lost before release (missing)']
@@ -190,7 +190,7 @@ def test_locks_lock_lost_by_purge_warns(tmp, monkeypatch):
 def test_locks_lock_keeps_the_lock_of_another(tmp, monkeypatch):
     """A lock taken by another after a purge stays held, with a warning."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _warnings_of(app, monkeypatch)
+        logged = _collect_warnings(app, monkeypatch)
         with app.cache.locks.lock('other'):
             app.cache.locks.purge()
             # another holder takes the lock after the purge
@@ -202,7 +202,7 @@ def test_locks_lock_keeps_the_lock_of_another(tmp, monkeypatch):
 def test_locks_lock_keeps_the_lock_of_another_after_expire(tmp, monkeypatch):
     """A lock taken by another after expire stays held, with a warning."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _warnings_of(app, monkeypatch)
+        logged = _collect_warnings(app, monkeypatch)
         with app.cache.locks.lock('expire', expire=0.05):
             time.sleep(0.1)
             app.cache.locks.acquire('expire')
@@ -225,7 +225,7 @@ def test_locks_lock_failing_acquire_keeps_the_lock_of_another(tmp, monkeypatch):
         assert app.cache.locks.locked('busy') is True
 
 
-def _sleeps_of_a_waiting_lock(app, monkeypatch, **kw):
+def _collect_sleeps_of_a_waiting_lock(app, monkeypatch, **kw):
     # the seconds a lock waits per check while another holds it
     slept = []
     app.cache.locks.acquire('busy')
@@ -243,10 +243,10 @@ def _sleeps_of_a_waiting_lock(app, monkeypatch, **kw):
 def test_locks_lock_waits_by_locks_sleep_time(tmp, monkeypatch):
     """A waiting lock sleeps 0.1 seconds, unless the config or call set it."""
     with DiskcacheTest(tmp.dir) as app:
-        assert _sleeps_of_a_waiting_lock(app, monkeypatch) == [0.1]
-        assert _sleeps_of_a_waiting_lock(app, monkeypatch, sleep_time=0.01) == [0.01]
+        assert _collect_sleeps_of_a_waiting_lock(app, monkeypatch) == [0.1]
+        assert _collect_sleeps_of_a_waiting_lock(app, monkeypatch, sleep_time=0.01) == [0.01]
     with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_time': 0.2}) as app:
-        assert _sleeps_of_a_waiting_lock(app, monkeypatch) == [0.2]
+        assert _collect_sleeps_of_a_waiting_lock(app, monkeypatch) == [0.2]
 
 
 def test_temper_waits_by_locks_sleep_time(tmp):
@@ -378,7 +378,7 @@ def test_temper_thread_max_concurrency(tmp):
 
         # all calls eventually ran and the concurrency never exceeded count
         assert len(intervals) == workers
-        assert max_overlap(intervals) <= count
+        assert get_max_overlap(intervals) <= count
 
 
 def test_temper_process_max_concurrency(tmp):
@@ -403,7 +403,7 @@ def test_temper_process_max_concurrency(tmp):
     errors = [payload for kind, payload in results if kind == 'error']
     assert errors == []
     intervals = [payload for kind, payload in results if kind == 'ok']
-    assert max_overlap(intervals) <= count
+    assert get_max_overlap(intervals) <= count
 
 
 # ---- throttle: five essential points ----------------------------------------
@@ -521,7 +521,7 @@ def test_throttle_process_max_rate(tmp):
 # ---- expire: a default for every key, only numbers greater than 0 -----------
 
 
-def _expires_in(app, key):
+def _get_expire_seconds(app, key):
     # the seconds until the key expires
     _, expire_time = app.cache._cache.get(key, expire_time=True)
     return expire_time - time.time()
@@ -577,7 +577,7 @@ def test_throttle_expire_defaults_to_per_seconds_plus_10(tmp):
             return 'ran'
 
         assert job() == 'ran'
-        assert 69 < _expires_in(app, 'dc_default') <= 70
+        assert 69 < _get_expire_seconds(app, 'dc_default') <= 70
 
 
 def test_temper_lock_and_acquire_expire_defaults_to_3600(tmp):
@@ -586,13 +586,13 @@ def test_temper_lock_and_acquire_expire_defaults_to_3600(tmp):
 
         @app.cache.locks.temper(name='default', verbose=False)
         def job():
-            return _expires_in(app, 'dc_default')
+            return _get_expire_seconds(app, 'dc_default')
 
         assert 3599 < job() <= 3600
         with app.cache.locks.lock('lock'):
-            assert 3599 < _expires_in(app, 'dc_lock') <= 3600
+            assert 3599 < _get_expire_seconds(app, 'dc_lock') <= 3600
         app.cache.locks.acquire('acquire')
-        assert 3599 < _expires_in(app, 'dc_acquire') <= 3600
+        assert 3599 < _get_expire_seconds(app, 'dc_acquire') <= 3600
 
 
 def test_throttle_and_temper_log_nothing_by_default(tmp, monkeypatch):
@@ -619,7 +619,7 @@ def test_temper_holds_its_slot_by_an_expire_time(tmp):
 
         @app.cache.locks.temper(count=2, name='expire_time', expire=60, verbose=False)
         def job():
-            return app.cache.get('dc_expire_time'), _expires_in(app, 'dc_expire_time')
+            return app.cache.get('dc_expire_time'), _get_expire_seconds(app, 'dc_expire_time')
 
         started = time.time()
         expire_times, expires_in = job()
@@ -631,7 +631,7 @@ def test_temper_holds_its_slot_by_an_expire_time(tmp):
 def test_temper_drops_an_expired_holder_while_others_run(tmp, monkeypatch):
     """The expire time of a killed holder frees its slot, a running one stays."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _warnings_of(app, monkeypatch)
+        logged = _collect_warnings(app, monkeypatch)
         now = time.time()
         # count 2 is full: a killed holder and one still running
         app.cache.set('dc_dead', [now - 1, now + 100], expire=100)
@@ -654,18 +654,18 @@ def test_temper_key_lives_until_the_latest_expire_time(tmp):
 
         @app.cache.locks.temper(count=2, name='shared', expire=60, verbose=False)
         def job():
-            return _expires_in(app, 'dc_shared')
+            return _get_expire_seconds(app, 'dc_shared')
 
         assert 3599 < job() <= 3600
         assert app.cache.get('dc_shared') == [now + 3600]
-        assert 3599 < _expires_in(app, 'dc_shared') <= 3600
+        assert 3599 < _get_expire_seconds(app, 'dc_shared') <= 3600
 
 
 @pytest.mark.parametrize('loss', ['purge', 'foreign'])
 def test_temper_warns_when_its_slot_was_lost(tmp, monkeypatch, loss):
     """A call whose expire time is gone on release warns and recreates no key."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _warnings_of(app, monkeypatch)
+        logged = _collect_warnings(app, monkeypatch)
 
         @app.cache.locks.temper(name='lost', verbose=False)
         def job():

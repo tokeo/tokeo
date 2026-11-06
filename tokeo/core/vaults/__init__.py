@@ -252,7 +252,7 @@ class Vault:
         """
         raise NotImplementedError
 
-    def _env_name(self, name, suffix):
+    def _build_env_name(self, name, suffix):
         # build a conventional env variable name for a profile scaffold, for
         # example VAULT_EXAMPLE_KEY, sanitising the profile name to upper case
         base = re.sub('[^0-9A-Za-z]+', '_', name).upper()

@@ -14,7 +14,7 @@ from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
 
 
-def max_overlap(intervals):
+def get_max_overlap(intervals):
     # compute the maximum number of overlapping (start, end) intervals;
     # an end at the same instant as a start does not count as overlap
     events = []
@@ -74,7 +74,7 @@ class Connections:
         return [con for con in self.opened if not con.closed]
 
 
-def in_threads(func, workers=4):
+def run_in_threads(func, workers=4):
     # run func once in each of the workers threads of a pool, return the results
     with ThreadPoolExecutor(max_workers=workers) as pool:
         return list(pool.map(lambda _: func(), range(workers)))

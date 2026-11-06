@@ -17,8 +17,8 @@ from tests.ext.vault.vault_tests_helper import (
     VaultTest,
     set_secrets,
     write_config,
-    fernet_token,
-    scrypt_token,
+    make_fernet_token,
+    make_scrypt_token,
 )
 
 
@@ -188,18 +188,18 @@ def test_encrypt_with_a_dash_reads_the_value_from_stdin(vault, key, monkeypatch)
 
 def test_decrypt_a_payload_with_a_profile(vault, key):
     """vault decrypt --profile master <token> prints the plaintext."""
-    assert vault('decrypt', '--profile', 'master', fernet_token(key, 's3cret')) == 's3cret\n'
+    assert vault('decrypt', '--profile', 'master', make_fernet_token(key, 's3cret')) == 's3cret\n'
 
 
 def test_decrypt_a_payload_with_a_scrypt_profile(vault, key):
     """decrypt --profile human <token> prints the plaintext."""
-    assert vault('decrypt', '--profile', 'human', scrypt_token('s3cret')) == 's3cret\n'
+    assert vault('decrypt', '--profile', 'human', make_scrypt_token('s3cret')) == 's3cret\n'
 
 
 def test_decrypt_a_payload_with_a_wrong_key_fails(vault, key):
     """A payload of another key raises TokeoVaultError."""
     with pytest.raises(TokeoVaultError, match='could not be decrypted'):
-        vault('decrypt', '--profile', 'master', fernet_token(Fernet.generate_key().decode(), 's3cret'))
+        vault('decrypt', '--profile', 'master', make_fernet_token(Fernet.generate_key().decode(), 's3cret'))
 
 
 def test_decrypt_without_input_fails(vault, key):
@@ -211,13 +211,13 @@ def test_decrypt_without_input_fails(vault, key):
 def test_decrypt_a_payload_without_profile_fails(vault, key):
     """vault decrypt <token> without --profile raises TokeoVaultError."""
     with pytest.raises(TokeoVaultError, match='a --profile is required'):
-        vault('decrypt', fernet_token(key, 's3cret'))
+        vault('decrypt', make_fernet_token(key, 's3cret'))
 
 
 def test_decrypt_a_payload_with_an_unknown_profile_fails(vault, key):
     """decrypt --profile nope raises TokeoVaultError naming the profile."""
     with pytest.raises(TokeoVaultError, match="unknown vault profile 'nope'"):
-        vault('decrypt', '--profile', 'nope', fernet_token(key, 's3cret'))
+        vault('decrypt', '--profile', 'nope', make_fernet_token(key, 's3cret'))
 
 
 # decrypt with --config
@@ -225,13 +225,13 @@ def test_decrypt_a_payload_with_an_unknown_profile_fails(vault, key):
 
 def test_decrypt_config_reference(vault, key):
     """decrypt --config db.password prints the plaintext of the value."""
-    text = f'db:\n  password: !vault:master {fernet_token(key, "s3cret")}\n'
+    text = f'db:\n  password: !vault:master {make_fernet_token(key, "s3cret")}\n'
     assert vault('decrypt', '--config', 'db.password', text=text) == 's3cret\n'
 
 
 def test_decrypt_config_reference_at_depth(vault, key):
     """vault decrypt --config db.auth.password follows the nested mapping."""
-    text = f'db:\n  auth:\n    password: !vault:human {scrypt_token("deep")}\n'
+    text = f'db:\n  auth:\n    password: !vault:human {make_scrypt_token("deep")}\n'
     assert vault('decrypt', '--config', 'db.auth.password', text=text) == 'deep\n'
 
 
@@ -261,6 +261,6 @@ def test_decrypt_config_reference_not_found_fails(vault, key, ref):
 
 def test_decrypt_config_reference_keeps_the_decryption_error(vault, key):
     """An undecryptable referenced secret reports the decryption error."""
-    text = f'db:\n  password: !vault:master {fernet_token(Fernet.generate_key().decode(), "s3cret")}\n'
+    text = f'db:\n  password: !vault:master {make_fernet_token(Fernet.generate_key().decode(), "s3cret")}\n'
     with pytest.raises(TokeoVaultError, match='could not be decrypted'):
         vault('decrypt', '--config', 'db.password', text=text)

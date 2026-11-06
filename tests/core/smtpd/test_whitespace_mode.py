@@ -17,7 +17,7 @@ import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, WhitespaceMode
 from tokeo.core.smtpd.events import SmtpdEvents
-from tests.core.smtpd.lib.smtpd_tests_helper import AuthEvents, dialog, auth_plain
+from tests.core.smtpd.lib.smtpd_tests_helper import AuthEvents, run_dialog, make_auth_plain
 
 
 class ValueEvents(SmtpdEvents):
@@ -44,7 +44,7 @@ def _reply(mode, lines):
     commands = [line + b'\r\n' for line in lines]
     if not lines[0].upper().startswith((b'HELO', b'EHLO')):
         commands.insert(0, b'HELO a\r\n')
-    _, r = dialog(ValueEvents(), {'whitespace_mode': mode}, commands)
+    _, r = run_dialog(ValueEvents(), {'whitespace_mode': mode}, commands)
     return r[-1][0][:3]
 
 
@@ -88,7 +88,7 @@ def test_replies_per_mode(line, expected):
 def test_helo_value_per_mode(mode, line, value):
     """MODERATE strips the edges and keeps the inside, UNSAFE keeps all chars."""
     events = ValueEvents()
-    _, r = dialog(events, {'whitespace_mode': mode}, [line.encode() + b'\r\n'])
+    _, r = run_dialog(events, {'whitespace_mode': mode}, [line.encode() + b'\r\n'])
     assert r[0][-1].startswith('250')
     assert events.values == [('helo', value)]
 
@@ -105,7 +105,7 @@ def test_helo_value_per_mode(mode, line, value):
 def test_mail_from_value_per_mode(mode, line, value):
     """The address reaches on_mail_from_event as separated by the mode."""
     events = ValueEvents()
-    _, r = dialog(events, {'whitespace_mode': mode}, [b'HELO a\r\n', line.encode() + b'\r\n'])
+    _, r = run_dialog(events, {'whitespace_mode': mode}, [b'HELO a\r\n', line.encode() + b'\r\n'])
     assert r[1][0] == '250 OK'
     assert events.values[-1] == ('mail', value)
 
@@ -132,7 +132,7 @@ def test_rcpt_to_param_after_no_break_space(mode, expected):
 
 def test_helo_without_domain_and_without_handler_answers_501():
     """Without an own on_helo_event an empty domain is answered by 501."""
-    _, r = dialog(SmtpdEvents(), {}, [b'HELO\r\n', b'EHLO \r\n'])
+    _, r = run_dialog(SmtpdEvents(), {}, [b'HELO\r\n', b'EHLO \r\n'])
     assert r[0][0].startswith('501')
     assert r[1][0].startswith('501')
 
@@ -140,7 +140,7 @@ def test_helo_without_domain_and_without_handler_answers_501():
 def test_helo_without_domain_is_left_to_the_handler():
     """With an own on_helo_event an empty domain is the decision of the handler."""
     events = ValueEvents()
-    _, r = dialog(events, {}, [b'HELO\r\n'])
+    _, r = run_dialog(events, {}, [b'HELO\r\n'])
     assert r[0][0].startswith('250')
     assert events.values == [('helo', '')]
 
@@ -148,8 +148,8 @@ def test_helo_without_domain_is_left_to_the_handler():
 @pytest.mark.parametrize('mode', MODES)
 def test_auth_with_tab_separators(mode):
     """AUTH separates the mechanism and the initial response by HTAB too."""
-    response = auth_plain('', 'user', 'secret').encode()
-    _, r = dialog(
+    response = make_auth_plain('', 'user', 'secret').encode()
+    _, r = run_dialog(
         AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL', 'whitespace_mode': mode}, [b'EHLO me\r\n', b'AUTH\tPLAIN\t' + response + b'\r\n']
     )
     assert r[1][0] == '235 OK'
@@ -158,16 +158,16 @@ def test_auth_with_tab_separators(mode):
 @pytest.mark.parametrize('line', [b'AUTH', b'AUTH PLAIN a b'])
 def test_auth_with_a_wrong_number_of_parts_answers_501(line):
     """AUTH takes a mechanism and an optional initial response, else 501."""
-    _, r = dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', line + b'\r\n'])
+    _, r = run_dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', line + b'\r\n'])
     assert r[1][0].startswith('501')
 
 
 @pytest.mark.parametrize('mode, expected', [('WHITESPACE_MODERATE', '235'), ('WHITESPACE_STRICT', '501'), ('WHITESPACE_UNSAFE', '501')])
 def test_auth_response_with_a_no_break_space_at_the_edge(mode, expected):
     """MODERATE strips a no-break space around an AUTH response as noise."""
-    response = auth_plain('', 'user', 'secret').encode()
+    response = make_auth_plain('', 'user', 'secret').encode()
     lines = [b'EHLO me\r\n', b'AUTH PLAIN\r\n', response + '\xa0'.encode() + b'\r\n']
-    _, r = dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL', 'whitespace_mode': mode}, lines)
+    _, r = run_dialog(AuthEvents(), {'auth_mode': 'AUTH_OPTIONAL', 'whitespace_mode': mode}, lines)
     assert r[2][0][:3] == expected
 
 

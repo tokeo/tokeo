@@ -19,7 +19,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     read_reply,
     send_command,
     stop_server,
-    insecure_tls_context,
+    make_insecure_tls_context,
 )
 
 needs_tls_immediate = pytest.mark.skipif(
@@ -66,7 +66,7 @@ def test_delivers_over_tls():
         server, port, task = await start_server(ev, _SERVER_OPTIONS)
         try:
             # the client speaks TLS from the first byte on
-            reader, writer = await asyncio.open_connection('127.0.0.1', port, ssl=insecure_tls_context())
+            reader, writer = await asyncio.open_connection('127.0.0.1', port, ssl=make_insecure_tls_context())
             greeting = await read_reply(reader)
             replies = await _deliver(reader, writer)
             writer.close()
@@ -98,7 +98,7 @@ def test_behind_proxy():
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             writer.write(b'PROXY TCP4 9.8.7.6 1.2.3.4 4711 465\r\n')
             await writer.drain()
-            await writer.start_tls(insecure_tls_context())
+            await writer.start_tls(make_insecure_tls_context())
             greeting = await read_reply(reader)
             replies = await _deliver(reader, writer)
             writer.close()

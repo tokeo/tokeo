@@ -36,47 +36,47 @@ def _derive(passphrase, salt, n, r=8, p=1):
     return base64.urlsafe_b64encode(raw)
 
 
-# _key
+# _get_key
 
 
 def test_key_matches_the_scrypt_of_hashlib(passphrase):
     """The key is the url-safe base64 of hashlib.scrypt of passphrase and salt."""
-    assert ScryptVault()._key(PROFILE) == _derive(passphrase, SALT, 16)
+    assert ScryptVault()._get_key(PROFILE) == _derive(passphrase, SALT, 16)
 
 
 def test_key_is_deterministic_for_the_same_salt(passphrase):
     """Two derivations with the same passphrase and salt give the same key."""
-    assert ScryptVault()._key(PROFILE) == ScryptVault()._key(dict(PROFILE))
+    assert ScryptVault()._get_key(PROFILE) == ScryptVault()._get_key(dict(PROFILE))
 
 
 def test_key_differs_for_another_salt(passphrase):
     """Another salt gives another key for the same passphrase."""
-    assert ScryptVault()._key(PROFILE) != ScryptVault()._key(dict(PROFILE, salt=OTHER_SALT))
+    assert ScryptVault()._get_key(PROFILE) != ScryptVault()._get_key(dict(PROFILE, salt=OTHER_SALT))
 
 
 def test_key_differs_for_another_passphrase(passphrase, monkeypatch):
     """Another passphrase gives another key for the same salt."""
-    first = ScryptVault()._key(PROFILE)
+    first = ScryptVault()._get_key(PROFILE)
     monkeypatch.setenv(ENV, 'wrong horse')
-    assert ScryptVault()._key(PROFILE) != first
+    assert ScryptVault()._get_key(PROFILE) != first
 
 
 @pytest.mark.parametrize('field, value', [('cost', 32), ('block_size', 4), ('parallelization', 2)])
 def test_key_differs_for_another_cost_parameter(passphrase, field, value):
     """Changing cost, block_size or parallelization changes the key."""
-    assert ScryptVault()._key(dict(PROFILE, **{field: value})) != ScryptVault()._key(PROFILE)
+    assert ScryptVault()._get_key(dict(PROFILE, **{field: value})) != ScryptVault()._get_key(PROFILE)
 
 
 def test_key_takes_the_cost_parameters_as_strings(passphrase):
     """Cost parameters given as strings derive the same key as the ints."""
     profile = dict(PROFILE, cost='16', block_size='8', parallelization='1')
-    assert ScryptVault()._key(profile) == ScryptVault()._key(PROFILE)
+    assert ScryptVault()._get_key(profile) == ScryptVault()._get_key(PROFILE)
 
 
 def test_key_without_cost_parameters_uses_the_defaults(passphrase):
     """Without cost parameters the key is derived with N=2**14, r=8, p=1."""
     profile = {'type': 'scrypt', 'env': ENV, 'salt': SALT}
-    assert ScryptVault()._key(profile) == _derive(passphrase, SALT, 2**14)
+    assert ScryptVault()._get_key(profile) == _derive(passphrase, SALT, 2**14)
 
 
 def test_key_is_derived_once_per_passphrase_salt_and_cost(passphrase, monkeypatch):
@@ -89,10 +89,10 @@ def test_key_is_derived_once_per_passphrase_salt_and_cost(passphrase, monkeypatc
 
     monkeypatch.setattr('tokeo.core.vaults.scrypt.Scrypt', counting)
     vault = ScryptVault()
-    assert vault._key(PROFILE) == vault._key(PROFILE) and len(calls) == 1
-    vault._key(dict(PROFILE, salt=OTHER_SALT))
+    assert vault._get_key(PROFILE) == vault._get_key(PROFILE) and len(calls) == 1
+    vault._get_key(dict(PROFILE, salt=OTHER_SALT))
     monkeypatch.setenv(ENV, 'another passphrase')
-    vault._key(PROFILE)
+    vault._get_key(PROFILE)
     assert len(calls) == 3
 
 

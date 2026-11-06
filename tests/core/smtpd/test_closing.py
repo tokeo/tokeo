@@ -72,14 +72,14 @@ class ClosingEvents(RecordingEvents):
         self.exceptions = ctx.server.exceptions
 
 
-def _run(events, options, client):
+def _run(events, options, run_client):
     """Run the client against a server and wait for on_disconnect_event."""
 
     async def go():
         server, port, task = await start_server(events, options)
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
-            result = await client(reader, writer)
+            result = await run_client(reader, writer)
             writer.close()
             assert await wait_until_async(lambda: 'disconnect' in events.fired)
             return result
@@ -89,7 +89,7 @@ def _run(events, options, client):
     return asyncio.run(go())
 
 
-async def _envelope(reader, writer):
+async def _send_envelope(reader, writer):
     """Read the greeting and send the envelope up to DATA."""
     await read_reply(reader)
     for command in ENVELOPE:
@@ -108,10 +108,10 @@ def test_close_exception_in_connect_answers_its_code(exc, reply):
     """In on_connect_event a close exception answers by its code, others by 421."""
     events = ClosingEvents('connect', exc)
 
-    async def client(reader, writer):
+    async def run_client(reader, writer):
         return await asyncio.wait_for(reader.read(), 5)
 
-    after = _run(events, {}, client)
+    after = _run(events, {}, run_client)
     assert after.startswith(reply)
     assert after.count(b'\r\n') == 1
     assert events.errors == [exc]
@@ -121,14 +121,14 @@ def test_close_exception_in_mail_from_answers_521_and_closes():
     """Smtpd521CloseException in MAIL answers 521 and closes, NOOP does not run."""
     events = ClosingEvents('mail', Smtpd521CloseException)
 
-    async def client(reader, writer):
+    async def run_client(reader, writer):
         await read_reply(reader)
         await send_command(reader, writer, b'HELO a\r\n')
         writer.write(b'MAIL FROM:<a@x>\r\nNOOP\r\n')
         await writer.drain()
         return await asyncio.wait_for(reader.read(), 5)
 
-    after = _run(events, {'pipelining_extension': True}, client)
+    after = _run(events, {'pipelining_extension': True}, run_client)
     assert after == b'521 Service does not accept mail\r\n'
     assert events.errors == [Smtpd521CloseException]
 
@@ -137,8 +137,8 @@ def test_close_exception_within_data_answers_after_its_end():
     """Smtpd421CloseException within DATA answers 421 only after its end."""
     events = ClosingEvents('receiving', Smtpd421CloseException)
 
-    async def client(reader, writer):
-        await _envelope(reader, writer)
+    async def run_client(reader, writer):
+        await _send_envelope(reader, writer)
         writer.write(b'Subject: t\r\n\r\nA\r\n')
         await writer.drain()
         # no reply before the end of DATA
@@ -148,7 +148,7 @@ def test_close_exception_within_data_answers_after_its_end():
         await writer.drain()
         return await asyncio.wait_for(reader.read(), 5)
 
-    after = _run(events, {}, client)
+    after = _run(events, {}, run_client)
     assert after.startswith(b'421 ')
     assert after.count(b'\r\n') == 1
     assert events.messages == []
@@ -163,14 +163,14 @@ def test_abort_exception_within_data_answers_at_once(exc, reply):
     """An abort exception within DATA answers at once and closes."""
     events = ClosingEvents('receiving', exc)
 
-    async def client(reader, writer):
-        await _envelope(reader, writer)
+    async def run_client(reader, writer):
+        await _send_envelope(reader, writer)
         # DATA does not end, the reply comes without it
         writer.write(b'Subject: t\r\n\r\nA\r\n')
         await writer.drain()
         return await asyncio.wait_for(reader.read(), 5)
 
-    after = _run(events, {}, client)
+    after = _run(events, {}, run_client)
     assert after.startswith(reply)
     assert after.count(b'\r\n') == 1
     assert events.messages == []
@@ -185,16 +185,16 @@ def test_line_over_io_buffer_max_size_answers_554_and_closes(in_data):
     """A command or DATA line over io_buffer_max_size answers 554 and closes."""
     events = ClosingEvents()
 
-    async def client(reader, writer):
+    async def run_client(reader, writer):
         if in_data:
-            await _envelope(reader, writer)
+            await _send_envelope(reader, writer)
         else:
             await read_reply(reader)
         writer.write(b'x' * 300 + b'\r\n')
         await writer.drain()
         return await asyncio.wait_for(reader.read(), 5)
 
-    after = _run(events, {'io_buffer_max_size': 100}, client)
+    after = _run(events, {'io_buffer_max_size': 100}, run_client)
     assert after == b'554 Transaction failed\r\n'
     assert events.errors == [SmtpdIOBufferOverrunException]
 
@@ -206,7 +206,7 @@ def test_session_timeout_ends_a_noop_loop():
     """NOOP without end gets 421 after io_session_timeout of 1 second."""
     events = ClosingEvents()
 
-    async def client(reader, writer):
+    async def run_client(reader, writer):
         await read_reply(reader)
         started = time.monotonic()
         replies = []
@@ -216,7 +216,7 @@ def test_session_timeout_ends_a_noop_loop():
             replies.append(reply[0][:3])
         return replies, time.monotonic() - started
 
-    replies, elapsed = _run(events, {'io_session_timeout': 1}, client)
+    replies, elapsed = _run(events, {'io_session_timeout': 1}, run_client)
     assert replies[-1] == '421'
     assert len(replies) > 2
     assert elapsed < 2
@@ -227,8 +227,8 @@ def test_session_timeout_ends_discarded_data():
     """DATA discarded after data_size gets 421 after io_session_timeout of 1 s."""
     events = ClosingEvents()
 
-    async def client(reader, writer):
-        await _envelope(reader, writer)
+    async def run_client(reader, writer):
+        await _send_envelope(reader, writer)
 
         async def feed():
             # a stream of DATA lines without end
@@ -243,7 +243,7 @@ def test_session_timeout_ends_discarded_data():
         finally:
             feeding.cancel()
 
-    reply = _run(events, {'io_session_timeout': 1, 'data_size': 100}, client)
+    reply = _run(events, {'io_session_timeout': 1, 'data_size': 100}, run_client)
     assert reply[0].startswith('421')
     assert events.messages == []
     assert events.errors == [SmtpdIOSessionTimeoutException]
@@ -253,7 +253,7 @@ def test_session_timeout_is_not_renewed_by_a_message():
     """A message accepted after 0.7 s does not renew io_session_timeout of 1 s."""
     events = ClosingEvents()
 
-    async def client(reader, writer):
+    async def run_client(reader, writer):
         await read_reply(reader)
         started = time.monotonic()
         await asyncio.sleep(0.7)
@@ -264,7 +264,7 @@ def test_session_timeout_is_not_renewed_by_a_message():
         reply = await asyncio.wait_for(read_reply(reader), 5)
         return accepted, reply, time.monotonic() - started
 
-    accepted, reply, elapsed = _run(events, {'io_session_timeout': 1}, client)
+    accepted, reply, elapsed = _run(events, {'io_session_timeout': 1}, run_client)
     assert accepted[0].startswith('250')
     assert reply[0].startswith('421')
     assert elapsed < 1.5
@@ -323,14 +323,14 @@ def test_reset_by_client_is_counted_and_logged_as_error():
     """An RST after HELO counts one exception, logs ERROR and sends no 421."""
     events = ClosingEvents()
 
-    async def client(reader, writer):
+    async def run_client(reader, writer):
         await read_reply(reader)
         await send_command(reader, writer, b'HELO a\r\n')
         # SO_LINGER with 0 seconds closes by RST instead of FIN
         writer.get_extra_info('socket').setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
         writer.transport.abort()
 
-    _run(events, {}, client)
+    _run(events, {}, run_client)
     assert events.exceptions == 1
     assert events.errors == [ConnectionResetError]
     assert (Severity.ERROR, 'Connection lost due reset by client!') in events.logged

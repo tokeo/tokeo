@@ -59,7 +59,7 @@ class ScryptVault(EncVault):
         # purpose, it runs once each; the passphrase is in the process anyway
         self._keys = {}
 
-    def _key(self, profile):
+    def _get_key(self, profile):
         # derive the Fernet key from the passphrase; salt and cost are public
         name = profile.get('env')
         if not name:
@@ -108,7 +108,7 @@ class ScryptVault(EncVault):
             must hold the chosen passphrase
 
         """
-        env = self._env_name(name, 'PASSPHRASE')
+        env = self._build_env_name(name, 'PASSPHRASE')
         salt = base64.b64encode(os.urandom(16)).decode()
         return {
             'profile': {'type': 'scrypt', 'env': env, 'salt': salt},

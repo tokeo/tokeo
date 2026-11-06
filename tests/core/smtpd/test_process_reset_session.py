@@ -11,14 +11,14 @@ from tokeo.core.smtpd.server import SmtpdServer, CMD_PROXY, CMD_HELO, CMD_RSET, 
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
 
-def _smtpd():
+def _make_smtpd():
     return SmtpdServer(CaptureSmtpdEvents(), options={})
 
 
 def test_reset_helo():
     """A new connection expects HELO first."""
     session = SmtpdSession()
-    _smtpd().process_reset_session(session, connection_initialize=True)
+    _make_smtpd().process_reset_session(session, connection_initialize=True)
     assert session.cmd_sequence is CMD_HELO
 
 
@@ -43,14 +43,14 @@ def test_reset_initial_sequence(monkeypatch, options, expected):
 def test_reset_rset():
     """A reset within a connection leaves the session in the RSET state."""
     session = SmtpdSession()
-    _smtpd().process_reset_session(session, connection_initialize=False)
+    _make_smtpd().process_reset_session(session, connection_initialize=False)
     assert session.cmd_sequence is CMD_RSET
 
 
 def test_session_status():
     """A new session has the empty defaults of server, envelope and message."""
     session = SmtpdSession()
-    _smtpd().process_reset_session(session, connection_initialize=True)
+    _make_smtpd().process_reset_session(session, connection_initialize=True)
     assert isinstance(session.auth_challenge, dict)
     server = session.ctx.server
     assert server.local_host == ''

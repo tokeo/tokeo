@@ -52,7 +52,7 @@ class TokeoTui:
     def __init__(self):
         self._parts = {}
 
-    def _part(self, name):
+    def _get_part(self, name):
         if name not in self._parts:
             raise TokeoTuiError(f'Enable the extension tokeo.ext.tui.{name} to use app.tui.{name}!')
         return self._parts[name]
@@ -60,12 +60,12 @@ class TokeoTui:
     @property
     def input(self):
         """The interactive shell, see ```TokeoTuiInput```."""
-        return self._part('input')
+        return self._get_part('input')
 
     @property
     def output(self):
         """Tables and live display, see ```TokeoTuiOutput```."""
-        return self._part('output')
+        return self._get_part('output')
 
 
 def register(app, name, part):

@@ -23,8 +23,8 @@ from tests.ext.vault.vault_tests_helper import (
     VaultTest,
     set_secrets,
     write_config,
-    fernet_token,
-    scrypt_token,
+    make_fernet_token,
+    make_scrypt_token,
 )
 
 
@@ -74,7 +74,7 @@ def test_load_leaves_the_full_loader_without_the_vault_tag():
 
 def test_load_of_a_config_file_keeps_the_secret_a_vaultref(key, tmp_path):
     """A !vault value of a config file is stored as VaultRef, never as plaintext."""
-    path = write_config(tmp_path, f'db:\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
+    path = write_config(tmp_path, f'db:\n  password: !vault:master {make_fernet_token(key, "s3cret")}\n')
     with VaultTest(path) as app:
         stored = RawConfigParser.get(app.config, 'db', 'password')
         assert isinstance(stored, VaultRef)
@@ -83,7 +83,7 @@ def test_load_of_a_config_file_keeps_the_secret_a_vaultref(key, tmp_path):
 
 def test_parse_file_of_a_further_file_loads_its_secret_and_skips_an_empty_one(key, tmp_path):
     """parse_file reads !vault of a further file, an empty file changes nothing."""
-    (tmp_path / 'more.yaml').write_text(f'mail:\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
+    (tmp_path / 'more.yaml').write_text(f'mail:\n  password: !vault:master {make_fernet_token(key, "s3cret")}\n')
     (tmp_path / 'empty.yaml').write_text('')
     with VaultTest(write_config(tmp_path)) as app:
         assert app.config.parse_file(str(tmp_path / 'more.yaml')) is True
@@ -205,7 +205,7 @@ def test_get_profile_stays_readable_beside_a_secret_in_another_profile(key, tmp_
     path = tmp_path / 'app.yaml'
     path.write_text(
         f'vault:\n  profiles:\n    master:\n      type: enc\n      env: {MASTER_ENV}\n'
-        f'    other:\n      type: enc\n      env: !vault:master {fernet_token(key, MASTER_ENV)}\n'
+        f'    other:\n      type: enc\n      env: !vault:master {make_fernet_token(key, MASTER_ENV)}\n'
     )
     with VaultTest(str(path)) as app:
         assert app.config.get_profile('master') == {'type': 'enc', 'env': MASTER_ENV}
@@ -216,7 +216,7 @@ def test_get_profile_with_a_secret_in_it_fails(key, tmp_path):
     path = tmp_path / 'app.yaml'
     path.write_text(
         f'vault:\n  profiles:\n    master:\n      type: enc\n      env: {MASTER_ENV}\n'
-        f'    other:\n      type: enc\n      env: !vault:master {fernet_token(key, MASTER_ENV)}\n'
+        f'    other:\n      type: enc\n      env: !vault:master {make_fernet_token(key, MASTER_ENV)}\n'
     )
     with VaultTest(str(path)) as app:
         with pytest.raises(TokeoVaultError, match="vault profile 'other' must not hold a !vault value"):
@@ -243,20 +243,20 @@ def test_resolve_passes_a_plain_value_through(value):
 def test_resolve_decrypts_a_vaultref(key, tmp_path):
     """A VaultRef of the master profile resolves to its plaintext."""
     with VaultTest(write_config(tmp_path)) as app:
-        assert app.config.resolve(VaultRef('master', fernet_token(key, 's3cret'))) == 's3cret'
+        assert app.config.resolve(VaultRef('master', make_fernet_token(key, 's3cret'))) == 's3cret'
 
 
 def test_resolve_decrypts_a_vaultref_of_a_scrypt_profile(key, tmp_path):
     """A VaultRef of the scrypt profile resolves with the derived key."""
     with VaultTest(write_config(tmp_path)) as app:
-        assert app.config.resolve(VaultRef('human', scrypt_token('s3cret'))) == 's3cret'
+        assert app.config.resolve(VaultRef('human', make_scrypt_token('s3cret'))) == 's3cret'
 
 
 def test_resolve_with_an_unknown_profile_fails(key, tmp_path):
     """A VaultRef of a missing profile raises TokeoVaultError."""
     with VaultTest(write_config(tmp_path)) as app:
         with pytest.raises(TokeoVaultError, match="unknown vault profile 'nope'"):
-            app.config.resolve(VaultRef('nope', fernet_token(key, 's3cret')))
+            app.config.resolve(VaultRef('nope', make_fernet_token(key, 's3cret')))
 
 
 def test_resolve_with_an_unregistered_type_fails(key, tmp_path):
@@ -273,7 +273,7 @@ def test_resolve_with_a_wrong_key_fails(key, tmp_path):
     other = Fernet.generate_key().decode()
     with VaultTest(write_config(tmp_path)) as app:
         with pytest.raises(TokeoVaultError, match='could not be decrypted'):
-            app.config.resolve(VaultRef('master', fernet_token(other, 's3cret')))
+            app.config.resolve(VaultRef('master', make_fernet_token(other, 's3cret')))
 
 
 # get
@@ -281,14 +281,14 @@ def test_resolve_with_a_wrong_key_fails(key, tmp_path):
 
 def test_get_decrypts_a_secret(key, tmp_path):
     """A !vault value of section.key is read as its plaintext."""
-    path = write_config(tmp_path, f'db:\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
+    path = write_config(tmp_path, f'db:\n  password: !vault:master {make_fernet_token(key, "s3cret")}\n')
     with VaultTest(path) as app:
         assert app.config.get('db', 'password') == 's3cret'
 
 
 def test_get_marks_a_secret_as_vault_secret(key, tmp_path):
     """A read secret is a VaultSecret, so redact_vault masks it in a copy."""
-    path = write_config(tmp_path, f'db:\n  user: shop\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
+    path = write_config(tmp_path, f'db:\n  user: shop\n  password: !vault:master {make_fernet_token(key, "s3cret")}\n')
     with VaultTest(path) as app:
         db = app.config.get_section_dict('db')
     assert isinstance(db['password'], VaultSecret) and redact_vault(db) == {'user': 'shop', 'password': '***'}
@@ -306,9 +306,10 @@ def test_get_reads_a_plain_value_without_a_key(tmp_path, monkeypatch):
 
 def test_get_decrypts_secrets_at_any_depth(key, tmp_path):
     """Secrets nested in mappings and lists read as plaintext."""
-    token = fernet_token(key, 'deep')
+    token = make_fernet_token(key, 'deep')
     path = write_config(
-        tmp_path, f'db:\n  auth:\n    user: admin\n    password: !vault:master {token}\n    list: [1, !vault:human {scrypt_token("pw")}]\n'
+        tmp_path,
+        f'db:\n  auth:\n    user: admin\n    password: !vault:master {token}\n    list: [1, !vault:human {make_scrypt_token("pw")}]\n',
     )
     with VaultTest(path) as app:
         assert app.config.get('db', 'auth') == {'user': 'admin', 'password': 'deep', 'list': [1, 'pw']}
@@ -316,7 +317,7 @@ def test_get_decrypts_secrets_at_any_depth(key, tmp_path):
 
 def test_get_keeps_the_stored_secret_encrypted(key, tmp_path):
     """After a read the stored config still holds the VaultRef."""
-    path = write_config(tmp_path, f'db:\n  auth:\n    password: !vault:master {fernet_token(key, "s3cret")}\n')
+    path = write_config(tmp_path, f'db:\n  auth:\n    password: !vault:master {make_fernet_token(key, "s3cret")}\n')
     with VaultTest(path) as app:
         assert app.config.get('db', 'auth') == {'password': 's3cret'}
         assert isinstance(RawConfigParser.get(app.config, 'db', 'auth')['password'], VaultRef)
@@ -331,7 +332,7 @@ def test_get_without_secrets_returns_the_stored_object(key, tmp_path):
 
 def test_get_section_dict_decrypts_the_secrets(key, tmp_path):
     """get_section_dict gives the secrets of a section as plaintext."""
-    path = write_config(tmp_path, f'db:\n  user: admin\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
+    path = write_config(tmp_path, f'db:\n  user: admin\n  password: !vault:master {make_fernet_token(key, "s3cret")}\n')
     with VaultTest(path) as app:
         assert app.config.get_section_dict('db') == {'user': 'admin', 'password': 's3cret'}
 
@@ -340,7 +341,7 @@ def test_get_decrypts_a_vaultref_merged_by_code(key):
     """A VaultRef merged into the config by code is decrypted on read as well."""
     with VaultTest() as app:
         app.config.merge({'vault': {'profiles': {'master': {'type': 'enc', 'env': MASTER_ENV}}}})
-        app.config.merge({'db': {'password': VaultRef('master', fernet_token(key, 's3cret'))}})
+        app.config.merge({'db': {'password': VaultRef('master', make_fernet_token(key, 's3cret'))}})
         assert app.config.get('db', 'password') == 's3cret'
 
 
@@ -355,7 +356,7 @@ def test_get_without_the_key_fails_on_read(tmp_path, monkeypatch):
 
 def test_get_of_a_tampered_secret_fails(key, tmp_path):
     """A secret changed in the file raises TokeoVaultError on read."""
-    token = fernet_token(key, 's3cret')
+    token = make_fernet_token(key, 's3cret')
     tampered = token[:40] + ('A' if token[40] != 'A' else 'B') + token[41:]
     path = write_config(tmp_path, f'db:\n  password: !vault:master {tampered}\n')
     with VaultTest(path) as app:
@@ -368,7 +369,7 @@ def test_get_of_a_tampered_secret_fails(key, tmp_path):
 
 def test_env_override_replaces_a_secret_with_its_plain_value(key, tmp_path, monkeypatch):
     """TOKEO_TEST_DB_PASSWORD=plain wins over the !vault value of db.password."""
-    path = write_config(tmp_path, f'db:\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
+    path = write_config(tmp_path, f'db:\n  password: !vault:master {make_fernet_token(key, "s3cret")}\n')
     with VaultTest(path) as app:
         monkeypatch.setenv('TOKEO_TEST_DB_PASSWORD', 'plain')
         assert app.config.get('db', 'password') == 'plain'
@@ -376,8 +377,8 @@ def test_env_override_replaces_a_secret_with_its_plain_value(key, tmp_path, monk
 
 def test_env_override_holding_a_token_is_not_decrypted(key, tmp_path, monkeypatch):
     """A Fernet token given as env override is read as the token itself."""
-    path = write_config(tmp_path, f'db:\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
-    token = fernet_token(key, 'other')
+    path = write_config(tmp_path, f'db:\n  password: !vault:master {make_fernet_token(key, "s3cret")}\n')
+    token = make_fernet_token(key, 'other')
     with VaultTest(path) as app:
         monkeypatch.setenv('TOKEO_TEST_DB_PASSWORD', token)
         assert app.config.get('db', 'password') == token
@@ -387,7 +388,8 @@ def test_env_override_of_a_nested_secret_is_plain(key, tmp_path, monkeypatch):
     """TOKEO_TEST_DB_AUTH_PASSWORD replaces one nested secret, not its sibling."""
     path = write_config(
         tmp_path,
-        f'db:\n  auth:\n    password: !vault:master {fernet_token(key, "s3cret")}\n    token: !vault:master {fernet_token(key, "t0ken")}\n',
+        f'db:\n  auth:\n    password: !vault:master {make_fernet_token(key, "s3cret")}\n'
+        f'    token: !vault:master {make_fernet_token(key, "t0ken")}\n',
     )
     with VaultTest(path) as app:
         monkeypatch.setenv('TOKEO_TEST_DB_AUTH_PASSWORD', 'plain')
@@ -396,8 +398,8 @@ def test_env_override_of_a_nested_secret_is_plain(key, tmp_path, monkeypatch):
 
 def test_env_override_with_a_vault_tag_fails(key, tmp_path, monkeypatch):
     """An env override holding a !vault value raises TokeoYamlConfigError."""
-    path = write_config(tmp_path, f'db:\n  password: !vault:master {fernet_token(key, "s3cret")}\n')
+    path = write_config(tmp_path, f'db:\n  password: !vault:master {make_fernet_token(key, "s3cret")}\n')
     with VaultTest(path) as app:
-        monkeypatch.setenv('TOKEO_TEST_DB_PASSWORD', f'!vault:master {fernet_token(key, "other")}')
+        monkeypatch.setenv('TOKEO_TEST_DB_PASSWORD', f'!vault:master {make_fernet_token(key, "other")}')
         with pytest.raises(TokeoYamlConfigError, match='TOKEO_TEST_DB_PASSWORD'):
             app.config.get('db', 'password')

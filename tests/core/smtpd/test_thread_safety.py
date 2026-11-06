@@ -46,13 +46,13 @@ def test_thread_safety_with_multiple_connections():
         srv, port = await start_smtpd(ev, options=OPTIONS)
         loop = asyncio.get_event_loop()
 
-        def one(index):
+        def send_one(index):
             email = f'administrator_{index}@local.local'
             send_mail(port, email, email, mail, authentication_id=email, password='password', auth_type='plain')
 
         try:
             with ThreadPoolExecutor(max_workers=count) as pool:
-                await asyncio.gather(*(loop.run_in_executor(pool, one, i) for i in range(count)))
+                await asyncio.gather(*(loop.run_in_executor(pool, send_one, i) for i in range(count)))
             assert await wait_until_async(lambda: srv.processings == 0)
         finally:
             await srv.stop(wait_seconds_before_close=1.0)

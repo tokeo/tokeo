@@ -32,17 +32,17 @@ needs_python_313 = pytest.mark.skipif(
 )
 
 
-def _busy(seconds):
+def _run_busy(seconds):
     # python steps only, so the exception arrives at once
     end = time.monotonic() + seconds
     while time.monotonic() < end:
         pass
 
 
-def _stray_exception():
+def _has_stray_exception():
     # python steps after a call, a stray exception of its limit shows up here
     try:
-        _busy(0.01)
+        _run_busy(0.01)
         return False
     except TokeoTimelimitExceeded:
         return True
@@ -69,7 +69,7 @@ def test_call_within_its_limit_returns_and_nothing_arrives_later():
         return 'ran'
 
     assert job() == 'ran'
-    _busy(0.4)
+    _run_busy(0.4)
     assert threading.active_count() == 1
 
 
@@ -79,13 +79,13 @@ def test_call_past_its_limit_is_aborted_with_a_message():
 
     @timelimit(0.2)
     def job():
-        _busy(10)
+        _run_busy(10)
 
     started = time.monotonic()
     with pytest.raises(TokeoTimelimitExceeded, match='job exceeded its time limit of 0.2 s'):
         job()
     assert 0.2 <= time.monotonic() - started < 0.5
-    assert not _stray_exception()
+    assert not _has_stray_exception()
 
 
 @needs_python_313
@@ -96,7 +96,7 @@ def test_except_exception_in_the_call_does_not_swallow_it():
     def job():
         while True:
             try:
-                _busy(0.05)
+                _run_busy(0.05)
             except Exception:
                 pass
 
@@ -111,13 +111,13 @@ def test_except_base_exception_in_the_call_swallows_it():
     @timelimit(0.1)
     def job():
         try:
-            _busy(0.3)
+            _run_busy(0.3)
         except BaseException:
             pass
         return 'ran'
 
     assert job() == 'ran'
-    assert not _stray_exception()
+    assert not _has_stray_exception()
 
 
 @needs_python_313
@@ -128,7 +128,7 @@ def test_finally_of_the_call_runs():
     @timelimit(0.2)
     def job():
         try:
-            _busy(10)
+            _run_busy(10)
         finally:
             cleaned.append(True)
 
@@ -143,7 +143,7 @@ def test_outer_limit_goes_through_an_inner_one():
 
     @timelimit(10)
     def inner():
-        _busy(10)
+        _run_busy(10)
 
     @timelimit(0.2)
     def outer():
@@ -159,7 +159,7 @@ def test_inner_limit_can_be_caught_by_the_outer_call():
 
     @timelimit(0.2)
     def inner():
-        _busy(10)
+        _run_busy(10)
 
     @timelimit(10)
     def outer():
@@ -169,7 +169,7 @@ def test_inner_limit_can_be_caught_by_the_outer_call():
             return str(err)
 
     assert 'inner exceeded its time limit of 0.2 s' in outer()
-    assert not _stray_exception()
+    assert not _has_stray_exception()
 
 
 @needs_python_313
@@ -178,7 +178,7 @@ def test_call_in_a_thread_pool_is_aborted():
 
     @timelimit(0.2)
     def job():
-        _busy(10)
+        _run_busy(10)
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(job)
@@ -241,7 +241,7 @@ def test_calls_ending_right_at_their_limit_leave_nothing_behind():
 
     @timelimit(0.02)
     def job(duration):
-        _busy(duration)
+        _run_busy(duration)
         return 'ran'
 
     outcomes = set()
@@ -250,7 +250,7 @@ def test_calls_ending_right_at_their_limit_leave_nothing_behind():
             outcomes.add(job(random.uniform(0.0, 0.05)))
         except TokeoTimelimitExceeded:
             outcomes.add('aborted')
-        assert not _stray_exception()
+        assert not _has_stray_exception()
     assert outcomes == {'ran', 'aborted'}
     assert threading.active_count() == 1
 
@@ -262,7 +262,7 @@ def test_errors_raised_right_at_the_limit_leave_nothing_behind():
 
     @timelimit(0.02)
     def job(duration):
-        _busy(duration)
+        _run_busy(duration)
         raise ValueError('own')
 
     outcomes = set()
@@ -273,7 +273,7 @@ def test_errors_raised_right_at_the_limit_leave_nothing_behind():
             outcomes.add('own error')
         except TokeoTimelimitExceeded:
             outcomes.add('aborted')
-        assert not _stray_exception()
+        assert not _has_stray_exception()
     assert outcomes == {'own error', 'aborted'}
 
 
@@ -284,13 +284,13 @@ def test_nested_limits_running_off_together_do_not_lose_the_outer_one():
 
     @timelimit(0.02)
     def inner(duration):
-        _busy(duration)
+        _run_busy(duration)
 
     @timelimit(0.02)
     def outer(duration):
         inner(duration)
         # far past the limit of the outer call
-        _busy(1)
+        _run_busy(1)
         return 'ran on'
 
     for _ in range(200):
@@ -298,7 +298,7 @@ def test_nested_limits_running_off_together_do_not_lose_the_outer_one():
         with pytest.raises(TokeoTimelimitExceeded):
             outer(random.uniform(0.0, 0.05))
         assert time.monotonic() - started < 0.5
-        assert not _stray_exception()
+        assert not _has_stray_exception()
 
 
 @stresstest
@@ -310,7 +310,7 @@ def test_many_threads_running_off_at_once_are_all_aborted():
 
     @timelimit(0.2)
     def job():
-        _busy(30)
+        _run_busy(30)
 
     def run():
         try:

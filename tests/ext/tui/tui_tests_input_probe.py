@@ -22,7 +22,7 @@ class TuiInputProbeTest(TuiInputTest):
         label = 'probe'
 
 
-def command(line):
+def run_command(line):
     if line == 'exit':
         raise EOFError()
     if line == 'slow':
@@ -36,7 +36,7 @@ def command(line):
     return True
 
 
-def other_thread(app):
+def run_other_thread(app):
     time.sleep(0.5)
     print('MARK-PRINT')
     app.log.warning('MARK-LOG')
@@ -48,8 +48,8 @@ if __name__ == '__main__':
         log_file = sys.argv[1] if len(sys.argv) > 1 else None
         if log_file:
             app.log.backend.addHandler(logging.FileHandler(log_file))
-        threading.Thread(target=other_thread, args=(app,), daemon=True).start()
-        app.tui.input.shell(command, prompt='Probe> ')
+        threading.Thread(target=run_other_thread, args=(app,), daemon=True).start()
+        app.tui.input.shell(run_command, prompt='Probe> ')
         if log_file:
             with open(log_file, 'a') as f:
                 f.write('SHELL-ENDED\n')

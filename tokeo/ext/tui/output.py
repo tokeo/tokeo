@@ -88,7 +88,7 @@ class TokeoTuiOutput:
         from rich import box
         from rich.table import Table
 
-        rows = [[_text(value) for value in row] for row in rows]
+        rows = [[_build_text(value) for value in row] for row in rows]
         specs = [(column, 'left') if isinstance(column, str) else column for column in columns]
         widths, minimums, lasts = [], [], []
         for index, (name, justify, *full) in enumerate(specs):
@@ -122,7 +122,7 @@ class TokeoTuiOutput:
         - **rich.text.Text**: The text, for tables or print
 
         """
-        text = _text(value)
+        text = _build_text(value)
         if style:
             text.stylize(style)
         return text
@@ -136,7 +136,7 @@ class TokeoTuiOutput:
         - **renderables**: What to print; plain strings are printed as they are
 
         """
-        self._console.print(_group(renderables))
+        self._console.print(_build_group(renderables))
 
     def json(self, data):
         """
@@ -168,7 +168,7 @@ class TokeoTuiOutput:
         from rich.console import Console
 
         buffer = io.StringIO()
-        Console(file=buffer, width=width or self._console.width, color_system=None, highlight=False).print(_group(renderables))
+        Console(file=buffer, width=width or self._console.width, color_system=None, highlight=False).print(_build_group(renderables))
         return buffer.getvalue()
 
     def follow(self, render, interval, repaint=None, count=None):
@@ -200,14 +200,14 @@ class TokeoTuiOutput:
             if repaint:
                 with Live(console=self._console, screen=True, auto_refresh=False) as live:
                     while count is None or shown < count:
-                        live.update(_group(_items(render())), refresh=True)
+                        live.update(_build_group(_build_items(render())), refresh=True)
                         shown += 1
                         time.sleep(interval)
             else:
                 while count is None or shown < count:
                     if shown:
                         self._console.print()
-                    self._console.print(_group(_items(render())))
+                    self._console.print(_build_group(_build_items(render())))
                     shown += 1
                     time.sleep(interval)
         except KeyboardInterrupt:
@@ -217,7 +217,7 @@ class TokeoTuiOutput:
                 raise
 
 
-def _text(value):
+def _build_text(value):
     """Turn a value into a renderable that shows it as it is."""
     from rich.protocol import is_renderable
     from rich.text import Text
@@ -239,14 +239,14 @@ def _fit(widths, minimums, available):
     return widths
 
 
-def _group(renderables):
+def _build_group(renderables):
     """Group renderables to show each on its own line."""
     from rich.console import Group
 
-    return Group(*(_text(item) for item in renderables))
+    return Group(*(_build_text(item) for item in renderables))
 
 
-def _items(renderables):
+def _build_items(renderables):
     """Make a list of one or more renderables."""
     return list(renderables) if isinstance(renderables, (list, tuple)) else [renderables]
 

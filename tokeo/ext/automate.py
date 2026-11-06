@@ -1309,7 +1309,7 @@ class TokeoAutomate(MetaMixin):
         """
 
         # a simple wrapper to raise not exist function error on runtime
-        def __unknown_function(module, key):
+        def __build_unknown_function(module, key):
             def wrapper(runner, **kwargs):
                 raise TokeoAutomateError(f'A function named "{key}" does not exist in module "{module}"')
 
@@ -1358,7 +1358,7 @@ class TokeoAutomate(MetaMixin):
             try:
                 func = getattr(self._imported_modules[module], key)
             except AttributeError:
-                func = __unknown_function(module, key)
+                func = __build_unknown_function(module, key)
             # non AttributeError exceptions will raise hereafter
             # create protected dict
             task_protect = _config_task.get('protect', _default_task_protect)
@@ -2162,16 +2162,16 @@ class TokeoAutomateShell:
         output = self.app.tui.output
         automate = self.app.automate
         if args.cmd == 'hosts.list':
-            rows = [[h['id'], h['name'], h['host'], h.get('port'), h.get('user'), _auth(h)] for h in automate.hosts.values()]
+            rows = [[h['id'], h['name'], h['host'], h.get('port'), h.get('user'), _join_auth_keys(h)] for h in automate.hosts.values()]
             output.print(output.table([('id', 'left', 'full'), 'name', 'host', ('port', 'right'), 'user', 'auth'], rows, title='hosts'))
         elif args.cmd == 'groups.list':
-            rows = [[group, _host_ids(hosts)] for group, hosts in automate.hostgroups.items()]
+            rows = [[group, _join_host_ids(hosts)] for group, hosts in automate.hostgroups.items()]
             output.print(output.table([('group', 'left', 'full'), 'hosts'], rows, title='hostgroups'))
         elif args.cmd == 'conns.list':
             # the defaults first
             names = ['_defaults', *(name for name in automate.connections if name != '_defaults')]
             rows = [
-                [name, c.get('name'), c.get('user'), c.get('port'), _host_ids(c.get('hosts') or ()), _auth(c)]
+                [name, c.get('name'), c.get('user'), c.get('port'), _join_host_ids(c.get('hosts') or ()), _join_auth_keys(c)]
                 for name, c in ((name, automate.connections[name]) for name in names)
             ]
             columns = [('id', 'left', 'full'), 'name', 'user', ('port', 'right'), 'hosts', 'auth']
@@ -2307,7 +2307,7 @@ class TokeoAutomateShell:
 
         """
 
-        def command(line):
+        def run_command(line):
             # an empty line between two commands
             try:
                 return self.command(line)
@@ -2315,7 +2315,9 @@ class TokeoAutomateShell:
                 print('')
 
         self.app.log.info('Welcome to automate interactive shell.')
-        self.app.tui.input.shell(command, prompt='Automate> ', completer=self.shell_completion(), history=self.shell_history(), **session)
+        self.app.tui.input.shell(
+            run_command, prompt='Automate> ', completer=self.shell_completion(), history=self.shell_history(), **session
+        )
         self.app.log.info('bye bye using automate shell...')
 
 
@@ -2487,12 +2489,12 @@ class TokeoAutomateController(Controller):
         shell.launch()
 
 
-def _host_ids(hosts):
+def _join_host_ids(hosts):
     """Join the ids of hosts, given as host dicts or as ids."""
     return ', '.join(host['id'] if isinstance(host, dict) else str(host) for host in hosts)
 
 
-def _auth(entry):
+def _join_auth_keys(entry):
     """Name the credentials set for a host or connection, never their values."""
     return ', '.join(key for key in ('identity', 'password', 'sudo') if entry.get(key))
 

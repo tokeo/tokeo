@@ -22,7 +22,7 @@ from tests.utils import stresstest
 from tests.ext.diskcache.diskcache_tests_helper import (
     DiskcacheTest,
     Connections,
-    max_overlap,
+    get_max_overlap,
     spawn_context,
     collect_results,
     stop_processes,
@@ -55,18 +55,18 @@ WEIGHTS = dict(
 )
 
 
-def _payload(rnd):
+def _make_payload(rnd):
     # mostly small values, sometimes above 32 KiB so diskcache stores them in files
     size = rnd.choice((0, 10, 1000, 10000, 40000, 100000))
     return rnd.randbytes(size)
 
 
-def _value_of(key, data):
+def _make_value(key, data):
     # raw bytes as diskcache stores them unchanged: key, separator, digest, data
     return key.encode() + b'\0' + hashlib.sha256(data).digest() + data
 
 
-def _wrong_value(key, value):
+def _find_value_error(key, value):
     # a value is right when it is missing or belongs to its key and is complete
     if value is None:
         return None
@@ -79,7 +79,7 @@ def _wrong_value(key, value):
     return None
 
 
-def _accounts(app):
+def _read_accounts(app):
     # read all accounts in a transaction, set them up again when one is missing
     keys = [f'acc:{n}' for n in range(ACCOUNTS)]
     values = [app.cache.get(key, retry=True) for key in keys]
@@ -99,12 +99,12 @@ class Participant:
         self.report = dict(errors=[], wrong=[], lost=[], ops=Counter(), counter=0, tempers={}, mutex=[], throttles={}, purges=[])
         self.report['tempers'] = {name: [] for name in TEMPERS}
         self.report['throttles'] = {name: [] for name in THROTTLES}
-        self.tempers = {name: self.tempered(name, count) for name, count in TEMPERS.items()}
-        self.throttles = {name: self.throttled(name, *spec) for name, spec in THROTTLES.items()}
+        self.tempers = {name: self.make_tempered(name, count) for name, count in TEMPERS.items()}
+        self.throttles = {name: self.make_throttled(name, *spec) for name, spec in THROTTLES.items()}
         # the warnings of locks that were lost before their release
         self.app.log.warning = lambda msg, **kw: self.record_lost(msg)
 
-    def tempered(self, name, count):
+    def make_tempered(self, name, count):
         @self.app.cache.locks.temper(count=count, name=name, sleep_time=0.005, verbose=False)
         def job(hold):
             start = time.time()
@@ -117,7 +117,7 @@ class Participant:
 
         return job, job_or_skip
 
-    def throttled(self, name, count, per_seconds, blocking):
+    def make_throttled(self, name, count, per_seconds, blocking):
         kw = {} if blocking else dict(cb_on_locked=lambda **kw: None)
 
         @self.app.cache.locks.throttle(count=count, per_seconds=per_seconds, name=name, verbose=False, **kw)
@@ -134,54 +134,54 @@ class Participant:
         with self.lock:
             self.report['lost'].append(msg)
 
-    def wrong(self, text):
+    def record_wrong(self, text):
         if text:
             with self.lock:
                 self.report['wrong'].append(text)
 
     # the operations, each gets the random generator of its thread
 
-    def op_get(self, rnd):
+    def run_op_get(self, rnd):
         key = f'd:{rnd.randrange(200)}'
-        self.wrong(_wrong_value(key, self.app.cache.get(key, retry=rnd.random() < 0.5)))
+        self.record_wrong(_find_value_error(key, self.app.cache.get(key, retry=rnd.random() < 0.5)))
 
-    def op_set(self, rnd):
+    def run_op_set(self, rnd):
         key = f'd:{rnd.randrange(200)}'
-        self.app.cache.set(key, _value_of(key, _payload(rnd)), tag='stress', retry=rnd.random() < 0.5)
+        self.app.cache.set(key, _make_value(key, _make_payload(rnd)), tag='stress', retry=rnd.random() < 0.5)
 
-    def op_delete(self, rnd):
+    def run_op_delete(self, rnd):
         self.app.cache.delete(f'd:{rnd.randrange(200)}', retry=rnd.random() < 0.5)
 
-    def op_add(self, rnd):
+    def run_op_add(self, rnd):
         key = f'e:{rnd.randrange(50)}'
-        self.app.cache.add(key, _value_of(key, _payload(rnd)), expire=rnd.uniform(0.01, 0.5), retry=rnd.random() < 0.5)
-        self.wrong(_wrong_value(key, self.app.cache.get(key, retry=rnd.random() < 0.5)))
+        self.app.cache.add(key, _make_value(key, _make_payload(rnd)), expire=rnd.uniform(0.01, 0.5), retry=rnd.random() < 0.5)
+        self.record_wrong(_find_value_error(key, self.app.cache.get(key, retry=rnd.random() < 0.5)))
 
-    def op_touch(self, rnd):
+    def run_op_touch(self, rnd):
         self.app.cache.touch(f'e:{rnd.randrange(50)}', expire=rnd.uniform(0.01, 0.5), retry=rnd.random() < 0.5)
 
-    def op_counter(self, rnd):
+    def run_op_counter(self, rnd):
         with self.app.cache.transact(retry=True):
             value = self.app.cache.get('counter', 0, retry=True)
             self.app.cache.set('counter', value + 1, retry=True)
         with self.lock:
             self.report['counter'] += 1
 
-    def op_transfer(self, rnd):
+    def run_op_transfer(self, rnd):
         with self.app.cache.transact(retry=True):
-            keys, values = _accounts(self.app)
+            keys, values = _read_accounts(self.app)
             a, b = rnd.sample(range(ACCOUNTS), 2)
             amount = rnd.randint(0, values[a])
             self.app.cache.set(keys[a], values[a] - amount, retry=True)
             self.app.cache.set(keys[b], values[b] + amount, retry=True)
 
-    def op_audit(self, rnd):
+    def run_op_audit(self, rnd):
         with self.app.cache.transact(retry=True):
-            _, values = _accounts(self.app)
+            _, values = _read_accounts(self.app)
         if sum(values) != ACCOUNTS * BALANCE or min(values) < 0:
-            self.wrong(f'accounts: {values}')
+            self.record_wrong(f'accounts: {values}')
 
-    def op_temper(self, rnd):
+    def run_op_temper(self, rnd):
         name = rnd.choice(list(TEMPERS))
         job, job_or_skip = self.tempers[name]
         interval = (job if rnd.random() < 0.5 else job_or_skip)(rnd.uniform(0.001, 0.02))
@@ -190,15 +190,15 @@ class Participant:
         # the expire times in the cache are sorted and never more than the count
         value = self.app.cache.get(f'dc_{name}', retry=True)
         if value is not None and not (type(value) is list and len(value) <= TEMPERS[name] and value == sorted(value)):
-            self.wrong(f'{name}: {value}')
+            self.record_wrong(f'{name}: {value}')
 
-    def op_throttle(self, rnd):
+    def run_op_throttle(self, rnd):
         name = rnd.choice(list(THROTTLES))
         ran = self.throttles[name]()
         if ran:
             self.record('throttles', name, ran)
 
-    def op_mutex(self, rnd):
+    def run_op_mutex(self, rnd):
         with self.app.cache.locks.lock('stress_m'):
             start = time.time()
             time.sleep(rnd.uniform(0, 0.003))
@@ -206,14 +206,14 @@ class Participant:
         with self.lock:
             self.report['mutex'].append((start, end))
 
-    def op_thread(self, rnd):
+    def run_op_thread(self, rnd):
         # a short thread, its connection has to close when it ends
         seed = rnd.randrange(2**32)
         thread = threading.Thread(target=self.work, args=(seed, time.monotonic() + rnd.uniform(0, 0.05)))
         thread.start()
         thread.join()
 
-    def op_purge(self, rnd):
+    def run_op_purge(self, rnd):
         choice = rnd.choice(('purge', 'locks', 'evict', 'expire'))
         if choice == 'purge':
             self.app.cache.purge(retry=True)
@@ -233,19 +233,19 @@ class Participant:
         while time.monotonic() < until:
             name = rnd.choices(names, weights)[0]
             try:
-                getattr(self, f'op_{name}')(rnd)
+                getattr(self, f'run_op_{name}')(rnd)
             except Exception:
                 with self.lock:
                     self.report['errors'].append(f'{name}: {traceback.format_exc(limit=-3)}')
             with self.lock:
                 self.report['ops'][name] += 1
 
-    def purger(self, seed, until):
+    def run_purger(self, seed, until):
         rnd = random.Random(seed)
         while time.monotonic() < until:
             time.sleep(rnd.uniform(0.05, 0.5))
             try:
-                self.op_purge(rnd)
+                self.run_op_purge(rnd)
             except Exception:
                 with self.lock:
                     self.report['errors'].append(f'purge: {traceback.format_exc(limit=-3)}')
@@ -259,7 +259,7 @@ class Participant:
             with ThreadPoolExecutor(max_workers=workers + 1) as pool:
                 futures = [pool.submit(self.work, rnd.randrange(2**32), until) for _ in range(workers)]
                 if self.purge:
-                    futures.append(pool.submit(self.purger, rnd.randrange(2**32), until - TAIL))
+                    futures.append(pool.submit(self.run_purger, rnd.randrange(2**32), until - TAIL))
                 for future in futures:
                     future.result()
         finally:
@@ -268,7 +268,7 @@ class Participant:
         return self.report
 
 
-def _stress_worker(directory, index, seed, seconds, purge, result_queue):
+def _run_stress_worker(directory, index, seed, seconds, purge, result_queue):
     try:
         with DiskcacheTest(directory) as app:
             result_queue.put(('ok', Participant(app, index, seed, seconds, purge).run()))
@@ -302,7 +302,7 @@ def _throttle_excess(times, count, per_seconds):
     return worst
 
 
-def _after(report, since):
+def _get_runs_after(report, since):
     # the runs that started after a point in time
     tail = dict(report, mutex=[item for item in report['mutex'] if item[0] > since])
     tail['tempers'] = {name: [item for item in items if item[0] > since] for name, items in report['tempers'].items()}
@@ -311,15 +311,15 @@ def _after(report, since):
 
 
 def _show(report, title):
-    print(f'{title}: mutex runs={len(report["mutex"])} overlap={max_overlap(report["mutex"])}')
+    print(f'{title}: mutex runs={len(report["mutex"])} overlap={get_max_overlap(report["mutex"])}')
     for name, count in TEMPERS.items():
-        print(f'{title}: {name} count={count} runs={len(report["tempers"][name])} overlap={max_overlap(report["tempers"][name])}')
+        print(f'{title}: {name} count={count} runs={len(report["tempers"][name])} overlap={get_max_overlap(report["tempers"][name])}')
     for name, (count, per_seconds, _) in THROTTLES.items():
         times = report['throttles'][name]
         print(f'{title}: {name} runs={len(times)} excess={_throttle_excess(times, count, per_seconds):.2f}')
 
 
-def _stress(directory, monkeypatch, purge):
+def _run_stress(directory, monkeypatch, purge):
     if SECONDS <= TAIL:
         # a purge run keeps its last TAIL seconds free of purges
         pytest.fail(f'STRESS_SECONDS={SECONDS} is too short, it must be above {TAIL}', pytrace=False)
@@ -331,7 +331,7 @@ def _stress(directory, monkeypatch, purge):
     with DiskcacheTest(directory) as app:
         app.cache.set('counter', 0)
         procs = [
-            ctx.Process(target=_stress_worker, args=(directory, index, seed + index, SECONDS, purge, result_queue))
+            ctx.Process(target=_run_stress_worker, args=(directory, index, seed + index, SECONDS, purge, result_queue))
             for index in range(1, PROCESSES + 1)
         ]
         for proc in procs:
@@ -354,7 +354,7 @@ def _stress(directory, monkeypatch, purge):
     print(f'counter={counter} increments={report["counter"]} lost locks={len(report["lost"])}')
     _show(report, 'all')
     if purge:
-        _show(_after(report, max(report['purges'])), 'tail')
+        _show(_get_runs_after(report, max(report['purges'])), 'tail')
     return report, counter, warnings, integrity, connections
 
 
@@ -366,7 +366,7 @@ def test_stress_runs_without_errors_or_wrong_values(tmp_path, monkeypatch, purge
     or wrong values, with a sound database and no open connection; the
     steady run also keeps every count, lock and limit.
     """
-    report, counter, warnings, integrity, connections = _stress(str(tmp_path), monkeypatch, purge)
+    report, counter, warnings, integrity, connections = _run_stress(str(tmp_path), monkeypatch, purge)
     # no failed operation, no wrong value, a healthy database, no open connection
     assert report['errors'] == []
     assert report['wrong'] == []
@@ -382,8 +382,8 @@ def test_stress_runs_without_errors_or_wrong_values(tmp_path, monkeypatch, purge
     assert report['lost'] == []
     for name, count in TEMPERS.items():
         assert len(report['tempers'][name]) > 0
-        assert max_overlap(report['tempers'][name]) <= count
-    assert max_overlap(report['mutex']) == 1
+        assert get_max_overlap(report['tempers'][name]) <= count
+    assert get_max_overlap(report['mutex']) == 1
     for name, (count, per_seconds, _) in THROTTLES.items():
         assert len(report['throttles'][name]) > 0
         assert _throttle_excess(report['throttles'][name], count, per_seconds) <= 0

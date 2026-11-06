@@ -148,7 +148,7 @@ def _resolve_events_handler(path):
     return events_handler
 
 
-def _plan(services, has_global_limit):
+def _build_plan(services, has_global_limit):
     """
     Decide the process topology for one invocation.
 
@@ -173,7 +173,7 @@ def _plan(services, has_global_limit):
     plan = {'inloop': [], 'forks': [], 'reuse': set(), 'shared': False}
     if len(services) == 1:
         svc = services[0]
-        count = _pre_fork(svc)
+        count = _get_pre_fork(svc)
         plan['inloop'] = [svc]
         if count > 1:
             plan['forks'] = [(svc, count - 1)]
@@ -181,7 +181,7 @@ def _plan(services, has_global_limit):
             plan['shared'] = has_global_limit
         return plan
     for svc in services:
-        count = _pre_fork(svc)
+        count = _get_pre_fork(svc)
         if count == 0:
             plan['inloop'].append(svc)
         else:
@@ -231,7 +231,7 @@ def _set_pdeathsig(sig=signal.SIGTERM):
         return False
 
 
-def _pre_fork(svc):
+def _get_pre_fork(svc):
     """Read the pre_fork worker count of a service config (default 0)."""
     count = (svc.get('server_options') or {}).get('pre_fork') or 0
     if not is_int_ge(count, 0):
@@ -423,7 +423,7 @@ class TokeoSmtpd(MetaMixin):
             raise TokeoSmtpdError(f'smtpd: service(s) named more than once: {", ".join(duplicates)}')
         return [by_name[name] for name in names]
 
-    def _listeners(self, svc, reuse_port):
+    def _build_listeners(self, svc, reuse_port):
         """The service listeners, flagged for SO_REUSEPORT when needed."""
         listeners = []
         for lst in svc.get('listeners') or []:
@@ -490,7 +490,7 @@ class TokeoSmtpd(MetaMixin):
             signal.pthread_sigmask(signal.SIG_UNBLOCK, (signal.SIGINT, signal.SIGTERM))
             for svc in services:
                 server = self._build_server(svc, global_limits)
-                listeners = self._listeners(svc, svc.get('name') in reuse)
+                listeners = self._build_listeners(svc, svc.get('name') in reuse)
                 await server.start(listeners)
                 # the server logs its addresses, here the service and its process
                 self.app.log.info(f"smtpd: service '{svc.get('name')}' started (pid {os.getpid()})")
@@ -546,7 +546,7 @@ class TokeoSmtpd(MetaMixin):
         max_processings = self._config('max_processings')
         max_connections = self._config('max_connections')
         has_global_limit = bool(max_processings) or bool(max_connections)
-        plan = _plan(services, has_global_limit)
+        plan = _build_plan(services, has_global_limit)
         if plan['shared']:
             global_limits = SharedGlobalLimits(max_processings, max_connections)
         elif has_global_limit:
@@ -632,7 +632,7 @@ class TokeoSmtpd(MetaMixin):
         for svc in self._config('services') or []:
             listeners_str = ', '.join(f"{lst.get('host')}:{lst.get('port')}" for lst in svc.get('listeners') or [])
             self.app.print(
-                f'{svc.get("name")}  events_handler={svc.get("events_handler")}  listeners=[{listeners_str}]  pre_fork={_pre_fork(svc)}'
+                f'{svc.get("name")}  events_handler={svc.get("events_handler")}  listeners=[{listeners_str}]  pre_fork={_get_pre_fork(svc)}'
             )
 
 

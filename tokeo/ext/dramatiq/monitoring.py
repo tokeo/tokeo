@@ -47,7 +47,7 @@ def exchange_name(app):
     return f'{app._meta.label}.dramatiq.monitoring'
 
 
-def _now_ms():
+def _get_now_ms():
     return int(time.time() * 1000)
 
 
@@ -55,7 +55,7 @@ def _cut(text):
     return text if len(text) <= DETAILS_MAX_LENGTH else text[:DETAILS_MAX_LENGTH] + '...'
 
 
-def _app_version(app):
+def _get_app_version(app):
     # the version of the distribution named like the package of the app
     try:
         return importlib.metadata.version(type(app).__module__.split('.')[0])
@@ -108,10 +108,10 @@ class TokeoDramatiqHeartbeat(Middleware):
 
     def after_worker_boot(self, broker, worker):
         self._worker = worker
-        self._started_at = _now_ms()
+        self._started_at = _get_now_ms()
         # another broker, e.g. the stub broker of tests, has no parameters
         self._parameters = getattr(broker, 'parameters', None)
-        self._thread = threading.Thread(target=self._loop, name='tokeo-dramatiq-heartbeat', daemon=True)
+        self._thread = threading.Thread(target=self._send_heartbeats, name='tokeo-dramatiq-heartbeat', daemon=True)
         self._thread.start()
 
     def after_worker_shutdown(self, broker, worker):
@@ -133,7 +133,7 @@ class TokeoDramatiqHeartbeat(Middleware):
             actor=message.actor_name,
             queue=message.queue_name,
             retries=message.options.get('retries', 0),
-            started_at=_now_ms(),
+            started_at=_get_now_ms(),
             started=time.monotonic(),
         )
         if self.with_details:
@@ -198,7 +198,7 @@ class TokeoDramatiqHeartbeat(Middleware):
             version=HEARTBEAT_VERSION,
             state=state,
             interval=self.interval,
-            sent_at=_now_ms(),
+            sent_at=_get_now_ms(),
             app=self.app,
             worker=dict(
                 host=socket.gethostname(),
@@ -215,7 +215,7 @@ class TokeoDramatiqHeartbeat(Middleware):
             since_last=since_last,
         )
 
-    def _loop(self):
+    def _send_heartbeats(self):
         self._send(self.heartbeat())
         while not self._stop.wait(self.interval):
             self._send(self.heartbeat())
@@ -411,7 +411,7 @@ class TokeoDramatiqMonitor:
         queues = self._dramatiq.queues.state()
         totals = {key: sum(q[key] or 0 for q in queues) for key in ('ready', 'delayed', 'dead', 'consumers')}
         return dict(
-            at=_now_ms(),
+            at=_get_now_ms(),
             monitoring=self._dramatiq.config('monitoring'),
             interval=self.interval,
             workers=workers,

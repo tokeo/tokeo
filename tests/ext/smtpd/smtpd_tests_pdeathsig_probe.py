@@ -21,7 +21,7 @@ import time
 from tokeo.ext.smtpd import _set_pdeathsig
 
 
-def _worker(marker_dir):
+def _run_worker(marker_dir):
     def _stop(*_):
         with open(os.path.join(marker_dir, f'stopped_{os.getpid()}'), 'w') as f:
             f.write('x')
@@ -42,7 +42,7 @@ def main():
         if os.fork() == 0:
             _set_pdeathsig(signal.SIGTERM)
             try:
-                _worker(marker_dir)
+                _run_worker(marker_dir)
             finally:
                 os._exit(0)
     # the master only waits until the test kills it

@@ -17,7 +17,15 @@ import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents
-from tests.core.smtpd.lib.smtpd_tests_helper import RecordingEvents, dialog, run_wire, start_server, stop_server, read_reply, send_command
+from tests.core.smtpd.lib.smtpd_tests_helper import (
+    RecordingEvents,
+    run_dialog,
+    run_wire,
+    start_server,
+    stop_server,
+    read_reply,
+    send_command,
+)
 
 
 class WireCapture(SmtpdEvents):
@@ -110,7 +118,7 @@ def test_unsafe_ends_data_at_a_false_end(end):
     """With CRLF_DATA_UNSAFE every dot line ends DATA like before."""
     events = RecordingEvents()
     options = {'crlf_data_mode': 'CRLF_DATA_UNSAFE'}
-    _, r = dialog(events, options, ENVELOPE + [b'Subject: t\r\n\r\nA' + end])
+    _, r = run_dialog(events, options, ENVELOPE + [b'Subject: t\r\n\r\nA' + end])
     assert r[4][0].startswith('250')
     assert len(events.messages) == 1
 

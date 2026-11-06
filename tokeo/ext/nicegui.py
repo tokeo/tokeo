@@ -524,14 +524,14 @@ class TokeoNicegui(MetaMixin):
         ### Notes
 
         - Runs on the watchdog observer thread
-        - Stores the time of the change so ```_watchdog_file_changes``` can wait
+        - Stores the time of the change so ```_watch_file_changes``` can wait
             for the burst to finish before restarting
 
         """
         self._watchdog_hotload_requested = True
         self._watchdog_last_event = monotonic()
 
-    async def _watchdog_file_changes(self):
+    async def _watch_file_changes(self):
         """
         Asynchronously monitor for file changes and handle app hot reload.
 
@@ -615,7 +615,7 @@ class TokeoNicegui(MetaMixin):
                 # activate watchdog
                 self._setup_watchdog()
                 # Create the file monitor task to run in the FastAPI's event loop
-                fastapi_app.on_startup(self._watchdog_file_changes)
+                fastapi_app.on_startup(self._watch_file_changes)
             else:
                 self.app.log.warning(f'Hotload is off, the dir to watch does not exist: {self._hotload_dir}')
 
@@ -823,7 +823,7 @@ class TokeoNiceguiController(Controller):
         )
 
 
-def _nicegui_decorator_path_param(args):
+def _get_decorator_path_param(args):
     """
     Read the first positional decorator argument as a display string.
 
@@ -895,7 +895,7 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
         return None
     return dict(
         decorator=decorator,
-        params=_nicegui_decorator_path_param(args),
+        params=_get_decorator_path_param(args),
         docstring=app.pdoc.docstrings('decorator', key),
     )
 

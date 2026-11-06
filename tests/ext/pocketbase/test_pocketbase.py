@@ -59,7 +59,7 @@ class PocketbaseTest(TokeoTest):
         super().__init__(config_defaults=config, **kw)
 
 
-def _jwt(exp, serial):
+def _make_jwt(exp, serial):
     # a token shaped like the one of PocketBase; exp None leaves the claim out
     def encode(data):
         return base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip('=')
@@ -70,7 +70,7 @@ def _jwt(exp, serial):
     return f'{encode(dict(alg="HS256", typ="JWT"))}.{encode(payload)}.signature'
 
 
-def _error(status, message):
+def _make_error(status, message):
     # an error answer in the format of PocketBase
     return httpx.Response(status, json=dict(status=status, message=message, data={}))
 
@@ -107,10 +107,10 @@ class _FakePocketBase:
         with self._lock:
             self.requests.append(request)
         if (request.method, request.url.path) in self.errors:
-            return _error(*self.errors[(request.method, request.url.path)])
+            return _make_error(*self.errors[(request.method, request.url.path)])
         match = _ROUTE.match(request.url.path)
         if not match:
-            return _error(404, 'Not found.')
+            return _make_error(404, 'Not found.')
         collection, action, id_ = match.groups()
         if action == 'auth-with-password':
             return self._login(collection, json.loads(request.content))
@@ -118,16 +118,16 @@ class _FakePocketBase:
             return self._refresh(collection, request.headers.get('Authorization', ''))
         if action == 'impersonate':
             if self.tokens.get(request.headers.get('Authorization', '')) != '_superusers':
-                return _error(403, 'Only superusers can perform this action.')
+                return _make_error(403, 'Only superusers can perform this action.')
             return self._issue(collection, id_)
-        return self._records(request, collection, id_)
+        return self._handle_records(request, collection, id_)
 
     def _issue(self, collection, identity):
         # a new token for the identity with its auth record
         with self._lock:
             serial = next(self._serial)
         exp = None if self.lifetime is None else int(time.time()) + self.lifetime
-        token = _jwt(exp, serial)
+        token = _make_jwt(exp, serial)
         self.tokens[token] = collection
         record = dict(id=f'id_{identity}', collectionName=collection, email=identity)
         return httpx.Response(200, json=dict(token=token, record=record))
@@ -136,15 +136,15 @@ class _FakePocketBase:
         time.sleep(self.login_delay)
         identity, password = body.get('identity'), body.get('password')
         if self.accounts.get((collection, identity)) != password or password is None:
-            return _error(400, 'Failed to authenticate.')
+            return _make_error(400, 'Failed to authenticate.')
         return self._issue(collection, identity)
 
     def _refresh(self, collection, token):
         if self.tokens.get(token) != collection:
-            return _error(401, 'The request requires valid record authorization token.')
+            return _make_error(401, 'The request requires valid record authorization token.')
         return self._issue(collection, 'refreshed')
 
-    def _records(self, request, collection, id_):
+    def _handle_records(self, request, collection, id_):
         method = request.method
         if method == 'GET' and id_ is None:
             items = [dict(id=key[1], **fields) for key, fields in self.records.items() if key[0] == collection]
@@ -165,7 +165,7 @@ class _FakePocketBase:
             self.records[(collection, id_)] = json.loads(request.content)
             return httpx.Response(200, json=dict(id=id_, collectionName=collection, **self.records[(collection, id_)]))
         if (collection, id_) not in self.records:
-            return _error(404, "The requested resource wasn't found.")
+            return _make_error(404, "The requested resource wasn't found.")
         if method == 'GET':
             return httpx.Response(200, json=dict(id=id_, collectionName=collection, **self.records[(collection, id_)]))
         if method == 'PATCH':
@@ -192,12 +192,12 @@ def server(monkeypatch):
     return fake
 
 
-def _params(request):
+def _get_params(request):
     # the query parameters of a request as dict
     return dict(request.url.params)
 
 
-def _body(request):
+def _get_body(request):
     # the json body of a request
     return json.loads(request.content)
 
@@ -320,7 +320,7 @@ def test_get_one_fetches_the_record_by_id(server):
     with PocketbaseTest() as app:
         record = app.db.get_one('posts', 'abc')
     assert server.calls == [('GET', '/api/collections/posts/records/abc')]
-    assert _params(server.requests[0]) == {}
+    assert _get_params(server.requests[0]) == {}
     assert isinstance(record, Record)
     assert (record.id, record.collectionName, record.title, record.views) == ('abc', 'posts', 'Hello', 3)
 
@@ -336,14 +336,14 @@ def test_get_one_sends_expand_fields_and_query(server):
     """expand, fields and the keys of query arrive as query parameters."""
     with PocketbaseTest() as app:
         app.db.get_one('posts', 'abc', expand='author', fields='id,title', query=dict(x='y'))
-    assert _params(server.requests[0]) == dict(expand='author', fields='id,title', x='y')
+    assert _get_params(server.requests[0]) == dict(expand='author', fields='id,title', x='y')
 
 
 def test_get_one_query_wins_over_the_arguments(server):
     """A key of query that is also an argument is no error, the query value wins."""
     with PocketbaseTest() as app:
         app.db.get_one('posts', 'abc', fields='id', query=dict(fields='id,title'))
-    assert _params(server.requests[0]) == dict(fields='id,title')
+    assert _get_params(server.requests[0]) == dict(fields='id,title')
 
 
 def test_get_one_missing_record_raises_an_error(server):
@@ -363,14 +363,14 @@ def test_get_list_sends_the_default_query(server):
     with PocketbaseTest() as app:
         app.db.get_list('posts')
     assert server.calls == [('GET', '/api/collections/posts/records')]
-    assert _params(server.requests[0]) == dict(page='1', perPage='30')
+    assert _get_params(server.requests[0]) == dict(page='1', perPage='30')
 
 
 def test_get_list_sends_all_options(server):
     """page, per_page, filter, sort, expand, fields, skip_total and query arrive."""
     with PocketbaseTest() as app:
         app.db.get_list('posts', 2, 50, 'views > 3', '-created,title', 'author', 'id,title', True, dict(x='y'))
-    assert _params(server.requests[0]) == dict(
+    assert _get_params(server.requests[0]) == dict(
         filter='views > 3',
         sort='-created,title',
         expand='author',
@@ -387,7 +387,7 @@ def test_get_list_leaves_out_an_empty_sort(server, sort):
     """An empty or no sort sends no sort parameter."""
     with PocketbaseTest() as app:
         app.db.get_list('posts', sort=sort)
-    assert 'sort' not in _params(server.requests[0])
+    assert 'sort' not in _get_params(server.requests[0])
 
 
 def test_get_list_returns_the_page_as_list_result(server):
@@ -403,7 +403,7 @@ def test_get_list_query_wins_over_the_arguments(server):
     """A filter or sort in query is no error, the query value wins."""
     with PocketbaseTest() as app:
         app.db.get_list('posts', filter='views > 0', sort='title', query=dict(filter='views > 3', sort='-created'))
-    params = _params(server.requests[0])
+    params = _get_params(server.requests[0])
     assert (params['filter'], params['sort']) == ('views > 3', '-created')
 
 
@@ -423,7 +423,7 @@ def test_get_full_list_gives_all_records_page_by_page(server):
     with PocketbaseTest() as app:
         records = app.db.get_full_list('posts', per_page=1)
     assert [record.id for record in records] == ['abc', 'def']
-    assert [_params(request)['page'] for request in server.requests] == ['1', '2', '3']
+    assert [_get_params(request)['page'] for request in server.requests] == ['1', '2', '3']
 
 
 def test_get_first_gives_the_first_record(server):
@@ -431,7 +431,7 @@ def test_get_first_gives_the_first_record(server):
     with PocketbaseTest() as app:
         record = app.db.get_first('posts', "title = 'Hello'")
     assert record.id == 'abc'
-    assert _params(server.requests[0]) == dict(page='1', perPage='1', filter="title = 'Hello'", skipTotal='true')
+    assert _get_params(server.requests[0]) == dict(page='1', perPage='1', filter="title = 'Hello'", skipTotal='true')
 
 
 # create
@@ -442,8 +442,8 @@ def test_create_posts_the_fields_and_returns_the_record(server):
     with PocketbaseTest() as app:
         record = app.db.create('posts', dict(title='New', views=0), expand='author')
     assert server.calls == [('POST', '/api/collections/posts/records')]
-    assert _body(server.requests[0]) == dict(title='New', views=0)
-    assert _params(server.requests[0]) == dict(expand='author')
+    assert _get_body(server.requests[0]) == dict(title='New', views=0)
+    assert _get_params(server.requests[0]) == dict(expand='author')
     assert (record.id, record.title) == ('new3', 'New')
 
 
@@ -451,8 +451,8 @@ def test_create_without_fields_posts_an_empty_object(server):
     """create without fields sends {} as body and no query."""
     with PocketbaseTest() as app:
         app.db.create('posts')
-    assert _body(server.requests[0]) == {}
-    assert _params(server.requests[0]) == {}
+    assert _get_body(server.requests[0]) == {}
+    assert _get_params(server.requests[0]) == {}
 
 
 def test_create_rejected_raises_an_error(server):
@@ -473,8 +473,8 @@ def test_update_patches_the_fields_and_returns_the_record(server):
     with PocketbaseTest() as app:
         record = app.db.update('posts', 'abc', dict(views=4), fields='id,views')
     assert server.calls == [('PATCH', '/api/collections/posts/records/abc')]
-    assert _body(server.requests[0]) == dict(views=4)
-    assert _params(server.requests[0]) == dict(fields='id,views')
+    assert _get_body(server.requests[0]) == dict(views=4)
+    assert _get_params(server.requests[0]) == dict(fields='id,views')
     assert (record.title, record.views) == ('Hello', 4)
 
 
@@ -482,7 +482,7 @@ def test_update_without_fields_patches_an_empty_object(server):
     """update without fields sends {} as body."""
     with PocketbaseTest() as app:
         app.db.update('posts', 'abc')
-    assert _body(server.requests[0]) == {}
+    assert _get_body(server.requests[0]) == {}
 
 
 # delete
@@ -493,7 +493,7 @@ def test_delete_removes_the_record_and_returns_true(server):
     with PocketbaseTest() as app:
         assert app.db.delete('posts', 'abc', query=dict(token='x')) is True
     assert server.calls == [('DELETE', '/api/collections/posts/records/abc')]
-    assert _params(server.requests[0]) == dict(token='x')
+    assert _get_params(server.requests[0]) == dict(token='x')
     assert ('posts', 'abc') not in server.records
 
 
@@ -521,7 +521,7 @@ def test_delete_unreachable_server_raises_an_error(server, monkeypatch):
 # keep_auth
 
 
-def _crud(db, method):
+def _run_crud(db, method):
     # run one CRUD method of the handler on the post abc
     return dict(
         get_one=lambda: db.get_one('posts', 'abc'),
@@ -536,7 +536,7 @@ def _crud(db, method):
 def test_keep_auth_logs_in_before_each_crud_method(server, method):
     """The first CRUD call logs the service in and runs with its token."""
     with PocketbaseTest(SERVICE) as app:
-        _crud(app.db, method)
+        _run_crud(app.db, method)
         token = app.db.pb.token
     assert server.calls[0] == USERS_LOGIN
     assert server.requests[1].headers['Authorization'] == token
@@ -563,7 +563,7 @@ def test_keep_auth_sends_identity_and_password(server):
     """The login posts identity and password and no Authorization of its own."""
     with PocketbaseTest(SERVICE) as app:
         app.db.get_one('posts', 'abc')
-    assert _body(server.requests[0]) == dict(identity='service@example.com', password='secret')
+    assert _get_body(server.requests[0]) == dict(identity='service@example.com', password='secret')
     assert server.requests[0].headers.get('Authorization', '') == ''
 
 
@@ -610,7 +610,7 @@ def test_keep_auth_identity_without_password_fails_on_first_request(server):
     with PocketbaseTest(dict(auth_identity='service@example.com')) as app:
         with pytest.raises(TokeoPocketBaseAuthError):
             app.db.get_one('posts', 'abc')
-    assert _body(server.requests[0]) == dict(identity='service@example.com', password=None)
+    assert _get_body(server.requests[0]) == dict(identity='service@example.com', password=None)
 
 
 @pytest.mark.parametrize('min_valid, refreshes', [(60, 0), (300, 1)], ids=['enough_left', 'too_little_left'])
@@ -748,7 +748,7 @@ def test_impersonate_gives_a_client_of_its_own_acting_as_the_record(server):
         client.collection('posts').get_list()
         assert (client.auth_record.email, client.http_client is app.db.pb.http_client) == ('u1', False)
         assert server.requests[-1].headers['Authorization'] == client.token != app.db.pb.token
-        assert _body(server.requests[-2]) == dict(duration=600)
+        assert _get_body(server.requests[-2]) == dict(duration=600)
         client.close()
 
 

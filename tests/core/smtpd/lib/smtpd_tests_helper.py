@@ -140,7 +140,7 @@ def read_message(name):
         return handle.read().replace('\r', '').replace('\n', '\r\n')
 
 
-def insecure_tls_context():
+def make_insecure_tls_context():
     """A client TLS context that accepts any certificate (VERIFY_NONE)."""
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -149,7 +149,7 @@ def insecure_tls_context():
 
 
 # test rules exception: kept in the helper on purpose, more cert tests will use it
-def verifying_tls_context(ca_file):
+def make_verifying_tls_context(ca_file):
     """A client TLS context that verifies the peer and its hostname via ca_file."""
     ctx = ssl.create_default_context(cafile=ca_file)
     ctx.check_hostname = True
@@ -194,7 +194,7 @@ def send_mail(
     try:
         client.ehlo(ehlo_name)
         if tls_enabled:
-            client.starttls(context=tls_context or insecure_tls_context())
+            client.starttls(context=tls_context or make_insecure_tls_context())
             client.ehlo(ehlo_name)
         if authentication_id is not None:
             client.user = authentication_id
@@ -344,7 +344,7 @@ async def _converse(events, options, commands):
         await stop_server(server, task)
 
 
-def dialog(events, options, commands):
+def run_dialog(events, options, commands):
     """Synchronous wrapper around a client dialog for pytest."""
     return asyncio.run(_converse(events, options, commands))
 
@@ -372,7 +372,7 @@ class AuthEvents(RecordingEvents):
         return super().on_mail_from_event(ctx, mail_from)
 
 
-def auth_plain(authzid, authcid, password):
+def make_auth_plain(authzid, authcid, password):
     """The base64 credentials of AUTH PLAIN."""
     return base64.b64encode(f'{authzid}\x00{authcid}\x00{password}'.encode()).decode()
 

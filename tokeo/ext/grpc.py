@@ -223,7 +223,7 @@ class TokeoGrpc(MetaMixin):
                 if not is_bool(tls_enabled):
                     raise TokeoGrpcError(f'tls_enabled must be true or false, not {tls_enabled!r}')
                 if tls_enabled:
-                    server.add_secure_port(self._config('url'), self._tls_server_credentials())
+                    server.add_secure_port(self._config('url'), self._build_tls_server_credentials())
                 else:
                     server.add_insecure_port(self._config('url'))
                 # append services
@@ -240,7 +240,7 @@ class TokeoGrpc(MetaMixin):
 
         return self._server
 
-    def _tls_server_credentials(self):
+    def _build_tls_server_credentials(self):
         """
         Build the gRPC server credentials for a TLS secured port.
 

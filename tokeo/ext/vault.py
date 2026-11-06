@@ -291,7 +291,7 @@ class TokeoVaultController(Controller):
         description = 'Generate keys and encrypt or decrypt configuration secrets.'
         epilog = f'Example: {basename(sys.argv[0])} vault command --options'
 
-    def _profile(self, name):
+    def _get_profile(self, name):
         # read a vault profile via the config handler, turning a missing or
         # malformed entry into a clean vault error instead of a traceback
         return self.app.config.get_profile(name)
@@ -377,7 +377,7 @@ class TokeoVaultController(Controller):
 
         """
         name = self.app.pargs.profile
-        profile = self._profile(name)
+        profile = self._get_profile(name)
         value = self.app.pargs.value
         if value is None:
             value = getpass.getpass('value: ')
@@ -454,7 +454,7 @@ class TokeoVaultController(Controller):
         name = self.app.pargs.profile
         if not name:
             raise TokeoVaultError('a --profile is required to decrypt a payload')
-        profile = self._profile(name)
+        profile = self._get_profile(name)
         self.app.print(self.app.config.get_handler(profile['type']).decrypt(profile, value))
 
 

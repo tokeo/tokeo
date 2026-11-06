@@ -139,7 +139,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
     def __init__(self, **kw):
         super().__init__(**kw)
-        self._template_exists_cache = dict()
+        self._has_template_cache = dict()
 
     def _config(self, key, **kwargs):
         """
@@ -334,7 +334,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         params = self._get_params(**kw)
 
         # build before connecting, so a bad CA option fails without network
-        context = self._host_cert_context(**params)
+        context = self._build_host_cert_context(**params)
         # an empty value means "not set", smtplib would announce an empty EHLO
         local_hostname = params['local_hostname'] or None
         # port 0 lets the system choose the local port
@@ -384,7 +384,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # enforce compatibility for cement v3.2+
         return res
 
-    def _host_cert_context(self, **params):
+    def _build_host_cert_context(self, **params):
         """
         Create the TLS context that verifies the certificate of the host.
 
@@ -420,7 +420,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             return ssl.create_default_context(cadata=ca)
         return ssl.create_default_context(cafile=ca)
 
-    def _header(self, value=None, _charset=None, **params):
+    def _build_header(self, value=None, _charset=None, **params):
         """
         Create an email header value with proper encoding if needed.
 
@@ -517,9 +517,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         if params['bcc']:
             msg['Bcc'] = ', '.join(params['bcc'])
         if params['subject_prefix'] not in [None, '']:
-            msg['Subject'] = self._header(f"{params['subject_prefix']} {params['subject']}", _charset=header_charset, **params)
+            msg['Subject'] = self._build_header(f"{params['subject_prefix']} {params['subject']}", _charset=header_charset, **params)
         else:
-            msg['Subject'] = self._header(params['subject'], _charset=header_charset, **params)
+            msg['Subject'] = self._build_header(params['subject'], _charset=header_charset, **params)
 
         # auto-generate date and message-id if enforced and not provided
         if is_true(params['date_enforce']) and not params.get('date', None):
@@ -539,7 +539,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # X-headers
         for item in params.keys():
             if item.startswith('X-'):
-                msg[item] = self._header(f'{params[item]}', _charset=header_charset, **params)
+                msg[item] = self._build_header(f'{params[item]}', _charset=header_charset, **params)
 
     def _attach_body(self, msg, part_text, part_html, body_charset, **params):
         """Attach body parts to the message with correct MIME structure."""
@@ -733,7 +733,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         """
 
         # Helper function to check if a template exists and cache the result
-        def _template_exists(template):
+        def _has_template(template):
             """
             Check if a template exists and cache the result.
 
@@ -750,8 +750,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
             """
             # Check if stored in cache already
-            if template in self._template_exists_cache:
-                return self._template_exists_cache[template]
+            if template in self._has_template_cache:
+                return self._has_template_cache[template]
 
             # Do first time check from file or module
             result = False
@@ -763,7 +763,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
                 pass
 
             # Store flag in cache to prevent repeated lookups
-            self._template_exists_cache[template] = result
+            self._has_template_cache[template] = result
             return result
 
         # update immutable default arguments
@@ -773,16 +773,16 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         # Check if we need to render the subject from template
         if 'subject' not in params:
-            if _template_exists(f'{template}.title.jinja2'):
+            if _has_template(f'{template}.title.jinja2'):
                 params['subject'] = self.app.render(data, f'{template}.title.jinja2', out=None, autoescape=False)
 
         # Build the email body from templates
         body = dict()
 
         # Plain text template, a text is not read as html, so not escaped
-        if _template_exists(f'{template}.plain.jinja2'):
+        if _has_template(f'{template}.plain.jinja2'):
             body['text'] = self.app.render({**data, 'mail_params': params}, f'{template}.plain.jinja2', out=None, autoescape=False)
-        if _template_exists(f'{template}.html.jinja2'):
+        if _has_template(f'{template}.html.jinja2'):
             body['html'] = self.app.render({**data, 'mail_params': params}, f'{template}.html.jinja2', out=None)
         # send the message
         return self.send(body=body, **params)

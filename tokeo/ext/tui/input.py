@@ -124,7 +124,7 @@ class TokeoTuiInput:
             on_tty = False
         line = ''
         # raw keeps the colors; sys.stdout is the proxy of patch_stdout for the logs
-        with own_stdin or nullcontext(), patch_stdout(raw=True), _logs_to(sys.stdout, consoles), _end_by_signals(prompt_session):
+        with own_stdin or nullcontext(), patch_stdout(raw=True), _redirect_logs_to(sys.stdout, consoles), _end_by_signals(prompt_session):
             while True:
                 try:
                     try:
@@ -159,7 +159,7 @@ class TokeoTuiInput:
 
 
 @contextmanager
-def _logs_to(stream, consoles):
+def _redirect_logs_to(stream, consoles):
     """Write the log handlers of the consoles to the stream meanwhile."""
     loggers = [logging.getLogger(), *(item for item in logging.Logger.manager.loggerDict.values() if isinstance(item, logging.Logger))]
     # log handlers keep the stream they were set up with, patch_stdout misses them

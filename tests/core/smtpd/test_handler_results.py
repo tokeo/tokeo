@@ -14,7 +14,7 @@ import pytest
 from tokeo.core.smtpd.server import SmtpdServer, SmtpdSession
 from tokeo.core.smtpd.events import SmtpdEvents
 from tokeo.core.smtpd.exc import Smtpd421CloseException
-from tests.core.smtpd.lib.smtpd_tests_helper import dialog, run_line
+from tests.core.smtpd.lib.smtpd_tests_helper import run_dialog, run_line
 
 
 class UnknownEvents(SmtpdEvents):
@@ -49,7 +49,7 @@ class UnknownEvents(SmtpdEvents):
 )
 def test_unknown_event_result(result, expected):
     """A reply line answers, None/False 500, else 451, the dialog goes on."""
-    _, r = dialog(UnknownEvents(result), {}, [b'HELO a\r\n', b'XYZZY\r\n', b'NOOP\r\n'])
+    _, r = run_dialog(UnknownEvents(result), {}, [b'HELO a\r\n', b'XYZZY\r\n', b'NOOP\r\n'])
     assert r[1][0].startswith(expected)
     assert r[2] == ['250 OK']
 
@@ -65,10 +65,10 @@ class NoResponseEvents(SmtpdEvents):
 
 def test_none_responses_are_empty_texts():
     """A None helo_response or local_response is answered as an empty text."""
-    greeting, r = dialog(NoResponseEvents(), {}, [b'HELO a\r\n', b'RSET\r\n', b'QUIT\r\n'])
+    greeting, r = run_dialog(NoResponseEvents(), {}, [b'HELO a\r\n', b'RSET\r\n', b'QUIT\r\n'])
     assert greeting == ['220 ']
     assert r[0] == ['250']
-    greeting, r = dialog(NoResponseEvents(), {}, [b'EHLO a\r\n'])
+    greeting, r = run_dialog(NoResponseEvents(), {}, [b'EHLO a\r\n'])
     assert r[0] == ['250 ']
 
 
@@ -83,7 +83,7 @@ class ProxyEvents(SmtpdEvents):
         return self.result
 
 
-def _proxy(result):
+def _run_proxy(result):
     smtpd = SmtpdServer(ProxyEvents(result), {'proxy_extension': True})
     session = SmtpdSession()
     smtpd.process_reset_session(session, connection_initialize=True)
@@ -115,7 +115,7 @@ PARSED = {
 )
 def test_proxy_event_updates_the_fields(result, expected):
     """A returned dict updates only its fields, None and {} keep the parsed data."""
-    reply, proxy = _proxy(result)
+    reply, proxy = _run_proxy(result)
     assert reply == '220 welcome'
     assert proxy == expected
 
@@ -124,4 +124,4 @@ def test_proxy_event_updates_the_fields(result, expected):
 def test_proxy_event_with_another_result_aborts(result):
     """Any other result of on_proxy_event aborts the connection by 421."""
     with pytest.raises(Smtpd421CloseException, match='on_proxy_event must not return'):
-        _proxy(result)
+        _run_proxy(result)

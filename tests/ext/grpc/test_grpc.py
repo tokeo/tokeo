@@ -45,19 +45,19 @@ def _call(port, method='Say', request=b'hi', credentials=None, metadata=None):
         return channel.unary_unary(f'/{SERVICE}/{method}')(request, timeout=5, metadata=metadata)
 
 
-def _refused(port, **kw):
+def _get_refused_code(port, **kw):
     # the status code of a call to the echo service that fails
     with pytest.raises(grpc.RpcError) as err:
         _call(port, **kw)
     return err.value.code()
 
 
-def _key():
+def _make_key():
     # a fast ec key for the certificates of the tests
     return ec.generate_private_key(ec.SECP256R1())
 
 
-def _cert(name, key, issuer=None, issuer_key=None, ca=False):
+def _make_cert(name, key, issuer=None, issuer_key=None, ca=False):
     # a certificate for name with name as dns san, self signed without issuer
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)])
     now = datetime.now(timezone.utc)
@@ -75,7 +75,7 @@ def _cert(name, key, issuer=None, issuer_key=None, ca=False):
     return builder.sign(issuer_key or key, hashes.SHA256())
 
 
-def _pem(obj):
+def _get_pem(obj):
     # the pem bytes of a certificate or a private key
     if isinstance(obj, x509.Certificate):
         return obj.public_bytes(serialization.Encoding.PEM)
@@ -93,19 +93,19 @@ def _write(directory, name, data):
 def certs(tmp_path_factory):
     """A ca with server and client cert, a client cert of a foreign ca."""
     tmp = tmp_path_factory.mktemp('certs')
-    ca_key, foreign_key, server_key, client_key, stranger_key = _key(), _key(), _key(), _key(), _key()
-    ca = _cert('tokeo test ca', ca_key, ca=True)
-    foreign = _cert('foreign test ca', foreign_key, ca=True)
-    server = _cert('localhost', server_key, ca, ca_key)
-    client = _cert('client.tokeo.test', client_key, ca, ca_key)
-    stranger = _cert('stranger.tokeo.test', stranger_key, foreign, foreign_key)
+    ca_key, foreign_key, server_key, client_key, stranger_key = _make_key(), _make_key(), _make_key(), _make_key(), _make_key()
+    ca = _make_cert('tokeo test ca', ca_key, ca=True)
+    foreign = _make_cert('foreign test ca', foreign_key, ca=True)
+    server = _make_cert('localhost', server_key, ca, ca_key)
+    client = _make_cert('client.tokeo.test', client_key, ca, ca_key)
+    stranger = _make_cert('stranger.tokeo.test', stranger_key, foreign, foreign_key)
     return SimpleNamespace(
-        ca=_pem(ca),
-        ca_file=_write(tmp, 'ca.pem', _pem(ca)),
-        server_cert_file=_write(tmp, 'server.pem', _pem(server)),
-        server_key_file=_write(tmp, 'server.key', _pem(server_key)),
-        client=(_pem(client_key), _pem(client)),
-        stranger=(_pem(stranger_key), _pem(stranger)),
+        ca=_get_pem(ca),
+        ca_file=_write(tmp, 'ca.pem', _get_pem(ca)),
+        server_cert_file=_write(tmp, 'server.pem', _get_pem(server)),
+        server_key_file=_write(tmp, 'server.key', _get_pem(server_key)),
+        client=(_get_pem(client_key), _get_pem(client)),
+        stranger=(_get_pem(stranger_key), _get_pem(stranger)),
     )
 
 
@@ -210,7 +210,7 @@ def test_server_uses_max_worker_threads(start_grpc, monkeypatch):
 def test_server_without_tls_builds_no_credentials(start_grpc, monkeypatch):
     """With tls_enabled false no tls credentials are built, calls are served."""
     app, port = start_grpc(startup=False)
-    monkeypatch.setattr(app.grpc, '_tls_server_credentials', lambda: pytest.fail('tls credentials built'))
+    monkeypatch.setattr(app.grpc, '_build_tls_server_credentials', lambda: pytest.fail('tls credentials built'))
     app.grpc.startup()
     assert _call(port) == b'echo hi'
 
@@ -239,7 +239,7 @@ def test_close_shuts_a_started_server_down():
         app.grpc.startup()
         assert _call(port) == b'echo hi'
         threads = list(app.grpc._executor._threads)
-    assert _refused(port) == grpc.StatusCode.UNAVAILABLE
+    assert _get_refused_code(port) == grpc.StatusCode.UNAVAILABLE
     assert wait_until(lambda: not any(thread.is_alive() for thread in threads))
 
 
@@ -258,7 +258,7 @@ def test_shutdown_stops_the_server(start_grpc):
     assert _call(port) == b'echo hi'
     app.grpc.shutdown()
     app.grpc.server.wait_for_termination(5)
-    assert _refused(port) == grpc.StatusCode.UNAVAILABLE
+    assert _get_refused_code(port) == grpc.StatusCode.UNAVAILABLE
 
 
 def test_shutdown_ends_the_threads_of_the_pool(start_grpc):
@@ -277,7 +277,7 @@ def test_shutdown_ends_the_threads_of_the_pool(start_grpc):
 def test_interceptors_of_grpc_interceptor_guard_the_calls(start_grpc):
     """The interceptors refuse a call without x-token and pass one with it."""
     _, port = start_grpc({'grpc_interceptor': INTERCEPTORS})
-    assert _refused(port) == grpc.StatusCode.UNAUTHENTICATED
+    assert _get_refused_code(port) == grpc.StatusCode.UNAUTHENTICATED
     assert _call(port, metadata=[('x-token', 'secret')]) == b'echo hi'
 
 
@@ -301,7 +301,7 @@ def test_serve_serves_until_interrupted_then_stops(start_grpc, monkeypatch, inte
     app.grpc.serve()
     assert answers == [b'echo hi']
     assert logged == [f'Grpc server started, listening on localhost:{port}']
-    assert _refused(port) == grpc.StatusCode.UNAVAILABLE
+    assert _get_refused_code(port) == grpc.StatusCode.UNAVAILABLE
 
 
 def test_controller_grpc_serve_runs_serve(monkeypatch):
@@ -316,26 +316,26 @@ def test_controller_grpc_serve_runs_serve(monkeypatch):
 # _generate_self_signed_cert
 
 
-def _auto_cert(grpc_config=None):
+def _make_auto_cert(grpc_config=None):
     # the key and the parsed certificate the auto cert path makes for grpc_config
     with GrpcTest(grpc_config={'url': 'localhost:50051', **(grpc_config or {})}) as app:
         key_pem, cert_pem = app.grpc._generate_self_signed_cert()
     return serialization.load_pem_private_key(key_pem, password=None), x509.load_pem_x509_certificate(cert_pem)
 
 
-def _sans_of(cert):
+def _get_sans(cert):
     # the subject alternative names of a certificate
     return list(cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value)
 
 
 def test_generate_self_signed_cert_defaults():
     """By default a self signed localhost cert, ec P-384 key, valid 90 days."""
-    key, cert = _auto_cert()
+    key, cert = _make_auto_cert()
     assert isinstance(key, ec.EllipticCurvePrivateKey)
     assert key.curve.name == 'secp384r1'
     assert cert.subject == cert.issuer
     assert cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == 'localhost'
-    assert _sans_of(cert) == [x509.DNSName('localhost')]
+    assert _get_sans(cert) == [x509.DNSName('localhost')]
     assert cert.not_valid_after_utc - cert.not_valid_before_utc == timedelta(days=90)
     cert.verify_directly_issued_by(cert)
 
@@ -343,28 +343,28 @@ def test_generate_self_signed_cert_defaults():
 @pytest.mark.parametrize('size, curve', [(256, 'secp256r1'), (384, 'secp384r1')])
 def test_generate_self_signed_cert_ec_key_size_picks_the_curve(size, curve):
     """tls_key_size 256 and 384 pick the curves P-256 and P-384."""
-    key, _ = _auto_cert({'tls_key_type': 'EC', 'tls_key_size': size})
+    key, _ = _make_auto_cert({'tls_key_type': 'EC', 'tls_key_size': size})
     assert key.curve.name == curve
 
 
 def test_generate_self_signed_cert_rsa_key():
     """tls_key_type rsa with tls_key_size 2048 makes an rsa key of 2048 bits."""
-    key, _ = _auto_cert({'tls_key_type': 'rsa', 'tls_key_size': 2048})
+    key, _ = _make_auto_cert({'tls_key_type': 'rsa', 'tls_key_size': 2048})
     assert isinstance(key, rsa.RSAPrivateKey)
     assert key.key_size == 2048
 
 
 def test_generate_self_signed_cert_tls_cn_sets_only_the_subject():
     """tls_cn becomes the common name, the san stays the url host."""
-    _, cert = _auto_cert({'tls_cn': 'Tokeo Test'})
+    _, cert = _make_auto_cert({'tls_cn': 'Tokeo Test'})
     assert cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == 'Tokeo Test'
-    assert _sans_of(cert) == [x509.DNSName('localhost')]
+    assert _get_sans(cert) == [x509.DNSName('localhost')]
 
 
 def test_generate_self_signed_cert_tls_sans_typed_and_without_duplicates():
     """tls_sans follow the url host once each, typed as ip address or dns."""
-    _, cert = _auto_cert({'tls_sans': ['localhost', '127.0.0.1', 'api.tokeo.test', '::1', '127.0.0.1', '']})
-    assert _sans_of(cert) == [
+    _, cert = _make_auto_cert({'tls_sans': ['localhost', '127.0.0.1', 'api.tokeo.test', '::1', '127.0.0.1', '']})
+    assert _get_sans(cert) == [
         x509.DNSName('localhost'),
         x509.IPAddress(ipaddress.ip_address('127.0.0.1')),
         x509.DNSName('api.tokeo.test'),
@@ -374,20 +374,20 @@ def test_generate_self_signed_cert_tls_sans_typed_and_without_duplicates():
 
 def test_generate_self_signed_cert_tls_sans_as_one_string():
     """A single tls_sans string is one name, not split into its characters."""
-    _, cert = _auto_cert({'tls_sans': 'api.tokeo.test'})
-    assert _sans_of(cert) == [x509.DNSName('localhost'), x509.DNSName('api.tokeo.test')]
+    _, cert = _make_auto_cert({'tls_sans': 'api.tokeo.test'})
+    assert _get_sans(cert) == [x509.DNSName('localhost'), x509.DNSName('api.tokeo.test')]
 
 
 def test_generate_self_signed_cert_ipv6_url_host():
     """The url [::1]:50051 gives the common name ::1 and the ip san ::1."""
-    _, cert = _auto_cert({'url': '[::1]:50051'})
+    _, cert = _make_auto_cert({'url': '[::1]:50051'})
     assert cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == '::1'
-    assert _sans_of(cert) == [x509.IPAddress(ipaddress.ip_address('::1'))]
+    assert _get_sans(cert) == [x509.IPAddress(ipaddress.ip_address('::1'))]
 
 
 def test_generate_self_signed_cert_tls_valid_days():
     """tls_valid_days 7 makes the cert valid for 7 days."""
-    _, cert = _auto_cert({'tls_valid_days': 7})
+    _, cert = _make_auto_cert({'tls_valid_days': 7})
     assert cert.not_valid_after_utc - cert.not_valid_before_utc == timedelta(days=7)
 
 
@@ -425,7 +425,7 @@ def test_generate_self_signed_cert_tls_valid_days():
 def test_generate_self_signed_cert_invalid_config_raise(grpc_config, message):
     """A bad key type, key size or number of days raises TokeoGrpcError."""
     with pytest.raises(TokeoGrpcError, match=message):
-        _auto_cert(grpc_config)
+        _make_auto_cert(grpc_config)
 
 
 # tls with the auto certificate
@@ -452,13 +452,13 @@ def test_tls_auto_cert_serves_clients_trusting_it(start_grpc, monkeypatch):
     assert len(made) == 1
     credentials = grpc.ssl_channel_credentials(root_certificates=made[0][1])
     assert _call(port, credentials=credentials) == b'echo hi'
-    assert _refused(port) == grpc.StatusCode.UNAVAILABLE
+    assert _get_refused_code(port) == grpc.StatusCode.UNAVAILABLE
 
 
 def test_tls_auto_cert_is_not_trusted_by_others(start_grpc, certs):
     """A client trusting only another ca refuses the auto cert, UNAVAILABLE."""
     _, port = start_grpc({'tls_enabled': True})
-    assert _refused(port, credentials=grpc.ssl_channel_credentials(root_certificates=certs.ca)) == grpc.StatusCode.UNAVAILABLE
+    assert _get_refused_code(port, credentials=grpc.ssl_channel_credentials(root_certificates=certs.ca)) == grpc.StatusCode.UNAVAILABLE
 
 
 # tls with a custom certificate
@@ -495,12 +495,12 @@ def test_tls_failed_setup_fails_again_on_the_next_startup(start_grpc, certs):
 # tls with a client ca (mutual tls)
 
 
-def _custom_tls(certs, **grpc_config):
+def _make_custom_tls(certs, **grpc_config):
     # the grpc config for tls by the custom server cert of certs plus grpc_config
     return {'tls_enabled': True, 'tls_certificate': certs.server_cert_file, 'tls_key': certs.server_key_file, **grpc_config}
 
 
-def _client(certs, pair=None):
+def _make_client_credentials(certs, pair=None):
     # channel credentials that trust the ca of certs, with a client cert pair
     key, chain = pair or (None, None)
     return grpc.ssl_channel_credentials(root_certificates=certs.ca, private_key=key, certificate_chain=chain)
@@ -508,21 +508,21 @@ def _client(certs, pair=None):
 
 def test_tls_client_ca_hands_the_client_cert_on(start_grpc, certs):
     """With tls_client_ca the service sees the name of the client cert."""
-    _, port = start_grpc(_custom_tls(certs, tls_client_ca=certs.ca_file))
-    assert _call(port, method='Peer', credentials=_client(certs, certs.client)) == b'client.tokeo.test'
+    _, port = start_grpc(_make_custom_tls(certs, tls_client_ca=certs.ca_file))
+    assert _call(port, method='Peer', credentials=_make_client_credentials(certs, certs.client)) == b'client.tokeo.test'
 
 
 def test_tls_client_ca_requires_a_client_cert(start_grpc, certs):
     """With tls_client_ca a client without cert is refused, one of the ca served."""
-    _, port = start_grpc(_custom_tls(certs, tls_client_ca=certs.ca_file))
-    assert _refused(port, credentials=_client(certs)) == grpc.StatusCode.UNAVAILABLE
-    assert _call(port, credentials=_client(certs, certs.client)) == b'echo hi'
+    _, port = start_grpc(_make_custom_tls(certs, tls_client_ca=certs.ca_file))
+    assert _get_refused_code(port, credentials=_make_client_credentials(certs)) == grpc.StatusCode.UNAVAILABLE
+    assert _call(port, credentials=_make_client_credentials(certs, certs.client)) == b'echo hi'
 
 
 def test_tls_client_ca_refuses_a_cert_of_another_ca(start_grpc, certs):
     """A client cert of a foreign ca is refused with UNAVAILABLE."""
-    _, port = start_grpc(_custom_tls(certs, tls_client_ca=certs.ca_file))
-    assert _refused(port, credentials=_client(certs, certs.stranger)) == grpc.StatusCode.UNAVAILABLE
+    _, port = start_grpc(_make_custom_tls(certs, tls_client_ca=certs.ca_file))
+    assert _get_refused_code(port, credentials=_make_client_credentials(certs, certs.stranger)) == grpc.StatusCode.UNAVAILABLE
 
 
 def test_tls_client_ca_with_the_auto_cert(start_grpc, certs, monkeypatch):
@@ -533,4 +533,4 @@ def test_tls_client_ca_with_the_auto_cert(start_grpc, certs, monkeypatch):
     key, chain = certs.client
     credentials = grpc.ssl_channel_credentials(root_certificates=made[0][1], private_key=key, certificate_chain=chain)
     assert _call(port, method='Peer', credentials=credentials) == b'client.tokeo.test'
-    assert _refused(port, credentials=grpc.ssl_channel_credentials(root_certificates=made[0][1])) == grpc.StatusCode.UNAVAILABLE
+    assert _get_refused_code(port, credentials=grpc.ssl_channel_credentials(root_certificates=made[0][1])) == grpc.StatusCode.UNAVAILABLE

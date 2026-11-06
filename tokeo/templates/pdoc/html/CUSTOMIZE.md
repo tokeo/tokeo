@@ -535,7 +535,7 @@ pdoc:
 ```
 
 Watching the template directory itself additionally requires a line in
-```_watch_dirs()```; without it only module and config changes trigger a rebuild.
+```_get_watch_dirs()```; without it only module and config changes trigger a rebuild.
 
 The theme is an original Tailwind (MIT) composition against the tokeo brand
 tokens. No upstream pdoc or pdoc3 CSS is used.

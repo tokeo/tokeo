@@ -28,7 +28,7 @@ from tokeo.main import TokeoTest
 from tokeo.ext.pdoc import (
     TokeoPdocError,
     _strip_comment_markers,
-    _yaml_header_end,
+    _get_yaml_header_end,
 )
 
 # ---- app under test ---------------------------------------------------------
@@ -154,7 +154,7 @@ def test_strip_comment_markers_handles_empty_input():
 )
 def test_yaml_header_end(lines, expected):
     """The header ends after "---", 0 without one."""
-    assert _yaml_header_end(lines) == expected
+    assert _get_yaml_header_end(lines) == expected
 
 
 # ---- `#:` variable comments (pdoc3 behaviour restored) ----------------------
@@ -392,7 +392,7 @@ def _render_page(tmp_path, monkeypatch, package_name, files):
     return {name: (tmp_path / 'html' / package_name / f'{name}.html').read_text() for name in files}
 
 
-def _section(html, tag, title):
+def _get_section(html, tag, title):
     """The text of the heading tag with the title up to the next heading."""
     match = re.search(rf'<{tag}[^>]*>{title}</{tag}>(.*?)(?=<h[23]|</nav>|$)', html, re.S)
     return match.group(1) if match else None
@@ -403,8 +403,8 @@ def test_render_shows_the_tests_of_a_test_module_apart(tmp_path, monkeypatch):
     html = _render_page(tmp_path, monkeypatch, 'sections_tests', {'test_sample': TESTS_SOURCE})['test_sample']
 
     for tag in ('h3', 'h2'):
-        tests = _section(html, tag, 'Tests')
-        functions = _section(html, tag, 'Functions')
+        tests = _get_section(html, tag, 'Tests')
+        functions = _get_section(html, tag, 'Functions')
         assert 'test_box_opens' in tests and 'test_box_closes' in tests
         assert 'make_box' not in tests
         assert 'make_box' in functions and 'test_box' not in functions
@@ -414,8 +414,8 @@ def test_render_keeps_test_functions_of_other_modules_under_functions(tmp_path, 
     """Outside a test module a test_* function stays under Functions."""
     html = _render_page(tmp_path, monkeypatch, 'sections_helpers', {'helpers': TESTS_SOURCE})['helpers']
 
-    assert _section(html, 'h2', 'Tests') is None
-    assert 'test_box_opens' in _section(html, 'h2', 'Functions')
+    assert _get_section(html, 'h2', 'Tests') is None
+    assert 'test_box_opens' in _get_section(html, 'h2', 'Functions')
 
 
 # ---- config page: per-section slicing and redaction -------------------------
@@ -520,7 +520,7 @@ def _collect_config_sections(app, tmp_path, monkeypatch):
         types.SimpleNamespace(
             APP_CONFIG_DIR=str(config_dir),
             get_config_files=lambda app_env='base', app_config_file_suffix='.yaml': (
-                _fake_appenv_files(config_dir, app_env, app_config_file_suffix)
+                _get_fake_appenv_files(config_dir, app_env, app_config_file_suffix)
             ),
         ),
         raising=False,
@@ -539,7 +539,7 @@ def _collect_config_sections(app, tmp_path, monkeypatch):
     return list(seen)
 
 
-def _fake_appenv_files(config_dir, app_env, suffix):
+def _get_fake_appenv_files(config_dir, app_env, suffix):
     """
     Reproduce appenv's resolver, including its ordering.
 
@@ -663,7 +663,7 @@ def test_discover_honours_pdoc_overrides(app, tmp_path, monkeypatch):
 
 def _stub_dirs(app, monkeypatch, dirs):
     """Pretend the documented modules resolve to ```dirs```."""
-    monkeypatch.setattr(app.pdoc, '_module_dirs', lambda: dirs)
+    monkeypatch.setattr(app.pdoc, '_get_module_dirs', lambda: dirs)
     monkeypatch.setattr(app.pdoc, '_resolve_docstrings_dirs', lambda: [])
 
 
@@ -687,7 +687,7 @@ def test_watch_dirs_drops_directories_outside_the_project(app, tmp_path, monkeyp
         ],
     )
 
-    dirs, outside = app.pdoc._watch_dirs()
+    dirs, outside = app.pdoc._get_watch_dirs()
 
     assert sorted(Path(d).name for d in dirs) == ['spiral', 'tests']
     assert outside == [str(outside_dir)]
@@ -707,7 +707,7 @@ def test_watch_dirs_collapses_nested_directories(app, tmp_path, monkeypatch):
         ],
     )
 
-    assert app.pdoc._watch_dirs()[0] == [str(project / 'spiral')]
+    assert app.pdoc._get_watch_dirs()[0] == [str(project / 'spiral')]
 
 
 def test_watch_dirs_does_not_confuse_a_prefix_with_a_parent(
@@ -725,7 +725,7 @@ def test_watch_dirs_does_not_confuse_a_prefix_with_a_parent(
     monkeypatch.chdir(project)
     _stub_dirs(app, monkeypatch, [str(project / 'app'), str(sibling)])
 
-    assert app.pdoc._watch_dirs()[0] == [str(project / 'app')]
+    assert app.pdoc._get_watch_dirs()[0] == [str(project / 'app')]
 
 
 def test_watch_dirs_includes_the_docstrings_dirs(app, tmp_path, monkeypatch):
@@ -738,7 +738,7 @@ def test_watch_dirs_includes_the_docstrings_dirs(app, tmp_path, monkeypatch):
     monkeypatch.chdir(project)
     monkeypatch.setattr(
         app.pdoc,
-        '_module_dirs',
+        '_get_module_dirs',
         lambda: [str(project / 'spiral')],
     )
     monkeypatch.setattr(
@@ -747,7 +747,7 @@ def test_watch_dirs_includes_the_docstrings_dirs(app, tmp_path, monkeypatch):
         lambda: [str(project / 'snippets')],
     )
 
-    dirs, _ = app.pdoc._watch_dirs()
+    dirs, _ = app.pdoc._get_watch_dirs()
 
     assert sorted(Path(d).name for d in dirs) == ['snippets', 'spiral']
 
@@ -772,7 +772,7 @@ def test_watch_dirs_includes_the_config_dir_when_appenv_is_loaded(
         raising=False,
     )
 
-    dirs, _ = app.pdoc._watch_dirs()
+    dirs, _ = app.pdoc._get_watch_dirs()
 
     assert sorted(Path(d).name for d in dirs) == ['config', 'spiral']
 
@@ -978,7 +978,7 @@ class SidebarEntries(HTMLParser):
             self._div_depth = max(self._div_depth - 1, 0)
 
 
-def _class_entries(sidebar):
+def _get_class_entries(sidebar):
     """Map each class name in the sidebar to how it was rendered."""
     parser = SidebarEntries()
     parser.feed(sidebar)
@@ -990,7 +990,7 @@ def test_sidebar_bare_classes_are_not_indented(tmp_path, monkeypatch):
     # with no chevron anywhere in the section there is nothing to line up
     # with, so padding would only push the names out of line with every
     # other sidebar section
-    entries = _class_entries(_render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['bare'], 'bare_a'))
+    entries = _get_class_entries(_render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['bare'], 'bare_a'))
 
     assert entries == {'Alpha': 'py-0.5', 'Beta': 'py-0.5'}
 
@@ -1004,13 +1004,13 @@ def test_sidebar_bare_classes_align_with_the_functions_section(
     # than the function names right below them
     sidebar = _render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['bare'], 'bare_b')
 
-    assert 'pl-' not in _class_entries(sidebar)['Alpha']
+    assert 'pl-' not in _get_class_entries(sidebar)['Alpha']
 
 
 def test_sidebar_expandable_classes_get_a_chevron(tmp_path, monkeypatch):
     """Classes with methods are expandable, each with a chevron."""
     sidebar = _render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['expandable'], 'exp_a')
-    entries = _class_entries(sidebar)
+    entries = _get_class_entries(sidebar)
 
     assert entries == {'Alpha': 'expandable', 'Beta': 'expandable'}
     assert sidebar.count('tk-chev') == 2
@@ -1029,7 +1029,7 @@ def test_sidebar_mixed_classes_line_up_with_the_chevron(tmp_path, monkeypatch):
     """Next to an expandable class a plain one gets pl-3.5."""
     # here the padding is earned: the plain link has to start where the
     # expandable one's name starts, past its chevron
-    entries = _class_entries(_render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_a'))
+    entries = _get_class_entries(_render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_a'))
 
     assert entries['Beta'] == 'expandable'
     assert entries['Alpha'] == 'py-0.5 pl-3.5'
@@ -1041,7 +1041,7 @@ def test_sidebar_padding_matches_the_chevron_width(tmp_path, monkeypatch):
     # name starts .9rem in; pl-3.5 is .875rem, the closest value the
     # pre-built tailwind.min.css actually ships
     sidebar = _render_sidebar(tmp_path, monkeypatch, SIDEBAR_SOURCES['mixed'], 'mix_b')
-    padding = _class_entries(sidebar)['Alpha']
+    padding = _get_class_entries(sidebar)['Alpha']
 
     assert padding.endswith('pl-3.5')
     assert 'gap-2' in sidebar  # the chevron gap the padding is derived from
@@ -1210,7 +1210,7 @@ def test_documented_lists_the_configured_modules(app, monkeypatch):
     app.pdoc.set_modules(['spiral', 'tests', 'tokeo'])
     monkeypatch.setattr(app, 'env', None, raising=False)
 
-    assert app.pdoc._documented() == ['spiral', 'tests', 'tokeo']
+    assert app.pdoc._get_documented_names() == ['spiral', 'tests', 'tokeo']
 
 
 def test_documented_appends_config_when_the_page_is_written(app, monkeypatch):
@@ -1226,7 +1226,7 @@ def test_documented_appends_config_when_the_page_is_written(app, monkeypatch):
         raising=False,
     )
 
-    assert app.pdoc._documented() == ['spiral', 'config']
+    assert app.pdoc._get_documented_names() == ['spiral', 'config']
 
 
 def test_documented_omits_config_when_disabled(app, monkeypatch):
@@ -1242,7 +1242,7 @@ def test_documented_omits_config_when_disabled(app, monkeypatch):
         raising=False,
     )
 
-    assert app.pdoc._documented() == ['spiral']
+    assert app.pdoc._get_documented_names() == ['spiral']
 
 
 def test_documented_keeps_the_specs_as_configured(app, monkeypatch):
@@ -1252,7 +1252,7 @@ def test_documented_keeps_the_specs_as_configured(app, monkeypatch):
     app.pdoc.set_modules(['spiral.core', 'spiral.ext', 'tests'])
     monkeypatch.setattr(app, 'env', None, raising=False)
 
-    assert app.pdoc._documented() == ['spiral.core', 'spiral.ext', 'tests']
+    assert app.pdoc._get_documented_names() == ['spiral.core', 'spiral.ext', 'tests']
 
 
 def test_documented_removes_duplicates_but_keeps_the_order(app, monkeypatch):
@@ -1260,7 +1260,7 @@ def test_documented_removes_duplicates_but_keeps_the_order(app, monkeypatch):
     app.pdoc.set_modules(['tests', 'spiral', 'tests'])
     monkeypatch.setattr(app, 'env', None, raising=False)
 
-    assert app.pdoc._documented() == ['tests', 'spiral']
+    assert app.pdoc._get_documented_names() == ['tests', 'spiral']
 
 
 def test_set_modules_takes_a_list(app):
@@ -1601,7 +1601,7 @@ def test_module_source_dir_of_a_package(app, tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(str(tmp_path))
     module = types.SimpleNamespace(obj=importlib.import_module('mdpkg'))
 
-    assert Path(app.pdoc._module_source_dir(module)).name == 'mdpkg'
+    assert Path(app.pdoc._get_module_source_dir(module)).name == 'mdpkg'
 
 
 # ---- controller flags -------------------------------------------------------
@@ -1701,7 +1701,7 @@ def test_no_config_switch_removes_config_from_the_summary(tmp_path, monkeypatch)
         monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--no-config'])
         booted.run()
 
-        assert 'config' not in booted.pdoc._documented()
+        assert 'config' not in booted.pdoc._get_documented_names()
 
 
 def test_controller_renders_only_without_flags(tmp_path, monkeypatch):
@@ -1800,7 +1800,7 @@ PDOC_REPLACED_COLOR_CLASSES = [
 ]
 
 
-def _css_block(css, selector):
+def _get_css_block(css, selector):
     """The custom properties of the first block that opens with the selector."""
     start = css.index(selector + ' {')
     end = css.index('}', start)
@@ -1833,9 +1833,9 @@ def test_pages_carry_the_mode_switch_and_the_early_script(tmp_path, monkeypatch)
 def test_every_colour_token_has_a_dark_value_for_dark_and_os():
     """Each colour token of :root is set in the dark block and in the os block."""
     css = (PDOC_TEMPLATE_DIR / 'assets' / 'tokeo.theme.css').read_text()
-    tokens = {token for token in _css_block(css, ':root') if token.startswith(('--color-brand-', '--gradient-', '--tk-'))}
-    dark = _css_block(css, ":root[data-theme='dark']")
-    os_dark = _css_block(css, ":root[data-theme='os']")
+    tokens = {token for token in _get_css_block(css, ':root') if token.startswith(('--color-brand-', '--gradient-', '--tk-'))}
+    dark = _get_css_block(css, ":root[data-theme='dark']")
+    os_dark = _get_css_block(css, ":root[data-theme='os']")
 
     assert tokens and tokens <= dark and tokens <= os_dark
 

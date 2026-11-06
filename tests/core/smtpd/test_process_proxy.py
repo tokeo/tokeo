@@ -30,7 +30,7 @@ _SMTPD = SmtpdServer(
 )
 
 
-def _session():
+def _make_session():
     session = SmtpdSession()
     _SMTPD.process_reset_session(session, connection_initialize=True)
     server = session.ctx.server
@@ -46,7 +46,7 @@ def _session():
 
 def test_00_proxy_tcp4_valid():
     """A TCP4 PROXY line fills source and dest ip and port."""
-    session = _session()
+    session = _make_session()
     run_line(_SMTPD, session, 'PROXY TCP4 1.1.1.1 2.2.2.2 1111 2222')
     proxy = session.ctx.server.proxy
     assert proxy is not None
@@ -58,7 +58,7 @@ def test_00_proxy_tcp4_valid():
 
 def test_01_proxy_tcp6_valid():
     """A TCP6 PROXY line is stored with normalized ips."""
-    session = _session()
+    session = _make_session()
     run_line(_SMTPD, session, 'PROXY TCP6 003::0003 4::4 3333 4444')
     proxy = session.ctx.server.proxy
     assert proxy is not None
@@ -70,14 +70,14 @@ def test_01_proxy_tcp6_valid():
 
 def test_02_proxy_illegal_command():
     """An illegal PROXY line raises the 421 abort."""
-    session = _session()
+    session = _make_session()
     with pytest.raises(Smtpd421CloseException):
         run_line(_SMTPD, session, 'PROXY ILLEGAL COMMAND')
 
 
 def test_03_proxy_multiple_proxy_abort():
     """A second PROXY line raises the 421 abort."""
-    session = _session()
+    session = _make_session()
     run_line(_SMTPD, session, 'PROXY TCP4 1.1.1.1 2.2.2.2 1111 2222')
     with pytest.raises(Smtpd421CloseException):
         run_line(_SMTPD, session, 'PROXY TCP6 003::0003 4::4 000003333 4444')
@@ -85,14 +85,14 @@ def test_03_proxy_multiple_proxy_abort():
 
 def test_04_proxy_not_first_aborts():
     """A first line other than PROXY raises the 421 abort."""
-    session = _session()
+    session = _make_session()
     with pytest.raises(Smtpd421CloseException):
         run_line(_SMTPD, session, 'EHLO SEQUENCE')
 
 
 def test_proxy_port_zero_is_valid():
     """A port 0 is valid (haproxy proxy-protocol version 1)."""
-    session = _session()
+    session = _make_session()
     run_line(_SMTPD, session, 'PROXY TCP4 1.1.1.1 2.2.2.2 0 25')
     assert session.ctx.server.proxy['source_port'] == 0
 
@@ -109,13 +109,13 @@ def test_proxy_port_zero_is_valid():
 )
 def test_proxy_outside_the_specification_aborts(line):
     """Leading zeros, ports above 65535, two spaces or over 107 bytes abort."""
-    session = _session()
+    session = _make_session()
     with pytest.raises(Smtpd421CloseException):
         run_line(_SMTPD, session, line)
 
 
 def test_proxy_in_lower_case_is_accepted():
     """The PROXY header is accepted in any case."""
-    session = _session()
+    session = _make_session()
     run_line(_SMTPD, session, 'proxy tcp4 1.1.1.1 2.2.2.2 1111 2222')
     assert session.ctx.server.proxy['proto'] == 'TCP4'

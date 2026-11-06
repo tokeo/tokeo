@@ -64,17 +64,17 @@ def pb(server):
         yield client
 
 
-def _params(request):
+def _get_params(request):
     # the query parameters of a request as dict
     return dict(request.url.params)
 
 
-def _body(request):
+def _get_body(request):
     # the json body of a request
     return json.loads(request.content)
 
 
-def _jwt(lifetime, **claims):
+def _make_jwt(lifetime, **claims):
     # a token shaped like the one of PocketBase; None leaves exp out
     def encode(data):
         return base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip('=')
@@ -85,7 +85,7 @@ def _jwt(lifetime, **claims):
     return f'{encode({"alg": "HS256", "typ": "JWT"})}.{encode(payload)}.signature'
 
 
-def _auth(token, record_id='u1'):
+def _make_auth(token, record_id='u1'):
     # the answer of a login
     return {'token': token, 'record': {'id': record_id, 'email': 'anna@tokeo.test'}}
 
@@ -192,7 +192,7 @@ def test_send_adds_the_token_and_leaves_out_empty_params(pb, server):
     pb.token = 'tok'
     pb.send('GET', '/api/x', params={'a': 1, 'b': None})
     assert server.requests[0].headers['Authorization'] == 'tok'
-    assert _params(server.requests[0]) == {'a': '1'}
+    assert _get_params(server.requests[0]) == {'a': '1'}
 
 
 def test_send_without_token_sends_no_authorization(pb, server):
@@ -246,8 +246,8 @@ def test_send_failed_connection_raises_with_status_0(pb, server):
 def test_before_request_runs_before_each_request_but_auth_and_health(server):
     """before_request runs before records, batch and send, not login or health."""
     calls = []
-    server.answers[('POST', '/api/collections/users/auth-with-password')] = _auth('tok')
-    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth('tok2')
+    server.answers[('POST', '/api/collections/users/auth-with-password')] = _make_auth('tok')
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth('tok2')
     server.answers[('POST', '/api/batch')] = []
     with PocketBase(URL, before_request=lambda: calls.append(True), transport=httpx.MockTransport(server.handle)) as client:
         client.auth_with_password('users', 'anna@tokeo.test', 'pass')
@@ -262,7 +262,7 @@ def test_before_request_runs_before_each_request_but_auth_and_health(server):
 
 def test_before_request_may_log_in(server):
     """A before_request that logs in runs once, its login does not call it again."""
-    server.answers[('POST', '/api/collections/users/auth-with-password')] = _auth('tok')
+    server.answers[('POST', '/api/collections/users/auth-with-password')] = _make_auth('tok')
     calls = []
 
     def log_in():
@@ -278,7 +278,7 @@ def test_before_request_may_log_in(server):
 
 def test_impersonate_runs_before_request_and_the_new_client_has_none(pb, server):
     """impersonate needs the login of before_request, the new client has no hook."""
-    server.answers[('POST', '/api/collections/users/impersonate/u1')] = _auth('imp', 'u1')
+    server.answers[('POST', '/api/collections/users/impersonate/u1')] = _make_auth('imp', 'u1')
     calls = []
     pb.before_request = lambda: calls.append(True)
     client = pb.impersonate('users', 'u1')
@@ -305,7 +305,7 @@ def test_get_list_sends_the_options_as_query(pb, server):
     """get_list sends all its options and query as query parameters."""
     server.answers[('GET', '/api/collections/posts/records')] = {'page': 2, 'perPage': 5, 'items': [{'id': 'r1'}]}
     result = pb.collection('posts').get_list(2, 5, 'views > 3', '-title', 'owner', 'id,title', True, {'x': 'y'})
-    assert _params(server.requests[0]) == dict(
+    assert _get_params(server.requests[0]) == dict(
         page='2', perPage='5', filter='views > 3', sort='-title', expand='owner', fields='id,title', skipTotal='true', x='y'
     )
     assert (result.page, result.items[0].id) == (2, 'r1')
@@ -314,13 +314,13 @@ def test_get_list_sends_the_options_as_query(pb, server):
 def test_get_list_defaults_send_page_1_of_30(pb, server):
     """By default get_list asks for page 1 of 30 without further options."""
     pb.collection('posts').get_list()
-    assert _params(server.requests[0]) == dict(page='1', perPage='30')
+    assert _get_params(server.requests[0]) == dict(page='1', perPage='30')
 
 
 def test_get_list_query_wins_over_the_arguments(pb, server):
     """A key of query that is also an argument wins."""
     pb.collection('posts').get_list(sort='title', query={'sort': '-created'})
-    assert _params(server.requests[0])['sort'] == '-created'
+    assert _get_params(server.requests[0])['sort'] == '-created'
 
 
 def test_get_full_list_pages_until_a_page_is_not_full(pb, server):
@@ -333,7 +333,7 @@ def test_get_full_list_pages_until_a_page_is_not_full(pb, server):
     server.respond = respond
     records = pb.collection('posts').get_full_list(per_page=2, filter='views > 0')
     assert [record.id for record in records] == ['a', 'b', 'c']
-    assert [(_params(r)['page'], _params(r)['perPage'], _params(r)['skipTotal']) for r in server.requests] == [
+    assert [(_get_params(r)['page'], _get_params(r)['perPage'], _get_params(r)['skipTotal']) for r in server.requests] == [
         ('1', '2', 'true'),
         ('2', '2', 'true'),
     ]
@@ -343,7 +343,7 @@ def test_get_first_gives_the_first_match(pb, server):
     """get_first asks for one record without total and gives it."""
     server.answers[('GET', '/api/collections/posts/records')] = {'items': [{'id': 'r1'}]}
     assert pb.collection('posts').get_first("title = 'a'").id == 'r1'
-    assert _params(server.requests[0]) == dict(page='1', perPage='1', filter="title = 'a'", skipTotal='true')
+    assert _get_params(server.requests[0]) == dict(page='1', perPage='1', filter="title = 'a'", skipTotal='true')
 
 
 def test_get_first_without_match_raises_404(pb, server):
@@ -358,7 +358,7 @@ def test_get_one_gets_the_record_by_id(pb, server):
     """get_one sends GET .../records/r1 with expand and fields."""
     server.answers[('GET', '/api/collections/posts/records/r1')] = {'id': 'r1', 'title': 'Hello'}
     record = pb.collection('posts').get_one('r1', expand='owner', fields='id,title')
-    assert _params(server.requests[0]) == dict(expand='owner', fields='id,title')
+    assert _get_params(server.requests[0]) == dict(expand='owner', fields='id,title')
     assert isinstance(record, Record) and record.title == 'Hello'
 
 
@@ -366,7 +366,7 @@ def test_create_posts_the_fields_as_json(pb, server):
     """create sends POST .../records with the fields as json body."""
     server.answers[('POST', '/api/collections/posts/records')] = {'id': 'r1', 'title': 'New'}
     record = pb.collection('posts').create({'title': 'New'}, fields='id,title')
-    assert _body(server.requests[0]) == {'title': 'New'} and _params(server.requests[0]) == dict(fields='id,title')
+    assert _get_body(server.requests[0]) == {'title': 'New'} and _get_params(server.requests[0]) == dict(fields='id,title')
     assert record.id == 'r1'
 
 
@@ -384,7 +384,7 @@ def test_update_patches_the_fields(pb, server):
     """update sends PATCH .../records/r1 with the fields, {} without fields."""
     pb.collection('posts').update('r1', {'views': 4})
     pb.collection('posts').update('r1')
-    assert [(r.method, r.url.path, _body(r)) for r in server.requests] == [
+    assert [(r.method, r.url.path, _get_body(r)) for r in server.requests] == [
         ('PATCH', '/api/collections/posts/records/r1', {'views': 4}),
         ('PATCH', '/api/collections/posts/records/r1', {}),
     ]
@@ -402,10 +402,10 @@ def test_delete_removes_the_record_and_gives_true(pb, server):
 
 def test_auth_with_password_keeps_the_token_and_record(pb, server):
     """A login keeps token, record and collection, the login sends no old token."""
-    server.answers[('POST', '/api/collections/users/auth-with-password')] = _auth('tok')
+    server.answers[('POST', '/api/collections/users/auth-with-password')] = _make_auth('tok')
     pb.token = 'old'
     record = pb.auth_with_password('users', 'anna@tokeo.test', 'pass')
-    assert _body(server.requests[0]) == {'identity': 'anna@tokeo.test', 'password': 'pass'}
+    assert _get_body(server.requests[0]) == {'identity': 'anna@tokeo.test', 'password': 'pass'}
     assert 'Authorization' not in server.requests[0].headers
     assert (pb.token, pb.auth_collection, record.email, pb.auth_record is record) == ('tok', 'users', 'anna@tokeo.test', True)
 
@@ -423,8 +423,8 @@ def test_auth_with_password_refused_raises_auth_error(pb, server, status):
 
 def test_auth_refresh_renews_the_token_of_the_login(pb, server):
     """auth_refresh sends the token of the login and keeps the new one."""
-    server.answers[('POST', '/api/collections/users/auth-with-password')] = _auth('tok1')
-    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth('tok2')
+    server.answers[('POST', '/api/collections/users/auth-with-password')] = _make_auth('tok1')
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth('tok2')
     pb.auth_with_password('users', 'anna@tokeo.test', 'pass')
     pb.auth_refresh()
     assert server.requests[1].headers['Authorization'] == 'tok1' and pb.token == 'tok2'
@@ -439,7 +439,7 @@ def test_auth_refresh_without_login_raises_auth_error(pb, server):
 
 def test_auth_refresh_refused_raises_auth_error(pb, server):
     """A refused refresh raises TokeoPocketBaseAuthError with status 401."""
-    server.answers[('POST', '/api/collections/users/auth-with-password')] = _auth('tok1')
+    server.answers[('POST', '/api/collections/users/auth-with-password')] = _make_auth('tok1')
     server.answers[('POST', '/api/collections/users/auth-refresh')] = httpx.Response(401, json={'message': 'expired'})
     pb.auth_with_password('users', 'anna@tokeo.test', 'pass')
     with pytest.raises(TokeoPocketBaseAuthError) as caught:
@@ -449,10 +449,10 @@ def test_auth_refresh_refused_raises_auth_error(pb, server):
 
 def test_impersonate_gives_a_client_of_its_own_with_the_token(pb, server):
     """impersonate gives a new client with the token of the record."""
-    server.answers[('POST', '/api/collections/users/impersonate/u1')] = _auth('imp', 'u1')
+    server.answers[('POST', '/api/collections/users/impersonate/u1')] = _make_auth('imp', 'u1')
     pb.token = 'super'
     client = pb.impersonate('users', 'u1', duration=60)
-    assert _body(server.requests[0]) == {'duration': 60} and server.requests[0].headers['Authorization'] == 'super'
+    assert _get_body(server.requests[0]) == {'duration': 60} and server.requests[0].headers['Authorization'] == 'super'
     assert (client.token, client.auth_collection, client.auth_record.id, pb.token) == ('imp', 'users', 'u1', 'super')
     assert client.http_client is not pb.http_client
     client.collection('posts').get_list()
@@ -470,7 +470,7 @@ def test_impersonate_refused_raises_auth_error(pb, server):
 
 @pytest.mark.parametrize(
     'token, seconds, valid',
-    [(None, 0, False), ('broken', 0, False), (_jwt(None), 0, False), (_jwt(3600), 60, True), (_jwt(30), 60, False)],
+    [(None, 0, False), ('broken', 0, False), (_make_jwt(None), 0, False), (_make_jwt(3600), 60, True), (_make_jwt(30), 60, False)],
     ids=['none', 'broken', 'no_exp', 'valid', 'too_short'],
 )
 def test_token_valid_tells_whether_the_token_lasts(pb, token, seconds, valid):
@@ -481,9 +481,9 @@ def test_token_valid_tells_whether_the_token_lasts(pb, token, seconds, valid):
 
 def test_logins_count_each_login_but_no_refresh(pb, server):
     """A login and an impersonation into the client count, a refresh does not."""
-    server.answers[('POST', '/api/collections/users/auth-with-password')] = _auth('tok1')
-    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth('tok2')
-    server.answers[('POST', '/api/collections/users/impersonate/u2')] = _auth('imp', 'u2')
+    server.answers[('POST', '/api/collections/users/auth-with-password')] = _make_auth('tok1')
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth('tok2')
+    server.answers[('POST', '/api/collections/users/impersonate/u2')] = _make_auth('imp', 'u2')
     pb.auth_with_password('users', 'anna@tokeo.test', 'pass')
     pb.auth_refresh()
     assert pb.logins == 1
@@ -494,13 +494,13 @@ def test_logins_count_each_login_but_no_refresh(pb, server):
 
 def test_auth_refresh_takes_the_collection_of_a_token_from_elsewhere(pb, server):
     """A token from elsewhere is refreshed on the collection it names."""
-    server.answers[('POST', '/api/collections/pbc_users/auth-refresh')] = _auth('tok2')
-    pb.token = _jwt(3600, collectionId='pbc_users')
+    server.answers[('POST', '/api/collections/pbc_users/auth-refresh')] = _make_auth('tok2')
+    pb.token = _make_jwt(3600, collectionId='pbc_users')
     pb.auth_refresh()
     assert (pb.token, pb.auth_collection) == ('tok2', 'pbc_users')
 
 
-@pytest.mark.parametrize('token', ['broken', _jwt(3600)], ids=['broken', 'no_collection'])
+@pytest.mark.parametrize('token', ['broken', _make_jwt(3600)], ids=['broken', 'no_collection'])
 def test_auth_refresh_of_a_token_without_collection_raises(pb, server, token):
     """A token that names no collection cannot be refreshed and sends nothing."""
     pb.token = token
@@ -527,7 +527,7 @@ def keeper(pb, server):
 
     def login():
         logins.append(1)
-        pb.token, pb.auth_collection = _jwt(3600), 'users'
+        pb.token, pb.auth_collection = _make_jwt(3600), 'users'
 
     keeper = AuthKeeper(pb, login, min_valid_seconds=60, check_seconds=60)
     keeper.logins = logins
@@ -545,7 +545,7 @@ def test_auth_keeper_logs_in_once_and_trusts_the_login_for_check_seconds(keeper,
 
 def test_auth_keeper_asks_the_server_once_check_seconds_passed(keeper, pb, server):
     """With check_seconds 0 each request confirms the login by a refresh first."""
-    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth(_jwt(3600))
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth(_make_jwt(3600))
     keeper.check_seconds = 0
     pb.collection('posts').get_list()
     pb.collection('posts').get_list()
@@ -557,23 +557,23 @@ def test_auth_keeper_asks_the_server_once_check_seconds_passed(keeper, pb, serve
 def test_auth_keeper_logs_in_anew_when_the_server_refuses_the_login(keeper, pb, server):
     """A refresh refused with 401, e.g. after a new password, logs in anew."""
     server.answers[('POST', '/api/collections/users/auth-refresh')] = httpx.Response(401, json={'message': 'refused'})
-    pb.token, pb.auth_collection = _jwt(3600), 'users'
+    pb.token, pb.auth_collection = _make_jwt(3600), 'users'
     pb.collection('posts').get_list()
     assert len(keeper.logins) == 1 and server.requests[0].url.path.endswith('/auth-refresh')
 
 
 def test_auth_keeper_renews_a_token_near_its_expiry_by_a_refresh(keeper, pb, server):
     """A token valid 30 more seconds is refreshed, without a new login."""
-    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth(_jwt(3600))
-    pb.token, pb.auth_collection = _jwt(30), 'users'
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth(_make_jwt(3600))
+    pb.token, pb.auth_collection = _make_jwt(30), 'users'
     pb.collection('posts').get_list()
     assert keeper.logins == [] and pb.is_token_valid(3000)
 
 
 def test_auth_keeper_logs_in_when_the_refresh_keeps_a_short_token(keeper, pb, server):
     """A refresh keeping a short token, as of an impersonation, logs in."""
-    short = _jwt(30)
-    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth(short)
+    short = _make_jwt(30)
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth(short)
     pb.token, pb.auth_collection = short, 'users'
     pb.collection('posts').get_list()
     assert len(keeper.logins) == 1 and pb.is_token_valid(3000)
@@ -586,9 +586,9 @@ def test_auth_keeper_logs_in_when_the_refresh_keeps_a_short_token(keeper, pb, se
 )
 def test_auth_keeper_trusts_a_new_login_but_checks_a_token_from_elsewhere(pb, server, logins, refreshes):
     """A new login of the client needs no refresh, a token from elsewhere does."""
-    server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth(_jwt(3600))
+    server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth(_make_jwt(3600))
     pb.before_request = AuthKeeper(pb, lambda: None)
-    pb.token, pb.auth_collection, pb.logins = _jwt(3600), 'users', logins
+    pb.token, pb.auth_collection, pb.logins = _make_jwt(3600), 'users', logins
     pb.collection('posts').get_list()
     assert sum(request.url.path.endswith('/auth-refresh') for request in server.requests) == refreshes
 
@@ -620,7 +620,7 @@ def test_batch_sends_all_changes_in_one_request(pb, server):
     assert isinstance(batch, Batch)
     batch.create('posts', {'title': 'A'}).update('posts', 'b', {'views': 1}).upsert('posts', {'id': 'c'}).delete('posts', 'd')
     results = batch.send()
-    assert _body(server.requests[0]) == {
+    assert _get_body(server.requests[0]) == {
         'requests': [
             {'method': 'POST', 'url': '/api/collections/posts/records', 'body': {'title': 'A'}},
             {'method': 'PATCH', 'url': '/api/collections/posts/records/b', 'body': {'views': 1}},

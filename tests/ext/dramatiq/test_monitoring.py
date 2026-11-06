@@ -17,9 +17,9 @@ from dramatiq import broker as dramatiq_broker
 from dramatiq.brokers.stub import StubBroker
 from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoDramatiqConnectionError
 from tokeo.ext.dramatiq import monitoring
-from tokeo.ext.dramatiq.base import _with_details
+from tokeo.ext.dramatiq.base import _get_with_details
 from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
-from tokeo.ext.dramatiq.controller import _duration, _monitor_view
+from tokeo.ext.dramatiq.controller import _format_duration, _monitor_view
 from tokeo.ext.tui.output import TokeoTuiOutput
 from tokeo.core.exc import TokeoError
 from tests.utils import wait_until
@@ -51,43 +51,43 @@ class DramatiqWithoutTuiTest(DramatiqTest):
 @pytest.mark.parametrize('value', [True, 'on', 'yes', 'True', 'ON'])
 def test_details_on(value):
     """True, "on", "yes" in any case switch the details on."""
-    assert _with_details(value, debug=False) is True
+    assert _get_with_details(value, debug=False) is True
 
 
 @pytest.mark.parametrize('value', [False, None, 'off', 'no', 'null', 'False'])
 def test_details_off(value):
     """False, None, "off", "no", "null" switch the details off."""
-    assert _with_details(value, debug=True) is False
+    assert _get_with_details(value, debug=True) is False
 
 
 @pytest.mark.parametrize('debug', [True, False])
 def test_details_follow_debug(debug):
     """ "debug" switches the details on in debug mode only."""
-    assert _with_details('debug', debug) is debug
+    assert _get_with_details('debug', debug) is debug
 
 
 @pytest.mark.parametrize('value', ['maybe', 1])
 def test_details_invalid(value):
     """Any other value raises the config error."""
     with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config monitoring_with_details: .* must be off, on or debug!'):
-        _with_details(value, debug=False)
+        _get_with_details(value, debug=False)
 
 
-def _heartbeats(app):
+def _get_heartbeats(app):
     return [m for m in app.dramatiq.broker.middleware if isinstance(m, TokeoDramatiqHeartbeat)]
 
 
 def test_monitoring_off_adds_no_heartbeat(tmp):
     """Without monitoring there is no heartbeat, the interval stays 5."""
     with DramatiqMiddlewareTest(tmp) as app:
-        assert _heartbeats(app) == []
+        assert _get_heartbeats(app) == []
         assert app.dramatiq.config('monitoring') is False and app.dramatiq.monitor.interval == 5
 
 
 def test_monitoring_adds_the_heartbeat(tmp):
     """monitoring adds the heartbeat with exchange, interval and details."""
     with DramatiqMiddlewareTest(tmp, monitoring=True, monitoring_interval=7, monitoring_with_details='on') as app:
-        (heartbeat,) = _heartbeats(app)
+        (heartbeat,) = _get_heartbeats(app)
         assert (heartbeat.exchange, heartbeat.interval, heartbeat.with_details) == ('tokeo_test.dramatiq.monitoring', 7, True)
         assert heartbeat.app['label'] == 'tokeo_test'
 
@@ -286,7 +286,7 @@ def test_heartbeat_without_broker_parameters_sends_nothing(monkeypatch):
 # ---- monitor ----------------------------------------------------------------
 
 
-def _beat(pid, interval=5, state='running', running=(), since=None, with_details=False):
+def _make_beat(pid, interval=5, state='running', running=(), since=None, with_details=False):
     return dict(
         type='tokeo.dramatiq.heartbeat',
         version=1,
@@ -326,7 +326,7 @@ def test_monitor_states(monitor):
     now = time.monotonic()
     beats = [(1, 1, 5, 'running'), (2, 12, 5, 'running'), (3, 16, 5, 'running'), (4, 3, 1, 'running'), (5, 2, 5, 'stopped')]
     for pid, seen, interval, state in beats:
-        monitor.receive(json.dumps(_beat(pid, interval, state)), received=now - seen)
+        monitor.receive(json.dumps(_make_beat(pid, interval, state)), received=now - seen)
     states = {w['heartbeat']['worker']['pid']: w['state'] for w in monitor.workers()}
     # late after 2 and gone after 3 intervals, each by the interval of the worker
     assert states == {1: 'ok', 2: 'late', 3: 'gone', 4: 'gone', 5: 'stopped'}
@@ -337,14 +337,14 @@ def test_monitor_drops_gone_and_stopped_workers(monitor):
     """Gone and stopped workers stay for 10 more intervals."""
     now = time.monotonic()
     for pid, seen, state in [(1, 64, 'running'), (2, 66, 'running'), (3, 49, 'stopped'), (4, 51, 'stopped')]:
-        monitor.receive(json.dumps(_beat(pid, state=state)), received=now - seen)
+        monitor.receive(json.dumps(_make_beat(pid, state=state)), received=now - seen)
     # gone and stopped workers stay for 10 more intervals
     assert [w['heartbeat']['worker']['pid'] for w in monitor.workers()] == [1, 3]
 
 
 def test_monitor_ignores_other_messages(monitor):
     """Messages that are no heartbeat are ignored."""
-    for body in (b'not json', b'{}', json.dumps(dict(_beat(1), type='other')), b'[1]'):
+    for body in (b'not json', b'{}', json.dumps(dict(_make_beat(1), type='other')), b'[1]'):
         monitor.receive(body)
     assert monitor.workers() == []
 
@@ -353,9 +353,9 @@ def test_monitor_snapshot_sums_running_workers(monitor):
     """The snapshot sums the actors of live workers and the queues."""
     now = time.monotonic()
     since = dict(send_mail=dict(done=2, failed=1, max_runtime_ms=1400, last_error='LookupError'))
-    monitor.receive(json.dumps(_beat(1, since=since)), received=now)
-    monitor.receive(json.dumps(_beat(2, since=dict(send_mail=dict(done=1, failed=0, max_runtime_ms=300)))), received=now)
-    monitor.receive(json.dumps(_beat(3, since=since)), received=now - 20)
+    monitor.receive(json.dumps(_make_beat(1, since=since)), received=now)
+    monitor.receive(json.dumps(_make_beat(2, since=dict(send_mail=dict(done=1, failed=0, max_runtime_ms=300)))), received=now)
+    monitor.receive(json.dumps(_make_beat(3, since=since)), received=now - 20)
     snapshot = monitor.snapshot()
     assert snapshot['monitoring'] is False and snapshot['interval'] == 5
     # the gone worker counts no more
@@ -380,15 +380,15 @@ def test_monitor_without_rabbitmq(tmp, monkeypatch):
 
 def test_duration():
     """Durations show as "850 ms", "1.4 s", "3m 5s" or "1h 2m"."""
-    assert [_duration(ms) for ms in (850, 1400, 185_000, 3_720_000)] == ['850 ms', '1.4 s', '3m 5s', '1h 2m']
+    assert [_format_duration(ms) for ms in (850, 1400, 185_000, 3_720_000)] == ['850 ms', '1.4 s', '3m 5s', '1h 2m']
 
 
-def _view(app, snapshot, follow=None):
+def _render_view(app, snapshot, follow=None):
     output = app.tui.output
     return output.render(*_monitor_view(output, snapshot, 'probe', follow), width=140)
 
 
-def _snapshot(workers, monitoring=True, actors=None):
+def _make_snapshot(workers, monitoring=True, actors=None):
     return dict(
         at=1_000 + 65_000,
         monitoring=monitoring,
@@ -406,12 +406,12 @@ def test_monitor_view(tmp):
     running = [dict(task, args="(('[red]anna',), {})")]
     since = dict(send_mail=dict(done=2, failed=1, max_runtime_ms=1400, last_error='LookupError'))
     workers = [
-        dict(state='ok', seen_ms=300, heartbeat=_beat(4711, running=running, since=since, with_details=True)),
+        dict(state='ok', seen_ms=300, heartbeat=_make_beat(4711, running=running, since=since, with_details=True)),
         # a worker without details sends no args
-        dict(state='gone', seen_ms=20_000, heartbeat=_beat(4712, running=[{k: v for k, v in running[0].items() if k != 'args'}])),
+        dict(state='gone', seen_ms=20_000, heartbeat=_make_beat(4712, running=[{k: v for k, v in running[0].items() if k != 'args'}])),
     ]
     with DramatiqMiddlewareTest(tmp) as app:
-        text = _view(app, _snapshot(workers, actors=since), follow=5)
+        text = _render_view(app, _make_snapshot(workers, actors=since), follow=5)
     assert text.startswith('probe dramatiq monitor  ') and 'every 5 s  (Ctrl-C to quit)' in text
     worker_line = next(line for line in text.splitlines() if 'w1:4711' in line and 'ok' in line)
     assert worker_line.split() == ['w1:4711', '1m', '5s', 'ok', '1/2', '3', '1', '0', '2', 'done,', '1', 'failed']
@@ -434,7 +434,7 @@ def test_monitor_view(tmp):
 def test_monitor_view_without_workers(tmp, monitoring, note):
     """Without workers the view says why, with monitoring on or off."""
     with DramatiqMiddlewareTest(tmp) as app:
-        text = _view(app, _snapshot([], monitoring=monitoring))
+        text = _render_view(app, _make_snapshot([], monitoring=monitoring))
     assert note in text and 'every' not in text
 
 
@@ -448,7 +448,7 @@ def command(tmp, monkeypatch):
 
             def snapshot(wait=0):
                 calls.append(wait)
-                return _snapshot([dict(state='ok', seen_ms=0, heartbeat=_beat(4711))])
+                return _make_snapshot([dict(state='ok', seen_ms=0, heartbeat=_make_beat(4711))])
 
             monkeypatch.setattr(app.dramatiq.monitor, 'snapshot', snapshot)
             follows = []

@@ -39,7 +39,7 @@ def shell(monkeypatch):
         yield TokeoAutomateShell(app)
 
 
-def _lines(capsys):
+def _get_lines(capsys):
     return [line.strip() for line in capsys.readouterr().out.splitlines() if line.strip()]
 
 
@@ -61,7 +61,7 @@ def test_list_tasks(shell, capsys):
     """list shows a table of the tasks with function and number of hosts."""
     capsys.readouterr()
     assert shell.command('list')
-    lines = _lines(capsys)
+    lines = _get_lines(capsys)
     assert lines[1] == 'tasks' and lines[2].split() == ['id', 'name', 'function', 'hosts']
     task2 = next(line for line in lines if line.startswith('task2'))
     hosts = str(len(shell.app.automate.tasks['task2']['connection']['hosts']))
@@ -82,7 +82,7 @@ def test_list_hostgroups(shell, capsys):
     """hostgroups list shows each group with its hosts."""
     capsys.readouterr()
     shell.command('hostgroups list')
-    group1 = next(line for line in _lines(capsys) if line.startswith('group1'))
+    group1 = next(line for line in _get_lines(capsys) if line.startswith('group1'))
     assert group1.split() == ['group1', 'host1,', 'host2']
 
 
@@ -90,7 +90,7 @@ def test_list_connections_defaults_first(shell, capsys):
     """connections list shows _defaults first, without passwords."""
     capsys.readouterr()
     shell.command('connections list')
-    lines = _lines(capsys)
+    lines = _get_lines(capsys)
     assert lines[3].startswith('_defaults') and 'password_connect_base' not in '\n'.join(lines)
     assert any(line.startswith('con1') for line in lines[4:])
 

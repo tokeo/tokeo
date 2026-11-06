@@ -33,7 +33,7 @@ class Collection:
         self.collection = collection
         self._path = f'/api/collections/{path_segment(collection)}/records'
 
-    def _record_path(self, record_id):
+    def _get_record_path(self, record_id):
         # the path of one record
         return f'{self._path}/{path_segment(record_id)}'
 
@@ -143,7 +143,7 @@ class Collection:
 
         """
         params = {'expand': expand or None, 'fields': fields or None, **(query or {})}
-        return Record(self.client.send('GET', self._record_path(record_id), params=params))
+        return Record(self.client.send('GET', self._get_record_path(record_id), params=params))
 
     def _write(self, method, path, data, files, expand, fields, query):
         # json, or multipart with the fields as @jsonPayload when files go along
@@ -193,7 +193,7 @@ class Collection:
         - **Record**: The changed record
 
         """
-        return self._write('PATCH', self._record_path(record_id), data, files, expand, fields, query)
+        return self._write('PATCH', self._get_record_path(record_id), data, files, expand, fields, query)
 
     def delete(self, record_id, query=None):
         """
@@ -213,5 +213,5 @@ class Collection:
         - **TokeoPocketBaseError**: With status 404 if the record is unknown
 
         """
-        self.client.send('DELETE', self._record_path(record_id), params=query)
+        self.client.send('DELETE', self._get_record_path(record_id), params=query)
         return True

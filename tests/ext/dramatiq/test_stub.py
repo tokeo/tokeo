@@ -72,7 +72,7 @@ def _join(broker, queue='default'):
     broker.join(queue, fail_fast=False, timeout=10_000)
 
 
-def _dead_ids(broker):
+def _get_dead_ids(broker):
     # the ids of the messages the stub broker took as dead letters
     return [message.message_id for message in broker.dead_letters]
 
@@ -178,7 +178,7 @@ def test_retries_follow_message_actor_and_config(tmp, start_worker, actor_option
         message = actor.send_with_options(**message_options)
         _join(app.dramatiq.broker)
         # after the last retry the message is a dead letter
-        assert len(calls) == runs and _dead_ids(app.dramatiq.broker) == [message.message_id]
+        assert len(calls) == runs and _get_dead_ids(app.dramatiq.broker) == [message.message_id]
 
 
 # ---- time limit, age limit and shutdown notice ------------------------------
@@ -206,7 +206,7 @@ def test_time_limit_from_config_stops_a_long_actor(tmp, start_worker):
         message = actor.send()
         _join(app.dramatiq.broker)
         # the limit is checked once a second
-        assert len(raised) == 1 and _dead_ids(app.dramatiq.broker) == [message.message_id]
+        assert len(raised) == 1 and _get_dead_ids(app.dramatiq.broker) == [message.message_id]
 
 
 def test_max_age_from_config_skips_old_messages(tmp, start_worker):
@@ -221,7 +221,7 @@ def test_max_age_from_config_skips_old_messages(tmp, start_worker):
         broker.enqueue(old)
         broker.enqueue(new)
         _join(broker)
-        assert runs == ['new'] and _dead_ids(broker) == [old.message_id]
+        assert runs == ['new'] and _get_dead_ids(broker) == [old.message_id]
 
 
 @pytest.mark.parametrize('notify_shutdown, ended', [(True, 'Shutdown'), (False, 'finished')])

@@ -64,7 +64,7 @@ class _Server:
         connection = self.connections.pop(0)
         if isinstance(connection, int):
             return httpx.Response(connection)
-        stream = self._async_stream if self.asynchronous else self._stream
+        stream = self._stream_events if self.asynchronous else self._stream
         return httpx.Response(200, headers={'content-type': 'text/event-stream'}, content=stream(connection, not self.connections))
 
     def _stream(self, events, last):
@@ -77,7 +77,7 @@ class _Server:
         if last:
             self.release.wait(5)
 
-    async def _async_stream(self, events, last):
+    async def _stream_events(self, events, last):
         for event in events:
             if isinstance(event, asyncio.Event):
                 await event.wait()
@@ -96,19 +96,19 @@ class _Server:
         return sum(request.url.path.endswith('/auth-refresh') for request in self.requests)
 
 
-def _sse(name, data):
+def _make_sse(name, data):
     # one server sent event as PocketBase writes it
     return f'id:c1\nevent:{name}\ndata:{json.dumps(data)}\n\n'.encode()
 
 
 def _connect(client_id):
     # the first event of each connection
-    return _sse('PB_CONNECT', {'clientId': client_id})
+    return _make_sse('PB_CONNECT', {'clientId': client_id})
 
 
 def _change(topic, action, record_id):
     # the event of a changed record
-    return _sse(topic, {'action': action, 'record': {'id': record_id, 'title': f'title {record_id}'}})
+    return _make_sse(topic, {'action': action, 'record': {'id': record_id, 'title': f'title {record_id}'}})
 
 
 def _record_delays(channel):
@@ -165,7 +165,7 @@ def server():
     return _Server()
 
 
-def _client(server):
+def _make_client(server):
     # a client logged in to users with the token tok, talking to the fake server
     client = PocketBase(URL, token='tok', transport=httpx.MockTransport(server.handle))
     client.auth_collection = 'users'
@@ -175,7 +175,7 @@ def _client(server):
 @pytest.fixture
 def pb(server):
     """A client logged in with the token tok that talks to the fake server."""
-    with _client(server) as client:
+    with _make_client(server) as client:
         yield client
 
 
@@ -197,7 +197,7 @@ def async_server():
 @pytest.fixture
 def async_pb(async_server):
     """A client logged in with the token tok that talks to the fake async server."""
-    with _client(async_server) as client:
+    with _make_client(async_server) as client:
         yield client
 
 

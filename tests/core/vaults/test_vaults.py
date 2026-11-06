@@ -106,7 +106,7 @@ def test_vault_create_is_not_supported_by_the_base():
 )
 def test_vault_env_name_is_sanitised_and_upper_case(name, env):
     """Each run of other characters becomes one _, letters go upper case."""
-    assert Vault()._env_name(name, 'KEY') == env
+    assert Vault()._build_env_name(name, 'KEY') == env
 
 
 # VaultLoader

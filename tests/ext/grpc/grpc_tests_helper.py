@@ -18,7 +18,7 @@ SERVICE = 'tokeo.tests.Echo'
 #: The config values that wire the echo service into the extension
 ADD_SERVICER = 'tests.ext.grpc.grpc_tests_helper:add_echo_servicer_to_server'
 SERVICER = 'tests.ext.grpc.grpc_tests_helper:EchoServicer'
-INTERCEPTORS = 'tests.ext.grpc.grpc_tests_helper:token_interceptors'
+INTERCEPTORS = 'tests.ext.grpc.grpc_tests_helper:build_token_interceptors'
 
 
 class EchoServicer:
@@ -54,7 +54,7 @@ class TokenInterceptor(grpc.ServerInterceptor):
         return grpc.unary_unary_rpc_method_handler(_deny)
 
 
-def token_interceptors():
+def build_token_interceptors():
     # the factory grpc_interceptor names, it returns the interceptor chain
     return [TokenInterceptor()]
 

@@ -178,7 +178,7 @@ from tests.ext.tui.tui_tests_helper import TuiInputTest         # own subject
 
 # never from another subject, a conftest.py or a test file, never by a bare name
 from tests.core.smtpd.lib.smtpd_tests_helper import make_cert   # wrong
-from tests.ext.diskcache.test_diskcache import _warnings_of     # wrong
+from tests.ext.diskcache.test_diskcache import _collect_warnings  # wrong
 from tui_tests_helper import TuiInputTest                       # wrong
 ```
 
@@ -517,7 +517,7 @@ is missing, never to hide a failure.
 
 ```python
 needs_rabbitmq = pytest.mark.skipif(
-    not _reachable(RABBITMQ_URL),
+    not _is_reachable(RABBITMQ_URL),
     reason='needs a rabbitmq at localhost:5672 (set TOKEO_TEST_RABBITMQ_URL)',
 )
 

@@ -23,7 +23,7 @@ from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqBrokerTest, Dra
 RABBITMQ_URL = os.environ.get('TOKEO_TEST_RABBITMQ_URL', 'amqp://guest:guest@localhost:5672/')
 
 
-def _reachable(url):
+def _is_reachable(url):
     parameters = pika.URLParameters(url)
     try:
         socket.create_connection((parameters.host, parameters.port), timeout=1).close()
@@ -33,7 +33,7 @@ def _reachable(url):
 
 
 needs_rabbitmq = pytest.mark.skipif(
-    not _reachable(RABBITMQ_URL),
+    not _is_reachable(RABBITMQ_URL),
     reason=f'needs a rabbitmq at {pika.URLParameters(RABBITMQ_URL).host}:{pika.URLParameters(RABBITMQ_URL).port} '
     '(set TOKEO_TEST_RABBITMQ_URL)',
 )
@@ -48,7 +48,7 @@ def keep_global_broker(monkeypatch):
 
 
 @contextmanager
-def _raw_channel():
+def _open_raw_channel():
     """A channel of its own, to put and check messages beside the app."""
     connection = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
     try:
@@ -95,14 +95,14 @@ def test_dead_letters(live):
         queues = app.dramatiq.queues
         actor.send(1)
         letter = Message(queue_name=name, actor_name=actor.actor_name, args=(7,), kwargs={}, options=dict(retries=3, traceback='E: x'))
-        with _raw_channel() as channel:
+        with _open_raw_channel() as channel:
             channel.basic_publish(exchange='', routing_key=f'{name}.XQ', body=letter.encode())
         (peeked,) = queues.peek_dead(name)
         assert (peeked['message_id'], peeked['retries'], peeked['error']) == (letter.message_id, 3, 'E: x')
         assert queues.state(name)[0]['dead'] == 1
         assert queues.requeue_dead(name) == dict(name=name, requeued=1)
         assert (queues.state(name)[0]['ready'], queues.state(name)[0]['dead']) == (2, 0)
-        with _raw_channel() as channel:
+        with _open_raw_channel() as channel:
             bodies = [channel.basic_get(name, auto_ack=True)[2] for _ in range(2)]
         requeued = [Message.decode(b) for b in bodies if Message.decode(b).message_id == letter.message_id][0]
         # the requeued message starts its retries again
@@ -129,7 +129,7 @@ def test_recreate_with_priority(live):
         (result,) = app.dramatiq.queues.recreate(name, force=True)
         assert result['arguments']['x-max-priority'] == 5
         # rabbitmq takes the same arguments again, but refuses other ones
-        with _raw_channel() as channel:
+        with _open_raw_channel() as channel:
             channel.queue_declare(name, durable=True, arguments=result['arguments'])
             with pytest.raises(pika.exceptions.ChannelClosedByBroker, match='PRECONDITION_FAILED'):
                 channel.queue_declare(name, durable=True, arguments=dict(result['arguments'], **{'x-max-priority': 3}))
@@ -157,7 +157,7 @@ def test_monitor_hears_a_worker(tmp, rando):
         monitor = app.dramatiq.monitor
         worker = dramatiq.Worker(app.dramatiq.broker, worker_threads=1, worker_timeout=100, queues={name})
 
-        def mine(wait):
+        def find_own_workers(wait):
             return [w for w in monitor.workers(wait) if w['heartbeat']['worker']['pid'] == os.getpid()]
 
         try:
@@ -165,11 +165,11 @@ def test_monitor_hears_a_worker(tmp, rando):
             # stopped once on every path, a second stop logs a CRITICAL
             try:
                 actor.send(2)
-                assert wait_until(lambda: mine(0.5) and mine(0)[0]['heartbeat']['running'], 15)
-                (running,) = mine(0)
+                assert wait_until(lambda: find_own_workers(0.5) and find_own_workers(0)[0]['heartbeat']['running'], 15)
+                (running,) = find_own_workers(0)
             finally:
                 worker.stop()
-            (stopped,) = mine(1)
+            (stopped,) = find_own_workers(1)
         finally:
             app.dramatiq.queues.delete(name, force=True)
     (task,) = running['heartbeat']['running']

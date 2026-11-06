@@ -439,16 +439,16 @@ class TokeoDramatiq(MetaMixin):
         """
         self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')
         # defaults of the middleware for all actors from the config
-        time_limit = _number('config', 'time_limit', self._config('time_limit'))
-        max_age = _number('config', 'max_age', self._config('max_age'), allow_none=True)
+        time_limit = _check_number('config', 'time_limit', self._config('time_limit'))
+        max_age = _check_number('config', 'max_age', self._config('max_age'), allow_none=True)
         notify_shutdown = self._config('notify_shutdown')
         if not is_bool(notify_shutdown):
             raise TokeoDramatiqConfigError('config', 'notify_shutdown', notify_shutdown, 'true or false')
-        max_retries = _number('config', 'max_retries', self._config('max_retries'), min_value=0)
-        min_backoff = _number('config', 'min_backoff', self._config('min_backoff'))
+        max_retries = _check_number('config', 'max_retries', self._config('max_retries'), min_value=0)
+        min_backoff = _check_number('config', 'min_backoff', self._config('min_backoff'))
         # dramatiq limits the retry delay to at most 7 days, a longer one has
         # no effect
-        max_backoff = _number('config', 'max_backoff', self._config('max_backoff'), max_value=604_800_000)
+        max_backoff = _check_number('config', 'max_backoff', self._config('max_backoff'), max_value=604_800_000)
         # re-build set of middlewares to use
         use_middleware = [
             middleware.AgeLimit(max_age=max_age),
@@ -460,7 +460,7 @@ class TokeoDramatiq(MetaMixin):
             middleware.CurrentMessage(),
             TokeoAsyncIO(),
         ]
-        heartbeat = self._heartbeat()
+        heartbeat = self._build_heartbeat()
         if heartbeat is not None:
             use_middleware.append(heartbeat)
         # create the broker to RabbitMQ based on config; configured
@@ -469,15 +469,15 @@ class TokeoDramatiq(MetaMixin):
         rabbitmq_config = {**self._meta.config_defaults['rabbitmq'], **self._config('rabbitmq')}
         if not is_bool(rabbitmq_config['confirm_delivery']):
             raise TokeoDramatiqConfigError('config', 'rabbitmq.confirm_delivery', rabbitmq_config['confirm_delivery'], 'true or false')
-        max_priority = _number('config', 'rabbitmq.max_priority', rabbitmq_config['max_priority'], max_value=255, allow_none=True)
-        dead_message_ttl = _number('config', 'rabbitmq.dead_message_ttl', rabbitmq_config['dead_message_ttl'], allow_none=True)
+        max_priority = _check_number('config', 'rabbitmq.max_priority', rabbitmq_config['max_priority'], max_value=255, allow_none=True)
+        dead_message_ttl = _check_number('config', 'rabbitmq.dead_message_ttl', rabbitmq_config['dead_message_ttl'], allow_none=True)
         # dramatiq read the env on import already, so set its constant
         if dead_message_ttl is not None:
             dramatiq_rabbitmq.DEAD_MESSAGE_TTL = dead_message_ttl
         else:
             # dramatiq takes the env then; 0 would drop every dead letter
             if 'dramatiq_dead_message_ttl' in os.environ:
-                _number('env', 'dramatiq_dead_message_ttl', os.environ['dramatiq_dead_message_ttl'])
+                _check_number('env', 'dramatiq_dead_message_ttl', os.environ['dramatiq_dead_message_ttl'])
         rabbitmq_broker = ExtendedRabbitmqBroker(
             url=rabbitmq_config['url'],
             auth_identity=rabbitmq_config['auth_identity'],
@@ -494,19 +494,19 @@ class TokeoDramatiq(MetaMixin):
         dramatiq.set_broker(rabbitmq_broker)
         self.app.log.debug('ExtendedRabbitmqBroker is registered as dramatiq broker')
 
-    def _heartbeat(self):
+    def _build_heartbeat(self):
         """Build the heartbeat middleware, None without monitoring."""
         monitoring = self._config('monitoring')
         if not is_bool(monitoring):
             raise TokeoDramatiqConfigError('config', 'monitoring', monitoring, 'true or false')
-        interval = _number('config', 'monitoring_interval', self._config('monitoring_interval'))
-        with_details = _with_details(self._config('monitoring_with_details'), self.app.debug)
+        interval = _check_number('config', 'monitoring_interval', self._config('monitoring_interval'))
+        with_details = _get_with_details(self._config('monitoring_with_details'), self.app.debug)
         if not monitoring:
             return None
         # imported here, the monitoring module builds on this one
-        from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat, exchange_name, _app_version
+        from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat, exchange_name, _get_app_version
 
-        app = dict(label=self.app._meta.label, version=_app_version(self.app))
+        app = dict(label=self.app._meta.label, version=_get_app_version(self.app))
         return TokeoDramatiqHeartbeat(exchange_name(self.app), interval, with_details, app)
 
     def close(self):
@@ -572,7 +572,7 @@ class TokeoDramatiq(MetaMixin):
             raise TokeoDramatiqError('Enable tokeo diskcache extension to allow locks')
 
 
-def _number(source, name, value, min_value=1, max_value=None, allow_none=False, allow_auto=False):
+def _check_number(source, name, value, min_value=1, max_value=None, allow_none=False, allow_auto=False):
     """
     Check a number from the config, an env or a switch of the extension.
 
@@ -617,7 +617,7 @@ def _number(source, name, value, min_value=1, max_value=None, allow_none=False, 
     return number
 
 
-def _with_details(value, debug):
+def _get_with_details(value, debug):
     """
     Read the config ```monitoring_with_details```.
 

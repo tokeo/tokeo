@@ -72,14 +72,14 @@ def _help(argv, capsys):
     return capsys.readouterr().out
 
 
-def _commands(text):
+def _get_commands(text):
     # the lines of the command list below "sub-commands:" up to the blank line
     lines = text.split('sub-commands:\n', 1)[1].split('\n')
     end = lines.index('')
     return lines[1:end]
 
 
-def _parser(*commands):
+def _make_parser(*commands):
     # a parser of TokeoHelpFormatter with the given (name, help) commands
     parser = argparse.ArgumentParser(prog='prog', formatter_class=TokeoHelpFormatter)
     subparsers = parser.add_subparsers(metavar='')
@@ -112,7 +112,7 @@ def test_controller_nested_without_a_command_prints_its_help(capsys):
     """'nested' without a command prints the help of the nested controller."""
     text = _help(['nested'], capsys)
     assert text.startswith('usage: tokeo_test nested')
-    assert _commands(text) == ['  inner    inner help']
+    assert _get_commands(text) == ['  inner    inner help']
 
 
 def test_controller_help_exits_with_0(capsys):
@@ -129,7 +129,7 @@ def test_controller_help_exits_with_0(capsys):
 
 def test_help_lists_the_commands_sorted_by_name(capsys):
     """zeta, alpha and the nested controller are listed as alpha, nested, zeta."""
-    names = [line.split()[0] for line in _commands(_help(['--help'], capsys))]
+    names = [line.split()[0] for line in _get_commands(_help(['--help'], capsys))]
     assert names == ['alpha', 'nested', 'zeta']
 
 
@@ -157,19 +157,19 @@ def test_iter_indented_subactions_of_an_object_without_subactions_is_empty():
 def test_help_aligns_the_help_of_the_commands(capsys):
     """Each help starts 4 spaces after the longest command name, 'nested'."""
     gap, column = len('  nested'), len('  nested    ')
-    lines = _commands(_help(['--help'], capsys))
+    lines = _get_commands(_help(['--help'], capsys))
     assert [line[gap:column] for line in lines] == ['    '] * 3
     assert [line[column] for line in lines] == ['a', 'n', 'z']
 
 
 def test_help_of_a_command_is_expanded(capsys):
     """%(prog)s and %% in the help of a command are expanded."""
-    assert '  alpha     alpha help of tokeo_test at 100%' in _commands(_help(['--help'], capsys))
+    assert '  alpha     alpha help of tokeo_test at 100%' in _get_commands(_help(['--help'], capsys))
 
 
 def test_format_action_of_a_command_without_help_shows_its_name():
     """A command added with help None is listed by its name alone."""
-    text = _parser(('first', 'first help'), ('second', None)).format_help()
+    text = _make_parser(('first', 'first help'), ('second', None)).format_help()
     assert '  second    \n' in text
     assert '  first     first help\n' in text
 

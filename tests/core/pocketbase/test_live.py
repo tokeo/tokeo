@@ -43,7 +43,7 @@ USER = ('anna@tokeo.test', 'anna-pass-123')
 TRICKY = ["it's", 'back\\', 'q"uote', "x\\' || id != '", '{:t}']
 
 
-def _sockets():
+def _count_sockets():
     # the number of open sockets of this process
     count = 0
     for fd in os.listdir('/proc/self/fd'):
@@ -54,19 +54,19 @@ def _sockets():
     return count
 
 
-def _user(su, rando):
+def _create_user(su, rando):
     # a user of its own for a test that changes or deletes it
     return su.collection('users').create({'email': f'{rando}@tokeo.test', 'password': USER[1], 'passwordConfirm': USER[1]})
 
 
-def _kept(su, user, check_seconds):
+def _make_impersonating_client(su, user, check_seconds):
     # a client acting as the user, its login kept by a new impersonation
     client = su.impersonate('users', user.id)
     client.before_request = AuthKeeper(client, lambda: su.impersonate('users', user.id, client=client), check_seconds=check_seconds)
     return client
 
 
-def _healthy(url):
+def _is_healthy(url):
     # whether the server answers its health check
     try:
         with PocketBase(url) as pb:
@@ -82,7 +82,7 @@ def live(tmp_path_factory):
     subprocess.run([POCKETBASE_BIN, 'superuser', 'upsert', *SUPERUSER, '--dir', data], check=True, capture_output=True)
     url = f'http://127.0.0.1:{free_port()}'
     with SubProcess.run(POCKETBASE_BIN, 'serve', '--dir', data, '--http', url.removeprefix('http://'), timeout=15) as process:
-        process.wait_for(lambda: _healthy(url))
+        process.wait_for(lambda: _is_healthy(url))
         with PocketBase(url) as su:
             su.auth_with_password('_superusers', *SUPERUSER)
             rule = '@request.auth.id != ""'
@@ -258,7 +258,7 @@ def test_live_realtime_start_and_stop_leave_no_thread_or_socket(pb):
     """
     # the pooled connection of the client is open before counting
     pb.health()
-    before = (threading.active_count(), _sockets())
+    before = (threading.active_count(), _count_sockets())
     for _ in range(20):
         with Realtime(pb) as channel:
             channel.subscribe('posts/*', print)
@@ -272,7 +272,7 @@ def test_live_realtime_start_and_stop_leave_no_thread_or_socket(pb):
             await realtime.stop()
 
     asyncio.run(go())
-    assert wait_until(lambda: (threading.active_count(), _sockets()) == before)
+    assert wait_until(lambda: (threading.active_count(), _count_sockets()) == before)
 
 
 def test_live_async_realtime_awaits_a_coroutine_for_each_event(pb):
@@ -330,7 +330,7 @@ def test_live_realtime_hanging_callback_hangs_up_and_catches_up_after(pb, su):
 
 def test_live_realtime_expired_token_without_hook_shows_the_error(su, rando):
     """An expired token is refused at the check, no silent guest channel."""
-    user = _user(su, rando)
+    user = _create_user(su, rando)
     client = su.impersonate('users', user.id, duration=1)
     try:
         time.sleep(1.5)
@@ -349,8 +349,8 @@ def test_live_realtime_changed_password_renews_the_login_and_the_events_go_on(su
     refused, a new impersonation logs in and sends the subscriptions again,
     so the next post arrives.
     """
-    user = _user(su, rando)
-    client = _kept(su, user, 0.2)
+    user = _create_user(su, rando)
+    client = _make_impersonating_client(su, user, 0.2)
     seen = []
     try:
         with Realtime(client, auth_check=0.2) as channel:
@@ -367,8 +367,8 @@ def test_live_realtime_changed_password_renews_the_login_and_the_events_go_on(su
 
 def test_live_realtime_deleted_user_shows_the_error(su, rando):
     """A deleted user fails the new impersonation, the channel shows the 404."""
-    user = _user(su, rando)
-    client = _kept(su, user, 0.2)
+    user = _create_user(su, rando)
+    client = _make_impersonating_client(su, user, 0.2)
     try:
         with Realtime(client, auth_check=0.2, max_delay=0.2) as channel:
             channel.subscribe('posts/*', print)
@@ -431,7 +431,7 @@ def short(tmp_path_factory):
     env = dict(PB_REALTIME_IDLE_SECONDS='1', PB_REALTIME_MAX_SECONDS='3')
     args = [POCKETBASE_BIN, 'serve', '--dir', data, '--hooksDir', str(hooks), '--hooksWatch=false', '--http', url.removeprefix('http://')]
     with SubProcess.run(*args, env=env, timeout=15) as process:
-        process.wait_for(lambda: _healthy(url))
+        process.wait_for(lambda: _is_healthy(url))
         with PocketBase(url) as su:
             su.auth_with_password('_superusers', *SUPERUSER)
             su.send(

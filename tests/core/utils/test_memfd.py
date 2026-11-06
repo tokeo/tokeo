@@ -55,7 +55,7 @@ def test_no_blobs_yields_empty():
         assert paths == ()
 
 
-def _self_signed_pem():
+def _make_self_signed_pem():
     # generated in-process with cryptography, the same library the tls module
     # uses for its self-signed test certificate (no external openssl needed)
     from cryptography import x509
@@ -87,7 +87,7 @@ def _self_signed_pem():
 
 def test_loads_ssl_cert_chain_from_memory():
     """ssl loads a certificate and key from the paths in memory."""
-    cert_pem, key_pem = _self_signed_pem()
+    cert_pem, key_pem = _make_self_signed_pem()
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     with memory_paths(cert_pem, key_pem) as (cert_ref, key_ref):
         context.load_cert_chain(cert_ref, key_ref)  # must not raise

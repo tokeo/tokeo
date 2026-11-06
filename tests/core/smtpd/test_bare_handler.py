@@ -11,7 +11,7 @@ import asyncio
 import socket
 import struct
 
-from tests.core.smtpd.lib.smtpd_tests_helper import dialog, read_reply, send_command, start_server, stop_server
+from tests.core.smtpd.lib.smtpd_tests_helper import run_dialog, read_reply, send_command, start_server, stop_server
 
 
 class BareEvents:
@@ -32,7 +32,7 @@ def test_a_bare_handler_runs_the_full_dialog():
         b'DATA\r\n',
         b'Subject: big\r\n\r\n' + b'x' * 100 + b'\r\n.\r\n',
     ]
-    greeting, r = dialog(BareEvents(), {'data_size': 50}, commands)
+    greeting, r = run_dialog(BareEvents(), {'data_size': 50}, commands)
     assert greeting[0].startswith('220')
     assert r[1][0].startswith('500')
     assert r[5][0].startswith('250')

@@ -15,23 +15,23 @@ from tokeo.ext.automate import TokeoAutomateError, TokeoAutomateResult, TokeoInv
 from tests.ext.automate.automate_tests_helper import (
     AutomateTest,
     DEFAULTS,
-    defaults_automate_hosts,
-    defaults_automate_hostgroups,
-    defaults_automate_connections,
-    defaults_automate_tasks,
+    make_automate_hosts,
+    make_automate_hostgroups,
+    make_automate_connections,
+    make_automate_tasks,
 )
 
 
 def test_hosts_are_completed_by_id_and_name():
     """The hosts are read and completed by their id and name."""
     with AutomateTest() as app:
-        assert app.automate.hosts == defaults_automate_hosts(validate=True)
+        assert app.automate.hosts == make_automate_hosts(validate=True)
 
 
 def test_hostgroups_are_expanded_to_their_hosts():
     """The hostgroups are read and expanded to their hosts."""
     with AutomateTest() as app:
-        assert app.automate.hostgroups == defaults_automate_hostgroups(validate=True)
+        assert app.automate.hostgroups == make_automate_hostgroups(validate=True)
 
 
 def test_local_as_id_of_a_host_or_hostgroup_raises():
@@ -49,7 +49,7 @@ def test_local_as_id_of_a_host_or_hostgroup_raises():
 def test_connections_are_completed_by_their_defaults():
     """The connections are read and completed by their defaults."""
     with AutomateTest() as app:
-        assert app.automate.connections == defaults_automate_connections(validate=True)
+        assert app.automate.connections == make_automate_connections(validate=True)
 
 
 def test_tasks_are_read_and_expanded():
@@ -62,7 +62,7 @@ def test_tasks_are_read_and_expanded():
         for name in ('task1', 'task2', 'task3'):
             tasks[name].pop('func')
             tasks[name].pop('module')
-        assert tasks == defaults_automate_tasks(validate=True)
+        assert tasks == make_automate_tasks(validate=True)
 
 
 def test_run_calls_a_task_with_its_runner(monkeypatch):
@@ -198,7 +198,7 @@ def test_run_closes_the_connections_of_every_host(monkeypatch):
     assert [result.exited for result in results] == [0, 0, -1]
 
 
-def _task_ref(**kwprotected):
+def _make_task_ref(**kwprotected):
     # a task reference for a context, strict and sanitized unless given
     return dict(kwargs={}, kwprotected=dict(dict(protect='strict', sanitize=True, env={}), **kwprotected))
 
@@ -206,15 +206,17 @@ def _task_ref(**kwprotected):
 def test_local_run_gets_the_env_values_as_they_are(monkeypatch):
     """A local run gets the env values unquoted, a bad name is dropped."""
     env = {'GREETING': 'hello world', 'BAD-NAME': 'x'}
-    context = TokeoInvokeLocalContext(config=invoke.Config(overrides={}), task_ref=_task_ref(env=env))
+    context = TokeoInvokeLocalContext(config=invoke.Config(overrides={}), task_ref=_make_task_ref(env=env))
     monkeypatch.setattr('sys.stdin', io.StringIO(''))
     result = context.run('printenv GREETING; env | grep -c "^BAD-NAME=" ; true', hide=True)
     assert result.stdout == 'hello world\n0\n'
 
 
-def _remote(exited, **kwprotected):
+def _make_remote(exited, **kwprotected):
     # a remote context on a fake ssh client whose command ends with exited
-    context = TokeoInvokeRemoteContext(host='h', config=invoke.Config(overrides={}), connect_kwargs={}, task_ref=_task_ref(**kwprotected))
+    context = TokeoInvokeRemoteContext(
+        host='h', config=invoke.Config(overrides={}), connect_kwargs={}, task_ref=_make_task_ref(**kwprotected)
+    )
     context.client = mock.MagicMock()
     channel = context.client.get_transport.return_value.open_session.return_value
     channel.exit_status_ready.return_value = True
@@ -225,14 +227,14 @@ def _remote(exited, **kwprotected):
 
 def test_remote_run_exports_the_env_values_quoted():
     """The export line of a remote shell has the values quoted, no bad names."""
-    context, channel = _remote(0, env={'GREETING': 'hello world', 'BAD-NAME': 'x'})
+    context, channel = _make_remote(0, env={'GREETING': 'hello world', 'BAD-NAME': 'x'})
     context.run('echo "$GREETING"', hide=True)
     channel.exec_command.assert_called_once_with('export GREETING=\'hello world\' ; echo "$GREETING"')
 
 
 def test_remote_run_failing_raises_unless_warn():
     """A failing remote command raises UnexpectedExit, with warn it returns."""
-    context, _ = _remote(1)
+    context, _ = _make_remote(1)
     with pytest.raises(invoke.exceptions.UnexpectedExit):
         context.run('false', hide=True)
     assert context.run('false', hide=True, warn=True).exited == 1

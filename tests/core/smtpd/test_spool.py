@@ -209,7 +209,7 @@ def test_two_messages_one_connection_get_fresh_files(tmp_path):
         srv, port = await start_smtpd(events, options={'spool': str(tmp_path) + '/'}, debug=True)
         loop = asyncio.get_event_loop()
 
-        def client():
+        def run_client():
             import smtplib
 
             c = smtplib.SMTP('127.0.0.1', port, timeout=10)
@@ -221,7 +221,7 @@ def test_two_messages_one_connection_get_fresh_files(tmp_path):
             c.quit()
 
         try:
-            await loop.run_in_executor(None, client)
+            await loop.run_in_executor(None, run_client)
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
@@ -289,7 +289,7 @@ def _abort_mid_data(tmp_path, debug):
         srv, port = await start_smtpd(Capture(), options={'spool': str(tmp_path) + '/'}, debug=debug)
         loop = asyncio.get_event_loop()
 
-        def client():
+        def run_client():
             import smtplib
 
             c = smtplib.SMTP('127.0.0.1', port, timeout=10)
@@ -302,7 +302,7 @@ def _abort_mid_data(tmp_path, debug):
             c.close()  # lost connection mid-DATA
 
         try:
-            await loop.run_in_executor(None, client)
+            await loop.run_in_executor(None, run_client)
             assert await wait_until_async(lambda: srv.connections == 0)
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
@@ -330,7 +330,7 @@ def test_data_size_cap_works_in_spool_mode(tmp_path):
         srv, port = await start_smtpd(Capture(), options={'spool': str(tmp_path) + '/', 'data_size': 64})
         loop = asyncio.get_event_loop()
 
-        def client():
+        def run_client():
             c = smtplib.SMTP('127.0.0.1', port, timeout=10)
             c.ehlo('cap')
             c.mail('a@x.org')
@@ -341,7 +341,7 @@ def test_data_size_cap_works_in_spool_mode(tmp_path):
             c.close()
 
         try:
-            await loop.run_in_executor(None, client)
+            await loop.run_in_executor(None, run_client)
             assert await wait_until_async(lambda: srv.connections == 0)
         finally:
             await srv.stop(wait_seconds_before_close=0.3)

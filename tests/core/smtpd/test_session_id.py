@@ -43,7 +43,7 @@ def _run(events, client_calls, **server_kwargs):
     asyncio.run(go())
 
 
-def _session(port):
+def _run_session(port):
     client = smtplib.SMTP('127.0.0.1', port, timeout=10)
     client.ehlo('probe')
     client.mail('a@local')
@@ -68,7 +68,7 @@ def test_ctx_id_is_write_once():
 def test_session_id_format_uniqueness_and_persistence():
     """Each connection gets its own 16 hex id, kept across RSET."""
     events = IdCaptureEvents()
-    _run(events, lambda port: (_session(port), _session(port)))
+    _run(events, lambda port: (_run_session(port), _run_session(port)))
     connects = [sid for kind, sid in events.seen_ids if kind == 'connect']
     mails = [sid for kind, sid in events.seen_ids if kind == 'mail']
     # two connections -> two distinct ids, default 8 bytes -> 16 hex chars
@@ -83,7 +83,7 @@ def test_session_id_bytes_is_keyword_only_not_a_service_option():
     """session_id_bytes sizes the id as keyword, the option is ignored."""
     events = IdCaptureEvents()
     # the keyword sizes the id; the same key in options must stay ignored
-    _run(events, _session, options={'session_id_bytes': 12}, session_id_bytes=4)
+    _run(events, _run_session, options={'session_id_bytes': 12}, session_id_bytes=4)
     assert re.fullmatch(r'[0-9a-f]{8}', events.seen_ids[0][1])
     srv = SmtpdServer(IdCaptureEvents(), options={'session_id_bytes': 12})
     assert srv.session_id_bytes == 8
