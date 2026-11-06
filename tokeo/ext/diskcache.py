@@ -565,11 +565,11 @@ class TokeoDiskCacheLocksHandler:
         is kept in DiskCache, so the limit is shared by all processes and
         threads that use the same cache.
 
-        The decorator keeps the sorted deadlines of the holders. Acquiring a
-        slot drops the expired deadlines and adds its own, now plus expire,
+        The decorator keeps the sorted expire times of the holders. Acquiring a
+        slot drops the past expire times and adds its own, now plus expire,
         when fewer than count are left; finishing the call removes its own
-        deadline again. A holder that was killed keeps its slot only until
-        its own deadline. When no slot is free, the call either waits and
+        expire time again. A holder that was killed keeps its slot only until
+        its own expire time. When no slot is free, the call either waits and
         retries or, if cb_on_locked is set, runs that callback instead of
         the wrapped function.
 
@@ -621,13 +621,13 @@ class TokeoDiskCacheLocksHandler:
             from name, name_format or the function full name.
 
         : A slot is only released by a call that actually acquired one;
-            the cb_on_locked path never changes the deadlines.
+            the cb_on_locked path never changes the expire times.
 
         : The release does not recreate a key that has vanished in the
             meantime, so purging the cache while no call holds a slot
             leaves it empty.
 
-        : The key lives as long as the latest deadline, so calls with a
+        : The key lives as long as the latest expire time, so calls with a
             different expire may share it by name.
 
         : ```temper``` never stops a running call, also not after its expire. A
@@ -635,21 +635,21 @@ class TokeoDiskCacheLocksHandler:
             ```@timelimit``` or the time_limit of a dramatiq actor.
 
         : Purging the cache while calls are in flight is destructive: it
-            clears the very deadlines that enforce the limit, so it can
+            clears the very expire times that enforce the limit, so it can
             breach the limit temporarily as well.
 
         : All processes on one cache must run the same version: an older
-            one reads the deadlines as an invalid counter and resets it.
+            one reads the expire times as an invalid counter and resets it.
 
         ### Reminders
 
         .. important::
 
             expire must be larger than the longest possible run time of the
-            wrapped function. If a call runs longer than expire, its deadline
-            is dropped mid-run and the next caller may start one more call on
+            wrapped function. If a call runs longer than expire, its expire
+            time is dropped mid-run and the next caller may start one more call on
             top of those still running, breaking the limit. Choose expire
-            generously. A dropped deadline logs a warning, and so does the
+            generously. A dropped expire time logs a warning, and so does the
             release of a call that lost it.
 
         """
@@ -694,32 +694,32 @@ class TokeoDiskCacheLocksHandler:
                 while True:
                     # run in a transaction
                     with self._cache.transact(retry=True):
-                        # the sorted deadlines of the holders, none without key
+                        # the sorted expire times of the holders, none without key
                         value = self._cache.get(key)
-                        deadlines = value if type(value) is list else []
+                        expire_times = value if type(value) is list else []
                         # take the current timestamp
                         now = time.time()
                         try:
-                            # the expired deadlines are at the start of the list,
+                            # the past expire times are at the start of the list,
                             # they might be from dead or crashed jobs that
-                            # couldn't drop their own deadline
-                            expired = bisect.bisect_right(deadlines, now)
+                            # couldn't drop their own expire time
+                            expired = bisect.bisect_right(expire_times, now)
                         except TypeError:
                             # the existing cache entry is invalid,
-                            # it's a list of anything else than valid deadlines
-                            deadlines, expired = [], len(deadlines)
-                        # drop the expired deadlines, they block temper otherwise
-                        del deadlines[:expired]
+                            # it's a list of anything else than valid expire times
+                            expire_times, expired = [], len(expire_times)
+                        # drop the past expire times, they block temper otherwise
+                        del expire_times[:expired]
                         # check for a free slot
-                        acquired = len(deadlines) < count
+                        acquired = len(expire_times) < count
                         if acquired:
-                            # add our own deadline to the sorted list of deadlines
-                            deadline = now + expire
-                            bisect.insort(deadlines, deadline)
+                            # add our own expire time to the sorted list
+                            expire_time = now + expire
+                            bisect.insort(expire_times, expire_time)
                         # if anything needs to change on the cache value, save it
                         if acquired or expired:
-                            # the key lives as long as the latest deadline
-                            self._cache.set(key, deadlines, expire=deadlines[-1] - now, tag=self._tag)
+                            # the key lives until the latest expire time
+                            self._cache.set(key, expire_times, expire=expire_times[-1] - now, tag=self._tag)
 
                     # Attention! This must be run outside the transact block,
                     # otherwise this will HOLD the code with no end (DEADLOCK)
@@ -750,10 +750,10 @@ class TokeoDiskCacheLocksHandler:
                         # run in a transaction
                         with self._cache.transact(retry=True):
                             # re-read; other processes may have changed it
-                            deadlines = self._cache.get(key)
+                            expire_times = self._cache.get(key)
                             try:
-                                # release only the own deadline
-                                deadlines.remove(deadline)
+                                # release only the own expire time
+                                expire_times.remove(expire_time)
                             except (AttributeError, ValueError):
                                 # gone by purge, expire or another value, no new key
                                 lost = True
@@ -762,12 +762,12 @@ class TokeoDiskCacheLocksHandler:
                                 # take a new current timestamp
                                 now = time.time()
                                 # cleanup cache, drop the expired ones
-                                del deadlines[: bisect.bisect_right(deadlines, now)]
-                                if deadlines:
-                                    # the key lives as long as the latest deadline
-                                    self._cache.set(key, deadlines, expire=deadlines[-1] - now, tag=self._tag)
+                                del expire_times[: bisect.bisect_right(expire_times, now)]
+                                if expire_times:
+                                    # the key lives until the latest expire time
+                                    self._cache.set(key, expire_times, expire=expire_times[-1] - now, tag=self._tag)
                                 else:
-                                    # without any existing deadline, drop the entry
+                                    # without any expire time left, drop the entry
                                     self._cache.delete(key)
                         if lost:
                             self.app.log.warning(f'@temper {key} slot was lost before release')

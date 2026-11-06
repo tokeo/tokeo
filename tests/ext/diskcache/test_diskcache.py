@@ -610,26 +610,26 @@ def test_throttle_and_temper_log_nothing_by_default(tmp, monkeypatch):
         assert infos == []
 
 
-# ---- temper: the deadlines of the holders -----------------------------------
+# ---- temper: the expire times of the holders --------------------------------
 
 
-def test_temper_holds_its_slot_by_a_deadline(tmp):
-    """A call holds one deadline of now plus expire, the key lives as long."""
+def test_temper_holds_its_slot_by_an_expire_time(tmp):
+    """A call holds one expire time of now plus expire, the key lives as long."""
     with DiskcacheTest(tmp.dir) as app:
 
-        @app.cache.locks.temper(count=2, name='deadline', expire=60, verbose=False)
+        @app.cache.locks.temper(count=2, name='expire_time', expire=60, verbose=False)
         def job():
-            return app.cache.get('dc_deadline'), _expires_in(app, 'dc_deadline')
+            return app.cache.get('dc_expire_time'), _expires_in(app, 'dc_expire_time')
 
         started = time.time()
-        deadlines, expires_in = job()
-        assert len(deadlines) == 1
-        assert started + 60 <= deadlines[0] <= time.time() + 60
+        expire_times, expires_in = job()
+        assert len(expire_times) == 1
+        assert started + 60 <= expire_times[0] <= time.time() + 60
         assert 59 < expires_in <= 60
 
 
 def test_temper_drops_an_expired_holder_while_others_run(tmp, monkeypatch):
-    """The deadline of a killed holder frees its slot, a running one stays."""
+    """The expire time of a killed holder frees its slot, a running one stays."""
     with DiskcacheTest(tmp.dir) as app:
         logged = _warnings_of(app, monkeypatch)
         now = time.time()
@@ -645,8 +645,8 @@ def test_temper_drops_an_expired_holder_while_others_run(tmp, monkeypatch):
         assert logged == ['@temper dc_dead dropped 1 expired slot(s)']
 
 
-def test_temper_key_lives_as_long_as_the_latest_deadline(tmp):
-    """A call with a short expire keeps the longer deadline of another."""
+def test_temper_key_lives_until_the_latest_expire_time(tmp):
+    """A call with a short expire keeps the longer expire time of another."""
     with DiskcacheTest(tmp.dir) as app:
         now = time.time()
         # another call with expire 3600 holds a slot under the same name
@@ -663,7 +663,7 @@ def test_temper_key_lives_as_long_as_the_latest_deadline(tmp):
 
 @pytest.mark.parametrize('loss', ['purge', 'foreign'])
 def test_temper_warns_when_its_slot_was_lost(tmp, monkeypatch, loss):
-    """A call whose deadline is gone on release warns and recreates no key."""
+    """A call whose expire time is gone on release warns and recreates no key."""
     with DiskcacheTest(tmp.dir) as app:
         logged = _warnings_of(app, monkeypatch)
 

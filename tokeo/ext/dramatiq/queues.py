@@ -100,10 +100,10 @@ class TokeoDramatiqQueues:
                 self._channel = None
                 raise TokeoDramatiqRefusedError(self._dramatiq.broker.address, e) from e
 
-    def _passive_declare(self, queue):
+    def _get_queue(self, name):
         # passive declare answers without creating a missing queue
         try:
-            return self._open().queue_declare(queue, passive=True).method
+            return self._open().queue_declare(name, passive=True).method
         except pika.exceptions.ChannelClosedByBroker as e:
             if e.reply_code != 404:
                 raise
@@ -181,7 +181,7 @@ class TokeoDramatiqQueues:
     def _read_state(self, names, actors):
         result = []
         for name in names:
-            queue, delay, dead = (self._passive_declare(n) for n in (name, dq_name(name), xq_name(name)))
+            queue, delay, dead = (self._get_queue(n) for n in (name, dq_name(name), xq_name(name)))
             result.append(
                 dict(
                     name=name,
@@ -217,7 +217,7 @@ class TokeoDramatiqQueues:
         return self._call(self._peek_dead, q_name(name), max_messages)
 
     def _peek_dead(self, name, max_messages):
-        if self._passive_declare(xq_name(name)) is None:
+        if self._get_queue(xq_name(name)) is None:
             return []
         channel = self._open()
         result, tag = [], None
@@ -259,9 +259,9 @@ class TokeoDramatiqQueues:
 
     def _requeue_dead(self, name, max_messages):
         self._cache.clear()
-        if self._passive_declare(name) is None:
+        if self._get_queue(name) is None:
             raise TokeoDramatiqQueueError(name, 'is missing, recreate it before the requeue')
-        dead = self._passive_declare(xq_name(name))
+        dead = self._get_queue(xq_name(name))
         # only the dead letters present now, not ones arriving meanwhile
         count = dead.message_count if dead else 0
         count = count if max_messages is None else min(count, max_messages)
@@ -317,7 +317,7 @@ class TokeoDramatiqQueues:
         for name in names:
             purged = 0
             for queue in (xq_name(name),) if dead_only else (name, dq_name(name), xq_name(name)):
-                if self._passive_declare(queue) is not None:
+                if self._get_queue(queue) is not None:
                     purged += self._open().queue_purge(queue).method.message_count
             result.append(dict(name=name, purged=purged))
         return result
@@ -356,7 +356,7 @@ class TokeoDramatiqQueues:
         for name in names:
             deleted = False
             for queue in (name, dq_name(name), xq_name(name)):
-                if self._passive_declare(queue) is not None:
+                if self._get_queue(queue) is not None:
                     self._open().queue_delete(queue)
                     deleted = True
             result.append(dict(name=name, deleted=deleted))

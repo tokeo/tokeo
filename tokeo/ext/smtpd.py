@@ -486,23 +486,23 @@ class TokeoSmtpd(MetaMixin):
                 self.app.log.info(f"smtpd: service '{svc.get('name')}' started (pid {os.getpid()})")
                 servers.append(server)
 
-            def reap():
+            def check_workers():
                 # a worker that ends before the stop signal ends all services
                 if stop.is_set():
                     return
                 for pid, name in workers.items():
                     try:
-                        reaped_pid, status = os.waitpid(pid, os.WNOHANG)
+                        worker_pid, status = os.waitpid(pid, os.WNOHANG)
                     except ChildProcessError:
                         continue
-                    if reaped_pid:
+                    if worker_pid:
                         ended_workers.append(f"worker {pid} of service '{name}' ended with {os.waitstatus_to_exitcode(status)}")
                         stop.set()
 
             if workers:
-                loop.add_signal_handler(signal.SIGCHLD, reap)
+                loop.add_signal_handler(signal.SIGCHLD, check_workers)
                 # a worker may have ended before the handler was set
-                reap()
+                check_workers()
             await stop.wait()
             for pid in workers:
                 try:
@@ -588,22 +588,22 @@ class TokeoSmtpd(MetaMixin):
             asyncio.run(self._serve_async(plan['inloop'], global_limits, workers, plan['reuse']))
         finally:
             # the normal stop already forwarded SIGTERM; after a failed start
-            # the workers still run and need it here before the reap
+            # the workers still run and need it here before the wait
             for pid in child_pids:
                 try:
                     os.kill(pid, signal.SIGTERM)
                 except ProcessLookupError:
                     pass
-            # bounded reap: a worker gets time to drain, then SIGKILL ends it
+            # bounded wait: a worker gets time to drain, then SIGKILL ends it
             pending = list(child_pids)
-            reap_deadline = time.monotonic() + 5.0
-            while pending and time.monotonic() < reap_deadline:
+            end_time = time.monotonic() + 5.0
+            while pending and time.monotonic() < end_time:
                 for pid in list(pending):
                     try:
-                        done, _status = os.waitpid(pid, os.WNOHANG)
+                        worker_pid, _status = os.waitpid(pid, os.WNOHANG)
                     except ChildProcessError:
-                        done = pid
-                    if done:
+                        worker_pid = pid
+                    if worker_pid:
                         pending.remove(pid)
                 if pending:
                     time.sleep(0.05)

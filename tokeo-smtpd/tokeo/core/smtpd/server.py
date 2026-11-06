@@ -194,7 +194,7 @@ class SmtpdSession:
 
     """
 
-    __slots__ = ('cmd_sequence', 'ctx', 'auth_challenge', 'processing', 'data_error', 'session_deadline')
+    __slots__ = ('cmd_sequence', 'ctx', 'auth_challenge', 'processing', 'data_error', 'end_time')
 
     def __init__(self):
         #: @private Current position in the SMTP command sequence
@@ -212,7 +212,7 @@ class SmtpdSession:
         self.data_error = None
         #: @private Monotonic time the session must end by (io_session_timeout),
         #: set on the greeting
-        self.session_deadline = None
+        self.end_time = None
 
 
 def _parse_ports(ports):
@@ -775,8 +775,8 @@ class SmtpdServer:
         if gracefully:
             # wait for active sessions to finish, up to the time budget
             loop = asyncio.get_running_loop()
-            close_deadline = loop.time() + max(0.0, wait_seconds_before_close)
-            while self._sessions and loop.time() < close_deadline:
+            end_time = loop.time() + max(0.0, wait_seconds_before_close)
+            while self._sessions and loop.time() < end_time:
                 await asyncio.sleep(0.05)
         # force any remaining sessions down
         for task in list(self._sessions):
@@ -979,7 +979,7 @@ class SmtpdServer:
                     raise Smtpd421CloseException('Abort connection while service is shutting down!')
 
                 # io_session_timeout limits the time a connection holds its slot
-                session.session_deadline = time.monotonic() + self.io_session_timeout
+                session.end_time = time.monotonic() + self.io_session_timeout
 
                 # initialize \r\n line_break for CRLF_ENSURE and CRLF_STRICT
                 line_break = b'\r\n'
@@ -1027,7 +1027,7 @@ class SmtpdServer:
                     raw = await self._read_line(
                         reader,
                         self.io_proxy_cmd_timeout if session.cmd_sequence is CMD_PROXY else self.io_cmd_timeout,
-                        session.session_deadline,
+                        session.end_time,
                     )
 
                     # an empty raw comes from a close of the client (also within
@@ -1214,7 +1214,7 @@ class SmtpdServer:
                 # finalize the session at least here, drop maybe interrupted parts
                 self.process_reset_session(session)
 
-    async def _read_line(self, reader, io_timeout, session_deadline):
+    async def _read_line(self, reader, io_timeout, session_end_time):
         """
         Read one raw line (with terminator) enforcing timeouts and buffer size.
 
@@ -1222,7 +1222,7 @@ class SmtpdServer:
 
         - **reader** (StreamReader): The connection input stream
         - **io_timeout** (int|float): Seconds to wait for a complete line
-        - **session_deadline** (float): Monotonic time the session must end by
+        - **session_end_time** (float): Monotonic time the session must end by
 
         ### Returns
 
@@ -1239,7 +1239,7 @@ class SmtpdServer:
 
         """
         # also a client that streams endless lines (NOOP or DATA) ends here
-        session_remaining = session_deadline - time.monotonic()
+        session_remaining = session_end_time - time.monotonic()
         if session_remaining <= 0:
             raise SmtpdIOSessionTimeoutException('Abort connection while exceeding io_session_timeout!')
         try:

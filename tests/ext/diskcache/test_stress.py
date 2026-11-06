@@ -187,7 +187,7 @@ class Participant:
         interval = (job if rnd.random() < 0.5 else job_or_skip)(rnd.uniform(0.001, 0.02))
         if interval:
             self.record('tempers', name, interval)
-        # the deadlines in the cache are sorted and never more than the count
+        # the expire times in the cache are sorted and never more than the count
         value = self.app.cache.get(f'dc_{name}', retry=True)
         if value is not None and not (type(value) is list and len(value) <= TEMPERS[name] and value == sorted(value)):
             self.wrong(f'{name}: {value}')

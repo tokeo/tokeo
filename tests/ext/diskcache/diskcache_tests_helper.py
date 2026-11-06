@@ -89,11 +89,11 @@ def spawn_context():
 
 def collect_results(result_queue, expected, total_timeout):
     # gather exactly expected payloads, but never block forever if a child
-    # dies without reporting; returns whatever arrived before the deadline
+    # dies without reporting; returns whatever arrived before the end time
     items = []
-    deadline = time.monotonic() + total_timeout
+    end_time = time.monotonic() + total_timeout
     for _ in range(expected):
-        remaining = deadline - time.monotonic()
+        remaining = end_time - time.monotonic()
         if remaining <= 0:
             break
         try:

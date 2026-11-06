@@ -327,10 +327,10 @@ class TokeoDramatiqMonitor:
                 self._listen()
                 # each running worker sends within one interval
                 wait = max(wait, self.interval)
-            collect_deadline = time.monotonic() + wait
+            end_time = time.monotonic() + wait
             while True:
-                self._connection.process_data_events(time_limit=max(0, collect_deadline - time.monotonic()))
-                if time.monotonic() >= collect_deadline:
+                self._connection.process_data_events(time_limit=max(0, end_time - time.monotonic()))
+                if time.monotonic() >= end_time:
                     break
         except pika.exceptions.AMQPError as e:
             self._close()
@@ -361,14 +361,14 @@ class TokeoDramatiqMonitor:
                 interval = heartbeat.get('interval') or self.interval
                 seen_seconds = now - entry['received']
                 if heartbeat.get('state') == 'stopped':
-                    state, remove_intervals = 'stopped', KEEP_INTERVALS
+                    state, keep_intervals = 'stopped', KEEP_INTERVALS
                 elif seen_seconds <= LATE_INTERVALS * interval:
-                    state, remove_intervals = 'ok', None
+                    state, keep_intervals = 'ok', None
                 elif seen_seconds <= GONE_INTERVALS * interval:
-                    state, remove_intervals = 'late', None
+                    state, keep_intervals = 'late', None
                 else:
-                    state, remove_intervals = 'gone', GONE_INTERVALS + KEEP_INTERVALS
-                if remove_intervals is not None and seen_seconds > remove_intervals * interval:
+                    state, keep_intervals = 'gone', GONE_INTERVALS + KEEP_INTERVALS
+                if keep_intervals is not None and seen_seconds > keep_intervals * interval:
                     del self._workers[key]
                     continue
                 result.append(dict(state=state, seen_ms=int(seen_seconds * 1000), heartbeat=heartbeat))

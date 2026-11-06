@@ -486,9 +486,9 @@ def test_read_line_takes_a_buffered_line_without_waiting(monkeypatch):
             raise AssertionError('asyncio.wait must not be used when a line is buffered')
 
         monkeypatch.setattr(asyncio, 'wait', boom)
-        deadline = time.monotonic() + srv.io_session_timeout
-        assert await srv._read_line(reader, srv.io_cmd_timeout, deadline) == b'HELO x\r\n'
-        assert await srv._read_line(reader, srv.io_cmd_timeout, deadline) == b'MAIL FROM:<a@b>\r\n'
+        session_end_time = time.monotonic() + srv.io_session_timeout
+        assert await srv._read_line(reader, srv.io_cmd_timeout, session_end_time) == b'HELO x\r\n'
+        assert await srv._read_line(reader, srv.io_cmd_timeout, session_end_time) == b'MAIL FROM:<a@b>\r\n'
 
     asyncio.run(go())
 
@@ -523,7 +523,7 @@ def test_wait_line_after_a_shutdown_reads_nothing():
     assert asyncio.run(go()) == b''
 
 
-def test_read_line_ends_a_session_past_its_deadline():
+def test_read_line_ends_a_session_past_its_end_time():
     """A read past io_session_timeout raises at once, also on a buffered line."""
     from tokeo.core.smtpd.exc import SmtpdIOSessionTimeoutException
     from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents

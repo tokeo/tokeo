@@ -448,51 +448,51 @@ smtp:
 
 
 @pytest.fixture
-def base_settings(app):
-    """The settings extracted from BASE_YAML as config base."""
+def base_sections(app):
+    """The sections extracted from BASE_YAML as config base."""
     import yaml
 
-    return app.pdoc._config_settings('base', BASE_YAML.split('\n'), yaml.safe_load(BASE_YAML))
+    return app.pdoc._config_sections('base', BASE_YAML.split('\n'), yaml.safe_load(BASE_YAML))
 
 
 @pytest.fixture
-def local_settings(app):
-    """The settings extracted from LOCAL_YAML as config development.local."""
+def local_sections(app):
+    """The sections extracted from LOCAL_YAML as config development.local."""
     import yaml
 
     from tokeo.core.vaults import VaultLoader
 
-    return app.pdoc._config_settings('development.local', LOCAL_YAML.split('\n'), yaml.load(LOCAL_YAML, Loader=VaultLoader))
+    return app.pdoc._config_sections('development.local', LOCAL_YAML.split('\n'), yaml.load(LOCAL_YAML, Loader=VaultLoader))
 
 
-def test_config_settings_extracts_intro_and_source(base_settings):
+def test_config_sections_extracts_intro_and_source(base_sections):
     """Each setting gets the comment above as intro and its yaml as source."""
-    assert base_settings['smtp']['intro'] == ('Outgoing mail.\nSecond line of the intro.')
-    assert base_settings['smtp']['source'] == ('smtp:\n  host: localhost\n  port: 25')
+    assert base_sections['smtp']['intro'] == ('Outgoing mail.\nSecond line of the intro.')
+    assert base_sections['smtp']['source'] == ('smtp:\n  host: localhost\n  port: 25')
 
 
-def test_config_settings_block_ends_at_a_dotted_key(base_settings):
+def test_config_sections_block_ends_at_a_dotted_key(base_sections):
     """ "log.colorlog:" ends the block before it."""
     # pdoc3's `^([a-zA-Z0-9]+:$|#)` knew no dots, so `log.colorlog:` did not
     # end the previous block and its source leaked into `smtp`
-    assert 'log.colorlog' not in base_settings['smtp']['source']
-    assert base_settings['log.colorlog']['source'] == 'log.colorlog:\n  level: info'
+    assert 'log.colorlog' not in base_sections['smtp']['source']
+    assert base_sections['log.colorlog']['source'] == 'log.colorlog:\n  level: info'
 
 
-def test_config_settings_masks_only_the_vault_values(local_settings):
+def test_config_sections_masks_only_the_vault_values(local_sections):
     """A !vault: value shows as ***, the other values, comments and order stay."""
-    assert local_settings['smtp']['source'] == 'smtp:\n  password: ***  # the mail password\n  host: mail.internal'
+    assert local_sections['smtp']['source'] == 'smtp:\n  password: ***  # the mail password\n  host: mail.internal'
 
 
-def test_config_settings_hides_a_source_it_cannot_read(app):
+def test_config_sections_hides_a_source_it_cannot_read(app):
     """A block that is no valid yaml shows a note instead of its text."""
     lines = ['smtp:', '  password: !vault:dev "open']
-    assert app.pdoc._config_settings('base', lines, {'smtp': None})['smtp']['source'].startswith('# source hidden, could not be read')
+    assert app.pdoc._config_sections('base', lines, {'smtp': None})['smtp']['source'].startswith('# source hidden, could not be read')
 
 
-def test_config_settings_returns_empty_for_a_non_mapping(app):
+def test_config_sections_returns_empty_for_a_non_mapping(app):
     """A yaml list gives {}."""
-    assert app.pdoc._config_settings('base', ['- a', '- b'], ['a', 'b']) == {}
+    assert app.pdoc._config_sections('base', ['- a', '- b'], ['a', 'b']) == {}
 
 
 # ---- config page: which files appear and in what order ----------------------
@@ -584,7 +584,7 @@ def test_config_page_shows_a_file_with_vault_values_masked(app, tmp_path, monkey
     import pdoc.render
 
     assert 'production.local' in _collect_config_sections(app, tmp_path, monkeypatch)
-    source = pdoc.render.env.globals['configdict']['production.local']['settings']['smtp']['source']
+    source = pdoc.render.env.globals['configdict']['production.local']['sections']['smtp']['source']
     assert source == 'smtp:\n  password: ***'
 
 
@@ -1822,7 +1822,7 @@ def test_pages_carry_the_mode_switch_and_the_early_script(tmp_path, monkeypatch)
 
     module = _render_page(tmp_path, monkeypatch, 'darkmode_pages', {'sample': '"""A module."""\n'})['sample']
     start = (tmp_path / 'html' / 'index.html').read_text()
-    pdoc.render.env.globals.update(configdict={}, configsettings=[], configenvs=[])
+    pdoc.render.env.globals.update(configdict={}, configsections=[], configenvs=[])
     config = pdoc.render.env.get_template('config.html.jinja2').render(app_name='darkmode')
 
     for html in (start, module, config):

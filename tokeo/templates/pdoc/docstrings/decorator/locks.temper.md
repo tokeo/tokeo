@@ -12,8 +12,8 @@ When the concurrent limit is reached, the decorator will either:
 1. Block and sleep until a slot becomes available
 1. Call an alternative callback function if cb_on_locked is provided
 
-The decorator keeps the deadlines of the holders. Each call adds its own
-deadline, now plus expire, and removes it when the function completes.
+The decorator keeps the expire times of the holders. Each call adds its own
+expire time, now plus expire, and removes it when the function completes.
 
 ### Args
 
@@ -50,7 +50,7 @@ def resource_intensive_operation(data):
     name or custom name/name_format parameter
 
 : If a process crashes while holding a slot, the slot is released at
-    its own deadline, preventing permanent deadlock
+    its own expire time, preventing permanent deadlock
 
 : ```temper``` never stops a running call, also not after its expire; a call
     that must end in time needs its own limit below expire, e.g.

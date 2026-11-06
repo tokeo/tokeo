@@ -166,9 +166,9 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
             changed = False
             result = {}
             for k, v in value.items():
-                res = self._resolve_value(v, (path + [k]) if path is not None else None)
-                result[k] = res
-                changed = changed or res is not v
+                r = self._resolve_value(v, (path + [k]) if path is not None else None)
+                result[k] = r
+                changed = changed or r is not v
             # keep the stored object when nothing changed, so a plain read is
             # identical to before (same reference, no copy)
             return result if changed else value
@@ -176,9 +176,9 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
             changed = False
             result = []
             for v in value:
-                res = self._resolve_value(v, None)
-                result.append(res)
-                changed = changed or res is not v
+                r = self._resolve_value(v, None)
+                result.append(r)
+                changed = changed or r is not v
             return result if changed else value
         # scalar leaf: an env override wins, else hand it to the leaf hook
         if path is not None:

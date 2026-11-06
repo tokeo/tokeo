@@ -228,7 +228,7 @@ Available in every template, on top of pdoc's own
 | ```is_namespace(mod)``` | callable | True for PEP 420 namespace packages |
 | ```is_enum(cls)``` | callable | True for ```enum.Enum``` subclasses |
 | ```all_modules``` | set | Names of every documented module |
-| ```configdict```, ```configsettings```, ```configenvs``` | - | Config page data |
+| ```configdict```, ```configsections```, ```configenvs``` | - | Config page data |
 | ```redact_data(data)``` | callable | Replaces every value, keeps the structure |
 | ```math```, ```mermaid``` | bool | Both False: pdoc's own includes target markup this layout does not use; ```head.html``` wires up mermaid itself |
 

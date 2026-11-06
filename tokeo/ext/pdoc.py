@@ -40,7 +40,7 @@ from tokeo.core.exc import TokeoError
 #: a heading. (Stripping every leading `#` would flatten it to a paragraph.)
 _RE_COMMENT_MARKER = re.compile(r'^[ \t]*#+[ \t]?', re.MULTILINE)
 
-#: A line that ends a settings block: either a new top-level key or a comment
+#: A line that ends a section block: either a new top-level key or a comment
 #: introducing the next one.
 _RE_BLOCK_END = re.compile(r'^([a-zA-Z0-9_.-]+:$|#)')
 
@@ -753,8 +753,8 @@ class TokeoPdoc(Handler):
                     dirs_exist_ok=True,
                 )
 
-    def _config_settings(self, section, lines, parsed):
-        """Slice a config file into its top-level settings.
+    def _config_sections(self, config_file, lines, parsed):
+        """Slice a config file into its top-level sections.
 
         For every top-level yaml key this returns the comment block written
         directly above it (as Markdown) and the yaml source of the key itself,
@@ -774,7 +774,7 @@ class TokeoPdoc(Handler):
         if not isinstance(parsed, dict):
             return {}
 
-        settings = {}
+        sections = {}
         for key in parsed:
             start = None
             for i, line in enumerate(lines):
@@ -806,16 +806,16 @@ class TokeoPdoc(Handler):
             except yaml.YAMLError as err:
                 source = f'# source hidden, could not be read\n# {err}'
 
-            settings[key] = dict(intro=intro, source=source)
+            sections[key] = dict(intro=intro, source=source)
 
-        return settings
+        return sections
 
     def _render_config_page(self, output_dir):
         """Render the app's YAML config files as a documentation page.
 
         Reproduces the prior pdoc3 ```show_config``` feature: it collects the
         config files cement actually loads (via appenv's resolver), reads
-        each into ```configdict[section] = {content: [lines], yaml: parsed}```,
+        each into ```configdict[config_file] = {content: [lines], yaml: parsed}```,
         masks the ```!vault:``` values, and renders a synthetic
         ```config/index.html```.
         Requires the appenv extension (```app.env```); skipped otherwise.
@@ -844,38 +844,38 @@ class TokeoPdoc(Handler):
             for filename in file_list:
                 if not os.path.isfile(filename):
                     continue
-                section = os.path.relpath(filename, config_dir)
-                if section.endswith(suffix):
-                    section = section[: -len(suffix)]
+                config_file = os.path.relpath(filename, config_dir)
+                if config_file.endswith(suffix):
+                    config_file = config_file[: -len(suffix)]
                 try:
                     with open(filename, 'r', encoding='utf-8') as f:
                         content = f.read()
                     lines = content.split('\n')
                     # a !vault: value loads as VaultRef, it is never decrypted
                     parsed = yaml.load(content, Loader=VaultLoader)
-                    configdict[section] = {
+                    configdict[config_file] = {
                         'content': lines,
                         'yaml': parsed,
                         'description': _strip_comment_markers('\n'.join(lines[: _yaml_header_end(lines)])),
-                        'settings': self._config_settings(
-                            section,
+                        'sections': self._config_sections(
+                            config_file,
                             lines,
                             parsed,
                         ),
                     }
                 except Exception as err:
-                    self.app.log.warning(f'pdoc: config file "{section}": {err}')
+                    self.app.log.warning(f'pdoc: config file "{config_file}": {err}')
 
         if not configdict:
             return
 
-        # union of top-level yaml keys across all files
-        configsettings = []
+        # union of the top-level keys (config sections) across all files
+        configsections = []
         for data in configdict.values():
             if data['yaml']:
                 for key in data['yaml']:
-                    if key not in configsettings:
-                        configsettings.append(key)
+                    if key not in configsections:
+                        configsections.append(key)
 
         # top-level environment files in documentation order, used for the
         # intro section. `ENVIRONMENTS` already reads production, staging,
@@ -887,7 +887,7 @@ class TokeoPdoc(Handler):
         import pdoc.render
 
         pdoc.render.env.globals['configdict'] = configdict
-        pdoc.render.env.globals['configsettings'] = configsettings
+        pdoc.render.env.globals['configsections'] = configsections
         pdoc.render.env.globals['configenvs'] = configenvs
         from tokeo.core.utils.dict import redact_data
 
