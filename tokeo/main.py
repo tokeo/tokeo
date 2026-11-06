@@ -39,7 +39,7 @@ class Tokeo(App):
         # this app main path
         main_dir = os.path.dirname(fs.abspath(__file__))
 
-        # configuration defaults
+        # Defaults of the config section
         config_defaults = dict(
             # run the app in debug mode
             debug=False,
