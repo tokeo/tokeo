@@ -134,7 +134,7 @@ class TokeoGrpc(MetaMixin):
         self._grpc_interceptor = None
 
     def _setup(self, app):
-        # the app handed to _setup must be the same instance this handler
+        # the app handed to _setup must be the same instance this extension
         # was initialized with; guard against accidental mis-wiring
         if app is not self.app:
             raise TokeoGrpcError('_setup() received a different app than the one TokeoGrpc was initialized with')

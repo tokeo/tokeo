@@ -1,7 +1,7 @@
 """
-The per-connection ```ctx``` handed to every handler event, a one-to-one
-translation of the ```session[:ctx]``` hash (```:server```,
-```:envelope```, ```:message```) into three dataclasses with attribute access.
+The per-connection ```ctx``` handed to every handler event, translated from
+the ```session[:ctx]``` hash (```:server```, ```:envelope```, ```:message```)
+into three dataclasses with attribute access.
 The server fills each value directly at the point it becomes known, exactly as
 the Ruby code assigns into the hash.
 

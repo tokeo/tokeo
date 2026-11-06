@@ -471,7 +471,7 @@ class TokeoNicegui(MetaMixin):
 
         ### Notes
 
-        : Uses the handler's config_section as defined in Meta
+        : Uses the extension's config_section as defined in Meta
 
         : Passes through any additional arguments to config.get()
 

@@ -1,6 +1,6 @@
 """
-A one-to-one translation of MidiSmtpServer dialog engine from Ruby to
-Python on ```asyncio```. ```serve_client``` owns the per-connection io loop
+The dialog engine of MidiSmtpServer, translated from Ruby to Python on
+```asyncio```. ```serve_client``` owns the per-connection io loop
 (timeout, buffer limit, PIPELINING guard, CRLF handling), ```process_line```
 is the single command dispatcher (a case/when chain kept as if/elif with
 the same regexes), and ```process_reset_session``` resets the session/ctx.
@@ -649,8 +649,8 @@ class SmtpdServer:
         self._servers = []
         # connection/processing bookkeeping (one event loop: plain counters
         # + an asyncio.Event as the condition-variable equivalent)
-        self._connections = 0
-        self._processings = 0
+        self._connection_cnt = 0
+        self._processing_cnt = 0
         # with global limits the wake event is the SHARED one, so a slot
         # released on any service wakes waiters on every service
         self._slot_free = global_limits.slot_free if global_limits is not None else asyncio.Event()
@@ -805,20 +805,20 @@ class SmtpdServer:
     @property
     def connections(self):
         """Number of connected clients."""
-        return self._connections
+        return self._connection_cnt
 
     def has_connections(self):
         """True while any client is connected."""
-        return self._connections > 0
+        return self._connection_cnt > 0
 
     @property
     def processings(self):
         """Number of clients processing a message."""
-        return self._processings
+        return self._processing_cnt
 
     def has_processings(self):
         """True while a message is being processed."""
-        return self._processings > 0
+        return self._processing_cnt > 0
 
     async def stop(self, wait_seconds_before_close=2.0, gracefully=True):
         """
@@ -882,7 +882,7 @@ class SmtpdServer:
 
         """
         # add to list of connections
-        self._connections += 1
+        self._connection_cnt += 1
         if self.global_limits is not None:
             self.global_limits.admit()
         # track the running task so a graceful stop can drain or cancel it
@@ -900,18 +900,18 @@ class SmtpdServer:
         finally:
             self._sessions.discard(task)
             # drop from connections and processings; wake the next waiter
-            self._connections = max(0, self._connections - 1)
+            self._connection_cnt = max(0, self._connection_cnt - 1)
             if self.global_limits is not None:
                 self.global_limits.release()
             if session.has_processing_slot:
-                self._processings = max(0, self._processings - 1)
+                self._processing_cnt = max(0, self._processing_cnt - 1)
                 if self.global_limits is not None:
                     self.global_limits.end_processing()
             self._slot_free.set()
 
     def _has_too_many_connections(self):
         """True when connections exceed max_connections (service or global)."""
-        if self.max_connections is not None and self._connections > int(self.max_connections):
+        if self.max_connections is not None and self._connection_cnt > int(self.max_connections):
             return True
         gl = self.global_limits
         if gl is not None and gl.max_connections is not None and gl.active > gl.max_connections:
@@ -932,15 +932,15 @@ class SmtpdServer:
         global_max_processings = gl.max_processings if gl is not None else None
 
         def _has_free_slot():
-            has_service_slot = max_processings is None or self._processings < max_processings
+            has_service_slot = max_processings is None or self._processing_cnt < max_processings
             has_global_slot = global_max_processings is None or gl.active_processings < global_max_processings
             return has_service_slot and has_global_slot
 
         while True:
             # the global max is checked and counted in one step, so two
             # processes cannot both take the last slot
-            if (max_processings is None or self._processings < max_processings) and (gl is None or gl.try_begin_processing()):
-                self._processings += 1
+            if (max_processings is None or self._processing_cnt < max_processings) and (gl is None or gl.try_begin_processing()):
+                self._processing_cnt += 1
                 session.has_processing_slot = True
                 return
             # arm the wake-up, then re-check once: a release between the failed
