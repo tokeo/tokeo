@@ -120,15 +120,15 @@ class PocketBase:
             raise TokeoPocketBaseError(f'{method} {url} failed: {err}', status=0, url=url) from err
         if response.status_code >= 400:
             try:
-                answer = response.json()
+                result = response.json()
             except ValueError:
-                answer = {}
-            message = answer.get('message') if isinstance(answer, dict) else None
+                result = {}
+            message = result.get('message') if isinstance(result, dict) else None
             raise TokeoPocketBaseError(
                 f'{method} {url} failed with {response.status_code}: {message or response.text[:200]}',
                 status=response.status_code,
                 url=url,
-                data=answer.get('data') if isinstance(answer, dict) else None,
+                data=result.get('data') if isinstance(result, dict) else None,
             )
         return response.json() if response.content else None
 
@@ -194,10 +194,10 @@ class PocketBase:
 
     # ---- auth ---------------------------------------------------------------
 
-    def _set_auth(self, collection, answer):
+    def _set_auth(self, collection, result):
         # keep the token and the record of a login
-        self.token = answer['token']
-        self.auth_record = Record(answer.get('record'))
+        self.token = result['token']
+        self.auth_record = Record(result.get('record'))
         self.auth_collection = collection
         return self.auth_record
 
@@ -207,7 +207,7 @@ class PocketBase:
         self.auth_record = None
         self.auth_collection = None
 
-    def token_valid(self, min_valid_seconds=0):
+    def is_token_valid(self, min_valid_seconds=0):
         """
         Tell whether a token is set and valid for some more seconds.
 
@@ -246,13 +246,13 @@ class PocketBase:
         """
         path = f'/api/collections/{path_segment(collection)}/auth-with-password'
         try:
-            answer = self._send('POST', path, json={'identity': identity, 'password': password}, headers={'Authorization': None})
+            result = self._send('POST', path, json={'identity': identity, 'password': password}, headers={'Authorization': None})
         except TokeoPocketBaseError as err:
             if err.status in (400, 401, 403):
                 raise TokeoPocketBaseAuthError(str(err), status=err.status, url=err.url, data=err.data) from err
             raise
         self.logins += 1
-        return self._set_auth(collection, answer)
+        return self._set_auth(collection, result)
 
     def auth_refresh(self):
         """
@@ -288,12 +288,12 @@ class PocketBase:
             raise TokeoPocketBaseAuthError('auth_refresh needs a login first')
         path = f'/api/collections/{path_segment(collection)}/auth-refresh'
         try:
-            answer = self._send('POST', path)
+            result = self._send('POST', path)
         except TokeoPocketBaseError as err:
             if err.status in (401, 403, 404):
                 raise TokeoPocketBaseAuthError(str(err), status=err.status, url=err.url, data=err.data) from err
             raise
-        return self._set_auth(collection, answer)
+        return self._set_auth(collection, result)
 
     def impersonate(self, collection, record_id, duration=0, client=None):
         """
@@ -329,14 +329,14 @@ class PocketBase:
         """
         path = f'/api/collections/{path_segment(collection)}/impersonate/{path_segment(record_id)}'
         try:
-            answer = self.send('POST', path, json={'duration': duration})
+            result = self.send('POST', path, json={'duration': duration})
         except TokeoPocketBaseError as err:
             if err.status in (401, 403, 404):
                 raise TokeoPocketBaseAuthError(str(err), status=err.status, url=err.url, data=err.data) from err
             raise
         client = client or PocketBase(self.url, **self._httpx_kwargs)
         client.logins += 1
-        client._set_auth(collection, answer)
+        client._set_auth(collection, result)
         return client
 
 
@@ -393,7 +393,7 @@ class AuthKeeper:
         #: Held while the login is checked or renewed
         self.lock = threading.Lock()
         # when the server confirmed the login last, by time.monotonic()
-        self._checked = None
+        self._last_check = None
         # the logins of the client at the last check
         self._logins = None
 
@@ -402,11 +402,11 @@ class AuthKeeper:
             # a login since the last check, e.g. a new impersonation, comes
             # just from the server; a token from elsewhere is no login
             if self.client.logins and self.client.logins != self._logins:
-                self._logins, self._checked = self.client.logins, time.monotonic()
-            fresh = self._checked is not None and time.monotonic() - self._checked < self.check_seconds
-            if fresh and self.client.token_valid(self.min_valid_seconds):
+                self._logins, self._last_check = self.client.logins, time.monotonic()
+            fresh = self._last_check is not None and time.monotonic() - self._last_check < self.check_seconds
+            if fresh and self.client.is_token_valid(self.min_valid_seconds):
                 return
-            if self.client.token_valid(0) and self.client.auth_collection:
+            if self.client.is_token_valid(0) and self.client.auth_collection:
                 token = self.client.token
                 try:
                     # the server confirms the login and renews a refreshable token
@@ -417,8 +417,8 @@ class AuthKeeper:
                 else:
                     # an impersonation answers with its same token, near its
                     # expiry only a new login renews it
-                    if self.client.token != token or self.client.token_valid(self.min_valid_seconds):
-                        self._checked = time.monotonic()
+                    if self.client.token != token or self.client.is_token_valid(self.min_valid_seconds):
+                        self._last_check = time.monotonic()
                         return
             self.login()
-            self._logins, self._checked = self.client.logins, time.monotonic()
+            self._logins, self._last_check = self.client.logins, time.monotonic()

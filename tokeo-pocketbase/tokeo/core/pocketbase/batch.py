@@ -82,5 +82,5 @@ class Batch:
             nothing is changed then
 
         """
-        answers = self.client.send('POST', '/api/batch', json={'requests': self.requests})
-        return [Record(answer['body']) if answer.get('body') is not None else None for answer in answers]
+        results = self.client.send('POST', '/api/batch', json={'requests': self.requests})
+        return [Record(result['body']) if result.get('body') is not None else None for result in results]

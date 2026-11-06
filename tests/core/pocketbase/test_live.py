@@ -184,7 +184,7 @@ def test_live_batch_is_all_or_nothing(pb):
 def test_live_refresh_and_wrong_password(pb):
     """A refresh keeps a valid token, a wrong password raises an auth error."""
     pb.auth_refresh()
-    assert pb.token_valid(60)
+    assert pb.is_token_valid(60)
     with pytest.raises(TokeoPocketBaseAuthError) as caught:
         pb.auth_with_password('users', USER[0], 'wrong')
     assert caught.value.status == 400
@@ -194,7 +194,7 @@ def test_live_impersonate_acts_as_the_user(su, pb, live):
     """A superuser gets a client of the user, the user cannot impersonate."""
     client = su.impersonate('users', live[1], duration=60)
     try:
-        assert (client.auth_record.email, client.token_valid(30), client.token_valid(120)) == (USER[0], True, False)
+        assert (client.auth_record.email, client.is_token_valid(30), client.is_token_valid(120)) == (USER[0], True, False)
         assert client.collection('posts').create({'title': 'as anna', 'owner': live[1]}).owner == live[1]
     finally:
         client.close()

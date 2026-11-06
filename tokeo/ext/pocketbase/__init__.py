@@ -92,7 +92,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         anonymously, so the mapped CRUD calls run against whatever the
         PocketBase api rules permit for unauthenticated requests. With
         auth_identity and auth_password it logs in that service identity on
-        first use and refreshes its token, see ensure_auth.
+        first use and refreshes its token, see keep_auth.
 
     : The handler holds one client with one login for the service
         identity; never log in other users on ```app.db.pb```, take a client
@@ -221,17 +221,19 @@ class TokeoPocketBaseHandler(MetaMixin):
         max_connections = self._config('max_connections')
         if max_connections:
             client_kwargs['limits'] = httpx.Limits(max_connections=max_connections)
-        # anonymous until a service identity is configured; ensure_auth runs
+        # anonymous until a service identity is configured; keep_auth runs
         # before each request of the client, also of collection() and batches
-        self.pb = PocketBase(url, before_request=self.ensure_auth, **client_kwargs)
+        self.pb = PocketBase(url, before_request=self.keep_auth, **client_kwargs)
         # cache the auth config once: the per-request guard must not hit
         # self._config on every call
         self._auth_identity = self._config('auth_identity')
-        self._auth_min_valid = self._config('auth_token_min_valid_seconds')
+        self._auth_token_min_valid_seconds = self._config('auth_token_min_valid_seconds')
         self._auth_check = float(self._config('auth_check_seconds'))
         # keeps the login of the service identity under its lock, since the
         # login of the shared client has no locking of its own
-        self._auth_keeper = AuthKeeper(self.pb, self._login, min_valid_seconds=self._auth_min_valid, check_seconds=self._auth_check)
+        self._auth_keeper = AuthKeeper(
+            self.pb, self._login, min_valid_seconds=self._auth_token_min_valid_seconds, check_seconds=self._auth_check
+        )
         # the collection a successful login used; reused for refresh and
         # re-login, set on the first successful authentication
         self._auth_collection = None
@@ -298,7 +300,7 @@ class TokeoPocketBaseHandler(MetaMixin):
                 last_error = error
         raise TokeoPocketBaseAuthError(f'PocketBase authentication failed for identity {self._auth_identity!r}') from last_error
 
-    def ensure_auth(self):
+    def keep_auth(self):
         """
         Ensure a valid auth token before a request, when credentials are set.
 
@@ -375,7 +377,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         client.before_request = AuthKeeper(
             client,
             lambda: self.pb.impersonate(collection, record_id, duration, client=client),
-            min_valid_seconds=self._auth_min_valid,
+            min_valid_seconds=self._auth_token_min_valid_seconds,
             check_seconds=self._auth_check,
         )
         return client

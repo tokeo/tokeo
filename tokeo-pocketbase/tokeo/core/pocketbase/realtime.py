@@ -466,10 +466,10 @@ class Realtime:
             while not pending.empty():
                 if stop.wait(0.1):
                     return
-            overflow, ended, started = False, False, time.monotonic()
+            overflow, is_ended, start_time = False, False, time.monotonic()
             try:
                 overflow = self._listen(stop, http, pending)
-                ended = not overflow
+                is_ended = not overflow
             except Exception as err:
                 # closing the client by stop() ends the stream with an error too
                 if not stop.is_set():
@@ -477,7 +477,7 @@ class Realtime:
                     LOG.warning('pocketbase realtime: %s', self.error)
             if stop.is_set():
                 return
-            served = ended and self.connected.is_set() and time.monotonic() - started >= STABLE_SECONDS
+            served = is_ended and self.connected.is_set() and time.monotonic() - start_time >= STABLE_SECONDS
             self.connected.clear()
             # the server ended a connection that served: connect at once
             if served:
@@ -528,10 +528,10 @@ class Realtime:
 
     def _dispatch(self, stop, pending):
         # dispatcher: hand each event to its callbacks, check the login
-        checked = time.monotonic()
+        last_check = time.monotonic()
         while not stop.is_set():
-            if self.connected.is_set() and time.monotonic() - checked >= self.auth_check:
-                checked = time.monotonic()
+            if self.connected.is_set() and time.monotonic() - last_check >= self.auth_check:
+                last_check = time.monotonic()
                 try:
                     with self._lock:
                         if stop.is_set():
@@ -553,7 +553,7 @@ class Realtime:
             if stop.is_set():
                 return
             if item is _CONNECTED:
-                checked = time.monotonic()
+                last_check = time.monotonic()
                 if self.on_connect:
                     self._call(self.on_connect)
             elif item is not None:
@@ -633,7 +633,7 @@ class AsyncRealtime:
         #: Called after each connect and reconnect, a function or coroutine
         self.on_connect = None
         self._subscriptions = _Subscriptions()
-        self._stopping = False
+        self._is_stopping = False
         self._http = None
         self._task = None
         self._listen_task = None
@@ -707,7 +707,7 @@ class AsyncRealtime:
         """Connect, read and connect again until ```stop()```."""
         if self._task is not None and not self._task.done():
             raise TokeoPocketBaseError('pocketbase realtime: the channel runs already')
-        self._stopping = False
+        self._is_stopping = False
         self._task = asyncio.current_task()
         timeout = httpx.Timeout(10.0, read=self.read_timeout)
         self._http = httpx.AsyncClient(base_url=self.client.url, **{**self.client._httpx_kwargs, 'timeout': timeout})
@@ -715,14 +715,14 @@ class AsyncRealtime:
         dispatcher = asyncio.create_task(self._dispatch(pending))
         listen = None
         try:
-            while not self._stopping:
+            while not self._is_stopping:
                 # a connection starts once the callbacks caught up
                 while not pending.empty():
                     await asyncio.sleep(0.1)
-                started = time.monotonic()
+                start_time = time.monotonic()
                 listen = self._listen_task = asyncio.create_task(self._listen(pending))
                 await asyncio.wait({listen})
-                overflow, ended = False, False
+                overflow, is_ended = False, False
                 if listen.cancelled():
                     # hung up after the login was not confirmed, already logged
                     pass
@@ -731,8 +731,8 @@ class AsyncRealtime:
                     LOG.warning('pocketbase realtime: %s', self.error)
                 else:
                     overflow = listen.result()
-                    ended = not overflow
-                served = ended and self.connected.is_set() and time.monotonic() - started >= STABLE_SECONDS
+                    is_ended = not overflow
+                served = is_ended and self.connected.is_set() and time.monotonic() - start_time >= STABLE_SECONDS
                 self.connected.clear()
                 # the server ended a connection that served: connect at once
                 if served:
@@ -740,7 +740,7 @@ class AsyncRealtime:
                 await asyncio.sleep(self.max_delay if overflow else self._delay)
                 self._delay = min(self._delay * 2, self.max_delay)
         except asyncio.CancelledError:
-            if not self._stopping:
+            if not self._is_stopping:
                 raise
         finally:
             self.connected.clear()
@@ -752,7 +752,7 @@ class AsyncRealtime:
 
     async def stop(self):
         """Close the channel and wait until ```run()``` ended."""
-        self._stopping = True
+        self._is_stopping = True
         tasks = [task for task in (self._task, *self._sends) if task is not None and not task.done()]
         for task in tasks:
             task.cancel()
@@ -817,10 +817,10 @@ class AsyncRealtime:
 
     async def _dispatch(self, pending):
         # dispatcher: hand each event to its callbacks, check the login
-        checked = time.monotonic()
+        last_check = time.monotonic()
         while True:
-            if self.connected.is_set() and time.monotonic() - checked >= self.auth_check:
-                checked = time.monotonic()
+            if self.connected.is_set() and time.monotonic() - last_check >= self.auth_check:
+                last_check = time.monotonic()
                 try:
                     await asyncio.to_thread(confirm_login, self.client)
                     # a new login: PocketBase dropped the old one
@@ -837,7 +837,7 @@ class AsyncRealtime:
             except TimeoutError:
                 continue
             if item is _CONNECTED:
-                checked = time.monotonic()
+                last_check = time.monotonic()
                 if self.on_connect:
                     await self._call(self.on_connect)
             else:

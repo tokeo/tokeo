@@ -474,9 +474,9 @@ def test_impersonate_refused_raises_auth_error(pb, server):
     ids=['none', 'broken', 'no_exp', 'valid', 'too_short'],
 )
 def test_token_valid_tells_whether_the_token_lasts(pb, token, seconds, valid):
-    """token_valid is True only for a token valid longer than the given seconds."""
+    """is_token_valid is True only for a token valid beyond the given seconds."""
     pb.token = token
-    assert pb.token_valid(seconds) is valid
+    assert pb.is_token_valid(seconds) is valid
 
 
 def test_logins_count_each_login_but_no_refresh(pb, server):
@@ -567,7 +567,7 @@ def test_auth_keeper_renews_a_token_near_its_expiry_by_a_refresh(keeper, pb, ser
     server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth(_jwt(3600))
     pb.token, pb.auth_collection = _jwt(30), 'users'
     pb.collection('posts').get_list()
-    assert keeper.logins == [] and pb.token_valid(3000)
+    assert keeper.logins == [] and pb.is_token_valid(3000)
 
 
 def test_auth_keeper_logs_in_when_the_refresh_keeps_a_short_token(keeper, pb, server):
@@ -576,7 +576,7 @@ def test_auth_keeper_logs_in_when_the_refresh_keeps_a_short_token(keeper, pb, se
     server.answers[('POST', '/api/collections/users/auth-refresh')] = _auth(short)
     pb.token, pb.auth_collection = short, 'users'
     pb.collection('posts').get_list()
-    assert len(keeper.logins) == 1 and pb.token_valid(3000)
+    assert len(keeper.logins) == 1 and pb.is_token_valid(3000)
 
 
 @pytest.mark.parametrize(

@@ -518,7 +518,7 @@ def test_delete_unreachable_server_raises_an_error(server, monkeypatch):
     assert caught.value.status == 0 and isinstance(caught.value.__cause__, httpx.ConnectError)
 
 
-# ensure_auth
+# keep_auth
 
 
 def _crud(db, method):
@@ -533,7 +533,7 @@ def _crud(db, method):
 
 
 @pytest.mark.parametrize('method', ['get_one', 'get_list', 'create', 'update', 'delete'])
-def test_ensure_auth_logs_in_before_each_crud_method(server, method):
+def test_keep_auth_logs_in_before_each_crud_method(server, method):
     """The first CRUD call logs the service in and runs with its token."""
     with PocketbaseTest(SERVICE) as app:
         _crud(app.db, method)
@@ -542,7 +542,7 @@ def test_ensure_auth_logs_in_before_each_crud_method(server, method):
     assert server.requests[1].headers['Authorization'] == token
 
 
-def test_ensure_auth_runs_before_the_records_of_collection(server):
+def test_keep_auth_runs_before_the_records_of_collection(server):
     """collection() logs the service in as well, by the hook of the client."""
     with PocketbaseTest(SERVICE) as app:
         app.db.collection('posts').get_list()
@@ -551,7 +551,7 @@ def test_ensure_auth_runs_before_the_records_of_collection(server):
     assert server.requests[1].headers['Authorization'] == token
 
 
-def test_ensure_auth_without_identity_stays_anonymous(server):
+def test_keep_auth_without_identity_stays_anonymous(server):
     """A password without auth_identity sends no login and no token."""
     with PocketbaseTest(dict(auth_password='secret')) as app:
         app.db.get_one('posts', 'abc')
@@ -559,7 +559,7 @@ def test_ensure_auth_without_identity_stays_anonymous(server):
     assert 'Authorization' not in server.requests[0].headers
 
 
-def test_ensure_auth_sends_identity_and_password(server):
+def test_keep_auth_sends_identity_and_password(server):
     """The login posts identity and password and no Authorization of its own."""
     with PocketbaseTest(SERVICE) as app:
         app.db.get_one('posts', 'abc')
@@ -567,7 +567,7 @@ def test_ensure_auth_sends_identity_and_password(server):
     assert server.requests[0].headers.get('Authorization', '') == ''
 
 
-def test_ensure_auth_logs_in_once_while_the_token_is_valid(server):
+def test_keep_auth_logs_in_once_while_the_token_is_valid(server):
     """Three calls with a token valid for an hour log in once and never refresh."""
     with PocketbaseTest(SERVICE) as app:
         for _ in range(3):
@@ -576,7 +576,7 @@ def test_ensure_auth_logs_in_once_while_the_token_is_valid(server):
     assert USERS_REFRESH not in server.calls
 
 
-def test_ensure_auth_falls_back_to_superusers(server):
+def test_keep_auth_falls_back_to_superusers(server):
     """An identity unknown in users logs in on _superusers, which is remembered."""
     server.accounts = {('_superusers', 'admin@example.com'): 'secret'}
     with PocketbaseTest(dict(auth_identity='admin@example.com', auth_password='secret')) as app:
@@ -585,7 +585,7 @@ def test_ensure_auth_falls_back_to_superusers(server):
     assert server.calls[:2] == [USERS_LOGIN, SUPERUSERS_LOGIN]
 
 
-def test_ensure_auth_wrong_password_raises_auth_error(server):
+def test_keep_auth_wrong_password_raises_auth_error(server):
     """Credentials no collection accepts raise TokeoPocketBaseAuthError."""
     with PocketbaseTest(dict(SERVICE, auth_password='wrong')) as app:
         with pytest.raises(TokeoPocketBaseAuthError, match="identity 'service@example.com'") as caught:
@@ -595,7 +595,7 @@ def test_ensure_auth_wrong_password_raises_auth_error(server):
     assert caught.value.__cause__.status == 400
 
 
-def test_ensure_auth_server_error_is_no_wrong_password(server):
+def test_keep_auth_server_error_is_no_wrong_password(server):
     """A login failing by the server raises its error, tries no other collection."""
     server.errors[USERS_LOGIN] = (503, 'Service unavailable.')
     with PocketbaseTest(SERVICE) as app:
@@ -605,7 +605,7 @@ def test_ensure_auth_server_error_is_no_wrong_password(server):
     assert server.calls == [USERS_LOGIN]
 
 
-def test_ensure_auth_identity_without_password_fails_on_first_request(server):
+def test_keep_auth_identity_without_password_fails_on_first_request(server):
     """An identity without password passes the setup and fails the first request."""
     with PocketbaseTest(dict(auth_identity='service@example.com')) as app:
         with pytest.raises(TokeoPocketBaseAuthError):
@@ -614,7 +614,7 @@ def test_ensure_auth_identity_without_password_fails_on_first_request(server):
 
 
 @pytest.mark.parametrize('min_valid, refreshes', [(60, 0), (300, 1)], ids=['enough_left', 'too_little_left'])
-def test_ensure_auth_refreshes_below_the_minimum_validity(server, min_valid, refreshes):
+def test_keep_auth_refreshes_below_the_minimum_validity(server, min_valid, refreshes):
     """A token valid 120 s is refreshed only below a minimum validity of 300 s."""
     server.lifetime = 120
     with PocketbaseTest(dict(SERVICE, auth_token_min_valid_seconds=min_valid)) as app:
@@ -627,7 +627,7 @@ def test_ensure_auth_refreshes_below_the_minimum_validity(server, min_valid, ref
     assert server.calls.count(USERS_REFRESH) == refreshes
 
 
-def test_ensure_auth_refresh_replaces_the_token(server):
+def test_keep_auth_refresh_replaces_the_token(server):
     """The refresh sends the old token, the next request carries the new one."""
     server.lifetime = 30
     with PocketbaseTest(SERVICE) as app:
@@ -641,7 +641,7 @@ def test_ensure_auth_refresh_replaces_the_token(server):
     assert server.requests[3].headers['Authorization'] == new != old
 
 
-def test_ensure_auth_rejected_refresh_logs_in_on_the_remembered_collection(server):
+def test_keep_auth_rejected_refresh_logs_in_on_the_remembered_collection(server):
     """A revoked token fails the refresh, the new login runs on _superusers only."""
     server.accounts = {('_superusers', 'admin@example.com'): 'secret'}
     server.lifetime = 30
@@ -653,7 +653,7 @@ def test_ensure_auth_rejected_refresh_logs_in_on_the_remembered_collection(serve
     assert server.calls == [SUPERUSERS_REFRESH, SUPERUSERS_LOGIN, ('GET', '/api/collections/posts/records/abc')]
 
 
-def test_ensure_auth_failed_relogin_raises_auth_error(server):
+def test_keep_auth_failed_relogin_raises_auth_error(server):
     """A failed refresh and new login raise, _superusers is not tried."""
     server.lifetime = 30
     with PocketbaseTest(SERVICE) as app:
@@ -666,7 +666,7 @@ def test_ensure_auth_failed_relogin_raises_auth_error(server):
     assert server.calls == [USERS_REFRESH, USERS_LOGIN]
 
 
-def test_ensure_auth_expired_token_logs_in_without_refresh(server):
+def test_keep_auth_expired_token_logs_in_without_refresh(server):
     """An already expired token is not refreshed but replaced by a new login."""
     server.lifetime = -10
     with PocketbaseTest(SERVICE) as app:
@@ -676,7 +676,7 @@ def test_ensure_auth_expired_token_logs_in_without_refresh(server):
     assert USERS_REFRESH not in server.calls
 
 
-def test_ensure_auth_token_without_exp_logs_in_again(server):
+def test_keep_auth_token_without_exp_logs_in_again(server):
     """A token without exp counts as unusable and leads to a new login."""
     server.lifetime = None
     with PocketbaseTest(SERVICE) as app:
@@ -685,7 +685,7 @@ def test_ensure_auth_token_without_exp_logs_in_again(server):
     assert server.calls.count(USERS_LOGIN) == 2
 
 
-def test_ensure_auth_concurrent_calls_log_in_once(server):
+def test_keep_auth_concurrent_calls_log_in_once(server):
     """8 threads starting together on a fresh handler share one login."""
     server.login_delay = 0.05
     barrier = threading.Barrier(8)
@@ -701,7 +701,7 @@ def test_ensure_auth_concurrent_calls_log_in_once(server):
     assert server.calls.count(USERS_LOGIN) == 1
 
 
-def test_ensure_auth_confirms_the_login_on_the_server_after_auth_check_seconds(server):
+def test_keep_auth_confirms_the_login_on_the_server_after_auth_check_seconds(server):
     """With auth_check_seconds 0 each request asks the server by a refresh first."""
     with PocketbaseTest(dict(SERVICE, auth_check_seconds=0)) as app:
         app.db.get_one('posts', 'abc')
@@ -710,7 +710,7 @@ def test_ensure_auth_confirms_the_login_on_the_server_after_auth_check_seconds(s
     assert server.calls == [USERS_LOGIN, get, USERS_REFRESH, get]
 
 
-def test_ensure_auth_login_refused_on_the_server_logs_in_anew(server):
+def test_keep_auth_login_refused_on_the_server_logs_in_anew(server):
     """A token revoked on the server, e.g. by a new password, logs in anew."""
     with PocketbaseTest(dict(SERVICE, auth_check_seconds=0)) as app:
         app.db.get_one('posts', 'abc')
@@ -722,7 +722,7 @@ def test_ensure_auth_login_refused_on_the_server_logs_in_anew(server):
     assert server.requests[2].headers['Authorization'] == token
 
 
-def test_ensure_auth_changed_password_raises_instead_of_a_guest_request(server):
+def test_keep_auth_changed_password_raises_instead_of_a_guest_request(server):
     """A revoked token and a changed password raise, nothing goes as guest."""
     with PocketbaseTest(dict(SERVICE, auth_check_seconds=0)) as app:
         app.db.get_one('posts', 'abc')

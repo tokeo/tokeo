@@ -149,10 +149,10 @@ class Collection:
         # json, or multipart with the fields as @jsonPayload when files go along
         params = {'expand': expand or None, 'fields': fields or None, **(query or {})}
         if files:
-            answer = self.client.send(method, path, params=params, data={'@jsonPayload': json.dumps(data or {})}, files=files)
+            result = self.client.send(method, path, params=params, data={'@jsonPayload': json.dumps(data or {})}, files=files)
         else:
-            answer = self.client.send(method, path, params=params, json=data or {})
-        return Record(answer)
+            result = self.client.send(method, path, params=params, json=data or {})
+        return Record(result)
 
     def create(self, data=None, files=None, expand=None, fields=None, query=None):
         """
