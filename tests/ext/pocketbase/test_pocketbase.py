@@ -349,10 +349,10 @@ def test_get_one_query_wins_over_the_arguments(server):
 def test_get_one_missing_record_raises_an_error(server):
     """A missing record raises TokeoPocketBaseError with status 404."""
     with PocketbaseTest() as app:
-        with pytest.raises(TokeoPocketBaseError) as caught:
+        with pytest.raises(TokeoPocketBaseError) as err_info:
             app.db.get_one('posts', 'missing')
-    assert caught.value.status == 404
-    assert "The requested resource wasn't found." in str(caught.value)
+    assert err_info.value.status == 404
+    assert "The requested resource wasn't found." in str(err_info.value)
 
 
 # get_list
@@ -459,10 +459,10 @@ def test_create_rejected_raises_an_error(server):
     """A 403 of the server raises TokeoPocketBaseError with status and message."""
     server.errors[('POST', '/api/collections/posts/records')] = (403, 'Only superusers can perform this action.')
     with PocketbaseTest() as app:
-        with pytest.raises(TokeoPocketBaseError) as caught:
+        with pytest.raises(TokeoPocketBaseError) as err_info:
             app.db.create('posts', dict(title='New'))
-    assert caught.value.status == 403
-    assert 'Only superusers can perform this action.' in str(caught.value)
+    assert err_info.value.status == 403
+    assert 'Only superusers can perform this action.' in str(err_info.value)
 
 
 # update
@@ -500,9 +500,9 @@ def test_delete_removes_the_record_and_returns_true(server):
 def test_delete_missing_record_raises_an_error(server):
     """Deleting a missing record raises TokeoPocketBaseError with status 404."""
     with PocketbaseTest() as app:
-        with pytest.raises(TokeoPocketBaseError) as caught:
+        with pytest.raises(TokeoPocketBaseError) as err_info:
             app.db.delete('posts', 'missing')
-    assert caught.value.status == 404
+    assert err_info.value.status == 404
 
 
 def test_delete_unreachable_server_raises_an_error(server, monkeypatch):
@@ -513,9 +513,9 @@ def test_delete_unreachable_server_raises_an_error(server, monkeypatch):
 
     monkeypatch.setattr(server, 'handle', refuse)
     with PocketbaseTest() as app:
-        with pytest.raises(TokeoPocketBaseError) as caught:
+        with pytest.raises(TokeoPocketBaseError) as err_info:
             app.db.delete('posts', 'abc')
-    assert caught.value.status == 0 and isinstance(caught.value.__cause__, httpx.ConnectError)
+    assert err_info.value.status == 0 and isinstance(err_info.value.__cause__, httpx.ConnectError)
 
 
 # keep_auth
@@ -588,20 +588,20 @@ def test_keep_auth_falls_back_to_superusers(server):
 def test_keep_auth_wrong_password_raises_auth_error(server):
     """Credentials no collection accepts raise TokeoPocketBaseAuthError."""
     with PocketbaseTest(dict(SERVICE, auth_password='wrong')) as app:
-        with pytest.raises(TokeoPocketBaseAuthError, match="identity 'service@example.com'") as caught:
+        with pytest.raises(TokeoPocketBaseAuthError, match="identity 'service@example.com'") as err_info:
             app.db.get_one('posts', 'abc')
     assert server.calls == [USERS_LOGIN, SUPERUSERS_LOGIN]
-    assert isinstance(caught.value, TokeoError)
-    assert caught.value.__cause__.status == 400
+    assert isinstance(err_info.value, TokeoError)
+    assert err_info.value.__cause__.status == 400
 
 
 def test_keep_auth_server_error_is_no_wrong_password(server):
     """A login failing by the server raises its error, tries no other collection."""
     server.errors[USERS_LOGIN] = (503, 'Service unavailable.')
     with PocketbaseTest(SERVICE) as app:
-        with pytest.raises(TokeoPocketBaseError) as caught:
+        with pytest.raises(TokeoPocketBaseError) as err_info:
             app.db.get_one('posts', 'abc')
-    assert not isinstance(caught.value, TokeoPocketBaseAuthError) and caught.value.status == 503
+    assert not isinstance(err_info.value, TokeoPocketBaseAuthError) and err_info.value.status == 503
     assert server.calls == [USERS_LOGIN]
 
 
@@ -769,9 +769,9 @@ def test_impersonate_renews_a_login_refused_on_the_server_by_a_new_impersonation
 def test_impersonate_by_a_service_without_superuser_raises(server):
     """A service of users may not impersonate, it raises with status 403."""
     with PocketbaseTest(SERVICE) as app:
-        with pytest.raises(TokeoPocketBaseAuthError) as caught:
+        with pytest.raises(TokeoPocketBaseAuthError) as err_info:
             app.db.impersonate('users', 'u1')
-    assert caught.value.status == 403
+    assert err_info.value.status == 403
 
 
 # nicegui

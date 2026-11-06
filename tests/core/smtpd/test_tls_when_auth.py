@@ -122,6 +122,6 @@ def test_parse_error_lists_the_new_mode():
     """An unknown encrypt_mode raises ValueError listing TLS_WHEN_AUTH."""
     from tokeo.core.smtpd.server import SmtpdServer
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ValueError) as err_info:
         SmtpdServer(AuthEvents(), options={'encrypt_mode': 'TLS_NOPE'})
-    assert 'TLS_WHEN_AUTH' in str(exc.value)
+    assert 'TLS_WHEN_AUTH' in str(err_info.value)

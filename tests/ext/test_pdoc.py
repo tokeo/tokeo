@@ -1193,9 +1193,9 @@ def test_serve_raises_a_clean_error_when_the_port_is_taken(tmp_path):
     try:
         with PdocTest(tmp_path, port=blocker.getsockname()[1]) as booted:
             booted.run()
-            with pytest.raises(TokeoPdocError) as excinfo:
+            with pytest.raises(TokeoPdocError) as err_info:
                 booted.pdoc.serve()
-            assert 'port' in str(excinfo.value)
+            assert 'port' in str(err_info.value)
     finally:
         blocker.close()
 
@@ -1668,10 +1668,10 @@ def test_both_config_switches_are_a_contradiction(tmp_path, monkeypatch):
             ['pdoc', 'render', '--config', '--no-config'],
         )
 
-        with pytest.raises(TokeoPdocError) as excinfo:
+        with pytest.raises(TokeoPdocError) as err_info:
             booted.run()
 
-        assert 'exclude each other' in str(excinfo.value)
+        assert 'exclude each other' in str(err_info.value)
 
 
 def test_config_switches_leave_the_option_alone_when_unused(tmp_path, monkeypatch):

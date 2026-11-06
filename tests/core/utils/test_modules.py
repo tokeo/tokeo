@@ -60,9 +60,9 @@ def test_resolve_module_refuses_no_name(name):
 
 def test_resolve_module_of_a_missing_module_raises(pkg):
     """A missing module raises TokeoModulesLoadError, the ImportError as cause."""
-    with pytest.raises(TokeoModulesLoadError, match=f"module '{pkg}.nope' does not import") as caught:
+    with pytest.raises(TokeoModulesLoadError, match=f"module '{pkg}.nope' does not import") as err_info:
         resolve_module(f'{pkg}.nope')
-    assert isinstance(caught.value.__cause__, ImportError)
+    assert isinstance(err_info.value.__cause__, ImportError)
 
 
 def test_resolve_module_names_the_import_error_inside_the_module(pkg):
@@ -99,9 +99,9 @@ def test_resolve_object_refuses_no_name():
 
 def test_resolve_object_of_a_missing_attr_raises(pkg):
     """A missing attr raises TokeoModulesLoadError, the AttributeError as cause."""
-    with pytest.raises(TokeoModulesLoadError, match='could not be found') as caught:
+    with pytest.raises(TokeoModulesLoadError, match='could not be found') as err_info:
         resolve_object(f'{pkg}.inner:nope')
-    assert isinstance(caught.value.__cause__, AttributeError)
+    assert isinstance(err_info.value.__cause__, AttributeError)
 
 
 def test_resolve_object_does_not_hide_an_import_error_inside_the_module(pkg):

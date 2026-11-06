@@ -47,9 +47,9 @@ def _call(port, method='Say', request=b'hi', credentials=None, metadata=None):
 
 def _get_refused_code(port, **kw):
     # the status code of a call to the echo service that fails
-    with pytest.raises(grpc.RpcError) as err:
+    with pytest.raises(grpc.RpcError) as err_info:
         _call(port, **kw)
-    return err.value.code()
+    return err_info.value.code()
 
 
 def _make_key():

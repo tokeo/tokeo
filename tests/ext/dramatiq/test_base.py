@@ -340,15 +340,15 @@ def test_actor_send_without_rabbitmq(tmp, monkeypatch):
     with DramatiqBrokerTest(tmp, dict(url='amqp://user:secret@mq.example:5673/')) as app:
         actor = app.dramatiq.actor(lambda: None, actor_name='count_words')
         monkeypatch.setattr(app.dramatiq.broker, 'enqueue', refused)
-        with pytest.raises(TokeoDramatiqConnectionError) as e:
+        with pytest.raises(TokeoDramatiqConnectionError) as err_info:
             actor.send()
-    assert str(e.value) == 'Cannot send count_words to rabbitmq at mq.example:5673 (ConnectionClosed: connection refused)!'
+    assert str(err_info.value) == 'Cannot send count_words to rabbitmq at mq.example:5673 (ConnectionClosed: connection refused)!'
     # main catches it as tokeo error, code catching dramatiq errors still does
-    assert isinstance(e.value, TokeoError) and isinstance(e.value, ConnectionClosed)
-    assert isinstance(e.value, BrokerConnectionError) and e.value.args[0] == str(e.value)
-    assert (e.value.address, e.value.actor_name) == ('mq.example:5673', 'count_words')
-    assert e.value.cause == 'ConnectionClosed: connection refused'
-    assert isinstance(e.value.__cause__, ConnectionClosed)
+    assert isinstance(err_info.value, TokeoError) and isinstance(err_info.value, ConnectionClosed)
+    assert isinstance(err_info.value, BrokerConnectionError) and err_info.value.args[0] == str(err_info.value)
+    assert (err_info.value.address, err_info.value.actor_name) == ('mq.example:5673', 'count_words')
+    assert err_info.value.cause == 'ConnectionClosed: connection refused'
+    assert isinstance(err_info.value.__cause__, ConnectionClosed)
 
 
 def test_pdoc_hooks_restore_the_tokeo_actor(tmp):

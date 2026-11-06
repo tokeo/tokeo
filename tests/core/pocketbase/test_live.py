@@ -25,7 +25,7 @@ import subprocess
 import pytest
 from tokeo.core.pocketbase import AuthKeeper, PocketBase, TokeoPocketBaseAuthError, TokeoPocketBaseError
 from tokeo.core.pocketbase.realtime import AsyncRealtime, Realtime
-from tests.utils import ROOT, free_port, wait_until, wait_until_async
+from tests.utils import ROOT_DIR, free_port, wait_until, wait_until_async
 from tests.utils.process import SubProcess
 
 #: The pocketbase binary of the tests, e.g. of version 0.40.6
@@ -141,9 +141,9 @@ def test_live_records_round_trip_with_expand(pb, live):
     assert (read.title, read.meta, read.expand.owner.name) == ('round', {'a': [1, 2]}, 'Anna')
     assert posts.update(post.id, {'views': 2}).views == 2
     assert posts.delete(post.id) is True
-    with pytest.raises(TokeoPocketBaseError) as caught:
+    with pytest.raises(TokeoPocketBaseError) as err_info:
         posts.get_one(post.id)
-    assert caught.value.status == 404
+    assert err_info.value.status == 404
 
 
 def test_live_upload_takes_the_fields_as_json_payload(pb):
@@ -163,17 +163,17 @@ def test_live_get_full_list_and_get_first(pb):
     titles = [record.title for record in posts.get_full_list(per_page=2, filter="title ~ 'page-'", sort='title')]
     assert titles == [f'page-{n}' for n in range(5)]
     assert posts.get_first(pb.filter('title = {:t}', {'t': 'page-3'})).title == 'page-3'
-    with pytest.raises(TokeoPocketBaseError) as caught:
+    with pytest.raises(TokeoPocketBaseError) as err_info:
         posts.get_first("title = 'nothing'")
-    assert caught.value.status == 404
+    assert err_info.value.status == 404
 
 
 def test_live_batch_is_all_or_nothing(pb):
     """A batch with a failing change creates nothing, a valid one does all."""
     posts = pb.collection('posts')
-    with pytest.raises(TokeoPocketBaseError) as caught:
+    with pytest.raises(TokeoPocketBaseError) as err_info:
         pb.batch().create('posts', {'title': 'batch-lost'}).update('posts', 'nope12345678901', {'title': 'x'}).send()
-    assert caught.value.data['requests']['1']['response']['status'] == 404
+    assert err_info.value.data['requests']['1']['response']['status'] == 404
     assert posts.get_list(filter="title = 'batch-lost'").total_items == 0
     created, upserted = (
         pb.batch().create('posts', {'title': 'batch-a'}).upsert('posts', {'id': 'batchupsert0001', 'title': 'batch-b'}).send()
@@ -185,9 +185,9 @@ def test_live_refresh_and_wrong_password(pb):
     """A refresh keeps a valid token, a wrong password raises an auth error."""
     pb.auth_refresh()
     assert pb.is_token_valid(60)
-    with pytest.raises(TokeoPocketBaseAuthError) as caught:
+    with pytest.raises(TokeoPocketBaseAuthError) as err_info:
         pb.auth_with_password('users', USER[0], 'wrong')
-    assert caught.value.status == 400
+    assert err_info.value.status == 400
 
 
 def test_live_impersonate_acts_as_the_user(su, pb, live):
@@ -198,9 +198,9 @@ def test_live_impersonate_acts_as_the_user(su, pb, live):
         assert client.collection('posts').create({'title': 'as anna', 'owner': live[1]}).owner == live[1]
     finally:
         client.close()
-    with pytest.raises(TokeoPocketBaseAuthError) as caught:
+    with pytest.raises(TokeoPocketBaseAuthError) as err_info:
         pb.impersonate('users', live[1])
-    assert caught.value.status == 403
+    assert err_info.value.status == 403
 
 
 def test_live_health(live):
@@ -411,7 +411,7 @@ def test_live_async_realtime_hanging_coroutine_hangs_up_and_catches_up_after(pb,
 
 
 #: The hook file of tokeo-pocketbase, code only, shown by its POCKETBASE.md
-HOOK = os.path.join(ROOT, 'tokeo-pocketbase', 'tokeo', 'core', 'pocketbase', 'realtime.pb.js.md')
+HOOK = os.path.join(ROOT_DIR, 'tokeo-pocketbase', 'tokeo', 'core', 'pocketbase', 'realtime.pb.js.md')
 
 
 def test_live_hook_file_is_shown_by_the_guide_as_javascript():

@@ -213,19 +213,19 @@ def test_send_error_answer_raises_with_status_message_and_data(pb, server):
     """A 400 raises TokeoPocketBaseError with status, url, message and data."""
     answer = {'status': 400, 'message': 'Failed to create record.', 'data': {'title': {'code': 'validation_required'}}}
     server.answers[('POST', '/api/x')] = httpx.Response(400, json=answer)
-    with pytest.raises(TokeoPocketBaseError, match='failed with 400: Failed to create record.') as caught:
+    with pytest.raises(TokeoPocketBaseError, match='failed with 400: Failed to create record.') as err_info:
         pb.send('POST', '/api/x', json={})
-    assert (caught.value.status, caught.value.url) == (400, f'{URL}/api/x')
-    assert caught.value.data == {'title': {'code': 'validation_required'}}
-    assert isinstance(caught.value, TokeoError)
+    assert (err_info.value.status, err_info.value.url) == (400, f'{URL}/api/x')
+    assert err_info.value.data == {'title': {'code': 'validation_required'}}
+    assert isinstance(err_info.value, TokeoError)
 
 
 def test_send_error_answer_without_json_names_its_text(pb, server):
     """An error answer that is no json names its text and has no data."""
     server.answers[('GET', '/api/x')] = httpx.Response(502, text='Bad Gateway')
-    with pytest.raises(TokeoPocketBaseError, match='failed with 502: Bad Gateway') as caught:
+    with pytest.raises(TokeoPocketBaseError, match='failed with 502: Bad Gateway') as err_info:
         pb.send('GET', '/api/x')
-    assert caught.value.data == {}
+    assert err_info.value.data == {}
 
 
 def test_send_failed_connection_raises_with_status_0(pb, server):
@@ -235,9 +235,9 @@ def test_send_failed_connection_raises_with_status_0(pb, server):
         raise httpx.ConnectError('connection refused', request=request)
 
     server.respond = refuse
-    with pytest.raises(TokeoPocketBaseError, match='connection refused') as caught:
+    with pytest.raises(TokeoPocketBaseError, match='connection refused') as err_info:
         pb.health()
-    assert caught.value.status == 0 and isinstance(caught.value.__cause__, httpx.ConnectError)
+    assert err_info.value.status == 0 and isinstance(err_info.value.__cause__, httpx.ConnectError)
 
 
 # before_request
@@ -349,9 +349,9 @@ def test_get_first_gives_the_first_match(pb, server):
 def test_get_first_without_match_raises_404(pb, server):
     """get_first without a matching record raises with status 404."""
     server.answers[('GET', '/api/collections/posts/records')] = {'items': []}
-    with pytest.raises(TokeoPocketBaseError, match='no record of posts matches') as caught:
+    with pytest.raises(TokeoPocketBaseError, match='no record of posts matches') as err_info:
         pb.collection('posts').get_first("title = 'a'")
-    assert caught.value.status == 404
+    assert err_info.value.status == 404
 
 
 def test_get_one_gets_the_record_by_id(pb, server):
@@ -416,9 +416,9 @@ def test_auth_with_password_refused_raises_auth_error(pb, server, status):
     server.answers[('POST', '/api/collections/users/auth-with-password')] = httpx.Response(
         status, json={'message': 'Failed to authenticate.'}
     )
-    with pytest.raises(TokeoPocketBaseAuthError, match='Failed to authenticate.') as caught:
+    with pytest.raises(TokeoPocketBaseAuthError, match='Failed to authenticate.') as err_info:
         pb.auth_with_password('users', 'anna@tokeo.test', 'bad')
-    assert caught.value.status == status and pb.token is None
+    assert err_info.value.status == status and pb.token is None
 
 
 def test_auth_refresh_renews_the_token_of_the_login(pb, server):
@@ -442,9 +442,9 @@ def test_auth_refresh_refused_raises_auth_error(pb, server):
     server.answers[('POST', '/api/collections/users/auth-with-password')] = _make_auth('tok1')
     server.answers[('POST', '/api/collections/users/auth-refresh')] = httpx.Response(401, json={'message': 'expired'})
     pb.auth_with_password('users', 'anna@tokeo.test', 'pass')
-    with pytest.raises(TokeoPocketBaseAuthError) as caught:
+    with pytest.raises(TokeoPocketBaseAuthError) as err_info:
         pb.auth_refresh()
-    assert caught.value.status == 401
+    assert err_info.value.status == 401
 
 
 def test_impersonate_gives_a_client_of_its_own_with_the_token(pb, server):
@@ -463,9 +463,9 @@ def test_impersonate_gives_a_client_of_its_own_with_the_token(pb, server):
 def test_impersonate_refused_raises_auth_error(pb, server):
     """impersonate without a superuser login raises with status 403."""
     server.answers[('POST', '/api/collections/users/impersonate/u1')] = httpx.Response(403, json={'message': 'not allowed'})
-    with pytest.raises(TokeoPocketBaseAuthError) as caught:
+    with pytest.raises(TokeoPocketBaseAuthError) as err_info:
         pb.impersonate('users', 'u1')
-    assert caught.value.status == 403
+    assert err_info.value.status == 403
 
 
 @pytest.mark.parametrize(
@@ -635,9 +635,9 @@ def test_batch_failed_raises_with_the_failed_request(pb, server):
     """A failed batch raises with the failed request in data."""
     failed = {'requests': {'1': {'code': 'batch_request_failed', 'response': {'status': 404}}}}
     server.answers[('POST', '/api/batch')] = httpx.Response(400, json={'message': 'Batch transaction failed.', 'data': failed})
-    with pytest.raises(TokeoPocketBaseError, match='Batch transaction failed.') as caught:
+    with pytest.raises(TokeoPocketBaseError, match='Batch transaction failed.') as err_info:
         pb.batch().create('posts', {}).delete('posts', 'x').send()
-    assert caught.value.data['requests']['1']['response']['status'] == 404
+    assert err_info.value.data['requests']['1']['response']['status'] == 404
 
 
 def test_health_gives_the_answer_of_the_server(pb, server):

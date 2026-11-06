@@ -116,7 +116,7 @@ with the same base. Keeping it small lets each subject be read on its own.
 | File | Holds |
 |---|---|
 | ```conftest.py``` | the hook that puts the temporary files into ```tmp/tests/```, the hook that runs a test marked ```isolated``` in a pytest of its own, the fixtures ```tmp```, ```rando```, ```key``` and ```disable_stdin_capture``` |
-| ```utils/__init__.py``` | ```ROOT```, ```stresstest```, ```isolated```, ```wait_until```, ```wait_until_async```, ```free_port```, ```wait_process_group_ended```, ```use_disabled_stdin_capture``` |
+| ```utils/__init__.py``` | ```ROOT_DIR```, ```stresstest```, ```isolated```, ```wait_until```, ```wait_until_async```, ```free_port```, ```wait_process_group_ended```, ```use_disabled_stdin_capture``` |
 | ```utils/process.py``` | ```SubProcess```, runs a program as a process of its own and observes it from outside |
 | ```utils/tui.py``` | ```Terminal```, runs a program in a pseudo terminal |
 | ```utils/nicegui.py``` | ```NiceguiSimulation```, runs an app with nicegui in its user simulation |
@@ -142,7 +142,7 @@ from tests.utils.isolation import IsolatedPytest
 - ```disable_stdin_capture``` gives the test an empty stdin, for code that
   reads stdin while pytest captures it, e.g. ```Connection.run()``` of
   fabric; ```use_disabled_stdin_capture()``` does the same for one step
-- ```ROOT``` is the root of the project, the working directory of every
+- ```ROOT_DIR``` is the root of the project, the working directory of every
   program a test starts
 
 A fixture goes into ```conftest.py``` only if every test may need it.
@@ -262,7 +262,8 @@ def test_serve_queues_needs_a_name(serve, capsys):
   order
 - A subject has no ```conftest.py``` of its own
 - A function of a test file that is neither a test nor a fixture starts
-  with an underscore, e.g. ```_run```
+  with an underscore and is named by verb and object, e.g. ```_run``` or
+  ```_make_service```; ```_make_``` builds test data. A fixture stays a noun
 
 ```python
 @pytest.fixture
@@ -290,15 +291,17 @@ def start_worker(tmp_path):
 - A file covering several modules prefixes the module, e.g.
   ```test_extensions_required_names_the_missing_ones```
 - No path in the name, pytest shows it: ```tests/core/utils/test_date.py::test_...```
+- The caught exception of ```pytest.raises``` is ```err_info```:
+  ```with pytest.raises(TokeoError) as err_info:```
 - The tests of one function stand together under a section comment with its
   name, with two blank lines before and after; a file that already uses
   another style of section comments keeps it
 
 ```python
-# outbox_dir
+# get_outbox_dir
 
 
-def test_outbox_dir_from_config(tmp_path, monkeypatch):
+def test_get_outbox_dir_from_config(tmp_path, monkeypatch):
     ...
 ```
 
@@ -655,14 +658,14 @@ import threading
 import uuid
 
 
-def outbox_dir(app):
+def get_outbox_dir(app):
     """The directory of the outbox, OUTBOX_DIR before the config."""
     return os.environ.get('OUTBOX_DIR') or app.config.get('outbox', 'dir')
 
 
-def put(directory, text):
+def put(outbox_dir, text):
     """Writes text as a new message and returns its file name."""
-    path = os.path.join(directory, uuid.uuid4().hex)
+    path = os.path.join(outbox_dir, uuid.uuid4().hex)
     with open(f'{path}.tmp', 'w') as f:
         f.write(text)
     # the worker only sees complete messages
@@ -673,18 +676,22 @@ def put(directory, text):
 class Worker(threading.Thread):
     """Hands each message of a directory on and removes it afterwards."""
 
-    def __init__(self, directory, handle, interval=0.02):
+    def __init__(self, outbox_dir, handle, interval=0.02):
         super().__init__(daemon=True)
-        self.directory = directory
+        #: The directory of the outbox
+        self.outbox_dir = outbox_dir
+        #: Called with the text of each message
         self.handle = handle
+        #: The seconds between two rounds
         self.interval = interval
-        self.stopped = threading.Event()
+        #: Set to stop the worker
+        self.stop_event = threading.Event()
 
     def run(self):
-        while not self.stopped.wait(self.interval):
-            for name in os.listdir(self.directory):
+        while not self.stop_event.wait(self.interval):
+            for name in os.listdir(self.outbox_dir):
                 if name.endswith('.msg'):
-                    self._take(os.path.join(self.directory, name))
+                    self._take(os.path.join(self.outbox_dir, name))
 
     def _take(self, path):
         with open(path) as f:
@@ -697,7 +704,7 @@ class Worker(threading.Thread):
         os.remove(path)
 
     def stop(self):
-        self.stopped.set()
+        self.stop_event.set()
         self.join()
 ```
 
@@ -716,7 +723,7 @@ import threading
 import pytest
 from cement.utils.misc import init_defaults
 from tokeo.main import TokeoTest
-from tokeo.core.utils.outbox import outbox_dir, put, Worker
+from tokeo.core.utils.outbox import get_outbox_dir, put, Worker
 from tests.utils import stresstest, wait_until
 
 # a stress run is repeated by make test STRESSTESTS=1 STRESS_SEED=<seed>
@@ -726,9 +733,9 @@ SEED = int(os.environ.get('STRESS_SEED', random.randrange(2**32)))
 class OutboxTest(TokeoTest):
     """A test app with the given directory as outbox."""
 
-    def __init__(self, directory, **kw):
+    def __init__(self, outbox_dir, **kw):
         config = init_defaults('outbox')
-        config['outbox']['dir'] = directory
+        config['outbox']['dir'] = outbox_dir
         super().__init__(config_defaults=config, **kw)
 
 
@@ -748,24 +755,24 @@ def start_worker(tmp_path):
         worker.stop()
 
 
-# outbox_dir
+# get_outbox_dir
 
 
-def test_outbox_dir_from_config(tmp_path, monkeypatch):
+def test_get_outbox_dir_from_config(tmp_path, monkeypatch):
     """Without OUTBOX_DIR the directory of the config is taken."""
     monkeypatch.delenv('OUTBOX_DIR', raising=False)
     with OutboxTest(str(tmp_path)) as app:
-        assert outbox_dir(app) == str(tmp_path)
+        assert get_outbox_dir(app) == str(tmp_path)
 
 
-def test_outbox_dir_from_env_while_set(tmp_path, monkeypatch):
+def test_get_outbox_dir_from_env_while_set(tmp_path, monkeypatch):
     """OUTBOX_DIR wins while it is set, afterwards the config counts again."""
     monkeypatch.delenv('OUTBOX_DIR', raising=False)
     with OutboxTest(str(tmp_path)) as app:
         with monkeypatch.context() as patch:
             patch.setenv('OUTBOX_DIR', '/var/outbox')
-            assert outbox_dir(app) == '/var/outbox'
-        assert outbox_dir(app) == str(tmp_path)
+            assert get_outbox_dir(app) == '/var/outbox'
+        assert get_outbox_dir(app) == str(tmp_path)
 
 
 # put

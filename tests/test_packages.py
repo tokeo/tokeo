@@ -16,7 +16,7 @@ import tomllib
 import pytest
 
 from tokeo.core.version import get_version
-from tests.utils import ROOT
+from tests.utils import ROOT_DIR
 
 # the imports a package may use besides the standard library
 ALLOWED = {
@@ -32,13 +32,13 @@ UNSAFE = ('pickle', 'pickletools', 'marshal', 'shelve')
 
 def _read_pyproject(package):
     # the parsed pyproject.toml of a package directory
-    with open(os.path.join(ROOT, package, 'pyproject.toml'), 'rb') as f:
+    with open(os.path.join(ROOT_DIR, package, 'pyproject.toml'), 'rb') as f:
         return tomllib.load(f)
 
 
 def _collect_imports(package):
     # (file, module) of every absolute import in the sources of a package
-    for sub_dir, _, files in os.walk(os.path.join(ROOT, package, 'tokeo')):
+    for sub_dir, _, files in os.walk(os.path.join(ROOT_DIR, package, 'tokeo')):
         for name in files:
             if not name.endswith('.py'):
                 continue
@@ -89,7 +89,7 @@ def test_tokeo_pins_tokeo_diskcache_by_its_own_version():
 def test_a_package_imports_only_its_own_parts(package):
     """Besides the standard library a package imports only the allowed modules."""
     found = [
-        f'{os.path.relpath(path, ROOT)}: {module}'
+        f'{os.path.relpath(path, ROOT_DIR)}: {module}'
         for path, module in _collect_imports(package)
         if not _is_allowed(module, ALLOWED[package])
     ]
@@ -99,7 +99,7 @@ def test_a_package_imports_only_its_own_parts(package):
 def test_tokeo_diskcache_never_imports_pickle():
     """No module of tokeo-diskcache imports pickle or another unsafe loader."""
     found = [
-        f'{os.path.relpath(path, ROOT)}: {module}'
+        f'{os.path.relpath(path, ROOT_DIR)}: {module}'
         for path, module in _collect_imports('tokeo-diskcache')
         if module.split('.')[0] in UNSAFE
     ]
@@ -113,7 +113,7 @@ WASM_GUEST_UTIL_MODULES = ('date', 'date_compat', 'json')
 @pytest.mark.parametrize('module', WASM_GUEST_UTIL_MODULES)
 def test_the_wasm_guest_utils_import_only_the_stdlib_or_each_other(module):
     """date, date_compat and json of tokeo-base import the stdlib or each other."""
-    path = os.path.join(ROOT, 'tokeo-base', 'tokeo', 'core', 'utils', f'{module}.py')
+    path = os.path.join(ROOT_DIR, 'tokeo-base', 'tokeo', 'core', 'utils', f'{module}.py')
     with open(path, encoding='utf-8') as f:
         tree = ast.parse(f.read(), path)
     found = []

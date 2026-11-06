@@ -118,9 +118,9 @@ def test_controller_nested_without_a_command_prints_its_help(capsys):
 def test_controller_help_exits_with_0(capsys):
     """--help prints the help and exits with 0."""
     with ArgparseTest(argv=['--help']) as app:
-        with pytest.raises(SystemExit) as raised:
+        with pytest.raises(SystemExit) as err_info:
             app.run()
-    assert raised.value.code == 0
+    assert err_info.value.code == 0
     assert 'sub-commands:' in capsys.readouterr().out
 
 

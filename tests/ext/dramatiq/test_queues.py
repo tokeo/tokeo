@@ -161,9 +161,9 @@ def test_names_import_actors_module(tmp):
     """An actors module that does not import raises the config error."""
     with DramatiqBrokerTest(tmp, None) as app:
         app.config.set('dramatiq', 'actors', 'no.such.actors')
-        with pytest.raises(TokeoDramatiqConfigError, match="Invalid dramatiq config actors: Value 'no.such.actors'") as e:
+        with pytest.raises(TokeoDramatiqConfigError, match="Invalid dramatiq config actors: Value 'no.such.actors'") as err_info:
             app.dramatiq.queues.names()
-    assert (e.value.source, e.value.name, e.value.value) == ('config', 'actors', 'no.such.actors')
+    assert (err_info.value.source, err_info.value.name, err_info.value.value) == ('config', 'actors', 'no.such.actors')
 
 
 def test_state(app, server):
@@ -235,9 +235,9 @@ def test_requeue_dead_resets_retries(app, server):
 def test_requeue_dead_refuses_missing_queue(app, server):
     """requeue_dead to a missing queue raises and keeps the letters."""
     server.add('mail.XQ', _make_dead_letter())
-    with pytest.raises(TokeoDramatiqQueueError, match='Queue mail is missing') as e:
+    with pytest.raises(TokeoDramatiqQueueError, match='Queue mail is missing') as err_info:
         app.dramatiq.queues.requeue_dead('mail')
-    assert e.value.queue == 'mail'
+    assert err_info.value.queue == 'mail'
     assert len(server.queues['mail.XQ']['messages']) == 1
 
 
@@ -324,13 +324,14 @@ def test_error_without_rabbitmq(tmp, server, url, address):
     server.down = True
     with DramatiqBrokerTest(tmp, dict(url=url)) as app:
         dramatiq.actor(lambda: None, actor_name='send_mail', queue_name='mail', broker=app.dramatiq.broker)
-        with pytest.raises(TokeoDramatiqConnectionError, match=rf'Cannot connect to rabbitmq at {address} \(AMQPConnectionError: ') as e:
+        match = rf'Cannot connect to rabbitmq at {address} \(AMQPConnectionError: '
+        with pytest.raises(TokeoDramatiqConnectionError, match=match) as err_info:
             app.dramatiq.queues.state('mail')
     # the error names host and port, never the password of the url
-    assert 'secret' not in str(e.value)
-    assert (e.value.address, e.value.actor_name) == (address, None)
-    assert e.value.cause.startswith('AMQPConnectionError: ')
-    assert isinstance(e.value.__cause__, pika.exceptions.AMQPConnectionError)
+    assert 'secret' not in str(err_info.value)
+    assert (err_info.value.address, err_info.value.actor_name) == (address, None)
+    assert err_info.value.cause.startswith('AMQPConnectionError: ')
+    assert isinstance(err_info.value.__cause__, pika.exceptions.AMQPConnectionError)
 
 
 def test_connection_is_kept_and_reopened(app, server):
@@ -454,9 +455,9 @@ def test_refused_request(app, server):
     server.add('mail', b'1')
     server.refuse = (403, "ACCESS_REFUSED - access to queue 'mail' refused")
     refused = r'Rabbitmq at localhost:5672 refused the request \(ChannelClosedByBroker: .*ACCESS_REFUSED'
-    with pytest.raises(TokeoDramatiqRefusedError, match=refused) as e:
+    with pytest.raises(TokeoDramatiqRefusedError, match=refused) as err_info:
         app.dramatiq.queues.purge('mail')
-    assert e.value.address == 'localhost:5672' and e.value.__cause__.reply_code == 403
+    assert err_info.value.address == 'localhost:5672' and err_info.value.__cause__.reply_code == 403
     # the next call works on a new channel of the same connection
     server.refuse = None
     assert app.dramatiq.queues.purge('mail') == [dict(name='mail', purged=1)]
@@ -467,6 +468,6 @@ def test_refused_request_is_no_connection_error(app, server):
     """A refused request is no connection error."""
     server.add('mail')
     server.refuse = (406, 'PRECONDITION_FAILED - inequivalent arg')
-    with pytest.raises(TokeoDramatiqError) as e:
+    with pytest.raises(TokeoDramatiqError) as err_info:
         app.dramatiq.queues.purge('mail')
-    assert not isinstance(e.value, TokeoDramatiqConnectionError)
+    assert not isinstance(err_info.value, TokeoDramatiqConnectionError)
