@@ -17,11 +17,11 @@ from tests.core.smtpd.lib.smtpd_tests_helper import start_smtpd
 MSG_WELCOME = '220 [127.0.0.1] says welcome!\r\n'
 MSG_ABORT = '421 Service too busy or not available, closing transmission channel\r\n'
 
-SETTINGS = {'max_processings': 1, 'max_connections': 2, 'do_dns_reverse_lookup': False}
+OPTIONS = {'max_processings': 1, 'max_connections': 2, 'do_dns_reverse_lookup': False}
 
 
 async def _start_limited():
-    return await start_smtpd(CaptureSmtpdEvents(), settings=SETTINGS)
+    return await start_smtpd(CaptureSmtpdEvents(), options=OPTIONS)
 
 
 async def _welcome(reader):

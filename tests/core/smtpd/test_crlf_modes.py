@@ -97,8 +97,8 @@ def test_moderate_keeps_a_false_end_as_data(crlf_mode, end):
 def test_strict_rejects_a_false_end_once(crlf_mode, end):
     """With CRLF_DATA_STRICT a false end answers 554 once after the real end."""
     events = RecordingEvents()
-    settings = {'crlf_mode': crlf_mode, 'crlf_data_mode': 'CRLF_DATA_STRICT'}
-    reply = run_wire(events, settings, b'Subject: t\r\n\r\nA' + end + SMUGGLED)
+    options = {'crlf_mode': crlf_mode, 'crlf_data_mode': 'CRLF_DATA_STRICT'}
+    reply = run_wire(events, options, b'Subject: t\r\n\r\nA' + end + SMUGGLED)
     assert reply == b'554'
     # nothing delivered, the smuggled commands did not run
     assert events.messages == []
@@ -109,8 +109,8 @@ def test_strict_rejects_a_false_end_once(crlf_mode, end):
 def test_unsafe_ends_data_at_a_false_end(end):
     """With CRLF_DATA_UNSAFE every dot line ends DATA like before."""
     events = RecordingEvents()
-    settings = {'crlf_data_mode': 'CRLF_DATA_UNSAFE'}
-    _, r = dialog(events, settings, ENVELOPE + [b'Subject: t\r\n\r\nA' + end])
+    options = {'crlf_data_mode': 'CRLF_DATA_UNSAFE'}
+    _, r = dialog(events, options, ENVELOPE + [b'Subject: t\r\n\r\nA' + end])
     assert r[4][0].startswith('250')
     assert len(events.messages) == 1
 
@@ -173,11 +173,11 @@ class ClosingEvents(RecordingEvents):
         self.lines.append(msg)
 
 
-def _close_after(events, settings, commands, rest):
+def _close_after(events, options, commands, rest):
     """Send the commands, then the rest and close; return what follows."""
 
     async def go():
-        server, port, task = await start_server(events, settings)
+        server, port, task = await start_server(events, options)
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)

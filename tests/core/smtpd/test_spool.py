@@ -96,9 +96,9 @@ class RenameCapture(Capture):
         self.seen[-1]['target'] = target
 
 
-def _run(events, settings, messages=(MESSAGE,), debug=False):
+def _run(events, options, messages=(MESSAGE,), debug=False):
     async def go():
-        srv, port = await start_smtpd(events, settings=settings, debug=debug)
+        srv, port = await start_smtpd(events, options=options, debug=debug)
         loop = asyncio.get_event_loop()
         try:
             for msg in messages:
@@ -147,9 +147,9 @@ def test_injected_headers_reach_file_and_bytesize(tmp_path):
 
 def test_bytesize_runs_live_in_both_modes(tmp_path):
     """bytesize grows while receiving and ends 2 below, the chomped CRLF."""
-    for settings in ({}, {'spool': str(tmp_path) + '/'}):
+    for options in ({}, {'spool': str(tmp_path) + '/'}):
         events = Capture()
-        _run(events, settings)
+        _run(events, options)
         sizes = events.receiving_sizes
         assert sizes == sorted(sizes) and sizes[0] > 0
         # final bytesize = last running value minus the chomped line break
@@ -206,7 +206,7 @@ def test_two_messages_one_connection_get_fresh_files(tmp_path):
     events = Capture()
 
     async def go():
-        srv, port = await start_smtpd(events, settings={'spool': str(tmp_path) + '/'}, debug=True)
+        srv, port = await start_smtpd(events, options={'spool': str(tmp_path) + '/'}, debug=True)
         loop = asyncio.get_event_loop()
 
         def client():
@@ -286,7 +286,7 @@ def test_manual_rename_takeover_still_safe(tmp_path):
 
 def _abort_mid_data(tmp_path, debug):
     async def go():
-        srv, port = await start_smtpd(Capture(), settings={'spool': str(tmp_path) + '/'}, debug=debug)
+        srv, port = await start_smtpd(Capture(), options={'spool': str(tmp_path) + '/'}, debug=debug)
         loop = asyncio.get_event_loop()
 
         def client():
@@ -327,7 +327,7 @@ def test_data_size_cap_works_in_spool_mode(tmp_path):
     import smtplib
 
     async def go():
-        srv, port = await start_smtpd(Capture(), settings={'spool': str(tmp_path) + '/', 'data_size': 64})
+        srv, port = await start_smtpd(Capture(), options={'spool': str(tmp_path) + '/', 'data_size': 64})
         loop = asyncio.get_event_loop()
 
         def client():
@@ -404,4 +404,4 @@ def test_completely_empty_message(tmp_path):
 def test_missing_spool_directory_fails_at_start(tmp_path):
     """A spool path in a missing directory raises ValueError at start."""
     with pytest.raises(ValueError):
-        SmtpdServer(Capture(), settings={'spool': str(tmp_path / 'nope' / 'mx1-')})
+        SmtpdServer(Capture(), options={'spool': str(tmp_path / 'nope' / 'mx1-')})

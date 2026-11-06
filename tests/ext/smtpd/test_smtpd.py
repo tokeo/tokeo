@@ -1,5 +1,5 @@
 """
-Tests for tokeo.ext.smtpd: settings mapping, topology planning, shared
+Tests for tokeo.ext.smtpd: server options mapping, topology planning, shared
 limits across processes and the termination guarantees with real processes.
 
 The termination guarantees are process properties (exit code, port release,
@@ -76,9 +76,9 @@ def test_events_handler_carries_the_app():
 
 
 def _svc(name, pre_fork=0):
-    svc = {'name': name, 'settings': {}}
+    svc = {'name': name, 'server_options': {}}
     if pre_fork:
-        svc['settings']['pre_fork'] = pre_fork
+        svc['server_options']['pre_fork'] = pre_fork
     return svc
 
 
@@ -218,7 +218,10 @@ def test_extension_loads_into_cement_app():
 @pytest.mark.parametrize(
     'svc, reason',
     [
-        (dict(events_handler='tokeo.ext.smtpd:TokeoSmtpdEvents', settings=dict(encrypt_mode='TLS_NOPE')), 'encrypt_mode must be one of'),
+        (
+            dict(events_handler='tokeo.ext.smtpd:TokeoSmtpdEvents', server_options=dict(encrypt_mode='TLS_NOPE')),
+            'encrypt_mode must be one of',
+        ),
         (dict(events_handler='NoDots'), "'NoDots' must be set as module:attr"),
     ],
     ids=['encrypt_mode', 'events_handler'],
@@ -243,15 +246,15 @@ def test_build_server_hands_the_options_to_the_handler():
     assert server.events_handler.options == {'tag': 'opt-42'}
 
 
-def test_build_server_hands_the_settings_to_the_server():
-    """The settings of a service reach its server."""
-    _, server = _build({'settings': {'io_session_timeout': 60, 'crlf_data_mode': 'CRLF_DATA_STRICT', 'pre_fork': 2}})
+def test_build_server_hands_the_server_options_to_the_server():
+    """The server options of a service reach its server."""
+    _, server = _build({'server_options': {'io_session_timeout': 60, 'crlf_data_mode': 'CRLF_DATA_STRICT', 'pre_fork': 2}})
     assert (server.io_session_timeout, server.crlf_data_mode.name) == (60, 'CRLF_DATA_STRICT')
 
 
 def test_build_server_leaves_out_logger_severity():
     """A logger_severity of a service is left out, the server logs to app.log."""
-    app, server = _build({'settings': {'logger_severity': 'DEBUG'}})
+    app, server = _build({'server_options': {'logger_severity': 'DEBUG'}})
     assert server.events_handler._logger_protected is app.log
 
 
@@ -306,7 +309,7 @@ def _service(name, port, pre_fork=0):
         'listeners': [{'host': '127.0.0.1', 'port': port}],
     }
     if pre_fork:
-        svc['settings'] = {'pre_fork': pre_fork}
+        svc['server_options'] = {'pre_fork': pre_fork}
     return svc
 
 
@@ -419,7 +422,7 @@ def _broken_service(name, pre_fork=0):
         'listeners': [{'host': '203.0.113.1', 'port': 2525}],
     }
     if pre_fork:
-        svc['settings'] = {'pre_fork': pre_fork}
+        svc['server_options'] = {'pre_fork': pre_fork}
     return svc
 
 
@@ -449,7 +452,7 @@ def test_broken_config_of_a_worker_stops_before_the_fork():
     """A worker service with a broken config ends the start before any fork."""
     port_a, port_b = free_port(), free_port()
     broken = _service('mx2', port_b, pre_fork=1)
-    broken['settings']['encrypt_mode'] = 'TLS_NOPE'
+    broken['server_options']['encrypt_mode'] = 'TLS_NOPE'
     with _serve({'services': [_service('mx1', port_a), broken]}) as process:
         assert process.wait() != 0
         assert wait_process_group_ended(process.pid)
@@ -474,12 +477,12 @@ def test_failed_worker_stops_all_services():
 # ---- process tests: services in the forked workers --------------------------
 
 
-def _tagged_service(name, port, pre_fork, settings=None):
+def _tagged_service(name, port, pre_fork, server_options=None):
     """A service whose handler answers EHLO with its tag and pid."""
     svc = _service(name, port, pre_fork=pre_fork)
     svc['events_handler'] = 'tests.ext.smtpd.smtpd_tests_helper:TaggedSmtpdEvents'
     svc['options'] = {'tag': 'opt-42'}
-    svc['settings'].update(settings or {})
+    svc['server_options'].update(server_options or {})
     return svc
 
 
@@ -512,10 +515,10 @@ def test_prefork_workers_hand_the_options_to_their_handler():
             assert pids <= {process.pid, *_child_pids(process.pid)}
 
 
-def test_prefork_workers_apply_the_settings():
+def test_prefork_workers_apply_the_server_options():
     """Open dialogs of a group of 3 end by 421 after io_session_timeout of 1 s."""
     port = free_port()
-    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3, settings={'io_session_timeout': 1})]}) as process:
+    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3, server_options={'io_session_timeout': 1})]}) as process:
         process.wait_for(lambda: _banner(port))
         socks = _open_dialogs(port, 6)
         for sock in socks:
@@ -527,7 +530,7 @@ def test_term_prefork_group_ends_open_dialogs_with_421():
     """SIGTERM ends the waiting dialogs of all processes of a group of 3 by 421."""
     port = free_port()
     # SO_REUSEPORT may hand all 6 dialogs to one process, it needs a slot for each
-    service = _tagged_service('mx1', port, pre_fork=3, settings={'max_processings': 6})
+    service = _tagged_service('mx1', port, pre_fork=3, server_options={'max_processings': 6})
     with _serve({'services': [service]}) as process:
         process.wait_for(lambda: _banner(port))
         socks = _open_dialogs(port, 6)
@@ -580,11 +583,11 @@ def test_prefork_workers_present_the_configured_certificate(cert_files):
     """All processes of a group of 3 present the certificate of tls_cert_path."""
     cert_path, key_path, fingerprint = cert_files
     port = free_port()
-    settings = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_path': cert_path, 'tls_key_path': key_path}
+    server_options = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_path': cert_path, 'tls_key_path': key_path}
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
-    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3, settings=settings)]}) as process:
+    with _serve({'services': [_tagged_service('mx1', port, pre_fork=3, server_options=server_options)]}) as process:
         process.wait_for(lambda: _banner(port))
         pids, fingerprints = set(), set()
         for _ in range(40):

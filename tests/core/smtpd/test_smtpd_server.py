@@ -74,8 +74,8 @@ def test_helo_gets_single_line_250():
 
 def test_ehlo_advertises_extensions_when_enabled():
     """EHLO lists 8BITMIME, SMTPUTF8 and PIPELINING when enabled."""
-    settings = {'internationalization_extensions': True, 'pipelining_extension': True}
-    _, r = dialog(RecordingEvents(), settings, [b'EHLO me\r\n'])
+    options = {'internationalization_extensions': True, 'pipelining_extension': True}
+    _, r = dialog(RecordingEvents(), options, [b'EHLO me\r\n'])
     text = '\n'.join(r[0])
     assert '8BITMIME' in text and 'SMTPUTF8' in text and 'PIPELINING' in text
     assert r[0][-1] == '250 PIPELINING'
@@ -206,8 +206,8 @@ def test_handler_reject_parameter_555():
             if ctx.envelope.encoding_utf8:
                 raise Smtpd555Exception
 
-    settings = {'internationalization_extensions': True}
-    _, r = dialog(E(), settings, [b'EHLO me\r\n', b'MAIL FROM:<a@x> SMTPUTF8\r\n'])
+    options = {'internationalization_extensions': True}
+    _, r = dialog(E(), options, [b'EHLO me\r\n', b'MAIL FROM:<a@x> SMTPUTF8\r\n'])
     assert r[1] == ['555 MAIL FROM/RCPT TO parameters not recognized or not implemented']
 
 
@@ -428,8 +428,8 @@ def test_a_failing_start_event_runs_once():
 def test_spool_with_empty_first_line_starts_once_and_keeps_data_size(tmp_path):
     """Spooling with an empty first DATA line starts once, data_size holds."""
     ev = RecordingEvents()
-    settings = {'spool': str(tmp_path) + '/', 'data_size': 100}
-    _, r = dialog(ev, settings, DATA_ENVELOPE + [b'\r\n' + b'X' * 60 + b'\r\n' + b'Y' * 60 + b'\r\n.\r\n'])
+    options = {'spool': str(tmp_path) + '/', 'data_size': 100}
+    _, r = dialog(ev, options, DATA_ENVELOPE + [b'\r\n' + b'X' * 60 + b'\r\n' + b'Y' * 60 + b'\r\n.\r\n'])
     assert r[4][0].startswith('552')
     assert ev.fired.count('start') == 1
 
@@ -478,7 +478,7 @@ def test_read_line_takes_a_buffered_line_without_waiting(monkeypatch):
     from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
     async def go():
-        srv = SmtpdServer(CaptureSmtpdEvents(), settings={'io_cmd_timeout': 30})
+        srv = SmtpdServer(CaptureSmtpdEvents(), options={'io_cmd_timeout': 30})
         reader = asyncio.StreamReader()
         reader.feed_data(b'HELO x\r\nMAIL FROM:<a@b>\r\n')
 
@@ -544,7 +544,7 @@ def test_read_line_refuses_a_buffered_line_over_io_buffer_max_size():
     from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
     async def go():
-        srv = SmtpdServer(CaptureSmtpdEvents(), settings={'io_buffer_max_size': 50})
+        srv = SmtpdServer(CaptureSmtpdEvents(), options={'io_buffer_max_size': 50})
         reader = asyncio.StreamReader()
         reader.feed_data(b'NOOP ' + b'x' * 100 + b'\r\n')
         with pytest.raises(SmtpdIOBufferOverrunException):
@@ -581,7 +581,7 @@ def test_body_param_rejected_without_intl():
 
 
 @pytest.mark.parametrize(
-    'settings, command, reply',
+    'options, command, reply',
     [
         # unknown or not announced: 555
         ({'internationalization_extensions': True}, b'MAIL FROM:<a@x> SIZE=1000', '555'),
@@ -605,11 +605,11 @@ def test_body_param_rejected_without_intl():
         ({}, b'RCPT TO:<b@y> Leer"', '555'),
     ],
 )
-def test_mail_rcpt_parameters_are_checked_strictly(settings, command, reply):
+def test_mail_rcpt_parameters_are_checked_strictly(options, command, reply):
     """Only announced parameters in valid form are accepted at MAIL and RCPT."""
     ev = RecordingEvents()
     commands = [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n'] if command.startswith(b'RCPT') else [b'EHLO me\r\n']
-    _, r = dialog(ev, settings, commands + [command + b'\r\n'])
+    _, r = dialog(ev, options, commands + [command + b'\r\n'])
     assert r[-1][0].startswith(reply)
     # a refused MAIL does not reach the handler
     assert ev.fired.count('mail') == (1 if command.startswith(b'RCPT') else 0)
@@ -706,7 +706,7 @@ def test_global_max_connections_refuses_with_421():
     from tokeo.core.smtpd.server import GlobalLimits
 
     async def go():
-        srv = SmtpdServer(RecordingEvents(), settings={}, global_limits=GlobalLimits(max_connections=1))
+        srv = SmtpdServer(RecordingEvents(), options={}, global_limits=GlobalLimits(max_connections=1))
         server = await asyncio.start_server(srv._on_connection, '127.0.0.1', 0)
         port = server.sockets[0].getsockname()[1]
         task = asyncio.create_task(server.serve_forever())
@@ -852,7 +852,7 @@ class ProxyEvents(RecordingEvents):
         self.proxy_on_ctx = ctx.server.proxy
 
 
-async def _dialog_raw(events, settings, steps, has_server_greeting=True):
+async def _dialog_raw(events, options, steps, has_server_greeting=True):
     """
     Run a dialog where each step says whether to read a reply.
 
@@ -870,7 +870,7 @@ async def _dialog_raw(events, settings, steps, has_server_greeting=True):
         server closed the connection at the end
 
     """
-    server, port, task = await start_server(events, settings)
+    server, port, task = await start_server(events, options)
     try:
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         greeting = await read_reply(reader) if has_server_greeting else None
@@ -1092,7 +1092,7 @@ def test_stop_stops_accepting_new_connections():
     """After stop a new connection is refused and stopped() is True."""
 
     async def go():
-        srv, port = await start_smtpd(RecordingEvents(), settings={})
+        srv, port = await start_smtpd(RecordingEvents(), options={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         greeting = await read_reply(reader)
         writer.close()
@@ -1128,7 +1128,7 @@ def test_graceful_stop_lets_the_current_command_finish():
     events = SlowMailEvents()
 
     async def go():
-        srv, port = await start_smtpd(events, settings={})
+        srv, port = await start_smtpd(events, options={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
         await send_command(reader, writer, b'EHLO me\r\n')
@@ -1152,7 +1152,7 @@ def test_shutdown_ends_a_waiting_dialog_at_once_with_421():
     """A dialog waiting for its next command gets 421 at once on shutdown."""
 
     async def go():
-        srv, port = await start_smtpd(RecordingEvents(), settings={})
+        srv, port = await start_smtpd(RecordingEvents(), options={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
         await send_command(reader, writer, b'EHLO me\r\n')
@@ -1173,7 +1173,7 @@ def test_graceful_stop_ends_early_when_all_dialogs_ended():
     """A graceful stop with only waiting dialogs returns before its drain window."""
 
     async def go():
-        srv, port = await start_smtpd(RecordingEvents(), settings={})
+        srv, port = await start_smtpd(RecordingEvents(), options={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
         await send_command(reader, writer, b'EHLO me\r\n')
@@ -1207,7 +1207,7 @@ def test_forced_stop_sends_421_before_the_drop():
     events = SlowEvents()
 
     async def go():
-        srv, port = await start_smtpd(events, settings={})
+        srv, port = await start_smtpd(events, options={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
         for cmd in (b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n'):
@@ -1229,7 +1229,7 @@ def test_stop_not_gracefully_sends_421_at_once():
     """A stop that is not graceful drops a waiting dialog at once with 421."""
 
     async def go():
-        srv, port = await start_smtpd(RecordingEvents(), settings={})
+        srv, port = await start_smtpd(RecordingEvents(), options={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
         await send_command(reader, writer, b'EHLO me\r\n')
@@ -1246,7 +1246,7 @@ def test_shutdown_refuses_ungreeted_connection():
     """After shutdown a new connection gets 421 instead of 220."""
 
     async def go():
-        srv, port = await start_smtpd(RecordingEvents(), settings={})
+        srv, port = await start_smtpd(RecordingEvents(), options={})
         # a scheduled shutdown greets a new connection with 421, not 220
         srv.shutdown()
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
@@ -1263,7 +1263,7 @@ def test_graceful_stop_cancels_idle_connection():
     """stop ends an idle connection, no session is left."""
 
     async def go():
-        srv, port = await start_smtpd(RecordingEvents(), settings={})
+        srv, port = await start_smtpd(RecordingEvents(), options={})
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await read_reply(reader)
         active_before = len(srv._sessions)
@@ -1282,7 +1282,7 @@ def test_lifecycle_state_flags():
     """stopped() and shutdown_requested() follow start, shutdown and stop."""
 
     async def go():
-        srv = SmtpdServer(RecordingEvents(), settings={})
+        srv = SmtpdServer(RecordingEvents(), options={})
         before = srv.stopped()
         await srv.start([{'host': '127.0.0.1', 'port': 0}])
         serving = srv.stopped()
@@ -1304,7 +1304,7 @@ def test_serve_blocks_until_stop_and_join_returns_then():
     """serve() serves until stop(), join() returns once all is stopped."""
 
     async def go():
-        srv = SmtpdServer(RecordingEvents(), settings={})
+        srv = SmtpdServer(RecordingEvents(), options={})
         task = asyncio.create_task(srv.serve([{'host': '127.0.0.1', 'port': 0}]))
         await wait_until_async(lambda: srv._servers)
         port = srv._servers[0].sockets[0].getsockname()[1]
@@ -1325,7 +1325,7 @@ def test_a_cancelled_connection_without_shutdown_gets_no_421():
     """A session cancelled without a shutdown ends without a reply."""
 
     async def go():
-        srv = SmtpdServer(RecordingEvents(), settings={})
+        srv = SmtpdServer(RecordingEvents(), options={})
         await srv.start([{'host': '127.0.0.1', 'port': 0}])
         port = srv._servers[0].sockets[0].getsockname()[1]
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
@@ -1343,7 +1343,7 @@ def test_a_cancelled_connection_without_shutdown_gets_no_421():
 
 def test_shutdown_before_start_only_marks_the_request():
     """A shutdown before start() marks the request and sends nothing."""
-    srv = SmtpdServer(RecordingEvents(), settings={})
+    srv = SmtpdServer(RecordingEvents(), options={})
     srv.shutdown()
     assert srv.shutdown_requested() is True
 
@@ -1357,7 +1357,7 @@ def test_stop_without_start_and_with_a_slow_session_ends_stopped():
             await asyncio.sleep(1)
 
     async def go():
-        srv = SmtpdServer(SlowEnd(), settings={})
+        srv = SmtpdServer(SlowEnd(), options={})
         server = await asyncio.start_server(srv._on_connection, '127.0.0.1', 0)
         srv._servers.append(server)
         port = server.sockets[0].getsockname()[1]
@@ -1374,7 +1374,7 @@ def test_join_waits_until_the_server_has_stopped():
     """join() returns only after stop() has ended the serving."""
 
     async def go():
-        srv = SmtpdServer(RecordingEvents(), settings={})
+        srv = SmtpdServer(RecordingEvents(), options={})
         await srv.start([{'host': '127.0.0.1', 'port': 0}])
         joined = asyncio.create_task(srv.join(poll_seconds=0.01))
         await asyncio.sleep(0.05)
@@ -1765,11 +1765,11 @@ def _auth_for(trusted, login, mails):
     """Runs the MAILs, logged in as "user" or not, and returns them recorded."""
     ev = AuthForEvents()
     auth = [b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n'] if login else []
-    settings = {'auth_mode': 'AUTH_OPTIONAL', 'trusted_relay_auth_ids': trusted}
+    options = {'auth_mode': 'AUTH_OPTIONAL', 'trusted_relay_auth_ids': trusted}
     commands = [b'EHLO me\r\n', *auth]
     for mail in mails:
         commands += [b'MAIL FROM:' + mail + b'\r\n', b'RSET\r\n']
-    _, r = dialog(ev, settings, commands)
+    _, r = dialog(ev, options, commands)
     # every MAIL and RSET is accepted
     assert [line[0] for line in r].count('250 OK') == 2 * len(mails)
     return ev.mails

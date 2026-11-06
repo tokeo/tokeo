@@ -15,7 +15,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import read_message, send_mail, run
 ENVELOPE_FROM = 'integration@local.local'
 ENVELOPE_TO = 'out@local.local'
 
-SETTINGS = {
+OPTIONS = {
     'max_processings': 1,
     'do_dns_reverse_lookup': False,
     'auth_mode': 'AUTH_OPTIONAL',
@@ -33,7 +33,7 @@ def test_simple_send_1_mail():
     # client components; Python has smtplib only, so one test remains
     ev = CaptureSmtpdEvents()
     mail = read_message('simple_mail.msg')
-    run_server_client(ev, SETTINGS, lambda port: send_mail(port, ENVELOPE_FROM, ENVELOPE_TO, mail))
+    run_server_client(ev, OPTIONS, lambda port: send_mail(port, ENVELOPE_FROM, ENVELOPE_TO, mail))
     assert ev.ev_message_data == mail.encode()
 
 
@@ -46,7 +46,7 @@ def test_net_smtp_simple_send_10_mails():
         for _ in range(10):
             send_mail(port, ENVELOPE_FROM, ENVELOPE_TO, mail)
 
-    run_server_client(ev, SETTINGS, client)
+    run_server_client(ev, OPTIONS, client)
     assert ev.ev_message_data == mail.encode()
 
 
@@ -56,7 +56,7 @@ def test_net_smtp_auth_plain_and_simple_send_1_mail():
     mail = read_message('simple_mail.msg')
     run_server_client(
         ev,
-        SETTINGS,
+        OPTIONS,
         lambda port: send_mail(
             port, ENVELOPE_FROM, ENVELOPE_TO, mail, authentication_id='administrator', password='password', auth_type='plain'
         ),
@@ -71,7 +71,7 @@ def test_net_smtp_auth_login_and_simple_send_1_mail():
     mail = read_message('simple_mail.msg')
     run_server_client(
         ev,
-        SETTINGS,
+        OPTIONS,
         lambda port: send_mail(
             port, ENVELOPE_FROM, ENVELOPE_TO, mail, authentication_id='administrator', password='password', auth_type='login'
         ),
@@ -87,7 +87,7 @@ def test_net_smtp_auth_plain_fail():
     with pytest.raises(smtplib.SMTPAuthenticationError):
         run_server_client(
             ev,
-            SETTINGS,
+            OPTIONS,
             lambda port: send_mail(
                 port, ENVELOPE_FROM, ENVELOPE_TO, mail, authentication_id='administrator', password='error_password', auth_type='plain'
             ),
@@ -100,7 +100,7 @@ def test_simple_send_1_mail_starttls():
     mail = read_message('simple_mail.msg')
     run_server_client(
         ev,
-        SETTINGS,
+        OPTIONS,
         lambda port: send_mail(
             port,
             ENVELOPE_FROM,

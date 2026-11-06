@@ -128,10 +128,10 @@ def test_required_python_version(monkeypatch, version, supported):
     """Below 3.13.13 or 3.14.4 a TLS_IMMEDIATE server raises ValueError."""
     monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', version + ('final', 0))
     if supported:
-        assert SmtpdServer(RecordingEvents(), settings=_SETTINGS).tls is not None
+        assert SmtpdServer(RecordingEvents(), options=_SETTINGS).tls is not None
     else:
         with pytest.raises(ValueError, match='requires Python 3.13.13\\+ or 3.14.4\\+'):
-            SmtpdServer(RecordingEvents(), settings=_SETTINGS)
+            SmtpdServer(RecordingEvents(), options=_SETTINGS)
 
 
 @pytest.mark.parametrize(

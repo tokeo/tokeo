@@ -24,7 +24,7 @@ class ThreadSafetyEvents(CaptureSmtpdEvents):
             self.ev_fail_counter += 1
 
 
-SETTINGS = {
+OPTIONS = {
     'max_processings': 50,
     'do_dns_reverse_lookup': False,
     'auth_mode': 'AUTH_OPTIONAL',
@@ -43,7 +43,7 @@ def test_thread_safety_with_multiple_connections():
     count = 100
 
     async def go():
-        srv, port = await start_smtpd(ev, settings=SETTINGS)
+        srv, port = await start_smtpd(ev, options=OPTIONS)
         loop = asyncio.get_event_loop()
 
         def one(index):

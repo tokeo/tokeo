@@ -81,23 +81,23 @@ def test_defaults_crlf_mode():
 def test_defaults_crlf_data_mode():
     """crlf_data_mode defaults to CRLF_DATA_MODERATE, with CRLF_STRICT to STRICT."""
     assert _smtpd().crlf_data_mode is CrlfDataMode.CRLF_DATA_MODERATE
-    assert _smtpd(settings={'crlf_mode': 'CRLF_LEAVE'}).crlf_data_mode is CrlfDataMode.CRLF_DATA_MODERATE
-    assert _smtpd(settings={'crlf_mode': 'CRLF_STRICT'}).crlf_data_mode is CrlfDataMode.CRLF_DATA_STRICT
+    assert _smtpd(options={'crlf_mode': 'CRLF_LEAVE'}).crlf_data_mode is CrlfDataMode.CRLF_DATA_MODERATE
+    assert _smtpd(options={'crlf_mode': 'CRLF_STRICT'}).crlf_data_mode is CrlfDataMode.CRLF_DATA_STRICT
 
 
 @pytest.mark.parametrize('value', ['CRLF_DATA_MODERATE', 'CRLF_DATA_UNSAFE'])
 def test_crlf_strict_allows_only_the_strict_data_modes(value):
     """CRLF_STRICT with a not strict crlf_data_mode is rejected."""
     with pytest.raises(ValueError, match='crlf_data_mode'):
-        _smtpd(settings={'crlf_mode': 'CRLF_STRICT', 'crlf_data_mode': value})
-    smtpd = _smtpd(settings={'crlf_mode': 'CRLF_STRICT', 'crlf_data_mode': 'CRLF_DATA_STRICT_CLOSE'})
+        _smtpd(options={'crlf_mode': 'CRLF_STRICT', 'crlf_data_mode': value})
+    smtpd = _smtpd(options={'crlf_mode': 'CRLF_STRICT', 'crlf_data_mode': 'CRLF_DATA_STRICT_CLOSE'})
     assert smtpd.crlf_data_mode is CrlfDataMode.CRLF_DATA_STRICT_CLOSE
 
 
 def test_unknown_crlf_data_mode_is_rejected():
     """An unknown crlf_data_mode names the allowed values."""
     with pytest.raises(ValueError, match='crlf_data_mode must be one of'):
-        _smtpd(settings={'crlf_data_mode': 'CRLF_DATA_LAX'})
+        _smtpd(options={'crlf_data_mode': 'CRLF_DATA_LAX'})
 
 
 def test_defaults_io_cmd_timeout():
@@ -115,27 +115,27 @@ def test_defaults_io_proxy_cmd_timeout():
 def test_io_timeouts_below_one_second_are_rejected(name, value):
     """An io timeout below 1 second, null or not a number stops the server setup."""
     with pytest.raises(ValueError, match=name):
-        _smtpd(settings={name: value})
+        _smtpd(options={name: value})
 
 
 def test_defaults_io_session_timeout():
     """io_session_timeout defaults to 3600 seconds, also when set to None."""
     assert DEFAULT_IO_SESSION_TIMEOUT == 3600
     assert _smtpd().io_session_timeout == DEFAULT_IO_SESSION_TIMEOUT
-    assert _smtpd(settings={'io_session_timeout': None}).io_session_timeout == DEFAULT_IO_SESSION_TIMEOUT
+    assert _smtpd(options={'io_session_timeout': None}).io_session_timeout == DEFAULT_IO_SESSION_TIMEOUT
 
 
 @pytest.mark.parametrize('value', [1, 1.5, 86400])
 def test_io_session_timeout_takes_seconds_from_1_to_86400(value):
     """io_session_timeout takes an int or a float from 1 to 86400 seconds."""
-    assert _smtpd(settings={'io_session_timeout': value}).io_session_timeout == value
+    assert _smtpd(options={'io_session_timeout': value}).io_session_timeout == value
 
 
 @pytest.mark.parametrize('value', [0, 0.5, -1, 86401, True, '10'])
 def test_io_session_timeout_out_of_range_is_rejected(value):
     """io_session_timeout outside 1 to 86400 or not a number stops the setup."""
     with pytest.raises(ValueError, match='io_session_timeout'):
-        _smtpd(settings={'io_session_timeout': value})
+        _smtpd(options={'io_session_timeout': value})
 
 
 def test_defaults_io_buffer_max_size():
@@ -161,14 +161,14 @@ def test_defaults_trusted_relay_auth_ids():
 @pytest.mark.parametrize('value', [['relay'], ('relay', 'backup'), []])
 def test_trusted_relay_auth_ids_takes_a_list_or_a_tuple_of_ids(value):
     """trusted_relay_auth_ids takes a list or a tuple of stripped ids."""
-    assert _smtpd(settings={'trusted_relay_auth_ids': value}).trusted_relay_auth_ids == value
+    assert _smtpd(options={'trusted_relay_auth_ids': value}).trusted_relay_auth_ids == value
 
 
 @pytest.mark.parametrize('value', [None, 'relay', ['relay', 1], ['relay', ''], [' relay'], ['relay '], ['  ']])
 def test_trusted_relay_auth_ids_not_a_list_of_ids_is_rejected(value):
     """trusted_relay_auth_ids accepts only a list of stripped non-empty ids."""
     with pytest.raises(ValueError, match='trusted_relay_auth_ids'):
-        _smtpd(settings={'trusted_relay_auth_ids': value})
+        _smtpd(options={'trusted_relay_auth_ids': value})
 
 
 def test_defaults_encrypt_mode():
@@ -192,7 +192,7 @@ def test_defaults_internationalization_extensions():
 
 
 @pytest.mark.parametrize(
-    'settings, name',
+    'options, name',
     [
         ({'max_processings': 0}, 'max_processings'),
         ({'max_processings': '4'}, 'max_processings'),
@@ -202,16 +202,16 @@ def test_defaults_internationalization_extensions():
         ({'max_connections': 2, 'max_processings': 4}, 'max_connections'),
     ],
 )
-def test_limits_that_do_not_fit_are_rejected(settings, name):
+def test_limits_that_do_not_fit_are_rejected(options, name):
     """A limit that is no positive integer, or too low, stops the setup."""
     with pytest.raises(ValueError, match=name):
-        _smtpd(settings=settings)
+        _smtpd(options=options)
 
 
-def test_keyword_style_settings_merge_into_the_settings():
-    """Keyword settings apply, tls_mode sets encrypt_mode, the settings win."""
+def test_keyword_style_options_merge_into_the_options():
+    """Keyword options apply, tls_mode sets encrypt_mode, the options win."""
     smtpd = _smtpd(
-        settings={'io_cmd_timeout': 20}, io_cmd_timeout=10, io_session_timeout=60, tls_mode='TLS_OPTIONAL', tls_cert_cn='localhost'
+        options={'io_cmd_timeout': 20}, io_cmd_timeout=10, io_session_timeout=60, tls_mode='TLS_OPTIONAL', tls_cert_cn='localhost'
     )
     assert smtpd.encrypt_mode is EncryptMode.TLS_OPTIONAL
     assert smtpd.io_cmd_timeout == 20

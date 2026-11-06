@@ -72,11 +72,11 @@ class ClosingEvents(RecordingEvents):
         self.exceptions = ctx.server.exceptions
 
 
-def _run(events, settings, client):
+def _run(events, options, client):
     """Run the client against a server and wait for on_disconnect_event."""
 
     async def go():
-        server, port, task = await start_server(events, settings)
+        server, port, task = await start_server(events, options)
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             result = await client(reader, writer)
@@ -286,7 +286,7 @@ def test_client_that_does_not_read_is_dropped_after_io_cmd_timeout():
     events = HugeReplyEvents()
 
     async def go():
-        srv = SmtpdServer(events, settings={'io_cmd_timeout': 1})
+        srv = SmtpdServer(events, options={'io_cmd_timeout': 1})
 
         async def on_connection(reader, writer):
             # a small send buffer of the server fills up quickly

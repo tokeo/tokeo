@@ -25,10 +25,10 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
 )
 
 
-def _ehlo_auth_and_authcmd(settings):
+def _ehlo_auth_and_authcmd(options):
     greeting, r = dialog(
         AuthEvents(),
-        settings,
+        options,
         [
             b'EHLO me\r\n',
             b'AUTH PLAIN ' + auth_plain('', 'user', 'secret').encode() + b'\r\n',
@@ -56,11 +56,11 @@ def test_when_auth_on_plain_hides_auth_but_offers_starttls():
 def test_when_auth_after_starttls_offers_and_accepts_auth():
     """After STARTTLS AUTH is offered and accepted by 235."""
     ev = AuthEvents()
-    settings = dict(TLS_SETTINGS)
-    settings.update({'encrypt_mode': 'TLS_WHEN_AUTH', 'auth_mode': 'AUTH_OPTIONAL'})
+    options = dict(TLS_SETTINGS)
+    options.update({'encrypt_mode': 'TLS_WHEN_AUTH', 'auth_mode': 'AUTH_OPTIONAL'})
 
     async def go():
-        server, port, task = await start_server(ev, settings)
+        server, port, task = await start_server(ev, options)
         try:
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             await read_reply(reader)
@@ -123,5 +123,5 @@ def test_parse_error_lists_the_new_mode():
     from tokeo.core.smtpd.server import SmtpdServer
 
     with pytest.raises(ValueError) as exc:
-        SmtpdServer(AuthEvents(), settings={'encrypt_mode': 'TLS_NOPE'})
+        SmtpdServer(AuthEvents(), options={'encrypt_mode': 'TLS_NOPE'})
     assert 'TLS_WHEN_AUTH' in str(exc.value)

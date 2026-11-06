@@ -97,7 +97,7 @@ def test_an_ipv6_address_literal_is_tagged():
         pytest.skip('no IPv6 on this host')
 
     async def go():
-        srv = SmtpdServer(RecordingEvents(), settings={'do_dns_reverse_lookup': False})
+        srv = SmtpdServer(RecordingEvents(), options={'do_dns_reverse_lookup': False})
         try:
             server = await asyncio.start_server(srv._on_connection, '::1', 0)
         except OSError:

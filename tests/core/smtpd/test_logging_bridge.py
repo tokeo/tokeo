@@ -97,7 +97,7 @@ def test_self_log_from_sync_and_async_events_with_async_logging():
     events = Handler()
 
     async def go():
-        srv, port = await start_smtpd(events, settings={})
+        srv, port = await start_smtpd(events, options={})
         loop = asyncio.get_event_loop()
         try:
             code, _ = await loop.run_in_executor(
@@ -129,7 +129,7 @@ def test_self_log_from_threaded_event_reaches_loop_threadsafe():
     events = Handler()
 
     async def go():
-        srv, port = await start_smtpd(events, settings={})
+        srv, port = await start_smtpd(events, options={})
         loop = asyncio.get_event_loop()
         try:
             code, _ = await loop.run_in_executor(

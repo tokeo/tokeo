@@ -1,5 +1,5 @@
 """
-Tests for the listener settings of the server.
+Tests for the listener options of the server.
 
 ```hosts '*'``` binds the wildcard addresses (0.0.0.0, and :: when IPv6 is
 configured) and names the local host in the test certificate instead of

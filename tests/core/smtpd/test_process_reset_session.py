@@ -12,7 +12,7 @@ from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdE
 
 
 def _smtpd():
-    return SmtpdServer(CaptureSmtpdEvents(), settings={})
+    return SmtpdServer(CaptureSmtpdEvents(), options={})
 
 
 def test_reset_helo():
@@ -23,18 +23,18 @@ def test_reset_helo():
 
 
 @pytest.mark.parametrize(
-    'settings, expected',
+    'options, expected',
     [
         ({'proxy_extension': True}, CMD_PROXY),
         ({'encrypt_mode': 'TLS_IMMEDIATE'}, CMD_STARTTLS),
         ({'proxy_extension': True, 'encrypt_mode': 'TLS_IMMEDIATE'}, CMD_PROXY),
     ],
 )
-def test_reset_initial_sequence(monkeypatch, settings, expected):
+def test_reset_initial_sequence(monkeypatch, options, expected):
     """With PROXY or TLS_IMMEDIATE the first step is PROXY or STARTTLS."""
     monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', (3, 14, 4, 'final', 0))
     session = SmtpdSession()
-    SmtpdServer(CaptureSmtpdEvents(), settings=dict(settings, tls_cert_cn='localhost')).process_reset_session(
+    SmtpdServer(CaptureSmtpdEvents(), options=dict(options, tls_cert_cn='localhost')).process_reset_session(
         session, connection_initialize=True
     )
     assert session.cmd_sequence is expected

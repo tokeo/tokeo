@@ -66,7 +66,7 @@ tokeo smtpd serve mx1 mx3
 
 : The servers log to the application log (```app.log```), its level comes
     from the log config of the application; a ```logger_severity``` in the
-    settings of a service is left out
+    ```server_options``` of a service is left out
 
 : Every selected service is built before a worker forks, so a broken config
     ends the start with the name of the service and nothing is bound. A
@@ -233,7 +233,7 @@ def _set_pdeathsig(sig=signal.SIGTERM):
 
 def _pre_fork(svc):
     """Read the pre_fork worker count of a service config (default 0)."""
-    count = (svc.get('settings') or {}).get('pre_fork') or 0
+    count = (svc.get('server_options') or {}).get('pre_fork') or 0
     if not is_int_ge(count, 0):
         raise TokeoSmtpdError(f"smtpd: service '{svc.get('name')}': pre_fork must be an integer of 0 or more, not {count!r}")
     return count
@@ -439,10 +439,10 @@ class TokeoSmtpd(MetaMixin):
             # derives its CN and SAN from them
             hosts = list(dict.fromkeys(lst.get('host') for lst in svc.get('listeners') or [] if lst.get('host')))
             # the server logs to app.log, the level of the app log config applies
-            settings = {key: value for key, value in (svc.get('settings') or {}).items() if key != 'logger_severity'}
+            server_options = {key: value for key, value in (svc.get('server_options') or {}).items() if key != 'logger_severity'}
             return SmtpdServer(
                 events_handler,
-                settings=settings,
+                options=server_options,
                 global_limits=global_limits,
                 logger=self.app.log,
                 debug=self.app.debug,
@@ -450,8 +450,8 @@ class TokeoSmtpd(MetaMixin):
                 session_id_bytes=self._config('session_id_bytes'),
             )
         except Exception as err:
-            reason = str(err).removeprefix('smtpd: ')
-            raise TokeoSmtpdError(f"smtpd: service '{svc.get('name')}': {reason}") from err
+            error = str(err).removeprefix('smtpd: ')
+            raise TokeoSmtpdError(f"smtpd: service '{svc.get('name')}': {error}") from err
 
     async def _serve_async(self, services, global_limits, workers, reuse):
         """
@@ -469,7 +469,7 @@ class TokeoSmtpd(MetaMixin):
 
         """
         servers = []
-        ended = []
+        ended_workers = []
         try:
             # the stop handlers come first, a stop during the start is kept
             stop = asyncio.Event()
@@ -492,11 +492,11 @@ class TokeoSmtpd(MetaMixin):
                     return
                 for pid, name in workers.items():
                     try:
-                        done, status = os.waitpid(pid, os.WNOHANG)
+                        reaped_pid, status = os.waitpid(pid, os.WNOHANG)
                     except ChildProcessError:
                         continue
-                    if done:
-                        ended.append(f"worker {pid} of service '{name}' ended with {os.waitstatus_to_exitcode(status)}")
+                    if reaped_pid:
+                        ended_workers.append(f"worker {pid} of service '{name}' ended with {os.waitstatus_to_exitcode(status)}")
                         stop.set()
 
             if workers:
@@ -513,8 +513,8 @@ class TokeoSmtpd(MetaMixin):
             # a failed start must not leave already started services bound
             for server in servers:
                 await server.stop(wait_seconds_before_close=2.0)
-        if ended:
-            raise TokeoSmtpdError(f'smtpd: {", ".join(ended)}, all services stopped')
+        if ended_workers:
+            raise TokeoSmtpdError(f'smtpd: {", ".join(ended_workers)}, all services stopped')
 
     def _run_worker(self, svc, global_limits, reuse):
         """Run one forked worker serving exactly one service."""
@@ -596,8 +596,8 @@ class TokeoSmtpd(MetaMixin):
                     pass
             # bounded reap: a worker gets time to drain, then SIGKILL ends it
             pending = list(child_pids)
-            deadline = time.monotonic() + 5.0
-            while pending and time.monotonic() < deadline:
+            reap_deadline = time.monotonic() + 5.0
+            while pending and time.monotonic() < reap_deadline:
                 for pid in list(pending):
                     try:
                         done, _status = os.waitpid(pid, os.WNOHANG)
@@ -620,9 +620,9 @@ class TokeoSmtpd(MetaMixin):
     def list(self):
         """Print the configured services."""
         for svc in self._config('services') or []:
-            where = ', '.join(f"{lst.get('host')}:{lst.get('port')}" for lst in svc.get('listeners') or [])
+            listeners_str = ', '.join(f"{lst.get('host')}:{lst.get('port')}" for lst in svc.get('listeners') or [])
             self.app.print(
-                f'{svc.get("name")}  events_handler={svc.get("events_handler")}  listeners=[{where}]  pre_fork={_pre_fork(svc)}'
+                f'{svc.get("name")}  events_handler={svc.get("events_handler")}  listeners=[{listeners_str}]  pre_fork={_pre_fork(svc)}'
             )
 
 

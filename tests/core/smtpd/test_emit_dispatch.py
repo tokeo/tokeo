@@ -109,7 +109,7 @@ def test_mail_flows_end_to_end_with_bare_handler():
     """A handler without overrides still delivers a mail with 250."""
 
     async def go():
-        srv, port = await start_smtpd(BareEvents(), settings={})
+        srv, port = await start_smtpd(BareEvents(), options={})
         loop = asyncio.get_event_loop()
         try:
             code, _ = await loop.run_in_executor(

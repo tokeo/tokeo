@@ -75,7 +75,7 @@ def certs(tmp_path_factory):
     )
 
 
-def _tls_settings(cert_path, key_path):
+def _tls_options(cert_path, key_path):
     return {
         'max_processings': 1,
         'do_dns_reverse_lookup': False,
@@ -88,11 +88,11 @@ def _tls_settings(cert_path, key_path):
     }
 
 
-def _deliver(events, settings, tls_context):
+def _deliver(events, options, tls_context):
     mail = read_message('simple_mail.msg')
     run_server_client(
         events,
-        settings,
+        options,
         lambda port: send_mail(
             port,
             ENVELOPE_FROM,
@@ -111,8 +111,8 @@ def _deliver(events, settings, tls_context):
 def test_self_signed_simple_certificate(certs):
     """A self-signed certificate from files delivers to a verifying client."""
     ev = CaptureSmtpdEvents()
-    settings = _tls_settings(certs['simple_cert'], certs['simple_key'])
-    mail = _deliver(ev, settings, verifying_tls_context(certs['simple_cert']))
+    options = _tls_options(certs['simple_cert'], certs['simple_key'])
+    mail = _deliver(ev, options, verifying_tls_context(certs['simple_cert']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -121,10 +121,10 @@ def test_self_signed_simple_certificate(certs):
 def test_legacy_tls_preset_still_delivers(certs):
     """The LEGACY preset, down to TLS 1.0, still delivers to a modern client."""
     ev = CaptureSmtpdEvents()
-    settings = _tls_settings(certs['simple_cert'], certs['simple_key'])
-    settings['tls_methods'] = TLS_METHODS_LEGACY
-    settings['tls_ciphers'] = TLS_CIPHERS_LEGACY
-    mail = _deliver(ev, settings, verifying_tls_context(certs['simple_cert']))
+    options = _tls_options(certs['simple_cert'], certs['simple_key'])
+    options['tls_methods'] = TLS_METHODS_LEGACY
+    options['tls_ciphers'] = TLS_CIPHERS_LEGACY
+    mail = _deliver(ev, options, verifying_tls_context(certs['simple_cert']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -139,8 +139,8 @@ def test_unknown_minimum_tls_version_raises(methods):
 def test_self_signed_chain_certificate(certs):
     """A certificate with its chain delivers to a client trusting the CA."""
     ev = CaptureSmtpdEvents()
-    settings = _tls_settings(certs['chain_cert'], certs['chain_key'])
-    mail = _deliver(ev, settings, verifying_tls_context(certs['ca']))
+    options = _tls_options(certs['chain_cert'], certs['chain_key'])
+    mail = _deliver(ev, options, verifying_tls_context(certs['ca']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -148,8 +148,8 @@ def test_self_signed_chain_certificate(certs):
 def test_self_signed_chain_and_key_certificate(certs):
     """A chain file with the key in it delivers without a key file."""
     ev = CaptureSmtpdEvents()
-    settings = _tls_settings(certs['chain_and_key'], None)
-    mail = _deliver(ev, settings, verifying_tls_context(certs['ca']))
+    options = _tls_options(certs['chain_and_key'], None)
+    mail = _deliver(ev, options, verifying_tls_context(certs['ca']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -157,7 +157,7 @@ def test_self_signed_chain_and_key_certificate(certs):
 def test_memory_only_certificate():
     """Without a certificate the server makes one in memory and delivers."""
     ev = CaptureSmtpdEvents()
-    settings = {
+    options = {
         'max_processings': 1,
         'do_dns_reverse_lookup': False,
         'auth_mode': 'AUTH_OPTIONAL',
@@ -167,7 +167,7 @@ def test_memory_only_certificate():
         'pipelining_extension': False,
         'internationalization_extensions': True,
     }
-    mail = _deliver(ev, settings, insecure_tls_context())
+    mail = _deliver(ev, options, insecure_tls_context())
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -175,9 +175,9 @@ def test_memory_only_certificate():
 def test_invalid_certificate_name(certs):
     """A certificate not naming 127.0.0.1 fails the handshake by SSLError."""
     ev = CaptureSmtpdEvents()
-    settings = _tls_settings(certs['invalid_cert'], certs['invalid_key'])
+    options = _tls_options(certs['invalid_cert'], certs['invalid_key'])
     with pytest.raises(ssl.SSLError):
-        _deliver(ev, settings, verifying_tls_context(certs['invalid_cert']))
+        _deliver(ev, options, verifying_tls_context(certs['invalid_cert']))
 
 
 def test_in_memory_certificate_string(certs):
@@ -187,7 +187,7 @@ def test_in_memory_certificate_string(certs):
         cert_pem = handle.read()
     with open(certs['simple_key']) as handle:
         key_pem = handle.read()
-    settings = {
+    options = {
         'max_processings': 1,
         'do_dns_reverse_lookup': False,
         'auth_mode': 'AUTH_OPTIONAL',
@@ -197,7 +197,7 @@ def test_in_memory_certificate_string(certs):
         'pipelining_extension': False,
         'internationalization_extensions': True,
     }
-    mail = _deliver(ev, settings, verifying_tls_context(certs['simple_cert']))
+    mail = _deliver(ev, options, verifying_tls_context(certs['simple_cert']))
     assert ev.ev_message_data == mail.encode()
     assert ev.ev_auth_authorization_id == 'supervisor'
 
@@ -205,14 +205,14 @@ def test_in_memory_certificate_string(certs):
 # ---- self-signed CN/SAN: derivation and configured override -----------------
 
 
-def _peer_certificate(settings, hosts=None):
+def _peer_certificate(options, hosts=None):
     """Serve with a self-signed cert and return the certificate from the wire."""
     import asyncio
     import smtplib
     from cryptography import x509
 
     async def go():
-        srv, port = await start_smtpd(CaptureSmtpdEvents(), settings=settings, hosts=hosts)
+        srv, port = await start_smtpd(CaptureSmtpdEvents(), options=options, hosts=hosts)
         loop = asyncio.get_event_loop()
 
         def client():
@@ -302,7 +302,7 @@ def test_self_signed_without_cryptography_raises(monkeypatch):
 
     monkeypatch.setitem(sys.modules, 'cryptography', None)
     with pytest.raises(ImportError):
-        SmtpdServer(CaptureSmtpdEvents(), settings={'encrypt_mode': 'TLS_OPTIONAL'})
+        SmtpdServer(CaptureSmtpdEvents(), options={'encrypt_mode': 'TLS_OPTIONAL'})
 
 
 def test_generated_test_certificate_has_an_ec_p384_key():

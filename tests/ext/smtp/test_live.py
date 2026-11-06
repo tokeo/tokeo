@@ -61,9 +61,9 @@ class RecordingEvents(SmtpdEvents):
 class BackgroundSmtpd:
     """Run a SmtpdServer in a background thread on an ephemeral port."""
 
-    def __init__(self, settings):
+    def __init__(self, options):
         self.events = RecordingEvents()
-        self.server = SmtpdServer(self.events, settings=dict(settings, do_dns_reverse_lookup=False))
+        self.server = SmtpdServer(self.events, options=dict(options, do_dns_reverse_lookup=False))
         self.loop = asyncio.new_event_loop()
         self.thread = None
         self.port = None
@@ -95,7 +95,7 @@ class BackgroundSmtpd:
         self.loop.close()
 
 
-def _tls_settings(mode, cert):
+def _tls_options(mode, cert):
     return {'encrypt_mode': mode, 'tls_cert': cert[0], 'tls_key': cert[1]}
 
 
@@ -126,7 +126,7 @@ def test_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
         with open(verify['host_cert_ca'], 'w') as f:
             f.write(cert[0])
 
-    with BackgroundSmtpd(_tls_settings(mode, cert)) as smtpd:
+    with BackgroundSmtpd(_tls_options(mode, cert)) as smtpd:
         with SmtpTest(host='127.0.0.1', port=smtpd.port, timeout=5, **client, **verify) as app:
             if delivered:
                 assert app.mail.send('body over tls') == {}

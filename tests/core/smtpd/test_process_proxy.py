@@ -18,7 +18,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import run_line
 
 _SMTPD = SmtpdServer(
     CaptureSmtpdEvents(),
-    settings={
+    options={
         'max_processings': 1,
         'auth_mode': 'AUTH_OPTIONAL',
         'encrypt_mode': 'TLS_OPTIONAL',

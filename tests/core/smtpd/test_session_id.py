@@ -82,8 +82,8 @@ def test_session_id_format_uniqueness_and_persistence():
 def test_session_id_bytes_is_keyword_only_not_a_service_setting():
     """session_id_bytes sizes the id as keyword, the setting is ignored."""
     events = IdCaptureEvents()
-    # the keyword sizes the id; the same key in settings must stay ignored
-    _run(events, _session, settings={'session_id_bytes': 12}, session_id_bytes=4)
+    # the keyword sizes the id; the same key in options must stay ignored
+    _run(events, _session, options={'session_id_bytes': 12}, session_id_bytes=4)
     assert re.fullmatch(r'[0-9a-f]{8}', events.seen_ids[0][1])
-    srv = SmtpdServer(IdCaptureEvents(), settings={'session_id_bytes': 12})
+    srv = SmtpdServer(IdCaptureEvents(), options={'session_id_bytes': 12})
     assert srv.session_id_bytes == 8

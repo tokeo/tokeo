@@ -221,8 +221,8 @@ async def start_smtpd(events, listeners=None, **kwargs):
     return srv, srv._servers[0].sockets[0].getsockname()[1]
 
 
-async def _run(events, settings, client_fn, listeners, settle):
-    srv, port = await start_smtpd(events, listeners, settings=settings)
+async def _run(events, options, client_fn, listeners, settle):
+    srv, port = await start_smtpd(events, listeners, options=options)
     loop = asyncio.get_event_loop()
     try:
         result = await loop.run_in_executor(None, lambda: client_fn(port))
@@ -232,7 +232,7 @@ async def _run(events, settings, client_fn, listeners, settle):
         await srv.stop(wait_seconds_before_close=0.5)
 
 
-def run_server_client(events, settings, client_fn, listeners=None, settle=0.15):
+def run_server_client(events, options, client_fn, listeners=None, settle=0.15):
     """
     Start the server, run a blocking client(port) in a thread, then stop.
 
@@ -241,7 +241,7 @@ def run_server_client(events, settings, client_fn, listeners=None, settle=0.15):
     - **Any**: Whatever ```client_fn(port)``` returned
 
     """
-    return asyncio.run(_run(events, settings, client_fn, listeners, settle))
+    return asyncio.run(_run(events, options, client_fn, listeners, settle))
 
 
 # ---- events and dialog of the tests -----------------------------------------
@@ -308,10 +308,10 @@ async def send_command(reader, writer, line):
     return await read_reply(reader)
 
 
-async def start_server(events, settings):
+async def start_server(events, options):
     """Start a server on an ephemeral port; return (server, port, task)."""
-    srv = SmtpdServer(events, settings=settings)
-    limit = int(settings.get('io_buffer_max_size', 1 << 20))
+    srv = SmtpdServer(events, options=options)
+    limit = int(options.get('io_buffer_max_size', 1 << 20))
     server = await asyncio.start_server(srv._on_connection, '127.0.0.1', 0, limit=limit)
     port = server.sockets[0].getsockname()[1]
     task = asyncio.create_task(server.serve_forever())
@@ -328,9 +328,9 @@ async def stop_server(server, task):
         pass
 
 
-async def _converse(events, settings, commands):
+async def _converse(events, options, commands):
     """Run one client dialog: send each command, read its reply."""
-    server, port, task = await start_server(events, settings)
+    server, port, task = await start_server(events, options)
     try:
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         greeting = await read_reply(reader)
@@ -344,9 +344,9 @@ async def _converse(events, settings, commands):
         await stop_server(server, task)
 
 
-def dialog(events, settings, commands):
+def dialog(events, options, commands):
     """Synchronous wrapper around a client dialog for pytest."""
-    return asyncio.run(_converse(events, settings, commands))
+    return asyncio.run(_converse(events, options, commands))
 
 
 class AuthEvents(RecordingEvents):
@@ -383,11 +383,11 @@ def auth_plain(authzid, authcid, password):
 TLS_SETTINGS = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
 
 
-def run_wire(events, settings, wire_body):
+def run_wire(events, options, wire_body):
     """Deliver one message with raw wire bytes; returns the reply code."""
 
     async def go():
-        srv, port = await start_smtpd(events, settings=settings)
+        srv, port = await start_smtpd(events, options=options)
         reader, writer = await asyncio.open_connection('127.0.0.1', port)
         await reader.readline()
         try:

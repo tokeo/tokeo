@@ -297,7 +297,7 @@ def test_start_notes_at_debug_that_the_dialog_shows_the_credentials(auth_mode, n
     events = LinesEvents()
 
     async def go():
-        server = SmtpdServer(events, settings={'auth_mode': auth_mode})
+        server = SmtpdServer(events, options={'auth_mode': auth_mode})
         await server.start([{'host': '127.0.0.1', 'port': 0}])
         await server.stop(wait_seconds_before_close=0)
 

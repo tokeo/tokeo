@@ -435,7 +435,7 @@ class SmtpdServer:
     ### Args
 
     - **events_handler** (SmtpdEvents): The bound handler implementation instance
-    - **settings** (dict): The service settings
+    - **options** (dict): The options of the server
     - **global_limits** (GlobalLimits, optional): Shared caps across services
     - **logger** (optional): Target of the default ```on_logging_event```, any
         logger with ```debug```/```info```/```warning```/```error```/```critical```;
@@ -443,15 +443,15 @@ class SmtpdServer:
 
     """
 
-    def __init__(self, events_handler, settings=None, *, global_limits=None, logger=None, debug=False, **kwargs):
-        # accept both the Tokeo settings-dict and the keyword style;
-        # keyword args merge into settings, which takes precedence
-        settings = dict(settings or {})
+    def __init__(self, events_handler, options=None, *, global_limits=None, logger=None, debug=False, **kwargs):
+        # accept both the options dict and the keyword style; the
+        # options dict takes precedence over the keyword args
+        options = dict(options or {})
         if kwargs.get('tls_mode') is not None:
-            settings.setdefault('encrypt_mode', kwargs['tls_mode'])
+            options.setdefault('encrypt_mode', kwargs['tls_mode'])
         for key, value in kwargs.items():
             if value is not None and key not in ('ports', 'hosts', 'tls_mode', 'session_id_bytes'):
-                settings.setdefault(key, value)
+                options.setdefault(key, value)
         self.events_handler = events_handler
         self.emit_events = self._build_emit_events_dispatcher(events_handler)
         self.debug = bool(debug)
@@ -462,7 +462,7 @@ class SmtpdServer:
         self._asyncio_running_loop = None
         # target of the default on_logging_event: the given logger, else an own
         # stderr logger; set on mounting, a value set on the handler is replaced
-        logger_severity = settings.get('logger_severity')
+        logger_severity = options.get('logger_severity')
         if logger_severity is not None and logger_severity not in Severity.__members__:
             raise ValueError(f'Severity of the server logger (logger_severity) must be one of {", ".join(Severity.__members__)}!')
         if logger is not None and logger_severity is not None:
@@ -481,34 +481,34 @@ class SmtpdServer:
         events_handler.log = self.logger
         # ports / hosts / addresses
         # bytes of randomness for the per-connection session id (ctx.id);
-        # a keyword-only server property, never read from service settings
+        # a keyword-only server property, never read from the server options
         self.session_id_bytes = int(kwargs.get('session_id_bytes') or 8)
-        self.ports = _parse_ports(kwargs.get('ports') if kwargs.get('ports') is not None else settings.get('ports', DEFAULT_SMTPD_PORT))
-        self.hosts = _parse_hosts(kwargs.get('hosts') if kwargs.get('hosts') is not None else settings.get('hosts', DEFAULT_SMTPD_HOST))
+        self.ports = _parse_ports(kwargs.get('ports') if kwargs.get('ports') is not None else options.get('ports', DEFAULT_SMTPD_PORT))
+        self.hosts = _parse_hosts(kwargs.get('hosts') if kwargs.get('hosts') is not None else options.get('hosts', DEFAULT_SMTPD_HOST))
         self._addresses = _build_addresses(self.ports, self.hosts)
         # dialog options
-        self.io_cmd_timeout = settings.get('io_cmd_timeout', DEFAULT_IO_CMD_TIMEOUT)
+        self.io_cmd_timeout = options.get('io_cmd_timeout', DEFAULT_IO_CMD_TIMEOUT)
         # like Ruby nil, None is the default
-        self.io_session_timeout = settings.get('io_session_timeout')
+        self.io_session_timeout = options.get('io_session_timeout')
         if self.io_session_timeout is None:
             self.io_session_timeout = DEFAULT_IO_SESSION_TIMEOUT
-        self.io_buffer_max_size = settings.get('io_buffer_max_size')
+        self.io_buffer_max_size = options.get('io_buffer_max_size')
         if self.io_buffer_max_size is None:
             self.io_buffer_max_size = DEFAULT_IO_BUFFER_MAX_SIZE
-        self.crlf_mode = _parse_mode(CrlfMode, settings.get('crlf_mode'), 'CRLF_ENSURE', 'crlf_mode')
+        self.crlf_mode = _parse_mode(CrlfMode, options.get('crlf_mode'), 'CRLF_ENSURE', 'crlf_mode')
         self.crlf_data_mode = _parse_mode(
             CrlfDataMode,
-            settings.get('crlf_data_mode'),
+            options.get('crlf_data_mode'),
             'CRLF_DATA_STRICT' if self.crlf_mode is CrlfMode.CRLF_STRICT else 'CRLF_DATA_MODERATE',
             'crlf_data_mode',
         )
-        self.whitespace_mode = _parse_mode(WhitespaceMode, settings.get('whitespace_mode'), 'WHITESPACE_MODERATE', 'whitespace_mode')
-        self.pipelining_extension = bool(settings.get('pipelining_extension', False))
-        self.proxy_extension = bool(settings.get('proxy_extension', False))
-        self.io_proxy_cmd_timeout = settings.get('io_proxy_cmd_timeout', DEFAULT_IO_PROXY_CMD_TIMEOUT)
+        self.whitespace_mode = _parse_mode(WhitespaceMode, options.get('whitespace_mode'), 'WHITESPACE_MODERATE', 'whitespace_mode')
+        self.pipelining_extension = bool(options.get('pipelining_extension', False))
+        self.proxy_extension = bool(options.get('proxy_extension', False))
+        self.io_proxy_cmd_timeout = options.get('io_proxy_cmd_timeout', DEFAULT_IO_PROXY_CMD_TIMEOUT)
         # test for message spooling
         # value has to be an existing directory + file-name prefix
-        value = settings.get('spool')
+        value = options.get('spool')
         if value:
             value = str(value)
             self._spool_dir, self._spool_prefix = os.path.split(value)
@@ -517,15 +517,15 @@ class SmtpdServer:
             self._spooling = True
         else:
             self._spooling = False
-        self.internationalization_extensions = bool(settings.get('internationalization_extensions', False))
-        self.do_dns_reverse_lookup = settings.get('do_dns_reverse_lookup')
+        self.internationalization_extensions = bool(options.get('internationalization_extensions', False))
+        self.do_dns_reverse_lookup = options.get('do_dns_reverse_lookup')
         if self.do_dns_reverse_lookup is None:
             self.do_dns_reverse_lookup = True
-        self.encrypt_mode = _parse_mode(EncryptMode, settings.get('encrypt_mode'), 'TLS_FORBIDDEN', 'encrypt_mode')
-        self.auth_mode = _parse_mode(AuthMode, settings.get('auth_mode'), 'AUTH_FORBIDDEN', 'auth_mode')
-        self.trusted_relay_auth_ids = settings.get('trusted_relay_auth_ids', [])
-        self.max_processings = settings.get('max_processings', DEFAULT_SMTPD_MAX_PROCESSINGS)
-        self.max_connections = settings.get('max_connections', None)
+        self.encrypt_mode = _parse_mode(EncryptMode, options.get('encrypt_mode'), 'TLS_FORBIDDEN', 'encrypt_mode')
+        self.auth_mode = _parse_mode(AuthMode, options.get('auth_mode'), 'AUTH_FORBIDDEN', 'auth_mode')
+        self.trusted_relay_auth_ids = options.get('trusted_relay_auth_ids', [])
+        self.max_processings = options.get('max_processings', DEFAULT_SMTPD_MAX_PROCESSINGS)
+        self.max_connections = options.get('max_connections', None)
         # validation
         if self.crlf_mode is CrlfMode.CRLF_STRICT and self.crlf_data_mode not in (
             CrlfDataMode.CRLF_DATA_STRICT,
@@ -555,7 +555,7 @@ class SmtpdServer:
                     'number of simultaneous processings (max_processings)!'
                 )
         # Tokeo-only option: hard cap on the message size during DATA
-        self.data_size = settings.get('data_size', None)
+        self.data_size = options.get('data_size', None)
         #: TLS transport, built when encryption is allowed (else None and
         #: STARTTLS answers 500)
         self.tls = None
@@ -563,15 +563,15 @@ class SmtpdServer:
             # reference parity: without a configured common name the CN and
             # SAN of a self-signed certificate derive from hosts + addresses
             tls_cert_cn, tls_cert_san = _tls_cert_names(
-                settings.get('tls_cert_cn'), settings.get('tls_cert_san'), self.hosts, self._addresses
+                options.get('tls_cert_cn'), options.get('tls_cert_san'), self.hosts, self._addresses
             )
             self.tls = TlsTransport(
-                cert_path=settings.get('tls_cert_path'),
-                key_path=settings.get('tls_key_path'),
-                cert=settings.get('tls_cert'),
-                key=settings.get('tls_key'),
-                ciphers=settings.get('tls_ciphers'),
-                methods=settings.get('tls_methods'),
+                cert_path=options.get('tls_cert_path'),
+                key_path=options.get('tls_key_path'),
+                cert=options.get('tls_cert'),
+                key=options.get('tls_key'),
+                ciphers=options.get('tls_ciphers'),
+                methods=options.get('tls_methods'),
                 cert_cn=tls_cert_cn,
                 cert_san=tls_cert_san,
                 logger=lambda severity, msg: self._log_bridge(None, severity, msg),
@@ -665,8 +665,8 @@ class SmtpdServer:
             )
             # a name may bind several addresses, port 0 gets its port only now
             for sock in server.sockets:
-                ip, bound = sock.getsockname()[:2]
-                self.logger.info(f'Service listening on {f"[{ip}]" if ":" in ip else ip}:{bound}')
+                ip, bound_port = sock.getsockname()[:2]
+                self.logger.info(f'Service listening on {f"[{ip}]" if ":" in ip else ip}:{bound_port}')
             self._servers.append(server)
 
     async def _serve_forever(self):
@@ -775,8 +775,8 @@ class SmtpdServer:
         if gracefully:
             # wait for active sessions to finish, up to the time budget
             loop = asyncio.get_running_loop()
-            deadline = loop.time() + max(0.0, wait_seconds_before_close)
-            while self._sessions and loop.time() < deadline:
+            close_deadline = loop.time() + max(0.0, wait_seconds_before_close)
+            while self._sessions and loop.time() < close_deadline:
                 await asyncio.sleep(0.05)
         # force any remaining sessions down
         for task in list(self._sessions):
@@ -857,26 +857,26 @@ class SmtpdServer:
         ```asyncio.Event``` re-checked in a loop.
 
         """
-        limit = int(self.max_processings) if self.max_processings is not None else None
+        max_processings = int(self.max_processings) if self.max_processings is not None else None
         gl = self.global_limits
-        glimit = gl.max_processings if gl is not None else None
+        global_max_processings = gl.max_processings if gl is not None else None
 
-        def _slot_ok():
-            svc_ok = limit is None or self._processings < limit
-            glob_ok = glimit is None or gl.active_processings < glimit
-            return svc_ok and glob_ok
+        def _has_free_slot():
+            has_service_slot = max_processings is None or self._processings < max_processings
+            has_global_slot = global_max_processings is None or gl.active_processings < global_max_processings
+            return has_service_slot and has_global_slot
 
         while True:
             # the global cap is checked and counted in one step, so two
             # processes cannot both take the last slot
-            if (limit is None or self._processings < limit) and (gl is None or gl.try_begin_processing()):
+            if (max_processings is None or self._processings < max_processings) and (gl is None or gl.try_begin_processing()):
                 self._processings += 1
                 session.processing = True
                 return
             # arm the wake-up, then re-check once: a release between the failed
             # check above and clear() would otherwise be swallowed (lost wakeup)
             self._slot_free.clear()
-            if _slot_ok():
+            if _has_free_slot():
                 continue
             if gl is not None:
                 # the wait strategy belongs to the limits implementation: the
@@ -1475,7 +1475,7 @@ class SmtpdServer:
                         raise Smtpd421CloseException('Abort connection for unsupported PROXY parameters!')
                 if SmtpdEvent.ON_PROXY_EVENT in self.emit_events:
                     return_value = await self._emit_and_return_value(
-                        SmtpdEvent.ON_PROXY_EVENT, ctx, proxy_data, fault=Smtpd421CloseException
+                        SmtpdEvent.ON_PROXY_EVENT, ctx, proxy_data, error_cls=Smtpd421CloseException
                     )
                     # None keeps the parsed data, a dict updates its fields (also
                     # {}), else a fault of the handler
@@ -1914,7 +1914,7 @@ class SmtpdServer:
                 # and rset command sequence
                 self.process_reset_session(session)
 
-    async def _emit_and_return_value(self, event, ctx, *args, fault=Smtpd451Exception):
+    async def _emit_and_return_value(self, event, ctx, *args, error_cls=Smtpd451Exception):
         """
         Emit an event and return the value of its handler.
 
@@ -1926,7 +1926,7 @@ class SmtpdServer:
 
         ### Keyword Args
 
-        - **fault** (type): The SmtpdException that answers any other exception
+        - **error_cls** (type): The SmtpdException that answers any other exception
             of the handler. Defaults to Smtpd451Exception.
 
         ### Returns
@@ -1940,7 +1940,7 @@ class SmtpdServer:
             raise
         # any other handler fault is answered by the given exception
         except Exception as e:  # noqa: B902
-            raise fault(f'{e} ({type(e).__name__})') from e
+            raise error_cls(f'{e} ({type(e).__name__})') from e
 
     # ---- authentication -----------------------------------------------------
 
@@ -1999,7 +1999,9 @@ class SmtpdServer:
                 raise Smtpd535Exception
             # call event function to test credentials
             # any other handler fault is a temporary failure (RFC 4954 section 6)
-            return_value = await self._emit_and_return_value(SmtpdEvent.ON_AUTH_EVENT, session.ctx, *auth_values, fault=Smtpd454Exception)
+            return_value = await self._emit_and_return_value(
+                SmtpdEvent.ON_AUTH_EVENT, session.ctx, *auth_values, error_cls=Smtpd454Exception
+            )
             # only a returned authorization id grants the access
             if not (isinstance(return_value, str) and return_value):
                 raise Smtpd535Exception
@@ -2070,7 +2072,9 @@ class SmtpdServer:
                 raise Smtpd535Exception
             # check for valid credentials
             # any other handler fault is a temporary failure (RFC 4954 section 6)
-            return_value = await self._emit_and_return_value(SmtpdEvent.ON_AUTH_EVENT, session.ctx, *auth_values, fault=Smtpd454Exception)
+            return_value = await self._emit_and_return_value(
+                SmtpdEvent.ON_AUTH_EVENT, session.ctx, *auth_values, error_cls=Smtpd454Exception
+            )
             # only a returned authorization id grants the access
             if not (isinstance(return_value, str) and return_value):
                 raise Smtpd535Exception

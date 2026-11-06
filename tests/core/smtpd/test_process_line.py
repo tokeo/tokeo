@@ -37,7 +37,7 @@ class ProcessLineSession:
     def __init__(self):
         self.smtpd = SmtpdServer(
             ProcessLineEvents(),
-            settings={
+            options={
                 'max_processings': 1,
                 'auth_mode': 'AUTH_OPTIONAL',
                 'encrypt_mode': 'TLS_OPTIONAL',
