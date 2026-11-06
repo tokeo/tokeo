@@ -19,7 +19,7 @@ from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoDramatiqConnection
 from tokeo.ext.dramatiq import monitoring
 from tokeo.ext.dramatiq.base import _get_with_details
 from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
-from tokeo.ext.dramatiq.controller import _format_duration, _monitor_view
+from tokeo.ext.dramatiq.controller import _format_duration, _format_monitor_view
 from tokeo.ext.tui.output import TokeoTuiOutput
 from tokeo.core.exc import TokeoError
 from tests.utils import wait_until
@@ -385,7 +385,7 @@ def test_duration():
 
 def _render_view(app, snapshot, follow=None):
     output = app.tui.output
-    return output.render(*_monitor_view(output, snapshot, 'probe', follow), width=140)
+    return output.render(*_format_monitor_view(output, snapshot, 'probe', follow), width=140)
 
 
 def _make_snapshot(workers, monitoring=True, actors=None):
@@ -400,7 +400,7 @@ def _make_snapshot(workers, monitoring=True, actors=None):
     )
 
 
-def test_monitor_view(tmp):
+def test_format_monitor_view(tmp):
     """The view shows workers, running tasks, actors and the queue totals."""
     task = dict(message_id='m1', actor='send_mail', queue='mail', retries=1, started_at=0, runtime_ms=1200)
     running = [dict(task, args="(('[red]anna',), {})")]
@@ -431,7 +431,7 @@ def test_monitor_view(tmp):
 
 
 @pytest.mark.parametrize('monitoring, note', [(True, 'No worker heard of yet.'), (False, 'Monitoring is off in the config')])
-def test_monitor_view_without_workers(tmp, monitoring, note):
+def test_format_monitor_view_without_workers(tmp, monitoring, note):
     """Without workers the view says why, with monitoring on or off."""
     with DramatiqMiddlewareTest(tmp) as app:
         text = _render_view(app, _make_snapshot([], monitoring=monitoring))

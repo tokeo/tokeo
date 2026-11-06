@@ -34,8 +34,8 @@ from tokeo.ext.nicegui import (
 from tests.utils import wait_until
 from tests.utils.nicegui import NiceguiSimulation
 
-#: The routes of the tests, _pages of this module
-ROUTES = dict(routes=f'{__name__}:_pages')
+#: The routes of the tests, _map_pages of this module
+ROUTES = dict(routes=f'{__name__}:_map_pages')
 
 
 class NiceguiTest(TokeoTest):
@@ -57,7 +57,7 @@ class NiceguiPdocTest(NiceguiTest):
         extensions = ['tokeo.ext.print', 'tokeo.ext.pdoc', 'tokeo.ext.nicegui']
 
 
-def _pages():
+def _map_pages():
     # the route handler of the tests: a page with the ux helper and an api
     @ui.page('/')
     def index():

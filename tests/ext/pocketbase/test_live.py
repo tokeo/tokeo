@@ -53,7 +53,7 @@ class LiveTest(TokeoTest):
     def __init__(self, url, **pocketbase):
         config = init_defaults('pocketbase', 'nicegui')
         config['pocketbase'].update(url=url, auth_identity=SUPERUSER[0], auth_password=SUPERUSER[1], **pocketbase)
-        config['nicegui'].update(routes=f'{__name__}:_pages', binding_refresh_interval=0.05)
+        config['nicegui'].update(routes=f'{__name__}:_map_pages', binding_refresh_interval=0.05)
         super().__init__(argv=[], config_defaults=config)
         LiveTest.running = self
 
@@ -84,7 +84,7 @@ async def _show_orders_page(feed, filter=None):
     await feed.follow('orders/*', on_order, reload, filter=filter)
 
 
-def _pages():
+def _map_pages():
     # the route handler: a dashboard, a page of a user and a page split by filter
     live = LiveTest.running.nicegui.pb.live
 

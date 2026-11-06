@@ -16,7 +16,7 @@ from tests.ext.diskcache.diskcache_tests_helper import (
     Connections,
     run_in_threads,
     get_max_overlap,
-    spawn_context,
+    get_spawn_context,
     collect_results,
     stop_processes,
 )
@@ -385,7 +385,7 @@ def test_temper_process_max_concurrency(tmp):
     """Of 6 processes with count 2 never more than 2 run at once."""
     count = 2
     workers = 6
-    ctx = spawn_context()
+    ctx = get_spawn_context()
     result_queue = ctx.Queue()
     # fmt: off
     procs = [
@@ -495,7 +495,7 @@ def test_throttle_process_max_rate(tmp):
     workers = 10
     # a large window keeps refill negligible during the (spawn) startup spread
     per_seconds = 3600
-    ctx = spawn_context()
+    ctx = get_spawn_context()
     result_queue = ctx.Queue()
     procs = [
         ctx.Process(

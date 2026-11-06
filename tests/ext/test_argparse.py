@@ -62,7 +62,7 @@ def no_colors(monkeypatch):
     monkeypatch.setenv('PYTHON_COLORS', '0')
 
 
-def _help(argv, capsys):
+def _get_help(argv, capsys):
     # the help the test app prints for argv, a --help ends in SystemExit
     with ArgparseTest(argv=argv) as app:
         try:
@@ -103,14 +103,14 @@ def test_controller_parsers_use_the_tokeo_help_formatter():
 
 def test_controller_without_a_command_prints_its_help(capsys):
     """Without a command the base controller prints its help and returns."""
-    text = _help([], capsys)
+    text = _get_help([], capsys)
     assert text.startswith('usage: tokeo_test')
     assert 'sub-commands:' in text
 
 
 def test_controller_nested_without_a_command_prints_its_help(capsys):
     """'nested' without a command prints the help of the nested controller."""
-    text = _help(['nested'], capsys)
+    text = _get_help(['nested'], capsys)
     assert text.startswith('usage: tokeo_test nested')
     assert _get_commands(text) == ['  inner    inner help']
 
@@ -129,7 +129,7 @@ def test_controller_help_exits_with_0(capsys):
 
 def test_help_lists_the_commands_sorted_by_name(capsys):
     """zeta, alpha and the nested controller are listed as alpha, nested, zeta."""
-    names = [line.split()[0] for line in _get_commands(_help(['--help'], capsys))]
+    names = [line.split()[0] for line in _get_commands(_get_help(['--help'], capsys))]
     assert names == ['alpha', 'nested', 'zeta']
 
 
@@ -157,14 +157,14 @@ def test_iter_indented_subactions_of_an_object_without_subactions_is_empty():
 def test_help_aligns_the_help_of_the_commands(capsys):
     """Each help starts 4 spaces after the longest command name, 'nested'."""
     gap, column = len('  nested'), len('  nested    ')
-    lines = _get_commands(_help(['--help'], capsys))
+    lines = _get_commands(_get_help(['--help'], capsys))
     assert [line[gap:column] for line in lines] == ['    '] * 3
     assert [line[column] for line in lines] == ['a', 'n', 'z']
 
 
 def test_help_of_a_command_is_expanded(capsys):
     """%(prog)s and %% in the help of a command are expanded."""
-    assert '  alpha     alpha help of tokeo_test at 100%' in _get_commands(_help(['--help'], capsys))
+    assert '  alpha     alpha help of tokeo_test at 100%' in _get_commands(_get_help(['--help'], capsys))
 
 
 def test_format_action_of_a_command_without_help_shows_its_name():
@@ -192,6 +192,6 @@ def test_fill_text_indents_each_line_and_appends_a_spacer():
 
 def test_help_keeps_the_description_and_epilog_as_written(capsys):
     """The description is not rewrapped and both texts end with the spacer."""
-    text = _help(['--help'], capsys)
+    text = _get_help(['--help'], capsys)
     assert f'{DESCRIPTION} \n \n' in text
     assert text.endswith('the epilog \n \n')

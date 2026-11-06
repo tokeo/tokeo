@@ -55,7 +55,7 @@ def test_connections_are_completed_by_their_defaults():
 def test_tasks_are_read_and_expanded():
     """
     The tasks are read and expanded; func and module are left out,
-    test_tasks_task1_runs_locally runs one of the functions.
+    test_run_calls_a_task_with_its_runner runs one of the functions.
     """
     with AutomateTest() as app:
         tasks = app.automate.tasks
@@ -90,7 +90,7 @@ def test_run_reports_a_missing_task_function():
     assert 'A function named "no_such_task" does not exist' in results[0].stderr
 
 
-def _connect_timeout(connect_timeout):
+def _get_connect_timeout(connect_timeout):
     # the timeout a task hands to the ssh client of a remote host, no server
     # is contacted to build the connection
     test_defaults = init_defaults('automate')
@@ -98,21 +98,21 @@ def _connect_timeout(connect_timeout):
         task1=dict(module='tests.ext.automate.automate_tests_helper', connection=dict(hosts='10.0.0.1', connect_timeout=connect_timeout)),
     )
     with AutomateTest(config_defaults=test_defaults) as app:
-        (run,) = app.automate._run_connections(app.automate.tasks['task1'])
+        (run,) = app.automate._build_run_connections(app.automate.tasks['task1'])
         return run['context'].connect_kwargs.get('timeout')
 
 
 @pytest.mark.parametrize('value, expected', [(30, 30), (2.5, 2.5), ('5.5', 5.5), (None, None)])
 def test_connect_timeout_takes_numbers_and_numeric_strings(value, expected):
     """connect_timeout takes seconds as number or as text, null sets none."""
-    assert _connect_timeout(value) == expected
+    assert _get_connect_timeout(value) == expected
 
 
 @pytest.mark.parametrize('value', [True, 0, -1, 'x'])
 def test_connect_timeout_that_is_no_number_greater_than_0_raises(value):
     """A connect_timeout that is no number of seconds greater than 0 raises."""
     with pytest.raises(TokeoAutomateError, match='connect_timeout must be a number of seconds greater than 0'):
-        _connect_timeout(value)
+        _get_connect_timeout(value)
 
 
 def test_task_module_that_is_no_string_raises():

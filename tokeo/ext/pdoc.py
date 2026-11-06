@@ -774,7 +774,7 @@ class TokeoPdoc(Handler):
                     dirs_exist_ok=True,
                 )
 
-    def _config_sections(self, config_file, lines, parsed):
+    def _split_config_sections(self, config_file, lines, parsed):
         """Slice a config file into its top-level sections.
 
         For every top-level yaml key this returns the comment block written
@@ -878,7 +878,7 @@ class TokeoPdoc(Handler):
                         'content': lines,
                         'yaml': parsed,
                         'description': _strip_comment_markers('\n'.join(lines[: _get_yaml_header_end(lines)])),
-                        'sections': self._config_sections(
+                        'sections': self._split_config_sections(
                             config_file,
                             lines,
                             parsed,

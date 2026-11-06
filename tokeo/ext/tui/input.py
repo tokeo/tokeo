@@ -18,7 +18,7 @@ when the extension is enabled.
 ### Example
 
 ```python
-def command(line):
+def run_command(line):
     if line in ('exit', 'quit'):
         raise EOFError()
     app.print(f'you entered {line}')
@@ -26,7 +26,7 @@ def command(line):
     return True
 
 completer = {'exit': None, 'quit': None}
-app.tui.input.shell(command, prompt='MyApp> ', completer=completer)
+app.tui.input.shell(run_command, prompt='MyApp> ', completer=completer)
 ```
 
 """

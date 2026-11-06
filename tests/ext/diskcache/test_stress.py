@@ -23,7 +23,7 @@ from tests.ext.diskcache.diskcache_tests_helper import (
     DiskcacheTest,
     Connections,
     get_max_overlap,
-    spawn_context,
+    get_spawn_context,
     collect_results,
     stop_processes,
 )
@@ -292,7 +292,7 @@ def _merge(reports):
     return merged
 
 
-def _throttle_excess(times, count, per_seconds):
+def _get_throttle_excess(times, count, per_seconds):
     # the most runs any time window had above what the bucket allows
     times, rate, worst = sorted(times), count / per_seconds, 0
     for i, start in enumerate(times):
@@ -302,7 +302,7 @@ def _throttle_excess(times, count, per_seconds):
     return worst
 
 
-def _get_runs_after(report, since):
+def _get_report_after(report, since):
     # the runs that started after a point in time
     tail = dict(report, mutex=[item for item in report['mutex'] if item[0] > since])
     tail['tempers'] = {name: [item for item in items if item[0] > since] for name, items in report['tempers'].items()}
@@ -316,7 +316,7 @@ def _show(report, title):
         print(f'{title}: {name} count={count} runs={len(report["tempers"][name])} overlap={get_max_overlap(report["tempers"][name])}')
     for name, (count, per_seconds, _) in THROTTLES.items():
         times = report['throttles'][name]
-        print(f'{title}: {name} runs={len(times)} excess={_throttle_excess(times, count, per_seconds):.2f}')
+        print(f'{title}: {name} runs={len(times)} excess={_get_throttle_excess(times, count, per_seconds):.2f}')
 
 
 def _run_stress(directory, monkeypatch, purge):
@@ -326,7 +326,7 @@ def _run_stress(directory, monkeypatch, purge):
     seed = SEED + purge
     print(f'\nSTRESS_SEED={SEED} purge={purge} seconds={SECONDS}')
     connections = Connections(monkeypatch)
-    ctx = spawn_context()
+    ctx = get_spawn_context()
     result_queue = ctx.Queue()
     with DiskcacheTest(directory) as app:
         app.cache.set('counter', 0)
@@ -354,7 +354,7 @@ def _run_stress(directory, monkeypatch, purge):
     print(f'counter={counter} increments={report["counter"]} lost locks={len(report["lost"])}')
     _show(report, 'all')
     if purge:
-        _show(_get_runs_after(report, max(report['purges'])), 'tail')
+        _show(_get_report_after(report, max(report['purges'])), 'tail')
     return report, counter, warnings, integrity, connections
 
 
@@ -386,4 +386,4 @@ def test_stress_runs_without_errors_or_wrong_values(tmp_path, monkeypatch, purge
     assert get_max_overlap(report['mutex']) == 1
     for name, (count, per_seconds, _) in THROTTLES.items():
         assert len(report['throttles'][name]) > 0
-        assert _throttle_excess(report['throttles'][name], count, per_seconds) <= 0
+        assert _get_throttle_excess(report['throttles'][name], count, per_seconds) <= 0

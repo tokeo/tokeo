@@ -214,7 +214,7 @@ def test_output_of_other_threads_appears_above_the_prompt():
 PROBE = 'tests.ext.tui.tui_tests_input_probe'
 
 
-def _probe():
+def _start_probe():
     """The probe in a pseudo terminal that is its controlling terminal."""
     return Terminal([sys.executable, '-m', PROBE], rows=12, columns=80, ctty=True)
 
@@ -223,7 +223,7 @@ def _probe():
 @pytest.mark.parametrize('signum', [signal.SIGTERM, signal.SIGHUP], ids=['sigterm', 'sighup'])
 def test_shutdown_signal_ends_the_waiting_prompt(signum):
     """SIGTERM or SIGHUP at the waiting prompt end the probe by 0, no ENTER."""
-    with _probe() as terminal:
+    with _start_probe() as terminal:
         assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
         terminal.process.send_signal(signum)
         code = terminal.wait()
@@ -234,7 +234,7 @@ def test_shutdown_signal_ends_the_waiting_prompt(signum):
 @needs_pty
 def test_sigint_and_ctrl_c_at_the_prompt_keep_the_shell():
     """A SIGINT and a Ctrl-C at the prompt clear the line, the shell goes on."""
-    with _probe() as terminal:
+    with _start_probe() as terminal:
         assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
         terminal.process.send_signal(signal.SIGINT)
         terminal.send(f'abc{CTRL_C}'.encode())
@@ -247,7 +247,7 @@ def test_sigint_and_ctrl_c_at_the_prompt_keep_the_shell():
 @needs_pty
 def test_ctrl_c_aborts_the_running_command():
     """Ctrl-C while the command slow runs aborts it, the prompt comes back."""
-    with _probe() as terminal:
+    with _start_probe() as terminal:
         assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
         terminal.send(b'slow\r')
         assert terminal.wait_for(lambda lines: 'MARK-SLOW-START' in lines)
@@ -263,7 +263,7 @@ def test_ctrl_c_aborts_the_running_command():
 @needs_pty
 def test_sigterm_ends_the_running_command_and_the_shell():
     """SIGTERM while slow runs ends the probe by 0, the command does not finish."""
-    with _probe() as terminal:
+    with _start_probe() as terminal:
         assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
         terminal.send(b'slow\r')
         assert terminal.wait_for(lambda lines: 'MARK-SLOW-START' in lines)
@@ -273,7 +273,7 @@ def test_sigterm_ends_the_running_command_and_the_shell():
     assert b'MARK-SLOW-END' not in terminal.raw
 
 
-def _probe_logging(log_file, ctty=True):
+def _start_probe_logging(log_file, ctty=True):
     """The probe in a pseudo terminal, logging into log_file as well."""
     return Terminal([sys.executable, '-m', PROBE, str(log_file)], rows=12, columns=80, ctty=ctty)
 
@@ -283,7 +283,7 @@ def _probe_logging(log_file, ctty=True):
 def test_closed_or_moved_stdin_keeps_the_shell(tmp_path, line):
     """Stdin closed or moved to /dev/null: the shell reads on, exit ends it by 0."""
     log_file = tmp_path / 'probe.log'
-    with _probe_logging(log_file) as terminal:
+    with _start_probe_logging(log_file) as terminal:
         assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
         terminal.send(f'{line}\r'.encode())
         terminal.send(b'hello\r')
@@ -299,7 +299,7 @@ def test_closed_or_moved_stdin_keeps_the_shell(tmp_path, line):
 def test_lost_terminal_ends_the_shell_with_one_error(tmp_path, ctty):
     """A terminal that goes away ends the probe by 0 after one error."""
     log_file = tmp_path / 'probe.log'
-    with _probe_logging(log_file, ctty=ctty) as terminal:
+    with _start_probe_logging(log_file, ctty=ctty) as terminal:
         assert terminal.wait_for(lambda lines: lines[-1] == 'Probe>'), '\n'.join(terminal.screen.display)
         # the terminal goes away: its master side closes
         os.close(terminal.master)

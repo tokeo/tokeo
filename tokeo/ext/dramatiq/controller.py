@@ -218,12 +218,14 @@ class TokeoDramatiqController(Controller):
             return
         output = self.app.tui.output
         if not pargs.follow:
-            output.print(*_monitor_view(output, monitor.snapshot(), self.app._meta.label))
+            output.print(*_format_monitor_view(output, monitor.snapshot(), self.app._meta.label))
         elif pargs.json:
             output.follow(lambda: json.dumps(monitor.snapshot(wait=interval)), interval=0, repaint=False)
         else:
             # listening fills the time between two displays
-            output.follow(lambda: _monitor_view(output, monitor.snapshot(wait=interval), self.app._meta.label, interval), interval=0)
+            output.follow(
+                lambda: _format_monitor_view(output, monitor.snapshot(wait=interval), self.app._meta.label, interval), interval=0
+            )
 
     # ---- serve --------------------------------------------------------------
 
@@ -539,7 +541,7 @@ def _format_duration(ms):
     return f'{hours}h {minutes}m' if hours else f'{minutes}m {seconds}s'
 
 
-def _monitor_view(output, snapshot, label, follow=None):
+def _format_monitor_view(output, snapshot, label, follow=None):
     """
     Format a monitor snapshot as header and tables.
 

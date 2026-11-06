@@ -39,7 +39,7 @@ class ValueEvents(SmtpdEvents):
         return True
 
 
-def _reply(mode, lines):
+def _get_last_reply_code(mode, lines):
     """Run the lines, after a HELO if needed, and return the last reply code."""
     commands = [line + b'\r\n' for line in lines]
     if not lines[0].upper().startswith((b'HELO', b'EHLO')):
@@ -73,7 +73,7 @@ MODES = ['WHITESPACE_MODERATE', 'WHITESPACE_STRICT', 'WHITESPACE_UNSAFE']
 )
 def test_replies_per_mode(line, expected):
     """Each line answers per whitespace_mode as agreed in the table of the modes."""
-    assert tuple(_reply(mode, [line]) for mode in MODES) == expected
+    assert tuple(_get_last_reply_code(mode, [line]) for mode in MODES) == expected
 
 
 @pytest.mark.parametrize(
@@ -117,7 +117,7 @@ def test_mail_from_value_per_mode(mode, line, value):
 def test_mail_from_param_after_no_break_space(mode, expected):
     """MODERATE splits a parameter at a no-break space, others refuse it."""
     line = 'MAIL FROM:<a@x>\xa0SIZE=1'.encode()
-    assert _reply(mode, [line]) == expected
+    assert _get_last_reply_code(mode, [line]) == expected
 
 
 @pytest.mark.parametrize(
@@ -127,7 +127,7 @@ def test_mail_from_param_after_no_break_space(mode, expected):
 def test_rcpt_to_param_after_no_break_space(mode, expected):
     """RCPT TO answers any parameter by 555, STRICT the unusual char by 501."""
     line = 'RCPT TO:<b@y>\xa0NOTIFY=NEVER'.encode()
-    assert _reply(mode, [b'MAIL FROM:<a@x>', line]) == expected
+    assert _get_last_reply_code(mode, [b'MAIL FROM:<a@x>', line]) == expected
 
 
 def test_helo_without_domain_and_without_handler_answers_501():

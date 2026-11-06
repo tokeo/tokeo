@@ -75,7 +75,7 @@ def test_events_handler_carries_the_app():
 # ---- unit: topology planning ------------------------------------------------
 
 
-def _make_svc(name, pre_fork=0):
+def _make_plan_service(name, pre_fork=0):
     svc = {'name': name, 'server_options': {}}
     if pre_fork:
         svc['server_options']['pre_fork'] = pre_fork
@@ -85,30 +85,30 @@ def _make_svc(name, pre_fork=0):
 def test_plan_single_service_stays_in_main_process():
     """One service with pre_fork up to 1 runs in the main process."""
     for pre_fork in (0, 1):
-        plan = _build_plan([_make_svc('mx1', pre_fork)], has_global_limit=True)
-        assert plan['inloop'] == [_make_svc('mx1', pre_fork)]
+        plan = _build_plan([_make_plan_service('mx1', pre_fork)], has_global_limit=True)
+        assert plan['inloop'] == [_make_plan_service('mx1', pre_fork)]
         assert plan['forks'] == [] and plan['shared'] is False
 
 
 def test_plan_single_service_prefork_main_is_worker_one():
     """One service with pre_fork 3 runs in main plus 2 forks on one port."""
-    plan = _build_plan([_make_svc('mx1', 3)], has_global_limit=True)
+    plan = _build_plan([_make_plan_service('mx1', 3)], has_global_limit=True)
     assert plan['inloop'][0]['name'] == 'mx1'  # main process serves
-    assert plan['forks'] == [(_make_svc('mx1', 3), 2)]  # plus N-1 workers
+    assert plan['forks'] == [(_make_plan_service('mx1', 3), 2)]  # plus N-1 workers
     assert plan['reuse'] == {'mx1'}
     assert plan['shared'] is True
 
 
 def test_plan_multi_services_rules():
     """Of several services only pre_fork 0 stays in main, all others fork."""
-    services = [_make_svc('mx1', 5), _make_svc('mx2'), _make_svc('mx3', 1)]
+    services = [_make_plan_service('mx1', 5), _make_plan_service('mx2'), _make_plan_service('mx3', 1)]
     plan = _build_plan(services, has_global_limit=True)
     assert [svc['name'] for svc in plan['inloop']] == ['mx2']
     assert [(svc['name'], count) for svc, count in plan['forks']] == [('mx1', 5), ('mx3', 1)]
     assert plan['reuse'] == {'mx1'}  # only groups > 1 share a port
     assert plan['shared'] is True
     # all services forked: the master only supervises
-    plan = _build_plan([_make_svc('mx1', 2), _make_svc('mx2', 1)], has_global_limit=False)
+    plan = _build_plan([_make_plan_service('mx1', 2), _make_plan_service('mx2', 1)], has_global_limit=False)
     assert plan['inloop'] == [] and plan['shared'] is False
 
 
@@ -116,7 +116,7 @@ def test_plan_multi_services_rules():
 def test_plan_refuses_a_pre_fork_that_is_no_count(pre_fork):
     """A pre_fork that is no integer of 0 or more names the service, none starts."""
     with pytest.raises(TokeoSmtpdError, match=f"smtpd: service 'mx1': pre_fork must be an integer of 0 or more, not {pre_fork!r}"):
-        _build_plan([_make_svc('mx1', pre_fork)], has_global_limit=False)
+        _build_plan([_make_plan_service('mx1', pre_fork)], has_global_limit=False)
 
 
 # ---- unit: shared limits ----------------------------------------------------

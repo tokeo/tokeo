@@ -44,7 +44,7 @@ def _make_server():
     return SmtpdServer(events), events
 
 
-def _expect(events, severity, msg):
+def _check_log_line(events, severity, msg):
     assert events.log_ctx is None
     assert events.log_severity is severity
     assert events.log_msg == msg
@@ -55,35 +55,35 @@ def test_log_info():
     """logger.info reaches on_logging_event with INFO and no ctx."""
     smtpd, events = _make_server()
     smtpd.logger.info('A simple info message.')
-    _expect(events, Severity.INFO, 'A simple info message.')
+    _check_log_line(events, Severity.INFO, 'A simple info message.')
 
 
 def test_log_warning():
     """logger.warning reaches on_logging_event with WARNING and no ctx."""
     smtpd, events = _make_server()
     smtpd.logger.warning('A simple warning message.')
-    _expect(events, Severity.WARNING, 'A simple warning message.')
+    _check_log_line(events, Severity.WARNING, 'A simple warning message.')
 
 
 def test_log_error():
     """logger.error reaches on_logging_event with ERROR and no ctx."""
     smtpd, events = _make_server()
     smtpd.logger.error('A simple error message.')
-    _expect(events, Severity.ERROR, 'A simple error message.')
+    _check_log_line(events, Severity.ERROR, 'A simple error message.')
 
 
 def test_log_critical():
     """logger.critical reaches on_logging_event with CRITICAL and no ctx."""
     smtpd, events = _make_server()
     smtpd.logger.critical('A simple critical message.')
-    _expect(events, Severity.CRITICAL, 'A simple critical message.')
+    _check_log_line(events, Severity.CRITICAL, 'A simple critical message.')
 
 
 def test_log_debug():
     """logger.debug reaches on_logging_event with DEBUG and no ctx."""
     smtpd, events = _make_server()
     smtpd.logger.debug('A simple debug message.')
-    _expect(events, Severity.DEBUG, 'A simple debug message.')
+    _check_log_line(events, Severity.DEBUG, 'A simple debug message.')
 
 
 def test_on_logging_event_with_context_and_err():

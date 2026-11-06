@@ -35,7 +35,7 @@ class NiceguiSimulation:
 
     ```python
     def test_page_shows_label():
-        with NiceguiTest(routes='tests.ext.nicegui.test_nicegui:_pages') as app:
+        with NiceguiTest(routes='tests.ext.nicegui.test_nicegui:_map_pages') as app:
 
             async def visit(simulation):
                 user = simulation.user()

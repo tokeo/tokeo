@@ -1443,7 +1443,7 @@ class TokeoAutomate(MetaMixin):
             self._get_tasks()
         return self._tasks
 
-    def _run_connections(self, task):
+    def _build_run_connections(self, task):
         # create the invokable connections
         run_connections = []
         connection = task.get('connection', {})
@@ -1570,7 +1570,7 @@ class TokeoAutomate(MetaMixin):
         """
         # list results for all connections
         results = []
-        run_connections = self._run_connections(task)
+        run_connections = self._build_run_connections(task)
         try:
             for run_connection in run_connections:
                 if len(filter_host_ids) == 0 or run_connection['host_id'] in filter_host_ids:

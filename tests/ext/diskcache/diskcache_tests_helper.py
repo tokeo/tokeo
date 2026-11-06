@@ -80,7 +80,7 @@ def run_in_threads(func, workers=4):
         return list(pool.map(lambda _: func(), range(workers)))
 
 
-def spawn_context():
+def get_spawn_context():
     # always use spawn for the multiprocessing tests; fork would inherit the
     # parent's open sqlite/diskcache handles and segfault on some platforms
     # (e.g. macos). spawn starts a clean interpreter and is stable everywhere.

@@ -112,7 +112,7 @@ class TokeoDramatiqQueues:
 
     # ---- names --------------------------------------------------------------
 
-    def _get_actors(self):
+    def _get_actors_by_queue(self):
         broker = self._dramatiq.broker
         # the cli knows no actors until their module is imported
         if not broker.get_declared_actors():
@@ -135,7 +135,7 @@ class TokeoDramatiqQueues:
         - **list**: The sorted queue names
 
         """
-        return sorted(self._get_actors())
+        return sorted(self._get_actors_by_queue())
 
     def _get_queue_names(self, names):
         if names is None:
@@ -166,7 +166,7 @@ class TokeoDramatiqQueues:
         : ```delayed``` misses the messages workers have prefetched already
 
         """
-        actors = self._get_actors()
+        actors = self._get_actors_by_queue()
         names = self._get_queue_names(names)
         key = tuple(names)
         # one lock for check and query, waiting callers get the fresh state

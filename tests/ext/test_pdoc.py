@@ -152,7 +152,7 @@ def test_strip_comment_markers_handles_empty_input():
         ([], 0),
     ],
 )
-def test_yaml_header_end(lines, expected):
+def test_get_yaml_header_end(lines, expected):
     """The header ends after "---", 0 without one."""
     assert _get_yaml_header_end(lines) == expected
 
@@ -452,7 +452,7 @@ def base_sections(app):
     """The sections extracted from BASE_YAML as config base."""
     import yaml
 
-    return app.pdoc._config_sections('base', BASE_YAML.split('\n'), yaml.safe_load(BASE_YAML))
+    return app.pdoc._split_config_sections('base', BASE_YAML.split('\n'), yaml.safe_load(BASE_YAML))
 
 
 @pytest.fixture
@@ -462,16 +462,16 @@ def local_sections(app):
 
     from tokeo.core.vaults import VaultLoader
 
-    return app.pdoc._config_sections('development.local', LOCAL_YAML.split('\n'), yaml.load(LOCAL_YAML, Loader=VaultLoader))
+    return app.pdoc._split_config_sections('development.local', LOCAL_YAML.split('\n'), yaml.load(LOCAL_YAML, Loader=VaultLoader))
 
 
-def test_config_sections_extracts_intro_and_source(base_sections):
+def test_split_config_sections_extracts_intro_and_source(base_sections):
     """Each section gets the comment above as intro and its yaml as source."""
     assert base_sections['smtp']['intro'] == ('Outgoing mail.\nSecond line of the intro.')
     assert base_sections['smtp']['source'] == ('smtp:\n  host: localhost\n  port: 25')
 
 
-def test_config_sections_block_ends_at_a_dotted_key(base_sections):
+def test_split_config_sections_block_ends_at_a_dotted_key(base_sections):
     """ "log.colorlog:" ends the block before it."""
     # pdoc3's `^([a-zA-Z0-9]+:$|#)` knew no dots, so `log.colorlog:` did not
     # end the previous block and its source leaked into `smtp`
@@ -479,20 +479,21 @@ def test_config_sections_block_ends_at_a_dotted_key(base_sections):
     assert base_sections['log.colorlog']['source'] == 'log.colorlog:\n  level: info'
 
 
-def test_config_sections_masks_only_the_vault_values(local_sections):
+def test_split_config_sections_masks_only_the_vault_values(local_sections):
     """A !vault: value shows as ***, the other values, comments and order stay."""
     assert local_sections['smtp']['source'] == 'smtp:\n  password: ***  # the mail password\n  host: mail.internal'
 
 
-def test_config_sections_hides_a_source_it_cannot_read(app):
+def test_split_config_sections_hides_a_source_it_cannot_read(app):
     """A block that is no valid yaml shows a note instead of its text."""
     lines = ['smtp:', '  password: !vault:dev "open']
-    assert app.pdoc._config_sections('base', lines, {'smtp': None})['smtp']['source'].startswith('# source hidden, could not be read')
+    sections = app.pdoc._split_config_sections('base', lines, {'smtp': None})
+    assert sections['smtp']['source'].startswith('# source hidden, could not be read')
 
 
-def test_config_sections_returns_empty_for_a_non_mapping(app):
+def test_split_config_sections_returns_empty_for_a_non_mapping(app):
     """A yaml list gives {}."""
-    assert app.pdoc._config_sections('base', ['- a', '- b'], ['a', 'b']) == {}
+    assert app.pdoc._split_config_sections('base', ['- a', '- b'], ['a', 'b']) == {}
 
 
 # ---- config page: which files appear and in what order ----------------------
@@ -667,7 +668,7 @@ def _stub_dirs(app, monkeypatch, dirs):
     monkeypatch.setattr(app.pdoc, '_resolve_docstrings_dirs', lambda: [])
 
 
-def test_watch_dirs_drops_directories_outside_the_project(app, tmp_path, monkeypatch):
+def test_get_watch_dirs_drops_directories_outside_the_project(app, tmp_path, monkeypatch):
     """Directories outside the project are not watched but reported."""
     # an installed tokeo lives in site-packages and is never edited there,
     # so it must not be watched, but it has to be reported back
@@ -693,7 +694,7 @@ def test_watch_dirs_drops_directories_outside_the_project(app, tmp_path, monkeyp
     assert outside == [str(outside_dir)]
 
 
-def test_watch_dirs_collapses_nested_directories(app, tmp_path, monkeypatch):
+def test_get_watch_dirs_collapses_nested_directories(app, tmp_path, monkeypatch):
     """A directory inside a watched one is not watched twice."""
     project = tmp_path / 'project'
     (project / 'spiral' / 'core').mkdir(parents=True)
@@ -710,7 +711,7 @@ def test_watch_dirs_collapses_nested_directories(app, tmp_path, monkeypatch):
     assert app.pdoc._get_watch_dirs()[0] == [str(project / 'spiral')]
 
 
-def test_watch_dirs_does_not_confuse_a_prefix_with_a_parent(
+def test_get_watch_dirs_does_not_confuse_a_prefix_with_a_parent(
     app,
     tmp_path,
     monkeypatch,
@@ -728,7 +729,7 @@ def test_watch_dirs_does_not_confuse_a_prefix_with_a_parent(
     assert app.pdoc._get_watch_dirs()[0] == [str(project / 'app')]
 
 
-def test_watch_dirs_includes_the_docstrings_dirs(app, tmp_path, monkeypatch):
+def test_get_watch_dirs_includes_the_docstrings_dirs(app, tmp_path, monkeypatch):
     """The directories of the docstrings are watched too."""
     # the decorator snippets are watched too, so editing one rebuilds. Cannot
     # use _stub_dirs() here: that helper pins _resolve_docstrings_dirs to []
@@ -752,7 +753,7 @@ def test_watch_dirs_includes_the_docstrings_dirs(app, tmp_path, monkeypatch):
     assert sorted(Path(d).name for d in dirs) == ['snippets', 'spiral']
 
 
-def test_watch_dirs_includes_the_config_dir_when_appenv_is_loaded(
+def test_get_watch_dirs_includes_the_config_dir_when_appenv_is_loaded(
     app,
     tmp_path,
     monkeypatch,
@@ -1203,7 +1204,7 @@ def test_serve_raises_a_clean_error_when_the_port_is_taken(tmp_path):
 # ---- startup output and the hidden --restart flag ---------------------------
 
 
-def test_documented_lists_the_configured_modules(app, monkeypatch):
+def test_get_documented_names_lists_the_configured_modules(app, monkeypatch):
     """The summary lists the configured modules, tokeo included."""
     # the summary says what is *documented*; an installed tokeo is
     # documented even though --watch never observes it
@@ -1213,7 +1214,7 @@ def test_documented_lists_the_configured_modules(app, monkeypatch):
     assert app.pdoc._get_documented_names() == ['spiral', 'tests', 'tokeo']
 
 
-def test_documented_appends_config_when_the_page_is_written(app, monkeypatch):
+def test_get_documented_names_appends_config_when_the_page_is_written(app, monkeypatch):
     """With the config page shown "config" is listed last."""
     import types
 
@@ -1229,7 +1230,7 @@ def test_documented_appends_config_when_the_page_is_written(app, monkeypatch):
     assert app.pdoc._get_documented_names() == ['spiral', 'config']
 
 
-def test_documented_omits_config_when_disabled(app, monkeypatch):
+def test_get_documented_names_omits_config_when_disabled(app, monkeypatch):
     """Without the config page "config" is not listed."""
     import types
 
@@ -1245,7 +1246,7 @@ def test_documented_omits_config_when_disabled(app, monkeypatch):
     assert app.pdoc._get_documented_names() == ['spiral']
 
 
-def test_documented_keeps_the_specs_as_configured(app, monkeypatch):
+def test_get_documented_names_keeps_the_specs_as_configured(app, monkeypatch):
     """Dotted modules are listed as configured."""
     # `modules: [spiral.core, spiral.ext, tests]` documents exactly those
     # three, so shortening them to `spiral` would misreport the render
@@ -1255,7 +1256,7 @@ def test_documented_keeps_the_specs_as_configured(app, monkeypatch):
     assert app.pdoc._get_documented_names() == ['spiral.core', 'spiral.ext', 'tests']
 
 
-def test_documented_removes_duplicates_but_keeps_the_order(app, monkeypatch):
+def test_get_documented_names_removes_duplicates_but_keeps_the_order(app, monkeypatch):
     """A module named twice is listed once, in its first place."""
     app.pdoc.set_modules(['tests', 'spiral', 'tests'])
     monkeypatch.setattr(app, 'env', None, raising=False)
@@ -1323,7 +1324,7 @@ def test_set_show_config_without_argument_takes_the_config(app):
     assert app.pdoc._show_config == app.config.get('pdoc', 'show_config')
 
 
-def _watch_output(app, monkeypatch, tmp_path, restarted=False):
+def _collect_watch_output(app, monkeypatch, tmp_path, restarted=False):
     """Start a watch and return the lines it logged, by level."""
     pytest.importorskip('watchdog')
     project = tmp_path / 'project'
@@ -1348,7 +1349,7 @@ def _watch_output(app, monkeypatch, tmp_path, restarted=False):
 
 def test_watch_announces_itself_on_info(app, monkeypatch, tmp_path):
     """The watch logs one line on info."""
-    lines = _watch_output(app, monkeypatch, tmp_path)
+    lines = _collect_watch_output(app, monkeypatch, tmp_path)
 
     assert lines['info'] == ['pdoc watching for changes on project files']
 
@@ -1357,7 +1358,7 @@ def test_watch_puts_the_directory_detail_on_debug(app, monkeypatch, tmp_path):
     """The watched and skipped directories are logged on debug."""
     # the paths are noise on info level but the only way to tell why an edit
     # does nothing, so they belong on debug rather than nowhere
-    lines = _watch_output(app, monkeypatch, tmp_path)
+    lines = _collect_watch_output(app, monkeypatch, tmp_path)
 
     assert any(line.startswith('pdoc watching /') for line in lines['debug'])
     assert any('not watching' in line for line in lines['debug'])
@@ -1368,7 +1369,7 @@ def test_watch_stays_quiet_after_a_restart(app, monkeypatch, tmp_path):
     """After a restart the watch logs nothing."""
     # a restart replays the whole command, and repeating the startup output
     # would bury the one line that says what changed
-    lines = _watch_output(app, monkeypatch, tmp_path, restarted=True)
+    lines = _collect_watch_output(app, monkeypatch, tmp_path, restarted=True)
 
     assert lines['info'] == []
     assert lines['debug'] == []
@@ -1592,7 +1593,7 @@ def test_render_logs_instead_of_raising_for_watch(app, log_lines, monkeypatch):
     assert _has(log_lines, 'render failed')
 
 
-def test_module_source_dir_of_a_package(app, tmp_path, monkeypatch):
+def test_get_module_source_dir_of_a_package(app, tmp_path, monkeypatch):
     """The source directory of a package is its own directory."""
     import importlib
     import types

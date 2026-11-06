@@ -64,10 +64,10 @@ class _Server:
         connection = self.connections.pop(0)
         if isinstance(connection, int):
             return httpx.Response(connection)
-        stream = self._stream_events if self.asynchronous else self._stream
+        stream = self._stream_events_async if self.asynchronous else self._stream_events
         return httpx.Response(200, headers={'content-type': 'text/event-stream'}, content=stream(connection, not self.connections))
 
-    def _stream(self, events, last):
+    def _stream_events(self, events, last):
         # an event in the script holds the stream until it is set
         for event in events:
             if isinstance(event, threading.Event):
@@ -77,7 +77,7 @@ class _Server:
         if last:
             self.release.wait(5)
 
-    async def _stream_events(self, events, last):
+    async def _stream_events_async(self, events, last):
         for event in events:
             if isinstance(event, asyncio.Event):
                 await event.wait()
@@ -101,12 +101,12 @@ def _make_sse(name, data):
     return f'id:c1\nevent:{name}\ndata:{json.dumps(data)}\n\n'.encode()
 
 
-def _connect(client_id):
+def _make_connect_event(client_id):
     # the first event of each connection
     return _make_sse('PB_CONNECT', {'clientId': client_id})
 
 
-def _change(topic, action, record_id):
+def _make_change_event(topic, action, record_id):
     # the event of a changed record
     return _make_sse(topic, {'action': action, 'record': {'id': record_id, 'title': f'title {record_id}'}})
 
@@ -132,7 +132,7 @@ class _SilentHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream')
         self.end_headers()
-        self.wfile.write(_connect(f'c{len(self.server.gets)}'))
+        self.wfile.write(_make_connect_event(f'c{len(self.server.gets)}'))
         self.wfile.flush()
         self.server.release.wait(10)
 
@@ -257,7 +257,7 @@ def test_realtime_event_reads_action_and_record():
 
 def test_realtime_subscribes_on_connect_by_the_login_of_the_client(realtime, server):
     """PB_CONNECT sends clientId and topics with the token, then on_connect runs."""
-    server.connections = [[_connect('c1')]]
+    server.connections = [[_make_connect_event('c1')]]
     calls = []
     realtime.on_connect = lambda: calls.append(realtime.connected.is_set())
     realtime.subscribe('posts/*', print).subscribe('posts/*', print, EXPAND)
@@ -272,7 +272,12 @@ def test_realtime_subscribes_on_connect_by_the_login_of_the_client(realtime, ser
 def test_realtime_hands_each_event_to_the_callbacks_of_its_topic(realtime, server):
     """Both callbacks of posts/* get the create, posts/r1 the update, no users/*."""
     server.connections = [
-        [_connect('c1'), _change('posts/*', 'create', 'r1'), _change('users/*', 'create', 'u1'), _change('posts/r1', 'update', 'r1')]
+        [
+            _make_connect_event('c1'),
+            _make_change_event('posts/*', 'create', 'r1'),
+            _make_change_event('users/*', 'create', 'u1'),
+            _make_change_event('posts/r1', 'update', 'r1'),
+        ]
     ]
     first, second, one = [], [], []
     realtime.subscribe('posts/*', lambda e: first.append((e.action, e.record.id)))
@@ -285,7 +290,9 @@ def test_realtime_hands_each_event_to_the_callbacks_of_its_topic(realtime, serve
 
 def test_realtime_failing_callback_is_logged_and_the_channel_goes_on(realtime, server, caplog):
     """A callback that raises is logged, the next callback and event still come."""
-    server.connections = [[_connect('c1'), _change('posts/*', 'create', 'r1'), _change('posts/*', 'create', 'r2')]]
+    server.connections = [
+        [_make_connect_event('c1'), _make_change_event('posts/*', 'create', 'r1'), _make_change_event('posts/*', 'create', 'r2')]
+    ]
     seen = []
 
     def fail(event):
@@ -300,7 +307,7 @@ def test_realtime_failing_callback_is_logged_and_the_channel_goes_on(realtime, s
 
 def test_realtime_changes_while_connected_send_the_subscriptions_again(realtime, server):
     """Only a new or a gone subscription is sent again, a second callback is not."""
-    server.connections = [[_connect('c1')]]
+    server.connections = [[_make_connect_event('c1')]]
     realtime.subscribe('posts/*', print).start()
     assert realtime.connected.wait(5)
     realtime.subscribe('users/*', print)
@@ -314,7 +321,7 @@ def test_realtime_changes_while_connected_send_the_subscriptions_again(realtime,
 
 def test_realtime_reconnects_and_subscribes_again_with_the_new_client_id(realtime, server):
     """After the end of the stream c2 is subscribed and on_connect called again."""
-    server.connections = [[_connect('c1')], [_connect('c2')]]
+    server.connections = [[_make_connect_event('c1')], [_make_connect_event('c2')]]
     calls = []
     realtime.on_connect = lambda: calls.append('connect')
     realtime.subscribe('posts/*', print).start()
@@ -329,7 +336,7 @@ def test_realtime_connects_again_at_once_only_after_a_connection_that_served(rea
     connects c2 at once, a shorter connection waits the delay of 0.5 seconds.
     """
     monkeypatch.setattr('tokeo.core.pocketbase.realtime.STABLE_SECONDS', stable)
-    server.connections = [[_connect('c1')], [_connect('c2')]]
+    server.connections = [[_make_connect_event('c1')], [_make_connect_event('c2')]]
     connects = []
     realtime.on_connect = lambda: connects.append(time.monotonic())
     realtime.subscribe('posts/*', print).start()
@@ -339,7 +346,7 @@ def test_realtime_connects_again_at_once_only_after_a_connection_that_served(rea
 
 def test_realtime_retries_after_a_doubling_delay_up_to_max_delay(realtime, server, caplog):
     """Failed connects wait 0.01, 0.02, 0.04, 0.04 seconds, a connect resets it."""
-    server.connections = [503, 503, 503, 503, [_connect('c1')]]
+    server.connections = [503, 503, 503, 503, [_make_connect_event('c1')]]
     delays = _record_delays(realtime)
     realtime._delay = 0.01
     with caplog.at_level(logging.WARNING, logger='tokeo.core.pocketbase.realtime'):
@@ -352,7 +359,7 @@ def test_realtime_retries_after_a_doubling_delay_up_to_max_delay(realtime, serve
 
 def test_realtime_refused_subscriptions_connect_again(realtime, server, caplog):
     """A POST refused with 403 is logged and the next connection subscribes c2."""
-    server.connections = [[_connect('c1')], [_connect('c2')]]
+    server.connections = [[_make_connect_event('c1')], [_make_connect_event('c2')]]
     server.post_status = [403]
     realtime._delay = 0.01
     with caplog.at_level(logging.WARNING, logger='tokeo.core.pocketbase.realtime'):
@@ -379,8 +386,8 @@ def test_realtime_stop_leaves_a_hanging_callback_and_a_new_start_runs_alone(real
     hands on no r2, ends and leaves the new channel connected.
     """
     server.connections = [
-        [_connect('c1'), _change('posts/*', 'create', 'r1'), _change('posts/*', 'create', 'r2')],
-        [_connect('c2'), _change('posts/*', 'create', 'r3')],
+        [_make_connect_event('c1'), _make_change_event('posts/*', 'create', 'r1'), _make_change_event('posts/*', 'create', 'r2')],
+        [_make_connect_event('c2'), _make_change_event('posts/*', 'create', 'r3')],
     ]
     hang, seen = threading.Event(), []
 
@@ -404,7 +411,9 @@ def test_realtime_stop_leaves_a_hanging_callback_and_a_new_start_runs_alone(real
 
 def test_realtime_stop_called_by_a_callback_ends_the_thread(realtime, server):
     """A callback calling stop() on r1 ends the thread, r2 reaches no callback."""
-    server.connections = [[_connect('c1'), _change('posts/*', 'create', 'r1'), _change('posts/*', 'create', 'r2')]]
+    server.connections = [
+        [_make_connect_event('c1'), _make_change_event('posts/*', 'create', 'r1'), _make_change_event('posts/*', 'create', 'r2')]
+    ]
     seen, threads = [], []
 
     def follow(event):
@@ -428,7 +437,7 @@ def test_realtime_refuses_max_pending_below_one(pb):
 
 def test_realtime_status_and_topics_follow_the_channel(realtime, server):
     """stopped, live once connected, stopped again; topics keep options."""
-    server.connections = [[_connect('c1')]]
+    server.connections = [[_make_connect_event('c1')]]
     assert realtime.status == 'stopped'
     realtime.subscribe('posts/*', print).subscribe('posts/*', print, EXPAND)
     assert realtime.topics == ['posts/*', topic_key('posts/*', EXPAND)]
@@ -441,7 +450,7 @@ def test_realtime_status_and_topics_follow_the_channel(realtime, server):
 
 def test_realtime_confirms_the_login_before_it_subscribes(realtime, server):
     """The refresh of the login goes before the POST of the subscriptions."""
-    server.connections = [[_connect('c1')]]
+    server.connections = [[_make_connect_event('c1')]]
     realtime.subscribe('posts/*', print).start()
     assert realtime.connected.wait(5)
     paths = [request.url.path for request in server.requests if request.method == 'POST']
@@ -450,7 +459,7 @@ def test_realtime_confirms_the_login_before_it_subscribes(realtime, server):
 
 def test_realtime_refused_login_shows_an_error_instead_of_a_silent_guest(realtime, server, caplog):
     """A refresh refused with 401 sends no subscriptions, the 401 shows."""
-    server.connections = [[_connect('c1')], [_connect('c2')]]
+    server.connections = [[_make_connect_event('c1')], [_make_connect_event('c2')]]
     server.refresh_status = [401, 401]
     realtime._delay = 0.01
     with caplog.at_level(logging.WARNING, logger='tokeo.core.pocketbase.realtime'):
@@ -465,7 +474,7 @@ def test_realtime_checks_the_login_while_connected_and_subscribes_again_after_a_
     logged in anew, the subscriptions go again on the same connection, as
     PocketBase dropped the old login of the connection.
     """
-    server.connections = [[_connect('c1')]]
+    server.connections = [[_make_connect_event('c1')]]
     calls = []
 
     def hook():
@@ -517,8 +526,13 @@ def test_realtime_hangs_up_when_the_callbacks_fall_behind_and_connects_once_they
     """
     hanging = threading.Event()
     server.connections = [
-        [_connect('c1'), _change('posts/*', 'create', 'r1'), hanging, *[_change('posts/*', 'create', f'r{n}') for n in range(2, 6)]],
-        [_connect('c2'), _change('posts/*', 'create', 'r6')],
+        [
+            _make_connect_event('c1'),
+            _make_change_event('posts/*', 'create', 'r1'),
+            hanging,
+            *[_make_change_event('posts/*', 'create', f'r{n}') for n in range(2, 6)],
+        ],
+        [_make_connect_event('c2'), _make_change_event('posts/*', 'create', 'r6')],
     ]
     release, seen, connects = threading.Event(), [], []
 
@@ -546,7 +560,7 @@ def test_realtime_hangs_up_when_the_callbacks_fall_behind_and_connects_once_they
 
 def test_realtime_as_context_manager_runs_one_thread_until_stop(pb, server):
     """A second start keeps the thread, the end of the with stops it at once."""
-    server.connections = [[_connect('c1')]]
+    server.connections = [[_make_connect_event('c1')]]
     with Realtime(pb) as channel:
         thread = channel._thread
         assert channel.start()._thread is thread
@@ -562,7 +576,7 @@ def test_realtime_as_context_manager_runs_one_thread_until_stop(pb, server):
 
 def test_async_realtime_subscribes_by_the_hook_and_awaits_coroutines(async_pb, async_server):
     """The hook sets the token of the POST, function and coroutine get events."""
-    async_server.connections = [[_connect('c1'), _change('posts/*', 'delete', 'r1')]]
+    async_server.connections = [[_make_connect_event('c1'), _make_change_event('posts/*', 'delete', 'r1')]]
     hooks, seen = [], []
 
     def hook():
@@ -595,7 +609,7 @@ def test_async_realtime_subscribes_by_the_hook_and_awaits_coroutines(async_pb, a
 
 def test_async_realtime_changes_while_connected_send_the_subscriptions_again(async_pb, async_server, caplog):
     """A new and a gone subscription are sent again, a refused one is logged."""
-    async_server.connections = [[_connect('c1')]]
+    async_server.connections = [[_make_connect_event('c1')]]
     async_server.post_status = [204, 204, 500]
 
     async def go():
@@ -616,7 +630,9 @@ def test_async_realtime_changes_while_connected_send_the_subscriptions_again(asy
 
 def test_async_realtime_failing_callback_is_logged_and_the_channel_goes_on(async_pb, async_server, caplog):
     """A coroutine that raises is logged, the next event still comes."""
-    async_server.connections = [[_connect('c1'), _change('posts/*', 'create', 'r1'), _change('posts/*', 'create', 'r2')]]
+    async_server.connections = [
+        [_make_connect_event('c1'), _make_change_event('posts/*', 'create', 'r1'), _make_change_event('posts/*', 'create', 'r2')]
+    ]
     seen = []
 
     async def fail(event):
@@ -638,7 +654,7 @@ def test_async_realtime_failing_callback_is_logged_and_the_channel_goes_on(async
 def test_async_realtime_connects_again_at_once_only_after_a_connection_that_served(async_pb, async_server, monkeypatch, stable, at_once):
     """After STABLE_SECONDS c2 comes at once, else after 0.5 seconds."""
     monkeypatch.setattr('tokeo.core.pocketbase.realtime.STABLE_SECONDS', stable)
-    async_server.connections = [[_connect('c1')], [_connect('c2')]]
+    async_server.connections = [[_make_connect_event('c1')], [_make_connect_event('c2')]]
     connects = []
 
     async def go():
@@ -654,7 +670,7 @@ def test_async_realtime_connects_again_at_once_only_after_a_connection_that_serv
 
 def test_async_realtime_retries_after_a_doubling_delay_and_subscribes_again(async_pb, async_server, caplog):
     """A failed connect and a refused POST are logged, the third subscribes c2."""
-    async_server.connections = [503, [_connect('c1')], [_connect('c2')]]
+    async_server.connections = [503, [_make_connect_event('c1')], [_make_connect_event('c2')]]
     async_server.post_status = [403]
     calls = []
 
@@ -692,7 +708,7 @@ def test_async_realtime_silent_connection_counts_as_lost_after_read_timeout(sile
 
 def test_async_realtime_runs_once_at_a_time(async_pb, async_server):
     """A second run() while the first runs raises, the first goes on."""
-    async_server.connections = [[_connect('c1')]]
+    async_server.connections = [[_make_connect_event('c1')]]
 
     async def go():
         realtime = AsyncRealtime(async_pb)
@@ -708,7 +724,7 @@ def test_async_realtime_runs_once_at_a_time(async_pb, async_server):
 
 def test_async_realtime_stop_cancels_the_pending_sends(async_pb, async_server):
     """A subscription changed just before stop() leaves no task behind."""
-    async_server.connections = [[_connect('c1')]]
+    async_server.connections = [[_make_connect_event('c1')]]
 
     async def go():
         realtime = AsyncRealtime(async_pb)
@@ -725,7 +741,7 @@ def test_async_realtime_stop_cancels_the_pending_sends(async_pb, async_server):
 
 def test_async_realtime_flush_waits_for_the_changed_subscriptions(async_pb, async_server):
     """After flush() the new subscription is sent; status and topics follow."""
-    async_server.connections = [[_connect('c1')]]
+    async_server.connections = [[_make_connect_event('c1')]]
 
     async def go():
         realtime = AsyncRealtime(async_pb).subscribe('posts/*', print)
@@ -745,7 +761,7 @@ def test_async_realtime_flush_waits_for_the_changed_subscriptions(async_pb, asyn
 
 def test_async_realtime_checks_the_login_and_subscribes_again_after_a_new_login(async_pb, async_server):
     """The hook confirms every 0.1 s; after a new login c1 subscribes again."""
-    async_server.connections = [[_connect('c1')]]
+    async_server.connections = [[_make_connect_event('c1')]]
     calls = []
 
     def hook():
@@ -767,7 +783,7 @@ def test_async_realtime_checks_the_login_and_subscribes_again_after_a_new_login(
 
 def test_async_realtime_lost_login_hangs_up_and_shows_the_error(async_pb, async_server, caplog):
     """A failed check after connect hangs up, logs and shows the error."""
-    async_server.connections = [[_connect('c1')]]
+    async_server.connections = [[_make_connect_event('c1')]]
     calls = []
 
     def hook():
@@ -801,8 +817,13 @@ def test_async_realtime_hangs_up_when_the_callbacks_fall_behind(async_pb, async_
     async def go():
         hanging, release = asyncio.Event(), asyncio.Event()
         async_server.connections = [
-            [_connect('c1'), _change('posts/*', 'create', 'r1'), hanging, *[_change('posts/*', 'create', f'r{n}') for n in range(2, 6)]],
-            [_connect('c2'), _change('posts/*', 'create', 'r6')],
+            [
+                _make_connect_event('c1'),
+                _make_change_event('posts/*', 'create', 'r1'),
+                hanging,
+                *[_make_change_event('posts/*', 'create', f'r{n}') for n in range(2, 6)],
+            ],
+            [_make_connect_event('c2'), _make_change_event('posts/*', 'create', 'r6')],
         ]
 
         async def follow(event):
