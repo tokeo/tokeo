@@ -25,7 +25,7 @@ import subprocess
 import pytest
 from tokeo.core.pocketbase import AuthKeeper, PocketBase, TokeoPocketBaseAuthError, TokeoPocketBaseError
 from tokeo.core.pocketbase.realtime import AsyncRealtime, Realtime
-from tests.utils import ROOT_DIR, free_port, wait_until, wait_until_async
+from tests.utils import ROOT_DIR, find_free_port, wait_until, wait_until_async
 from tests.utils.process import SubProcess
 
 #: The pocketbase binary of the tests, e.g. of version 0.40.6
@@ -80,7 +80,7 @@ def live(tmp_path_factory):
     """A running PocketBase with superuser, user, posts and the batch api on."""
     data = str(tmp_path_factory.mktemp('pocketbase'))
     subprocess.run([POCKETBASE_BIN, 'superuser', 'upsert', *SUPERUSER, '--dir', data], check=True, capture_output=True)
-    url = f'http://127.0.0.1:{free_port()}'
+    url = f'http://127.0.0.1:{find_free_port()}'
     with SubProcess.run(POCKETBASE_BIN, 'serve', '--dir', data, '--http', url.removeprefix('http://'), timeout=15) as process:
         process.wait_for(lambda: _is_healthy(url))
         with PocketBase(url) as su:
@@ -425,7 +425,7 @@ def short(tmp_path_factory):
     """A PocketBase by the hook file as it is: 1 s idle, 3 s in all, ticks."""
     data = str(tmp_path_factory.mktemp('pocketbase_short'))
     subprocess.run([POCKETBASE_BIN, 'superuser', 'upsert', *SUPERUSER, '--dir', data], check=True, capture_output=True)
-    url = f'http://127.0.0.1:{free_port()}'
+    url = f'http://127.0.0.1:{find_free_port()}'
     hooks = tmp_path_factory.mktemp('pb_hooks')
     (hooks / 'realtime.pb.js').write_text(open(HOOK).read())
     env = dict(PB_REALTIME_IDLE_SECONDS='1', PB_REALTIME_MAX_SECONDS='3')

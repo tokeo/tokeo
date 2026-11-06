@@ -26,7 +26,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cement.core.exc import CaughtSignal
 from tokeo.ext.grpc import TokeoGrpcError
 from tokeo.core.utils.modules import TokeoModulesLoadError
-from tests.utils import free_port, wait_until
+from tests.utils import find_free_port, wait_until
 from tests.ext.grpc.grpc_tests_helper import GrpcTest, SERVICE, ADD_SERVICER, SERVICER, INTERCEPTORS
 
 
@@ -115,7 +115,7 @@ def start_grpc():
     with contextlib.ExitStack() as stack:
 
         def start(grpc_config=None, startup=True):
-            port = free_port()
+            port = find_free_port()
             app = stack.enter_context(GrpcTest(grpc_config={'url': f'localhost:{port}', **(grpc_config or {})}))
             # the stack runs this before it closes the app
             stack.callback(_stop, app)
@@ -234,7 +234,7 @@ def test_server_on_an_address_that_does_not_bind_raises_and_ends_its_pool(start_
 
 def test_close_shuts_a_started_server_down():
     """Closing the app stops a server started by startup, its port is free again."""
-    port = free_port()
+    port = find_free_port()
     with GrpcTest(grpc_config={'url': f'localhost:{port}'}) as app:
         app.grpc.startup()
         assert _call(port) == b'echo hi'

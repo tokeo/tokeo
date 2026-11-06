@@ -23,7 +23,7 @@ from nicegui import ui
 from tokeo.main import TokeoTest
 from tokeo.ext.nicegui import TokeoNiceguiError
 from tokeo.core.pocketbase import PocketBase, TokeoPocketBaseError
-from tests.utils import free_port, wait_until_async
+from tests.utils import find_free_port, wait_until_async
 from tests.utils.process import SubProcess
 from tests.utils.nicegui import NiceguiSimulation
 
@@ -116,7 +116,7 @@ def server(tmp_path_factory):
     """A running PocketBase with the superuser, anna, bert and orders."""
     data = str(tmp_path_factory.mktemp('pocketbase'))
     subprocess.run([POCKETBASE_BIN, 'superuser', 'upsert', *SUPERUSER, '--dir', data], check=True, capture_output=True)
-    url = f'http://127.0.0.1:{free_port()}'
+    url = f'http://127.0.0.1:{find_free_port()}'
     with SubProcess.run(POCKETBASE_BIN, 'serve', '--dir', data, '--http', url.removeprefix('http://'), timeout=15) as process:
         process.wait_for(lambda: _is_healthy(url))
         with PocketBase(url) as su:

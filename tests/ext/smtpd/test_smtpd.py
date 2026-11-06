@@ -36,7 +36,7 @@ from tokeo.ext.smtpd import (
     _resolve_events_handler,
     _build_plan,
 )
-from tests.utils import free_port, isolated, wait_until, wait_process_group_ended
+from tests.utils import find_free_port, isolated, wait_until, wait_process_group_ended
 from tests.utils.process import SubProcess
 from tests.ext.smtpd.smtpd_tests_helper import SmtpdTest
 
@@ -348,7 +348,7 @@ def _assert_port_free(port):
 
 def test_term_single_service_in_main_process():
     """SIGTERM ends one service in main with 0, the port is free again."""
-    port = free_port()
+    port = find_free_port()
     with _serve({'services': [_make_service('mx1', port)]}) as process:
         process.wait_for(lambda: _has_banner(port))
         _check_ehlo(port)
@@ -360,7 +360,7 @@ def test_term_single_service_in_main_process():
 
 def test_term_single_service_with_global_limits():
     """A single service with global limits serves unforked and ends by SIGTERM."""
-    port = free_port()
+    port = find_free_port()
     with _serve({'max_processings': 2, 'services': [_make_service('mx1', port)]}) as process:
         process.wait_for(lambda: _has_banner(port))
         _check_ehlo(port)
@@ -371,7 +371,7 @@ def test_term_single_service_with_global_limits():
 
 def test_term_single_service_prefork_group():
     """SIGTERM ends main and its 2 forks with 0, the port is free again."""
-    port = free_port()
+    port = find_free_port()
     with _serve({'services': [_make_service('mx1', port, pre_fork=3)]}) as process:
         process.wait_for(lambda: _has_banner(port))
         if sys.platform.startswith('linux'):
@@ -386,7 +386,7 @@ def test_term_single_service_prefork_group():
 @needs_pdeathsig
 def test_kill_master_takes_workers_down():
     """After SIGKILL of the master its workers end by the parent death signal."""
-    port = free_port()
+    port = find_free_port()
     with _serve({'services': [_make_service('mx1', port, pre_fork=3)]}) as process:
         process.wait_for(lambda: _has_banner(port))
         assert len(_get_child_pids(process.pid)) == 2
@@ -397,7 +397,7 @@ def test_kill_master_takes_workers_down():
 
 def test_term_mixed_services_with_shared_limits():
     """One SIGTERM ends forked and main services with shared limits."""
-    port_a, port_b = free_port(), free_port()
+    port_a, port_b = find_free_port(), find_free_port()
     config = {
         'max_connections': 10,
         'services': [_make_service('mx1', port_a, pre_fork=2), _make_service('mx2', port_b)],
@@ -428,7 +428,7 @@ def _make_broken_service(name, pre_fork=0):
 
 def test_failed_service_start_aborts_and_stops_started_ones():
     """A service that cannot bind ends the run with an error, ports free."""
-    port_a = free_port()
+    port_a = find_free_port()
     with _serve({'services': [_make_service('mx1', port_a), _make_broken_service('mx2')]}) as process:
         assert process.wait() != 0
         assert wait_process_group_ended(process.pid)
@@ -437,7 +437,7 @@ def test_failed_service_start_aborts_and_stops_started_ones():
 
 def test_failed_start_terminates_forked_workers():
     """A failed start in main also ends the forked workers, before their SIGKILL."""
-    port_a = free_port()
+    port_a = find_free_port()
     start_time = time.monotonic()
     with _serve({'services': [_make_service('mx1', port_a, pre_fork=2), _make_broken_service('mx2')]}) as process:
         assert process.wait() != 0
@@ -450,7 +450,7 @@ def test_failed_start_terminates_forked_workers():
 
 def test_broken_config_of_a_worker_stops_before_the_fork():
     """A worker service with a broken config ends the start before any fork."""
-    port_a, port_b = free_port(), free_port()
+    port_a, port_b = find_free_port(), find_free_port()
     broken = _make_service('mx2', port_b, pre_fork=1)
     broken['server_options']['encrypt_mode'] = 'TLS_NOPE'
     with _serve({'services': [_make_service('mx1', port_a), broken]}) as process:
@@ -464,7 +464,7 @@ def test_broken_config_of_a_worker_stops_before_the_fork():
 
 def test_failed_worker_stops_all_services():
     """A worker that cannot bind logs why and ends all services, ports free."""
-    port_a = free_port()
+    port_a = find_free_port()
     with _serve({'services': [_make_service('mx1', port_a), _make_broken_service('mx2', pre_fork=1)]}) as process:
         assert process.wait() != 0
         assert wait_process_group_ended(process.pid)
@@ -498,7 +498,7 @@ def _open_dialogs(port, count):
 
 def test_prefork_workers_hand_the_options_to_their_handler():
     """Every process of a group of 3 answers EHLO with the tag of the options."""
-    port = free_port()
+    port = find_free_port()
     with _serve({'services': [_make_tagged_service('mx1', port, pre_fork=3)]}) as process:
         process.wait_for(lambda: _has_banner(port))
         pids = set()
@@ -517,7 +517,7 @@ def test_prefork_workers_hand_the_options_to_their_handler():
 
 def test_prefork_workers_apply_the_server_options():
     """Open dialogs of a group of 3 end by 421 after io_session_timeout of 1 s."""
-    port = free_port()
+    port = find_free_port()
     with _serve({'services': [_make_tagged_service('mx1', port, pre_fork=3, server_options={'io_session_timeout': 1})]}) as process:
         process.wait_for(lambda: _has_banner(port))
         socks = _open_dialogs(port, 6)
@@ -528,7 +528,7 @@ def test_prefork_workers_apply_the_server_options():
 
 def test_term_prefork_group_ends_open_dialogs_with_421():
     """SIGTERM ends the waiting dialogs of all processes of a group of 3 by 421."""
-    port = free_port()
+    port = find_free_port()
     # SO_REUSEPORT may hand all 6 dialogs to one process, it needs a slot for each
     service = _make_tagged_service('mx1', port, pre_fork=3, server_options={'max_processings': 6})
     with _serve({'services': [service]}) as process:
@@ -545,7 +545,7 @@ def test_term_prefork_group_ends_open_dialogs_with_421():
 @needs_pdeathsig
 def test_prefork_logs_the_started_service_of_every_process():
     """The master logs its workers, every process its started service and pid."""
-    port = free_port()
+    port = find_free_port()
     with _serve({'services': [_make_tagged_service('mx1', port, pre_fork=3)]}) as process:
         process.wait_for(lambda: _has_banner(port))
         pids = [process.pid, *_get_child_pids(process.pid)]
@@ -582,7 +582,7 @@ def cert_files(tmp_path_factory):
 def test_prefork_workers_present_the_configured_certificate(cert_files):
     """All processes of a group of 3 present the certificate of tls_cert_path."""
     cert_path, key_path, fingerprint = cert_files
-    port = free_port()
+    port = find_free_port()
     server_options = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_path': cert_path, 'tls_key_path': key_path}
     context = ssl.create_default_context()
     context.check_hostname = False
