@@ -4,6 +4,7 @@ Merges nested data deeply and redacts its values before they are logged.
 
 import logging
 
+#: The logger of this module
 LOG = logging.getLogger(__name__)
 
 

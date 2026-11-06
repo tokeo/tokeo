@@ -255,13 +255,13 @@ class TokeoDramatiq(MetaMixin):
     class Meta:
         """Extension meta-data and configuration defaults."""
 
-        #: Unique identifier for this handler
+        # Unique identifier for this handler
         label = 'tokeo.dramatiq'
 
-        #: Id for config
+        # Name of the config section
         config_section = 'dramatiq'
 
-        #: Dict with the config defaults
+        # Defaults of the config section
         config_defaults = dict(
             # Entry point method for the workers
             serve='main:method',

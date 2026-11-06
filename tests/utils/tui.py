@@ -54,8 +54,30 @@ class Terminal:
 
     """
 
+    #: (int) The file descriptor of the terminal side of the test, set on enter
+    master = None
+    #: (subprocess.Popen) The running program, set on enter
+    process = None
+    #: (pyte.Screen) The screen of the terminal, set on enter
+    screen = None
+    #: (pyte.ByteStream) The stream that feeds the screen, set on enter
+    stream = None
+    #: (bytes) Every byte read from the program, set on enter
+    raw = None
+    #: (float) The time ```wait_for``` waits until in all, set on enter
+    end_time = None
+
     def __init__(self, args, rows=24, columns=80, ctty=False, timeout=30):
-        self.args, self.rows, self.columns, self.ctty, self.timeout = args, rows, columns, ctty, timeout
+        #: The program and its arguments
+        self.args = args
+        #: The rows of the screen
+        self.rows = rows
+        #: The columns of the screen
+        self.columns = columns
+        #: Whether the terminal is the controlling one of the program
+        self.ctty = ctty
+        #: The seconds ```wait_for``` waits at most in all
+        self.timeout = timeout
 
     def __enter__(self):
         pyte = pytest.importorskip('pyte')

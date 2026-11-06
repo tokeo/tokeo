@@ -71,46 +71,70 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         """
 
-        #: Unique identifier for this handler
+        # Unique identifier for this handler
         label = 'tokeo.smtp'
 
-        #: Configuration section name in the application config
+        # Configuration section name in the application config
         config_section = 'smtp'
 
-        #: Configuration default values
+        # Defaults of the config section
         config_defaults = {
             # Email recipients and sender
-            'to': [],  # List of primary recipients
-            'from_addr': 'noreply@localhost',  # Sender email address
-            'cc': [],  # Carbon copy recipients
-            'bcc': [],  # Blind carbon copy recipients
-            # Email subject
-            'subject': None,  # Email subject line
-            'subject_prefix': None,  # Optional prefix for all subjects
+            # List of primary recipients
+            'to': [],
+            # Sender email address
+            'from_addr': 'noreply@localhost',
+            # Carbon copy recipients
+            'cc': [],
+            # Blind carbon copy recipients
+            'bcc': [],
+            # Email subject line
+            'subject': None,
+            # Optional prefix for all subjects
+            'subject_prefix': None,
             # SMTP server configuration
-            'host': 'localhost',  # SMTP server hostname
-            'port': '25',  # SMTP server port
-            'timeout': 30,  # Connection timeout in seconds
-            'local_hostname': None,  # Name announced in EHLO/HELO (None = FQDN of local host)
-            'source_address': None,  # Local address to bind before connecting (None = by routing)
-            'ssl': False,  # Use SSL/TLS connection
-            'tls': False,  # Use STARTTLS command
-            'host_cert_verify': False,  # Verify certificate chain and hostname for ssl and tls
-            'host_cert_ca': None,  # CA for verify: single line = file path, multi line = PEM text
-            'auth': False,  # Use SMTP authentication
-            'auth_identity': None,  # SMTP username or identity
-            'auth_password': None,  # SMTP password
-            # Email content
-            'files': None,  # Attachments or inline images
+            # SMTP server hostname
+            'host': 'localhost',
+            # SMTP server port
+            'port': '25',
+            # Connection timeout in seconds
+            'timeout': 30,
+            # Name announced in EHLO/HELO (None = FQDN of local host)
+            'local_hostname': None,
+            # Local address to bind before connecting (None = by routing)
+            'source_address': None,
+            # Use SSL/TLS connection
+            'ssl': False,
+            # Use STARTTLS command
+            'tls': False,
+            # Verify certificate chain and hostname for ssl and tls
+            'host_cert_verify': False,
+            # CA for verify: single line = file path, multi line = PEM text
+            'host_cert_ca': None,
+            # Use SMTP authentication
+            'auth': False,
+            # SMTP username or identity
+            'auth_identity': None,
+            # SMTP password
+            'auth_password': None,
+            # Attachments or inline images
+            'files': None,
             # Email encoding options
-            'charset': 'utf-8',  # Character set for email
-            'header_encoding': None,  # Encoding for headers (None, 'base64', 'qp', 'quoted-printable')
-            'body_encoding': None,  # Encoding for body (None, 'base64', 'qp', 'quoted-printable')
+            # Character set for email
+            'charset': 'utf-8',
+            # Encoding for headers (None, 'base64', 'qp', 'quoted-printable')
+            'header_encoding': None,
+            # Encoding for body (None, 'base64', 'qp', 'quoted-printable')
+            'body_encoding': None,
             # Message identification
-            'date_enforce': True,  # Auto-add Date header if missing
-            'msgid_enforce': True,  # Auto-add Message-ID if missing
-            'msgid_str': None,  # Custom string for Message-ID generation
-            'msgid_domain': 'localhost',  # Domain for Message-ID generation
+            # Auto-add Date header if missing
+            'date_enforce': True,
+            # Auto-add Message-ID if missing
+            'msgid_enforce': True,
+            # Custom string for Message-ID generation
+            'msgid_str': None,
+            # Domain for Message-ID generation
+            'msgid_domain': 'localhost',
         }
 
     def __init__(self, **kw):

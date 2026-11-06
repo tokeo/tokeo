@@ -169,11 +169,11 @@ class TokeoPrintOutputHandler(output.OutputHandler):
 
         """
 
+        # The string identifier of this handler
         label = 'print'
-        """The string identifier of this handler."""
 
-        #: Whether or not to include ```print``` as an available choice
-        #: to override the ```output_handler``` via command line options.
+        # Whether or not to include ```print``` as an available choice
+        # to override the ```output_handler``` via command line options.
         overridable = False
 
     def _print(self, args, sep=' ', end='\n', divider=None):
@@ -306,11 +306,11 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
 
         """
 
+        # The string identifier of this handler
         label = 'print_dict'
-        """The string identifier of this handler."""
 
-        #: Whether or not to include ```json``` as an available choice
-        #: to override the ```output_handler``` via command line options.
+        # Whether or not to include ```print_dict``` as an available choice
+        # to override the ```output_handler``` via command line options.
         overridable = False
 
     def render(self, data, *args, **kw):
@@ -382,11 +382,11 @@ class TokeoInspectOutputHandler(output.OutputHandler):
 
         """
 
+        # The string identifier of this handler
         label = 'inspect'
-        """The string identifier of this handler."""
 
-        #: Whether or not to include ```json``` as an available choice
-        #: to override the ```output_handler``` via command line options.
+        # Whether or not to include ```inspect``` as an available choice
+        # to override the ```output_handler``` via command line options.
         overridable = False
 
     def _inspect(

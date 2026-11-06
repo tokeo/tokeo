@@ -311,39 +311,68 @@ class TokeoNicegui(MetaMixin):
         # Unique identifier for this handler
         label = 'tokeo.nicegui'
 
-        # Id for config
+        # Name of the config section
         config_section = 'nicegui'
 
-        # Dict with the config defaults
+        # Defaults of the config section
         config_defaults = dict(
+            # host the web server listens on
             host='127.0.0.1',
+            # port the web server listens on
             port='4123',
+            # module:function that maps the pages and apis at startup
             routes=None,
+            # title of the pages, also the start of the welcome message
             title='Tokeo NiceGUI',
+            # favicon of the pages, path, url or emoji
             favicon=None,
+            # content of the viewport meta tag
             viewport='width=device-width, initial-scale=1',
+            # dark mode: True, False or None to follow the browser
             dark=None,
+            # load tailwind css
             tailwind=True,
+            # unocss preset to load, None loads no unocss
             unocss=None,
+            # use the production builds of vue and quasar
             prod_js=True,
+            # message logged when nicegui runs, None builds it from title
             welcome_message=None,
+            # module that serves the openapi schema and its docs pages
             openapi_custom_module=None,
+            # endpoints in the openapi: none, internal, page or all
             openapi_documentation=None,
+            # url of the openapi schema, None serves no openapi
             openapi_url=None,
+            # url of the swagger page, None serves none
             openapi_swagger_url=None,
+            # url of the redoc page, None serves none
             openapi_redoc_url=None,
+            # secret that signs the session and the per-user storage
             storage_secret=None,
+            # extra arguments of the session middleware
             session_middleware_kwargs=None,
+            # seconds between two refreshes of active bindings
             binding_refresh_interval=0.5,
+            # seconds a client may take to reconnect
             reconnect_timeout=5.0,
+            # messages kept to resend after a reconnect
             message_history_length=1000,
+            # cache-control header of the static files
             cache_control_directives='public, max-age=31536000, immutable, stale-while-revalidate=31536000',
+            # directory watched by --hotload, None watches site of main_dir
             hotload_dir=None,
+            # file patterns that trigger a hotload
             hotload_includes='*.py',
+            # file patterns ignored by the hotload
             hotload_excludes='.*, .py[cod], .sw.*, ~*',
+            # seconds between two checks for changes
             hotload_interval=2.0,
+            # seconds without a change before the hotload restarts
             hotload_settle=1.5,
+            # log level of uvicorn
             logging_level='warning',
+            # dict of arguments of ui.run that replace the ones above
             run_kwargs=None,
         )
 

@@ -286,8 +286,11 @@ class SmtpdContext:
 
     #: Unique session id (hex string), set once when the context is created
     id: str = ''
+    #: The connection: remote and local address, helo, auth and errors
     server: ServerCtx = field(default_factory=ServerCtx)
+    #: The envelope of the current transaction: sender and recipients
     envelope: EnvelopeCtx = field(default_factory=EnvelopeCtx)
+    #: The message of the current transaction: data and its size
     message: MessageCtx = field(default_factory=MessageCtx)
 
     def __setattr__(self, name, value):

@@ -7,8 +7,11 @@ from cement.utils.version import get_version_banner as cement_version_banner
 from tokeo.ext.argparse import Controller
 from tokeo.core.version import get_version as tokeo_get_version
 
+#: The description of the tokeo CLI
 DESCRIPTION = """Tokeo ignites your powerful event-driven backends in seconds."""
+#: The versions of cement, python and the os, from the version banner of cement
 CEMENT_VERSION, PYTHON_VERSION, OS_VERSION = (cement_version_banner().split('\n') + ['unknown', 'unknown', 'unknown'])[:3]
+#: The banner of ```tokeo --version```
 VERSION_BANNER = f"""
  
 ┃

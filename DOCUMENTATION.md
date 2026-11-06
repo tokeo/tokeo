@@ -190,16 +190,19 @@ lazily.
 
 ## Attributes and Values
 
-1. Values on module and class level, also those of ```Meta```, and instance
-   attributes (```self.x = ...``` in ```__init__```) are documented by a ```#:```
-   comment right above the assignment. pdoc shows the text at the value. Each
-   key of ```Meta.config_defaults``` has a comment above it:
+1. Public values on module and class level and public instance attributes
+   (```self.x = ...``` in ```__init__```) are documented by a ```#:``` comment
+   right above the assignment. pdoc shows the text at the value. ```Meta``` is
+   internal and gets no ```#:```: ```label```, ```config_section``` and
+   ```config_defaults``` carry a plain ```#``` comment, and each key of
+   ```Meta.config_defaults``` has a comment above it:
 
-        #: Dict with the config defaults
-        config_defaults = dict(
-            # Default timeout for cache operations in seconds
-            timeout=60,
-        )
+        class Meta:
+            # Defaults of the config section
+            config_defaults = dict(
+                # Default timeout for cache operations in seconds
+                timeout=60,
+            )
 
         def __init__(self, app):
             #: The Cement application instance

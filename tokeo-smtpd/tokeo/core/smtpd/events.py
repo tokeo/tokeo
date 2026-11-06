@@ -41,21 +41,37 @@ from .logger import Severity
 class SmtpdEvent(Enum):
     """The dispatchable handler events (keys of ```SmtpdServer.emit_events```)."""
 
+    #: A client connected
     ON_CONNECT_EVENT = auto()
+    #: A client disconnected
     ON_DISCONNECT_EVENT = auto()
+    #: A PROXY header arrived
     ON_PROXY_EVENT = auto()
+    #: A HELO or EHLO arrived
     ON_HELO_EVENT = auto()
+    #: An AUTH login arrived
     ON_AUTH_EVENT = auto()
+    #: A MAIL FROM arrived
     ON_MAIL_FROM_EVENT = auto()
+    #: A RCPT TO arrived
     ON_RCPT_TO_EVENT = auto()
+    #: DATA starts
     ON_MESSAGE_DATA_START_EVENT = auto()
+    #: A line of DATA arrived
     ON_MESSAGE_DATA_RECEIVING_EVENT = auto()
+    #: The headers of DATA are complete
     ON_MESSAGE_DATA_HEADERS_EVENT = auto()
+    #: DATA is complete
     ON_MESSAGE_DATA_EVENT = auto()
+    #: A VRFY arrived
     ON_VRFY_EVENT = auto()
+    #: An EXPN arrived
     ON_EXPN_EVENT = auto()
+    #: A HELP arrived
     ON_HELP_EVENT = auto()
+    #: An unknown command line arrived
     ON_PROCESS_LINE_UNKNOWN_EVENT = auto()
+    #: The server logs a line
     ON_LOGGING_EVENT = auto()
 
 

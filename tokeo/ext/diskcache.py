@@ -804,13 +804,13 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
     class Meta:
         """Handler meta-data and configuration defaults."""
 
-        #: Unique identifier for this handler
+        # Unique identifier for this handler
         label = 'tokeo.diskcache'
 
-        #: Id for config
+        # Name of the config section
         config_section = 'diskcache'
 
-        #: Dict with the config defaults
+        # Defaults of the config section
         config_defaults = dict(
             # Directory where cache db files are stored. When using
             # diskcache to synchronize processes, make sure that all

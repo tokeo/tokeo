@@ -128,13 +128,16 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
 
         label = 'tokeo.jinja2'
 
-        # Id for config
+        # Name of the config section
         config_section = 'jinja2'
 
-        # Configuration default values
+        # Defaults of the config section
         config_defaults = {
+            # extra directories to find templates in
             'template_dirs': None,
+            # keep the trailing newline of a template when rendering
             'keep_trailing_newline': True,
+            # remove the first newline after a block tag
             'trim_blocks': True,
         }
 

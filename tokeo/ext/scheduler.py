@@ -103,6 +103,7 @@ class TokeoCronAndFireTrigger(CronTrigger):
         delay=None,
     ):
         super().__init__(year, month, day, week, day_of_week, hour, minute, second, start_date, end_date, timezone, jitter)
+        #: Seconds the fire time is moved after the crontab time
         self.delay = delay
 
     @classmethod
@@ -239,7 +240,7 @@ class TokeoScheduler(MetaMixin):
         # Configuration section in the application config
         config_section = 'scheduler'
 
-        # the defaults of the config section
+        # Defaults of the config section
         config_defaults = dict(
             # Maximum number of concurrent job executions
             max_concurrent_jobs=10,

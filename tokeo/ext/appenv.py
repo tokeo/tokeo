@@ -34,11 +34,15 @@ import glob
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.sort import sort_key_by_lex_and_num_ordered
 
-# Environment constants
+#: The environment of production
 PRODUCTION = 'production'
+#: The environment of staging
 STAGING = 'staging'
+#: The environment of development
 DEVELOPMENT = 'development'
+#: The environment of testing
 TESTING = 'testing'
+#: All environments, from production to testing
 ENVIRONMENTS = (
     PRODUCTION,
     STAGING,

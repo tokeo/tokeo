@@ -72,6 +72,7 @@ import httpx
 from .exc import TokeoPocketBaseError
 from .record import Record
 
+#: The logger of this module
 LOG = logging.getLogger(__name__)
 
 #: The path of the realtime api

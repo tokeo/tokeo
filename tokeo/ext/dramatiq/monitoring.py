@@ -22,15 +22,17 @@ import pika
 from dramatiq.middleware import Middleware
 from tokeo.ext.dramatiq.exc import TokeoDramatiqConnectionError
 
-#: Format and version of the heartbeat messages
+#: Format of the heartbeat messages
 HEARTBEAT_TYPE = 'tokeo.dramatiq.heartbeat'
+#: Version of the format of the heartbeat messages
 HEARTBEAT_VERSION = 1
 
 #: Characters of the arguments and error texts in a heartbeat
 DETAILS_MAX_LENGTH = 500
 
-#: Intervals without a heartbeat until a worker is late or gone
+#: Intervals without a heartbeat until a worker is late
 LATE_INTERVALS = 2
+#: Intervals without a heartbeat until a worker is gone
 GONE_INTERVALS = 3
 
 #: Intervals a gone or stopped worker is still shown
@@ -81,9 +83,13 @@ class TokeoDramatiqHeartbeat(Middleware):
     """
 
     def __init__(self, exchange, interval, with_details, app):
+        #: The monitoring exchange
         self.exchange = exchange
+        #: Seconds between two heartbeats
         self.interval = interval
+        #: Whether to send arguments and error texts
         self.with_details = with_details
+        #: Label and version of the app
         self.app = app
         self._lock = threading.Lock()
         self._running = {}

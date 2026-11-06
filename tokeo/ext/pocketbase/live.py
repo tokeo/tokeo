@@ -63,6 +63,7 @@ from tokeo.ext.nicegui import guard_user_context
 from tokeo.core.pocketbase import TokeoPocketBaseError
 from tokeo.core.pocketbase.realtime import MAX_SUBSCRIPTIONS, AsyncRealtime, topic_key
 
+#: The logger of this module
 LOG = logging.getLogger(__name__)
 
 #: The states of a feed: live while all its channels are, connecting while

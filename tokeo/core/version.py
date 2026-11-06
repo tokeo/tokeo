@@ -4,6 +4,7 @@ Hands out the version of tokeo, counted by cement like the build does.
 
 from cement.utils.version import get_version as cement_get_version
 
+#: The version of tokeo as (major, minor, patch, release, build)
 VERSION = (2, 2, 0, 'final', 0)
 
 

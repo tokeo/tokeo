@@ -80,26 +80,30 @@ class TokeoGrpc(MetaMixin):
     class Meta:
         """Extension meta-data and configuration defaults."""
 
-        #: Unique identifier for this handler
+        # Unique identifier for this handler
         label = 'tokeo.grpc'
 
-        #: Id for config
+        # Name of the config section
         config_section = 'grpc'
 
-        #: Dict with the config defaults
+        # Defaults of the config section
         config_defaults = dict(
             # address and port to run the service on
             url='localhost:50051',
             # number of concurrent workers
             max_workers=1,
-            # modules and methods for server, interceptor and service
+            # module:method that adds the servicer to the server (generated
+            # by protoc), mandatory
             proto_add_servicer_to_server=None,
+            # module:class of the servicer that serves the calls, mandatory
             grpc_servicer=None,
+            # module:method that returns the chain of interceptors, optional
             grpc_interceptor=None,
             # tls is opt-in; while disabled no tls code or library is touched
             tls_enabled=False,
-            # custom cert: paths to pem files for cert and key (both or none)
+            # custom cert: path to the pem file of the cert (both or none)
             tls_certificate=None,
+            # custom cert: path to the pem file of the key (both or none)
             tls_key=None,
             # validity for the in-memory auto cert when no custom cert is set
             tls_valid_days=90,
@@ -110,6 +114,7 @@ class TokeoGrpc(MetaMixin):
             # auto cert key: 'rsa' (size in bits) or 'ec' (size = curve 256/384),
             # grpc does no tls handshake with a P-521 key
             tls_key_type='ec',
+            # auto cert key size, bits for rsa or the curve for ec
             tls_key_size=384,
             # client ca: when set, only clients with a valid cert of this ca
             # pass the tls handshake, the interceptors still decide each call

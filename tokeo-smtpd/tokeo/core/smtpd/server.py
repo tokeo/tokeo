@@ -68,13 +68,19 @@ from .exc import (
     Tls530Exception,
 )
 
-# default constants
+#: The default host the server listens on
 DEFAULT_SMTPD_HOST = '127.0.0.1'
+#: The default port the server listens on
 DEFAULT_SMTPD_PORT = 2525
+#: The default max of simultaneous processings
 DEFAULT_SMTPD_MAX_PROCESSINGS = 4
+#: The default seconds to wait for a command
 DEFAULT_IO_CMD_TIMEOUT = 30
+#: The default seconds to wait for the PROXY line
 DEFAULT_IO_PROXY_CMD_TIMEOUT = 5
+#: The default seconds a session may last
 DEFAULT_IO_SESSION_TIMEOUT = 3600
+#: The default max length in bytes of a line
 DEFAULT_IO_BUFFER_MAX_SIZE = 1 * 1024 * 1024
 
 
@@ -89,50 +95,74 @@ class CmdSequence(Enum):
 
     """
 
+    #: Waits for the PROXY header
     PROXY = auto()
+    #: Waits for HELO or EHLO
     HELO = auto()
+    #: Ready for a new transaction
     RSET = auto()
+    #: Waits for RCPT TO after MAIL FROM
     MAIL = auto()
+    #: Waits for more RCPT TO or DATA
     RCPT = auto()
+    #: Receives the lines of DATA
     DATA = auto()
+    #: The dialog ends
     QUIT = auto()
+    #: Runs the TLS handshake, of STARTTLS or on connect
     STARTTLS = auto()
     # AUTH challenge states (used when AUTH is added)
+    #: Waits for the values of AUTH PLAIN
     AUTH_PLAIN_VALUES = auto()
+    #: Waits for the user of AUTH LOGIN
     AUTH_LOGIN_USER = auto()
+    #: Waits for the password of AUTH LOGIN
     AUTH_LOGIN_PASS = auto()
 
 
 class CrlfMode(Enum):
     """The crlf_mode symbols (member names match the config values)."""
 
+    #: Ends each line with CRLF and drops a bare CR or LF
     CRLF_ENSURE = auto()
+    #: Rejects a line without CRLF by 500
     CRLF_STRICT = auto()
+    #: Keeps the line break as received
     CRLF_LEAVE = auto()
 
 
 class CrlfDataMode(Enum):
     """The crlf_data_mode symbols (member names match the config values)."""
 
+    #: Ends DATA on any dot line
     CRLF_DATA_UNSAFE = auto()
+    #: Ends DATA only at CRLF.CRLF, keeps a bare CR or LF as data
     CRLF_DATA_MODERATE = auto()
+    #: Answers a bare CR or LF in DATA by 554 after its end
     CRLF_DATA_STRICT = auto()
+    #: Like CRLF_DATA_STRICT and closes the connection then
     CRLF_DATA_STRICT_CLOSE = auto()
 
 
 class WhitespaceMode(Enum):
     """The whitespace_mode symbols (member names match the config values)."""
 
+    #: Hands unusual whitespace to the events
     WHITESPACE_UNSAFE = auto()
+    #: Strips unusual whitespace at the edges
     WHITESPACE_MODERATE = auto()
+    #: Answers unusual whitespace by 501
     WHITESPACE_STRICT = auto()
 
 
 class AuthMode(Enum):
     """The auth_mode symbols (member names match the config values)."""
 
+    #: AUTH is not offered
     AUTH_FORBIDDEN = auto()
+    #: AUTH is offered
     AUTH_OPTIONAL = auto()
+    #: AUTH is required before MAIL
     AUTH_REQUIRED = auto()
 
 
@@ -165,19 +195,30 @@ def tls_immediate_supported():
 
 
 # short module-level aliases for the :CMD_* symbol names
+#: Alias of ```CmdSequence.PROXY```
 CMD_PROXY = CmdSequence.PROXY
+#: Alias of ```CmdSequence.HELO```
 CMD_HELO = CmdSequence.HELO
+#: Alias of ```CmdSequence.RSET```
 CMD_RSET = CmdSequence.RSET
+#: Alias of ```CmdSequence.MAIL```
 CMD_MAIL = CmdSequence.MAIL
+#: Alias of ```CmdSequence.RCPT```
 CMD_RCPT = CmdSequence.RCPT
+#: Alias of ```CmdSequence.DATA```
 CMD_DATA = CmdSequence.DATA
+#: Alias of ```CmdSequence.QUIT```
 CMD_QUIT = CmdSequence.QUIT
+#: Alias of ```CmdSequence.STARTTLS```
 CMD_STARTTLS = CmdSequence.STARTTLS
+#: Alias of ```CmdSequence.AUTH_PLAIN_VALUES```
 CMD_AUTH_PLAIN_VALUES = CmdSequence.AUTH_PLAIN_VALUES
+#: Alias of ```CmdSequence.AUTH_LOGIN_USER```
 CMD_AUTH_LOGIN_USER = CmdSequence.AUTH_LOGIN_USER
+#: Alias of ```CmdSequence.AUTH_LOGIN_PASS```
 CMD_AUTH_LOGIN_PASS = CmdSequence.AUTH_LOGIN_PASS
 
-# reply that ends a dialog on a shutdown of the service (RFC 5321 3.8)
+#: Reply that ends a dialog on a shutdown of the service (RFC 5321 3.8)
 REPLY_421_FOR_SHUTDOWN = '421 Service shutting down and closing transmission channel'
 
 
@@ -340,9 +381,13 @@ class GlobalLimits:
     """
 
     def __init__(self, max_processings=None, max_connections=None):
+        #: Global max of simultaneous processings, None is unlimited
         self.max_processings = int(max_processings) if max_processings else None
+        #: Global max of open connections, None is unlimited
         self.max_connections = int(max_connections) if max_connections else None
+        #: Open connections of all services
         self.active = 0
+        #: In-progress dialogs of all services
         self.active_processings = 0
         #: @private Shared wake event: a slot released on any service wakes
         #: every waiter (each server with global_limits waits on this instead
@@ -452,9 +497,13 @@ class SmtpdServer:
         for key, value in kwargs.items():
             if value is not None and key not in ('ports', 'hosts', 'tls_mode', 'session_id_bytes'):
                 options.setdefault(key, value)
+        #: The bound handler implementation instance
         self.events_handler = events_handler
+        #: The dispatch table of the events the handler overrides
         self.emit_events = self._build_emit_events_dispatcher(events_handler)
+        #: Whether the server runs in debug mode
         self.debug = bool(debug)
+        #: Limits shared across services, None for none
         self.global_limits = global_limits
         #: Strong refs to scheduled log tasks (the loop only holds them weakly)
         self._pending_log_tasks = set()
@@ -482,29 +531,41 @@ class SmtpdServer:
         # ports / hosts / addresses
         # bytes of randomness for the per-connection session id (ctx.id);
         # a keyword-only server property, never read from the server options
+        #: Bytes of randomness of the session id of each connection
         self.session_id_bytes = int(kwargs.get('session_id_bytes') or 8)
+        #: The ports the server listens on
         self.ports = _parse_ports(kwargs.get('ports') if kwargs.get('ports') is not None else options.get('ports', DEFAULT_SMTPD_PORT))
+        #: The hosts the server listens on
         self.hosts = _parse_hosts(kwargs.get('hosts') if kwargs.get('hosts') is not None else options.get('hosts', DEFAULT_SMTPD_HOST))
         self._addresses = _build_addresses(self.ports, self.hosts)
         # dialog options
+        #: Seconds to wait for a command line
         self.io_cmd_timeout = options.get('io_cmd_timeout', DEFAULT_IO_CMD_TIMEOUT)
         # like Ruby nil, None is the default
+        #: Seconds a session may last
         self.io_session_timeout = options.get('io_session_timeout')
         if self.io_session_timeout is None:
             self.io_session_timeout = DEFAULT_IO_SESSION_TIMEOUT
+        #: Max length in bytes of a command or DATA line
         self.io_buffer_max_size = options.get('io_buffer_max_size')
         if self.io_buffer_max_size is None:
             self.io_buffer_max_size = DEFAULT_IO_BUFFER_MAX_SIZE
+        #: The line breaks of all lines, a ```CrlfMode```
         self.crlf_mode = _parse_mode(CrlfMode, options.get('crlf_mode'), 'CRLF_ENSURE', 'crlf_mode')
+        #: The line breaks in DATA, a ```CrlfDataMode```
         self.crlf_data_mode = _parse_mode(
             CrlfDataMode,
             options.get('crlf_data_mode'),
             'CRLF_DATA_STRICT' if self.crlf_mode is CrlfMode.CRLF_STRICT else 'CRLF_DATA_MODERATE',
             'crlf_data_mode',
         )
+        #: The unusual whitespace in command lines, a ```WhitespaceMode```
         self.whitespace_mode = _parse_mode(WhitespaceMode, options.get('whitespace_mode'), 'WHITESPACE_MODERATE', 'whitespace_mode')
+        #: Whether PIPELINING is offered
         self.pipelining_extension = bool(options.get('pipelining_extension', False))
+        #: Whether a PROXY header is expected on connect
         self.proxy_extension = bool(options.get('proxy_extension', False))
+        #: Seconds to wait for the PROXY header
         self.io_proxy_cmd_timeout = options.get('io_proxy_cmd_timeout', DEFAULT_IO_PROXY_CMD_TIMEOUT)
         # test for message spooling
         # value has to be an existing directory + file-name prefix
@@ -517,14 +578,21 @@ class SmtpdServer:
             self._spooling = True
         else:
             self._spooling = False
+        #: Whether SMTPUTF8 is announced
         self.internationalization_extensions = bool(options.get('internationalization_extensions', False))
+        #: Whether the hostname of a client is looked up by reverse DNS
         self.do_dns_reverse_lookup = options.get('do_dns_reverse_lookup')
         if self.do_dns_reverse_lookup is None:
             self.do_dns_reverse_lookup = True
+        #: The TLS of the dialog, an ```EncryptMode```
         self.encrypt_mode = _parse_mode(EncryptMode, options.get('encrypt_mode'), 'TLS_FORBIDDEN', 'encrypt_mode')
+        #: The AUTH of the dialog, an ```AuthMode```
         self.auth_mode = _parse_mode(AuthMode, options.get('auth_mode'), 'AUTH_FORBIDDEN', 'auth_mode')
+        #: Authorization ids that may relay for others
         self.trusted_relay_auth_ids = options.get('trusted_relay_auth_ids', [])
+        #: Max of simultaneous processings of this service
         self.max_processings = options.get('max_processings', DEFAULT_SMTPD_MAX_PROCESSINGS)
+        #: Max of open connections of this service, None is unlimited
         self.max_connections = options.get('max_connections', None)
         # validation
         if self.crlf_mode is CrlfMode.CRLF_STRICT and self.crlf_data_mode not in (
@@ -555,6 +623,7 @@ class SmtpdServer:
                     'number of simultaneous processings (max_processings)!'
                 )
         # Tokeo-only option: hard limit of the message size during DATA
+        #: Max size in bytes of a message, None is unlimited
         self.data_size = options.get('data_size', None)
         #: TLS transport, built when encryption is allowed (else None and
         #: STARTTLS answers 500)

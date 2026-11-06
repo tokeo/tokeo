@@ -73,6 +73,7 @@ class App:
         return getattr(self._app, key)
 
 
+#: The shared app, set by ```load()```
 app = App()
 
 

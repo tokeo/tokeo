@@ -20,10 +20,15 @@ from enum import Enum
 class Severity(Enum):
     """Log severity levels handed to on_logging_event (Python logging levels)."""
 
+    #: Debug level
     DEBUG = logging.DEBUG
+    #: Info level
     INFO = logging.INFO
+    #: Warning level
     WARNING = logging.WARNING
+    #: Error level
     ERROR = logging.ERROR
+    #: Critical level
     CRITICAL = logging.CRITICAL
 
 

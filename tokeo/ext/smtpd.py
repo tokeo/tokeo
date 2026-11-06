@@ -263,8 +263,12 @@ class SharedGlobalLimits(GlobalLimits):
     """
 
     def __init__(self, max_processings=None, max_connections=None):
+        #: Global max of simultaneous processings, None is unlimited
         self.max_processings = int(max_processings) if max_processings else None
+        #: Global max of open connections, None is unlimited
         self.max_connections = int(max_connections) if max_connections else None
+        #: @private Wake event of the waiters of this process, set when a
+        #: slot may be free
         self.slot_free = asyncio.Event()
         self.slot_free.set()
         self._shared_active = multiprocessing.Value('i', 0)
@@ -350,17 +354,23 @@ class TokeoSmtpd(MetaMixin):
     class Meta:
         """Extension meta-data and config defaults."""
 
-        #: Unique identifier for this handler
+        # Unique identifier for this handler
         label = 'tokeo.smtpd'
 
-        #: Configuration section in the application config
+        # Configuration section in the application config
         config_section = 'smtpd'
 
-        #: Default configuration values
+        # Defaults of the config section
         config_defaults = dict(
+            # global max of simultaneous processings of all services, None
+            # is unlimited
             max_processings=None,
+            # global max of open connections of all services, None is
+            # unlimited
             max_connections=None,
+            # bytes of the random session id of each connection
             session_id_bytes=8,
+            # the services, each with its name, events_handler and server_options
             services=[],
         )
 

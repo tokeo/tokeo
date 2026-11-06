@@ -38,12 +38,14 @@ from tokeo.core.utils.memfd import memory_paths
 # Old. The defaults (ADVANCED*) follow the current "Intermediate" profile (ECDHE
 # preferred over DHE, AEAD only, ChaCha20 for clients without AES-NI); see
 # https://ssl-config.mozilla.org and the OWASP TLS Cipher String Cheat Sheet.
+#: Ciphers of the strictest preset: ECDHE and DHE with AEAD only
 TLS_CIPHERS_ADVANCED_PLUS = (
     'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:'
     'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:'
     'ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:'
     'DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305'
 )
+#: Ciphers of the default preset: ADVANCED_PLUS and the SHA2 CBC suites
 TLS_CIPHERS_ADVANCED = (
     TLS_CIPHERS_ADVANCED_PLUS
     + ':ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256'
@@ -53,6 +55,7 @@ TLS_CIPHERS_ADVANCED = (
 # LEGACY: the widest compatible set that still keeps forward secrecy: it adds
 # the SHA1 CBC suites needed by TLS 1.0/1.1 clients, but deliberately excludes
 # the broken/legacy suites (3DES/Sweet32, RC4, DES, MD5, static-RSA). Opt-in.
+#: Ciphers of the legacy preset: ADVANCED and the SHA1 CBC suites
 TLS_CIPHERS_LEGACY = (
     TLS_CIPHERS_ADVANCED
     + ':ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA'
@@ -64,8 +67,11 @@ TLS_CIPHERS_LEGACY = (
 # maximum client/server interoperability, an explicit opt-in trade-off (TLS
 # 1.0/1.1 are deprecated) that is still useful for opportunistic SMTP TLS, where
 # an old, weakly-encrypted hop beats a cleartext one.
+#: The lowest TLS version of the modern preset, TLS 1.3 only
 TLS_METHODS_MODERN = 'TLSv1_3'
+#: The lowest TLS version of the default preset
 TLS_METHODS_ADVANCED = 'TLSv1_2'
+#: The lowest TLS version of the legacy preset
 TLS_METHODS_LEGACY = 'TLSv1'
 
 # An unknown method falls back to the secure TLS 1.2 default; the maximum is left
@@ -97,10 +103,15 @@ class EncryptMode(Enum):
 
     """
 
+    #: No STARTTLS is offered
     TLS_FORBIDDEN = auto()
+    #: The client may upgrade by STARTTLS
     TLS_OPTIONAL = auto()
+    #: Like TLS_OPTIONAL, AUTH only on an encrypted channel
     TLS_WHEN_AUTH = auto()
+    #: Every command beyond EHLO and STARTTLS needs TLS
     TLS_REQUIRED = auto()
+    #: SMTPS, the handshake runs right on connect
     TLS_IMMEDIATE = auto()
 
 
@@ -135,6 +146,7 @@ class TlsTransport:
         self._logger = logger
         cert_path = (cert_path or '').strip() or None
         key_path = (key_path or '').strip() or None
+        #: The ssl context of the server
         self.context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         # PROTOCOL_TLS_SERVER already sets OP_NO_COMPRESSION (CRIME) and
         # OP_CIPHER_SERVER_PREFERENCE; also refuse client-initiated TLS 1.2

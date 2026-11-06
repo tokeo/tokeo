@@ -180,28 +180,45 @@ class TokeoPdoc(Handler):
         label = 'pdoc'
         interface = 'pdoc'
 
-        #: config section this extension reads
+        # config section this extension reads
         config_section = 'pdoc'
 
-        #: config defaults, merged (non-overriding) at setup so the section
-        #: always exists even when the app config does not set it
+        # config defaults, merged (non-overriding) at setup so the section
+        # always exists even when the app config does not set it
         config_defaults = dict(
+            # modules to render (str or list), None renders the app and tests
             modules=None,
+            # module prefixes skipped during the discovery
             exclude=[],
+            # directory the html is rendered into
             output_dir='html',
+            # host the documentation is served on
             host='127.0.0.1',
+            # port the documentation is served on
             port=9999,
+            # project path of the favicon, copied into the root of the docs
             favicon='public/favicon.ico',
+            # lang attribute of <html>
             lang='en',
+            # suffix of the page titles
             title='Tokeo API',
+            # label of the sidebar, None shows the label of the app
             brand=None,
+            # modules or directories of the jinja2 templates, the first wins
             templates=['tokeo.templates.pdoc.html'],
+            # modules or directories of the markdown docstrings of decorators
             docstrings=['tokeo.templates.pdoc.docstrings'],
+            # render the yaml config page
             show_config=True,
+            # levels of the class hierarchy shown above a class
             ancestors_max_depth=2,
+            # file patterns that trigger a new render with --watch
             watch_includes='*.py, *.yaml, *.yml, *.md',
+            # file patterns ignored by --watch
             watch_excludes='.*',
+            # seconds between two checks for changes with --watch
             watch_interval=2.0,
+            # seconds without a change before --watch renders again
             watch_settle=1.5,
         )
 

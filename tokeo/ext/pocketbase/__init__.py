@@ -122,7 +122,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         # Configuration section name in the application config
         config_section = 'pocketbase'
 
-        # the defaults of the config section
+        # Defaults of the config section
         config_defaults = dict(
             # URL for the PocketBase server; use https:// to enable tls,
             # verified against the system ca store by default (the secure option)

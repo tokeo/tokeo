@@ -41,6 +41,7 @@ class Tokeo(App):
 
         # configuration defaults
         config_defaults = dict(
+            # run the app in debug mode
             debug=False,
         )
 

@@ -144,10 +144,15 @@ class TokeoInvokeLocalContext(invoke.Context):
 
     def __init__(self, config=None, task_ref=None):
         super().__init__(config=config)
+        #: The task definition
         self.task_ref = task_ref
+        #: The protect and sanitize rules of the task
         self.task_kwprotected = task_ref['kwprotected']
+        #: A copy of the kwargs of the task
         self.task_kwargs = copy.deepcopy(task_ref['kwargs'])
+        #: How the protected kwargs of a run are handled
         self.protect = self.task_kwprotected['protect']
+        #: Whether the kwargs of a run are sanitized
         self.sanitize = self.task_kwprotected['sanitize']
 
     @staticmethod
@@ -310,18 +315,31 @@ class TokeoInvokeRemoteContext(invoke.Context):
         task_ref=None,
     ):
         super().__init__(config=config)
+        #: Target hostname or IP
         self.host = host
+        #: SSH username
         self.user = user
+        #: SSH port
         self.port = port
+        #: Config of the invoke base context
         self.config = config
+        #: Known host keys, None adds unknown hosts
         self.host_keys = host_keys
+        #: Whether to forward the SSH agent
         self.forward_agent = forward_agent
+        #: Extra kwargs for the connect() of paramiko
         self.connect_kwargs = connect_kwargs
+        #: The task definition
         self.task_ref = task_ref
+        #: The protect and sanitize rules of the task
         self.task_kwprotected = task_ref['kwprotected']
+        #: A copy of the kwargs of the task
         self.task_kwargs = copy.deepcopy(task_ref['kwargs'])
+        #: How the protected kwargs of a run are handled
         self.protect = self.task_kwprotected['protect']
+        #: Whether the kwargs of a run are sanitized
         self.sanitize = self.task_kwprotected['sanitize']
+        #: The paramiko client, None until the first run connects
         self.client = None
 
     def _connect(self):
@@ -616,6 +634,7 @@ class TokeoAutomateResult:
         # try to get values from an additional values attribute
         # otherwise save the result as values for latter processing
         if hasprops(result, ('stdout', 'stderr', 'command', 'exited')):
+            #: Values handed back by the task, or the result itself
             self.values = getprop(result, 'values', fallback=None)
         else:
             self.values = result
@@ -654,31 +673,49 @@ class TokeoAutomate(MetaMixin):
     class Meta:
         """Extension meta-data and configuration defaults."""
 
-        #: Unique identifier for this handler
+        # Unique identifier for this handler
         label = 'tokeo.automate'
 
-        #: Id for config
+        # Name of the config section
         config_section = 'automate'
 
-        #: Dict with the config defaults
+        # Defaults of the config section
         config_defaults = dict(
+            # the named hosts, each with its host, port, user and keys
             hosts={},
+            # the named groups of hosts
             hostgroups={},
+            # the named connections, how to access the hosts
             connections=dict(
+                # the defaults of every connection
                 _defaults=dict(
+                    # id of the connection, its key by default
                     id=None,
+                    # name of the connection, its key by default
                     name=None,
+                    # seconds to wait for the ssh connection
                     connect_timeout=60,
+                    # hosts or hostgroups of the connection
                     hosts=None,
+                    # ssh port of the hosts
                     port=22,
+                    # login user, None uses the one of ssh
                     user=None,
+                    # login password
                     password=None,
+                    # sudo of the commands, e.g. its password and mode
                     sudo=None,
+                    # path of the private key file
                     identity=None,
+                    # look for private keys in ~/.ssh
                     lookup_keys=False,
+                    # use the ssh agent for keys
                     allow_agent=False,
+                    # forward the ssh agent to the hosts, with allow_agent only
                     forward_agent=False,
+                    # known_hosts lines of the host keys to check
                     known_hosts=None,
+                    # nested connections, dropped when a connection is built
                     connections={},
                 ),
             ),
