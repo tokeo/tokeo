@@ -532,8 +532,8 @@ The same is available in code as ```app.dramatiq.queues```:
 <tbody>
 <tr><td>names()</td><td>the queue names of the actors</td></tr>
 <tr><td>state(names=None, cache_ttl=0)</td><td>one dict per queue; a cache_ttl keeps the state for further calls</td></tr>
-<tr><td>peek_dead(name, limit=10)</td><td>dead letters with message_id, actor, retries, error, args and timestamp</td></tr>
-<tr><td>requeue_dead(name, limit=None)</td><td>move dead letters back, resetting retries and traceback</td></tr>
+<tr><td>peek_dead(name, max_messages=10)</td><td>dead letters with message_id, actor, retries, error, args and timestamp</td></tr>
+<tr><td>requeue_dead(name, max_messages=None)</td><td>move dead letters back, resetting retries and traceback</td></tr>
 <tr><td>purge(names=None, dead_only=False)</td><td>remove messages</td></tr>
 <tr><td>delete(names=None, force=False)</td><td>delete queues</td></tr>
 <tr><td>recreate(names=None, force=False)</td><td>declare queues again</td></tr>
@@ -593,7 +593,7 @@ only):
   "app": {"label": "myapp", "version": "2.2.0"},
   "worker": {"host": "worker-01", "pid": 4711, "started_at": 1761097200000,
              "threads": 8, "queues": null, "queue_prefetch": 16,
-             "delay_queue_prefetch": 8000, "details": true},
+             "delay_queue_prefetch": 8000, "with_details": true},
   "running": [{"message_id": "3f2a9c1e-...", "actor": "send_mail", "queue": "mail",
                "retries": 0, "started_at": 1761100798800, "runtime_ms": 1200,
                "args": "(('anna@example.com',), {})"}],

@@ -17,7 +17,7 @@ from dramatiq import broker as dramatiq_broker
 from dramatiq.brokers.stub import StubBroker
 from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoDramatiqConnectionError
 from tokeo.ext.dramatiq import monitoring
-from tokeo.ext.dramatiq.base import _details
+from tokeo.ext.dramatiq.base import _with_details
 from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
 from tokeo.ext.dramatiq.controller import _duration, _monitor_view
 from tokeo.ext.tui.output import TokeoTuiOutput
@@ -51,26 +51,26 @@ class DramatiqWithoutTuiTest(DramatiqTest):
 @pytest.mark.parametrize('value', [True, 'on', 'yes', 'True', 'ON'])
 def test_details_on(value):
     """True, "on", "yes" in any case switch the details on."""
-    assert _details(value, debug=False) is True
+    assert _with_details(value, debug=False) is True
 
 
 @pytest.mark.parametrize('value', [False, None, 'off', 'no', 'null', 'False'])
 def test_details_off(value):
     """False, None, "off", "no", "null" switch the details off."""
-    assert _details(value, debug=True) is False
+    assert _with_details(value, debug=True) is False
 
 
 @pytest.mark.parametrize('debug', [True, False])
 def test_details_follow_debug(debug):
     """ "debug" switches the details on in debug mode only."""
-    assert _details('debug', debug) is debug
+    assert _with_details('debug', debug) is debug
 
 
 @pytest.mark.parametrize('value', ['maybe', 1])
 def test_details_invalid(value):
     """Any other value raises the config error."""
     with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config monitoring_with_details: .* must be off, on or debug!'):
-        _details(value, debug=False)
+        _with_details(value, debug=False)
 
 
 def _heartbeats(app):
@@ -88,7 +88,7 @@ def test_monitoring_adds_the_heartbeat(tmp):
     """monitoring adds the heartbeat with exchange, interval and details."""
     with DramatiqMiddlewareTest(tmp, monitoring=True, monitoring_interval=7, monitoring_with_details='on') as app:
         (heartbeat,) = _heartbeats(app)
-        assert (heartbeat.exchange, heartbeat.interval, heartbeat.details) == ('tokeo_test.dramatiq.monitoring', 7, True)
+        assert (heartbeat.exchange, heartbeat.interval, heartbeat.with_details) == ('tokeo_test.dramatiq.monitoring', 7, True)
         assert heartbeat.app['label'] == 'tokeo_test'
 
 
@@ -114,9 +114,9 @@ def test_monitoring_config_checked(tmp, config, error):
 def worker():
     """Builds a stub broker with the heartbeat middleware and its heartbeats."""
 
-    def build(details=False, interval=60):
+    def build(with_details=False, interval=60):
         broker = StubBroker()
-        heartbeat = TokeoDramatiqHeartbeat('probe.dramatiq.monitoring', interval, details, dict(label='probe', version='1.0'))
+        heartbeat = TokeoDramatiqHeartbeat('probe.dramatiq.monitoring', interval, with_details, dict(label='probe', version='1.0'))
         sent = []
         heartbeat._send = sent.append
         broker.add_middleware(heartbeat)
@@ -177,16 +177,16 @@ def test_heartbeat_describes_the_worker(worker):
         w.stop()
     assert (beat['type'], beat['version'], beat['interval']) == ('tokeo.dramatiq.heartbeat', 1, 60)
     assert beat['app'] == dict(label='probe', version='1.0')
-    assert beat['worker']['threads'] == 2 and beat['worker']['queues'] is None and beat['worker']['details'] is False
+    assert beat['worker']['threads'] == 2 and beat['worker']['queues'] is None and beat['worker']['with_details'] is False
     assert beat['worker']['queue_prefetch'] == w.queue_prefetch and beat['worker']['started_at'] <= beat['sent_at']
     # a last heartbeat on shutdown
     assert sent[-1]['state'] == 'stopped'
 
 
-@pytest.mark.parametrize('details', [False, True])
-def test_heartbeat_shows_running_tasks(worker, details):
+@pytest.mark.parametrize('with_details', [False, True])
+def test_heartbeat_shows_running_tasks(worker, with_details):
     """A running task shows actor, queue and runtime, args with details."""
-    broker, w, heartbeat, sent, release, actors = worker(details=details)
+    broker, w, heartbeat, sent, release, actors = worker(with_details=with_details)
     w.start()
     try:
         actors['waits'].send('anna@example.com')
@@ -200,15 +200,15 @@ def test_heartbeat_shows_running_tasks(worker, details):
         w.stop()
     assert (task['actor'], task['queue'], task['retries']) == ('waits', 'default', 0)
     assert task['runtime_ms'] >= 0 and 'started' not in task
-    assert ('args' in task) is details
-    if details:
+    assert ('args' in task) is with_details
+    if with_details:
         assert task['args'] == "(('anna@example.com',), {})"
     assert heartbeat.heartbeat()['running'] == []
 
 
 def test_heartbeat_details_show_error_texts(worker):
     """With details the last error shows its text."""
-    broker, w, heartbeat, sent, release, actors = worker(details=True)
+    broker, w, heartbeat, sent, release, actors = worker(with_details=True)
     w.start()
     try:
         actors['fails'].send('anna@example.com')
@@ -286,7 +286,7 @@ def test_heartbeat_without_broker_parameters_sends_nothing(monkeypatch):
 # ---- monitor ----------------------------------------------------------------
 
 
-def _beat(pid, interval=5, state='running', running=(), since=None, details=False):
+def _beat(pid, interval=5, state='running', running=(), since=None, with_details=False):
     return dict(
         type='tokeo.dramatiq.heartbeat',
         version=1,
@@ -295,7 +295,14 @@ def _beat(pid, interval=5, state='running', running=(), since=None, details=Fals
         sent_at=1_000_000,
         app=dict(label='probe', version=None),
         worker=dict(
-            host='w1', pid=pid, started_at=1_000, threads=2, queues=None, queue_prefetch=4, delay_queue_prefetch=8, details=details
+            host='w1',
+            pid=pid,
+            started_at=1_000,
+            threads=2,
+            queues=None,
+            queue_prefetch=4,
+            delay_queue_prefetch=8,
+            with_details=with_details,
         ),
         running=list(running),
         totals=dict(done=3, failed=1, dead=0),
@@ -399,7 +406,7 @@ def test_monitor_view(tmp):
     running = [dict(task, args="(('[red]anna',), {})")]
     since = dict(send_mail=dict(done=2, failed=1, max_runtime_ms=1400, last_error='LookupError'))
     workers = [
-        dict(state='ok', seen_ms=300, heartbeat=_beat(4711, running=running, since=since, details=True)),
+        dict(state='ok', seen_ms=300, heartbeat=_beat(4711, running=running, since=since, with_details=True)),
         # a worker without details sends no args
         dict(state='gone', seen_ms=20_000, heartbeat=_beat(4712, running=[{k: v for k, v in running[0].items() if k != 'args'}])),
     ]

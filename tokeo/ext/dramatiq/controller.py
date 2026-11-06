@@ -173,15 +173,15 @@ class TokeoDramatiqController(Controller):
             result = queues.recreate(names, force=pargs.force)
             lines = [f'{r["name"]}: recreated with {r["arguments"]}' for r in result]
         elif actions == ['requeue_dead']:
-            limit = _number('switch', '--limit', pargs.limit, allow_none=True)
-            result = [queues.requeue_dead(name, limit) for name in names]
+            max_messages = _number('switch', '--limit', pargs.limit, allow_none=True)
+            result = [queues.requeue_dead(name, max_messages) for name in names]
             lines = [f'{r["name"]}: requeued {r["requeued"]} dead letters' for r in result]
         else:
             result = queues.state(names)
             if pargs.dead is not None:
-                limit = _number('switch', '--dead', pargs.dead)
+                max_messages = _number('switch', '--dead', pargs.dead)
                 for state in result:
-                    state['dead_letters'] = queues.peek_dead(state['name'], limit)
+                    state['dead_letters'] = queues.peek_dead(state['name'], max_messages)
             if not pargs.json:
                 output = self.app.tui.output
                 output.print(_queue_table(output, result), *_dead_letter_tables(output, result))
@@ -567,7 +567,7 @@ def _monitor_view(output, snapshot, label, follow=None):
             beat = worker['heartbeat']
             name = f'{beat["worker"]["host"]}:{beat["worker"]["pid"]}'
             last = beat['since_last']['actors'].values()
-            done, failed = sum(a.get('done', 0) for a in last), sum(a.get('failed', 0) for a in last)
+            done_cnt, failed_cnt = sum(a.get('done', 0) for a in last), sum(a.get('failed', 0) for a in last)
             rows.append(
                 [
                     name,
@@ -577,14 +577,16 @@ def _monitor_view(output, snapshot, label, follow=None):
                     beat['totals']['done'],
                     beat['totals']['failed'],
                     beat['totals']['dead'],
-                    f'{done} done, {failed} failed' if done or failed else '',
+                    f'{done_cnt} done, {failed_cnt} failed' if done_cnt or failed_cnt else '',
                 ]
             )
             # a running task went on since its heartbeat
-            gone_on = worker['seen_ms'] if worker['state'] in ('ok', 'late') else 0
+            since_heartbeat_ms = worker['seen_ms'] if worker['state'] in ('ok', 'late') else 0
             for task in beat['running']:
-                args = task.get('args', '' if beat['worker']['details'] else 'details off')
-                tasks.append([name, task['actor'], task['queue'], _duration(task['runtime_ms'] + gone_on), task['retries'], args])
+                args = task.get('args', '' if beat['worker']['with_details'] else 'details off')
+                tasks.append(
+                    [name, task['actor'], task['queue'], _duration(task['runtime_ms'] + since_heartbeat_ms), task['retries'], args]
+                )
         columns = [
             ('worker', 'left', 'full'),
             'up',

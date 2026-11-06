@@ -2243,9 +2243,9 @@ class TokeoAutomateShell:
             raise EOFError('Command exit entered.')
 
         # check command
-        splitted_cmd = shlex.split(cmd)
+        cmd_args = shlex.split(cmd)
         try:
-            args = self.command_parser.parse_args(args=splitted_cmd)
+            args = self.command_parser.parse_args(args=cmd_args)
         except SystemExit as err:
             # if parse was ok but only help, err == 0, else err != 0
             return err.code == 0

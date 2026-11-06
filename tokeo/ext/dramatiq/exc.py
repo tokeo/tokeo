@@ -72,8 +72,8 @@ class TokeoDramatiqConnectionError(TokeoDramatiqError, ConnectionClosed):
         #: The actor, when sending failed
         self.actor_name = actor_name
         action = f'send {actor_name} to' if actor_name else 'connect to'
-        where = f'rabbitmq at {address}' if address else 'the broker'
-        super().__init__(f'Cannot {action} {where} ({self.cause})!')
+        broker_str = f'rabbitmq at {address}' if address else 'the broker'
+        super().__init__(f'Cannot {action} {broker_str} ({self.cause})!')
         # the dramatiq error base keeps the init arguments as args
         self.args = (self.message,)
 

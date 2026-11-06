@@ -211,10 +211,10 @@ def test_peek_dead_leaves_letters(app, server):
     assert [Message.decode(b).message_id for b in server.queues['mail.XQ']['messages']] == [ltr['message_id'] for ltr in letters]
 
 
-def test_peek_dead_limit_and_missing(app, server):
-    """peek_dead stops at the limit and gives [] for a missing queue."""
+def test_peek_dead_max_messages_and_missing(app, server):
+    """peek_dead stops at max_messages and gives [] for a missing queue."""
     server.add('mail.XQ', _dead_letter(), _dead_letter(), _dead_letter())
-    assert len(app.dramatiq.queues.peek_dead('mail', limit=2)) == 2
+    assert len(app.dramatiq.queues.peek_dead('mail', max_messages=2)) == 2
     assert len(server.queues['mail.XQ']['messages']) == 3
     assert app.dramatiq.queues.peek_dead('orders_unparalleled') == []
 
@@ -223,7 +223,7 @@ def test_requeue_dead_resets_retries(app, server):
     """requeue_dead moves letters back without retries, traceback and eta."""
     server.add('mail')
     server.add('mail.XQ', _dead_letter(queue='mail.DQ', retries=20, traceback='tb', eta=1, broker_priority=3), _dead_letter())
-    assert app.dramatiq.queues.requeue_dead('mail', limit=1) == dict(name='mail', requeued=1)
+    assert app.dramatiq.queues.requeue_dead('mail', max_messages=1) == dict(name='mail', requeued=1)
     (body,) = server.queues['mail']['messages']
     message = Message.decode(body)
     # retries, traceback and eta are gone, other options and the id stay

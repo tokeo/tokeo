@@ -100,7 +100,7 @@ class TokeoDramatiqQueues:
                 self._channel = None
                 raise TokeoDramatiqRefusedError(self._dramatiq.broker.address, e) from e
 
-    def _declared(self, queue):
+    def _passive_declare(self, queue):
         # passive declare answers without creating a missing queue
         try:
             return self._open().queue_declare(queue, passive=True).method
@@ -171,17 +171,17 @@ class TokeoDramatiqQueues:
         key = tuple(names)
         # one lock for check and query, waiting callers get the fresh state
         with self._lock:
-            cached = self._cache.get(key)
-            if cached is None or time.monotonic() - cached[0] >= cache_ttl:
-                cached = (time.monotonic(), self._run(self._state, names, actors))
-                self._cache[key] = cached
+            cache_entry = self._cache.get(key)
+            if cache_entry is None or time.monotonic() - cache_entry[0] >= cache_ttl:
+                cache_entry = (time.monotonic(), self._run(self._read_state, names, actors))
+                self._cache[key] = cache_entry
             # a copy, a caller may change its dicts
-            return copy.deepcopy(cached[1])
+            return copy.deepcopy(cache_entry[1])
 
-    def _state(self, names, actors):
+    def _read_state(self, names, actors):
         result = []
         for name in names:
-            queue, delay, dead = (self._declared(n) for n in (name, dq_name(name), xq_name(name)))
+            queue, delay, dead = (self._passive_declare(n) for n in (name, dq_name(name), xq_name(name)))
             result.append(
                 dict(
                     name=name,
@@ -198,14 +198,14 @@ class TokeoDramatiqQueues:
 
     # ---- dead letters -------------------------------------------------------
 
-    def peek_dead(self, name, limit=10):
+    def peek_dead(self, name, max_messages=10):
         """
         Show dead letters of a queue and leave them in place.
 
         ### Args
 
         - **name** (str): The queue name
-        - **limit** (int, optional): Dead letters to show. Defaults to 10
+        - **max_messages** (int, optional): Dead letters to show. Defaults to 10
 
         ### Returns
 
@@ -214,14 +214,14 @@ class TokeoDramatiqQueues:
             ```timestamp```
 
         """
-        return self._call(self._peek_dead, q_name(name), limit)
+        return self._call(self._peek_dead, q_name(name), max_messages)
 
-    def _peek_dead(self, name, limit):
-        if self._declared(xq_name(name)) is None:
+    def _peek_dead(self, name, max_messages):
+        if self._passive_declare(xq_name(name)) is None:
             return []
         channel = self._open()
         result, tag = [], None
-        while len(result) < limit:
+        while len(result) < max_messages:
             method, _, body = channel.basic_get(xq_name(name), auto_ack=False)
             if method is None:
                 break
@@ -232,14 +232,14 @@ class TokeoDramatiqQueues:
             channel.basic_nack(delivery_tag=tag, multiple=True, requeue=True)
         return result
 
-    def requeue_dead(self, name, limit=None):
+    def requeue_dead(self, name, max_messages=None):
         """
         Move dead letters of a queue back into the queue.
 
         ### Args
 
         - **name** (str): The queue name
-        - **limit** (int, optional): Dead letters to move, all without
+        - **max_messages** (int, optional): Dead letters to move, all without
 
         ### Returns
 
@@ -255,16 +255,16 @@ class TokeoDramatiqQueues:
             after rabbitmq confirmed it in the queue
 
         """
-        return self._call(self._requeue_dead, q_name(name), limit)
+        return self._call(self._requeue_dead, q_name(name), max_messages)
 
-    def _requeue_dead(self, name, limit):
+    def _requeue_dead(self, name, max_messages):
         self._cache.clear()
-        if self._declared(name) is None:
+        if self._passive_declare(name) is None:
             raise TokeoDramatiqQueueError(name, 'is missing, recreate it before the requeue')
-        dead = self._declared(xq_name(name))
+        dead = self._passive_declare(xq_name(name))
         # only the dead letters present now, not ones arriving meanwhile
         count = dead.message_count if dead else 0
-        count = count if limit is None else min(count, limit)
+        count = count if max_messages is None else min(count, max_messages)
         channel = self._open()
         requeued = 0
         for _ in range(count):
@@ -317,7 +317,7 @@ class TokeoDramatiqQueues:
         for name in names:
             purged = 0
             for queue in (xq_name(name),) if dead_only else (name, dq_name(name), xq_name(name)):
-                if self._declared(queue) is not None:
+                if self._passive_declare(queue) is not None:
                     purged += self._open().queue_purge(queue).method.message_count
             result.append(dict(name=name, purged=purged))
         return result
@@ -348,7 +348,7 @@ class TokeoDramatiqQueues:
     def _delete(self, names, force):
         self._cache.clear()
         if not force:
-            for state in self._state(names, {}):
+            for state in self._read_state(names, {}):
                 busy = [key for key in ('ready', 'delayed', 'dead', 'consumers') if state[key]]
                 if busy:
                     raise TokeoDramatiqQueueError(state['name'], f'has {", ".join(busy)}, use force to delete it anyway')
@@ -356,7 +356,7 @@ class TokeoDramatiqQueues:
         for name in names:
             deleted = False
             for queue in (name, dq_name(name), xq_name(name)):
-                if self._declared(queue) is not None:
+                if self._passive_declare(queue) is not None:
                     self._open().queue_delete(queue)
                     deleted = True
             result.append(dict(name=name, deleted=deleted))

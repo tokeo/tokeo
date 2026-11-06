@@ -27,7 +27,7 @@ HEARTBEAT_TYPE = 'tokeo.dramatiq.heartbeat'
 HEARTBEAT_VERSION = 1
 
 #: Characters of the arguments and error texts in a heartbeat
-DETAILS_LENGTH = 500
+DETAILS_MAX_LENGTH = 500
 
 #: Intervals without a heartbeat until a worker is late or gone
 LATE_INTERVALS = 2
@@ -50,7 +50,7 @@ def _now_ms():
 
 
 def _cut(text):
-    return text if len(text) <= DETAILS_LENGTH else text[:DETAILS_LENGTH] + '...'
+    return text if len(text) <= DETAILS_MAX_LENGTH else text[:DETAILS_MAX_LENGTH] + '...'
 
 
 def _app_version(app):
@@ -69,7 +69,7 @@ class TokeoDramatiqHeartbeat(Middleware):
 
     - **exchange** (str): The monitoring exchange
     - **interval** (int): Seconds between two heartbeats
-    - **details** (bool): Whether to send arguments and error texts
+    - **with_details** (bool): Whether to send arguments and error texts
     - **app** (dict): Label and version of the app
 
     ### Notes
@@ -80,10 +80,10 @@ class TokeoDramatiqHeartbeat(Middleware):
 
     """
 
-    def __init__(self, exchange, interval, details, app):
+    def __init__(self, exchange, interval, with_details, app):
         self.exchange = exchange
         self.interval = interval
-        self.details = details
+        self.with_details = with_details
         self.app = app
         self._lock = threading.Lock()
         self._running = {}
@@ -130,7 +130,7 @@ class TokeoDramatiqHeartbeat(Middleware):
             started_at=_now_ms(),
             started=time.monotonic(),
         )
-        if self.details:
+        if self.with_details:
             task['args'] = _cut(repr((message.args, message.kwargs)))
         with self._lock:
             self._running[message.message_id] = task
@@ -149,7 +149,7 @@ class TokeoDramatiqHeartbeat(Middleware):
                 actor['failed'] += 1
                 # the type never holds data, the text only with details
                 error = type(exception).__name__
-                if self.details and str(exception):
+                if self.with_details and str(exception):
                     error = _cut(f'{error}: {str(exception).splitlines()[0]}')
                 actor['last_error'] = error
 
@@ -202,7 +202,7 @@ class TokeoDramatiqHeartbeat(Middleware):
                 queues=sorted(worker.consumer_whitelist) if getattr(worker, 'consumer_whitelist', None) else None,
                 queue_prefetch=getattr(worker, 'queue_prefetch', None),
                 delay_queue_prefetch=getattr(worker, 'delay_prefetch', None),
-                details=self.details,
+                with_details=self.with_details,
             ),
             running=running,
             totals=totals,
@@ -327,10 +327,10 @@ class TokeoDramatiqMonitor:
                 self._listen()
                 # each running worker sends within one interval
                 wait = max(wait, self.interval)
-            deadline = time.monotonic() + wait
+            collect_deadline = time.monotonic() + wait
             while True:
-                self._connection.process_data_events(time_limit=max(0, deadline - time.monotonic()))
-                if time.monotonic() >= deadline:
+                self._connection.process_data_events(time_limit=max(0, collect_deadline - time.monotonic()))
+                if time.monotonic() >= collect_deadline:
                     break
         except pika.exceptions.AMQPError as e:
             self._close()
@@ -359,19 +359,19 @@ class TokeoDramatiqMonitor:
             for key, entry in list(self._workers.items()):
                 heartbeat = entry['heartbeat']
                 interval = heartbeat.get('interval') or self.interval
-                seen = now - entry['received']
+                seen_seconds = now - entry['received']
                 if heartbeat.get('state') == 'stopped':
-                    state, ends = 'stopped', KEEP_INTERVALS
-                elif seen <= LATE_INTERVALS * interval:
-                    state, ends = 'ok', None
-                elif seen <= GONE_INTERVALS * interval:
-                    state, ends = 'late', None
+                    state, remove_intervals = 'stopped', KEEP_INTERVALS
+                elif seen_seconds <= LATE_INTERVALS * interval:
+                    state, remove_intervals = 'ok', None
+                elif seen_seconds <= GONE_INTERVALS * interval:
+                    state, remove_intervals = 'late', None
                 else:
-                    state, ends = 'gone', GONE_INTERVALS + KEEP_INTERVALS
-                if ends is not None and seen > ends * interval:
+                    state, remove_intervals = 'gone', GONE_INTERVALS + KEEP_INTERVALS
+                if remove_intervals is not None and seen_seconds > remove_intervals * interval:
                     del self._workers[key]
                     continue
-                result.append(dict(state=state, seen_ms=int(seen * 1000), heartbeat=heartbeat))
+                result.append(dict(state=state, seen_ms=int(seen_seconds * 1000), heartbeat=heartbeat))
         return sorted(result, key=lambda w: (w['heartbeat']['worker']['host'], w['heartbeat']['worker']['pid']))
 
     def snapshot(self, wait=0):

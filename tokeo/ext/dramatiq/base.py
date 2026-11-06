@@ -499,14 +499,14 @@ class TokeoDramatiq(MetaMixin):
         if not is_bool(monitoring):
             raise TokeoDramatiqConfigError('config', 'monitoring', monitoring, 'true or false')
         interval = _number('config', 'monitoring_interval', self._config('monitoring_interval'))
-        details = _details(self._config('monitoring_with_details'), self.app.debug)
+        with_details = _with_details(self._config('monitoring_with_details'), self.app.debug)
         if not monitoring:
             return None
         # imported here, the monitoring module builds on this one
         from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat, exchange_name, _app_version
 
         app = dict(label=self.app._meta.label, version=_app_version(self.app))
-        return TokeoDramatiqHeartbeat(exchange_name(self.app), interval, details, app)
+        return TokeoDramatiqHeartbeat(exchange_name(self.app), interval, with_details, app)
 
     def close(self):
         """
@@ -605,10 +605,10 @@ def _number(source, name, value, min_value=1, max_value=None, allow_none=False, 
     except ValueError:
         number = None
     if number == 'auto':
-        valid = allow_auto
+        is_valid = allow_auto
     else:
-        valid = number is not None and (max_value is None or number <= max_value)
-    if not valid:
+        is_valid = number is not None and (max_value is None or number <= max_value)
+    if not is_valid:
         expected = f'{min_value} to {max_value}' if max_value is not None else f'an integer >= {min_value}'
         expected = f'"auto" or {expected}' if allow_auto else expected
         expected = f'null or {expected}' if allow_none else expected
@@ -616,7 +616,7 @@ def _number(source, name, value, min_value=1, max_value=None, allow_none=False, 
     return number
 
 
-def _details(value, debug):
+def _with_details(value, debug):
     """
     Read the config ```monitoring_with_details```.
 
