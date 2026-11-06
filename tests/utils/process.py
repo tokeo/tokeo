@@ -58,13 +58,14 @@ class SubProcess:
 
     """
 
-    #: (file) The temp file of the output of the program, set on enter
+    #: (file) The anonymous temp file of the output, set on enter
     log = None
-    #: (subprocess.Popen) The running program, set on enter
+
+    #: (Popen) The running program, set on enter
     process = None
 
     def __init__(self, args, env=None, timeout=30, name=None):
-        #: The program and its arguments, as text
+        #: The program and its arguments, as strings
         self.args = [str(arg) for arg in args]
         #: More environment variables of the program
         self.env = env

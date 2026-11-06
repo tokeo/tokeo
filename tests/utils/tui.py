@@ -54,21 +54,28 @@ class Terminal:
 
     """
 
-    #: (int) The file descriptor of the terminal side of the test, set on enter
+    #: (int) The file descriptor of the master side of the terminal, set on
+    #: enter
     master = None
-    #: (subprocess.Popen) The running program, set on enter
+
+    #: (Popen) The running program, set on enter
     process = None
-    #: (pyte.Screen) The screen of the terminal, set on enter
+
+    #: (pyte.Screen) The screen the output is drawn on, set on enter
     screen = None
+
     #: (pyte.ByteStream) The stream that feeds the screen, set on enter
     stream = None
+
     #: (bytes) Every byte read from the program, set on enter
     raw = None
-    #: (float) The time ```wait_for``` waits until in all, set on enter
+
+    #: (float) The ```time.monotonic()``` at which ```wait_for``` gives up,
+    #: set on enter
     end_time = None
 
     def __init__(self, args, rows=24, columns=80, ctty=False, timeout=30):
-        #: The program and its arguments
+        #: The program and its arguments, started in ```ROOT_DIR```
         self.args = args
         #: The rows of the screen
         self.rows = rows
