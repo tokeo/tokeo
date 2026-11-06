@@ -442,7 +442,7 @@ def test_failed_start_terminates_forked_workers():
     with _serve({'services': [_make_service('mx1', port_a, pre_fork=2), _make_broken_service('mx2')]}) as process:
         assert process.wait() != 0
         # the workers stop on the SIGTERM of the master; a lost one costs the
-        # 5 s until the SIGKILL of the bounded wait
+        # wait with a max of 5 s until its SIGKILL
         assert time.monotonic() - started < 4.0
         assert wait_process_group_ended(process.pid)
         _assert_port_free(port_a)

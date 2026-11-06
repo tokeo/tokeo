@@ -111,7 +111,7 @@ class CmdSequence(Enum):
     QUIT = auto()
     #: Runs the TLS handshake, of STARTTLS or on connect
     STARTTLS = auto()
-    # AUTH challenge states (used when AUTH is added)
+    # AUTH challenge states
     #: Waits for the values of AUTH PLAIN
     AUTH_PLAIN_VALUES = auto()
     #: Waits for the user of AUTH LOGIN

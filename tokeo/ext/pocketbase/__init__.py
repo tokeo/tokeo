@@ -106,20 +106,12 @@ class TokeoPocketBaseHandler(MetaMixin):
     """
 
     class Meta:
-        """
-        Handler meta-data configuration.
+        """Handler meta-data configuration."""
 
-        ### Notes
-
-        : This class defines the configuration section, default values,
-            and unique identifier required by the Cement framework for
-            proper handler registration and operation.
-        """
-
-        # Unique identifier for this handler
+        # Label of this handler
         label = 'tokeo.pocketbase'
 
-        # Configuration section name in the application config
+        # Name of the config section
         config_section = 'pocketbase'
 
         # Defaults of the config section

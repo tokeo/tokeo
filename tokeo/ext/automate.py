@@ -152,7 +152,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         self.task_kwargs = copy.deepcopy(task_ref['kwargs'])
         #: How the protected kwargs of a run are handled
         self.protect = self.task_kwprotected['protect']
-        #: Whether the kwargs of a run are sanitized
+        #: Whether the env of a run is sanitized
         self.sanitize = self.task_kwprotected['sanitize']
 
     @staticmethod
@@ -242,7 +242,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         # take care of kwargs
         TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs)
 
-        # check for sudo config and options
+        # check for the sudo config
         sudo_config = self.config.get('sudo')
         sudo_pass = sudo_config.get('password') if sudo_config else None
 
@@ -250,7 +250,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         if sudo_pass:
             # sudo almost always requires a PTY to prompt properly over SSH
             kwargs['pty'] = True
-            # local proxy values for sudo config options
+            # local values of the sudo config
             sudo_mode = sudo_config.get('mode')
             if sudo_mode == 'env':
                 sudo_match = TokeoInvokeLocalContext.generate_sudo_env_match_token(self)
@@ -337,7 +337,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         self.task_kwargs = copy.deepcopy(task_ref['kwargs'])
         #: How the protected kwargs of a run are handled
         self.protect = self.task_kwprotected['protect']
-        #: Whether the kwargs of a run are sanitized
+        #: Whether the env of a run is sanitized
         self.sanitize = self.task_kwprotected['sanitize']
         #: The paramiko client, None until the first run connects
         self.client = None
@@ -434,7 +434,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         # get encoding
         encoding = kwargs.get('encoding', None)
 
-        # check for sudo config and options
+        # check for the sudo config
         sudo_config = self.config.get('sudo')
         sudo_pass = sudo_config.get('password') if sudo_config else None
 
@@ -442,7 +442,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         if sudo_pass:
             # sudo almost always requires a PTY to prompt properly over SSH
             kwargs['pty'] = True
-            # local proxy values for sudo config options
+            # local values of the sudo config
             sudo_mode = sudo_config.get('mode')
             sudo_tail = sudo_config.get('tail')
             if sudo_mode == 'env':
@@ -610,9 +610,6 @@ class TokeoAutomateResult:
 
     """
 
-    #: (any) Additional values returned by the task
-    values = None
-
     def __init__(self, task_id, connection_id, host_id, result):
         #: Identifier of the executed task
         self.task_id = task_id
@@ -671,9 +668,9 @@ class TokeoAutomate(MetaMixin):
     """
 
     class Meta:
-        """Extension meta-data and configuration defaults."""
+        """Extension meta-data configuration."""
 
-        # Unique identifier for this handler
+        # Label of this extension
         label = 'tokeo.automate'
 
         # Name of the config section
@@ -1377,7 +1374,7 @@ class TokeoAutomate(MetaMixin):
             kwprotected['pty'] = _config_task.get('pty', False)
             if task_protect is None:
                 kwargs['pty'] = kwprotected['pty']
-            # sanitize kwargs and env on run (True by default)
+            # sanitize the env on run (True by default)
             kwprotected['sanitize'] = _config_task.get('sanitize', _default_task_sanitize)
             # check env
             kwprotected['env'] = _config_task.get('env', _default_env)
@@ -2331,7 +2328,7 @@ class TokeoAutomateController(Controller):
     """
 
     class Meta:
-        """Controller configuration."""
+        """Controller meta-data configuration."""
 
         label = 'automate'
         stacked_type = 'nested'

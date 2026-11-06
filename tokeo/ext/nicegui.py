@@ -303,12 +303,9 @@ class TokeoNicegui(MetaMixin):
     """
 
     class Meta:
-        """
-        Extension meta-data and configuration defaults.
+        """Extension meta-data configuration."""
 
-        """
-
-        # Unique identifier for this handler
+        # Label of this extension
         label = 'tokeo.nicegui'
 
         # Name of the config section
@@ -752,10 +749,7 @@ class TokeoNiceguiController(Controller):
     """
 
     class Meta:
-        """
-        Controller meta-data for command-line integration.
-
-        """
+        """Controller meta-data configuration."""
 
         label = 'nicegui'
         stacked_type = 'nested'

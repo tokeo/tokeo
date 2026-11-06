@@ -86,18 +86,10 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     """
 
     class Meta:
-        """
-        Handler meta-data for configuration and identification.
+        """Handler meta-data configuration."""
 
-        ### Notes
-
-        : This class defines metadata required by the Cement framework
-            for proper handler registration and operation.
-
-        """
-
+        # Label of this handler
         label = 'tokeo.yaml'
-        """The unique string identifier of this handler in the application."""
 
     def _build_env_var_name(self, path):
         """

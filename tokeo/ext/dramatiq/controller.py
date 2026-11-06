@@ -32,7 +32,7 @@ class TokeoDramatiqController(Controller):
     """
 
     class Meta:
-        """Meta configuration for the Dramatiq controller."""
+        """Controller meta-data configuration."""
 
         label = 'dramatiq'
         stacked_type = 'nested'

@@ -292,7 +292,7 @@ class SmtpdEvents:
 
         : If authentication is used, override this event and implement
             your own user management, otherwise all authentications are
-            blocked per default (deny with ```Smtpd535Exception```)
+            denied by default (```Smtpd535Exception```)
         : The credential check and its source (vault, DB, LDAP) live entirely in
             the handler; only a returned non-empty string grants the access and
             is used as the authorization id, any other result is denied by 535

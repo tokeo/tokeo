@@ -60,21 +60,12 @@ class TokeoSMTPMailHandler(mail.MailHandler):
     """
 
     class Meta:
-        """
-        Handler meta-data defining configuration and behavior.
+        """Handler meta-data configuration."""
 
-        ### Notes
-
-        : This class defines the configuration section, default values,
-            and other metadata required by the Cement framework for
-            proper handler registration and operation.
-
-        """
-
-        # Unique identifier for this handler
+        # Label of this handler
         label = 'tokeo.smtp'
 
-        # Configuration section name in the application config
+        # Name of the config section
         config_section = 'smtp'
 
         # Defaults of the config section

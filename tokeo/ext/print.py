@@ -157,19 +157,9 @@ class TokeoPrintOutputHandler(output.OutputHandler):
     """
 
     class Meta(output.OutputHandler.Meta):
-        """
-        Handler meta-data configuration.
+        """Handler meta-data configuration."""
 
-        ### Notes
-
-        : This class defines the metadata required by the Cement framework for
-            proper handler registration and operation. It specifies how the
-            output handler is identified and whether it can be overridden via
-            command line options.
-
-        """
-
-        # The string identifier of this handler
+        # Label of this handler
         label = 'print'
 
         # Whether or not to include ```print``` as an available choice
@@ -294,19 +284,9 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
     """
 
     class Meta(output.OutputHandler.Meta):
-        """
-        Handler meta-data configuration.
+        """Handler meta-data configuration."""
 
-        ### Notes
-
-        : This class defines the metadata required by the Cement framework for
-            proper handler registration and operation. It specifies how the
-            output handler is identified and whether it can be overridden via
-            command line options.
-
-        """
-
-        # The string identifier of this handler
+        # Label of this handler
         label = 'print_dict'
 
         # Whether or not to include ```print_dict``` as an available choice
@@ -370,19 +350,9 @@ class TokeoInspectOutputHandler(output.OutputHandler):
     """
 
     class Meta(output.OutputHandler.Meta):
-        """
-        Handler meta-data configuration.
+        """Handler meta-data configuration."""
 
-        ### Notes
-
-        : This class defines the metadata required by the Cement framework for
-            proper handler registration and operation. It specifies how the
-            output handler is identified and whether it can be overridden via
-            command line options.
-
-        """
-
-        # The string identifier of this handler
+        # Label of this handler
         label = 'inspect'
 
         # Whether or not to include ```inspect``` as an available choice
@@ -482,7 +452,7 @@ class TokeoInspectOutputHandler(output.OutputHandler):
                 a_filtered = [a[0] for a in a_inspect if not (a[0].startswith('__') and a[0].endswith('__'))]
                 line += f'{prepend}Attributes: {a_filtered}'
                 prepend = '\n'
-            # append o
+            # append the line of this object
             out += line
 
         return (divider * 40 + '\n' if divider else '') + out

@@ -87,31 +87,20 @@ _TLS_VERSIONS = {
 
 
 class EncryptMode(Enum):
-    """
-    The encrypt_mode symbols (member names match the config values).
-
-    ### Notes
-
-    - ```TLS_FORBIDDEN```: no STARTTLS offered at all
-    - ```TLS_OPTIONAL```: the client may upgrade via STARTTLS
-    - ```TLS_WHEN_AUTH```: like ```TLS_OPTIONAL```, but AUTH is only offered
-        and accepted on an encrypted channel. Protects credentials against
-        a plaintext downgrade
-    - ```TLS_REQUIRED```: every dialog beyond EHLO/STARTTLS demands TLS
-    - ```TLS_IMMEDIATE```: SMTPS (immediate TLS, RFC 8314), the handshake runs
-        right on connect (after a PROXY header), STARTTLS is not offered
-
-    """
+    """The encrypt_mode symbols (member names match the config values)."""
 
     #: No STARTTLS is offered
     TLS_FORBIDDEN = auto()
     #: The client may upgrade by STARTTLS
     TLS_OPTIONAL = auto()
-    #: Like TLS_OPTIONAL, AUTH only on an encrypted channel
+    #: Like TLS_OPTIONAL, but AUTH is only offered and accepted on an
+    #: encrypted channel, which protects the credentials against a plaintext
+    #: downgrade
     TLS_WHEN_AUTH = auto()
     #: Every command beyond EHLO and STARTTLS needs TLS
     TLS_REQUIRED = auto()
-    #: SMTPS, the handshake runs right on connect
+    #: SMTPS (immediate TLS, RFC 8314), the handshake runs right on connect
+    #: (after a PROXY header), STARTTLS is not offered
     TLS_IMMEDIATE = auto()
 
 

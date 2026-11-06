@@ -78,9 +78,9 @@ class TokeoGrpc(MetaMixin):
     """
 
     class Meta:
-        """Extension meta-data and configuration defaults."""
+        """Extension meta-data configuration."""
 
-        # Unique identifier for this handler
+        # Label of this extension
         label = 'tokeo.grpc'
 
         # Name of the config section
@@ -346,7 +346,7 @@ class TokeoGrpc(MetaMixin):
         key_size = self._config('tls_key_size')
         if not is_int_gt(key_size, 0):
             raise TokeoGrpcError(f'tls_key_size must be an integer greater than 0, not {key_size!r}')
-        # generate key but validate also senseful key_size
+        # generate key but validate also sensible key_size
         if key_type == 'rsa':
             if key_size < 2048:
                 raise TokeoGrpcError(f'tls_key_size {key_size} is not valid for rsa (use 2048 or greater)')
@@ -370,7 +370,7 @@ class TokeoGrpc(MetaMixin):
             if not entry or entry in seen:
                 continue
             seen.add(entry)
-            # using the builtin validation and exception to check wether an entry
+            # using the builtin validation and exception to check whether an entry
             # is an ip address or DNS name
             try:
                 sans.append(x509.IPAddress(ipaddress.ip_address(entry)))
@@ -474,7 +474,7 @@ class TokeoGrpcController(Controller):
     """
 
     class Meta:
-        """Controller meta-data for command-line integration."""
+        """Controller meta-data configuration."""
 
         label = 'grpc'
         stacked_type = 'nested'
@@ -506,7 +506,7 @@ def tokeo_grpc_extend_app(app):
     """
     Extend the application with the gRPC extension.
 
-    This function adds the gRPC handler to the application and initializes it,
+    This function adds the gRPC extension to the application and initializes it,
     making it available as app.grpc.
 
     ### Args

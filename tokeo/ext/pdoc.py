@@ -177,14 +177,18 @@ class TokeoPdoc(Handler):
     """Render and serve API documentation via pdoc."""
 
     class Meta:
+        """Handler meta-data configuration."""
+
+        # Label of this handler
         label = 'pdoc'
+
+        # Interface this handler implements
         interface = 'pdoc'
 
-        # config section this extension reads
+        # Name of the config section
         config_section = 'pdoc'
 
-        # config defaults, merged (non-overriding) at setup so the section
-        # always exists even when the app config does not set it
+        # Defaults of the config section
         config_defaults = dict(
             # modules to render (str or list), None renders the app and tests
             modules=None,
@@ -1769,6 +1773,8 @@ class TokeoPdocController(Controller):
     """CLI: ```tokeo pdoc render``` / ```tokeo pdoc serve``` (unchanged surface)."""
 
     class Meta:
+        """Controller meta-data configuration."""
+
         label = 'pdoc'
         stacked_type = 'nested'
         stacked_on = 'base'

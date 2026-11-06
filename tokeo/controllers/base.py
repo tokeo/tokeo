@@ -35,6 +35,8 @@ class BaseController(Controller):
     """
 
     class Meta:
+        """Controller meta-data configuration."""
+
         label = 'base'
 
         # disable the ugly curly command doubled listening

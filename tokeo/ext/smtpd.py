@@ -352,12 +352,12 @@ class TokeoSmtpd(MetaMixin):
     """
 
     class Meta:
-        """Extension meta-data and config defaults."""
+        """Extension meta-data configuration."""
 
-        # Unique identifier for this handler
+        # Label of this extension
         label = 'tokeo.smtpd'
 
-        # Configuration section in the application config
+        # Name of the config section
         config_section = 'smtpd'
 
         # Defaults of the config section
@@ -604,7 +604,8 @@ class TokeoSmtpd(MetaMixin):
                     os.kill(pid, signal.SIGTERM)
                 except ProcessLookupError:
                     pass
-            # bounded wait: a worker gets time to drain, then SIGKILL ends it
+            # wait with a max of 5 s: a worker gets time to drain, then
+            # SIGKILL ends it
             pending = list(child_pids)
             end_time = time.monotonic() + 5.0
             while pending and time.monotonic() < end_time:
@@ -646,7 +647,7 @@ class TokeoSmtpdController(Controller):
     """
 
     class Meta:
-        """Meta configuration for the smtpd controller."""
+        """Controller meta-data configuration."""
 
         label = 'smtpd'
         stacked_type = 'nested'

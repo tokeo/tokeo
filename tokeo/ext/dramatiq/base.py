@@ -253,9 +253,9 @@ class TokeoDramatiq(MetaMixin):
     """
 
     class Meta:
-        """Extension meta-data and configuration defaults."""
+        """Extension meta-data configuration."""
 
-        # Unique identifier for this handler
+        # Label of this extension
         label = 'tokeo.dramatiq'
 
         # Name of the config section

@@ -183,7 +183,7 @@ class DecoratedFunction:
                 self.app.log.debug(block)
                 continue
 
-            # clear value for additonal docstring
+            # clear value for additional docstring
             _params = None
             _docstring = None
 
@@ -234,7 +234,7 @@ class DecoratedFunction:
             existing docstring, avoiding duplicates from the same decorator type.
 
         """
-        # do insert same decorator's docstring twice
+        # do not insert the same decorator's docstring twice
         _unique = {}
         # initialize docstring placeholder
         _docstring = ''

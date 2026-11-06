@@ -223,21 +223,12 @@ class TokeoScheduler(MetaMixin):
     """
 
     class Meta:
-        """
-        Extension meta-data and configuration.
+        """Extension meta-data configuration."""
 
-        ### Notes
-
-        : This class defines the configuration section, default values, and
-            unique identifier required by the Cement framework for proper handler
-            registration and operation.
-
-        """
-
-        # Unique identifier for this handler
+        # Label of this extension
         label = 'tokeo.scheduler'
 
-        # Configuration section in the application config
+        # Name of the config section
         config_section = 'scheduler'
 
         # Defaults of the config section
@@ -1079,17 +1070,7 @@ class TokeoSchedulerController(Controller):
     """
 
     class Meta:
-        """
-        Controller meta-data configuration.
-
-        ### Notes
-
-        : This class defines the metadata required by the Cement framework for
-            proper controller registration and CLI integration. It specifies how
-            the controller is displayed in help text and how it relates to other
-            controllers in the application.
-
-        """
+        """Controller meta-data configuration."""
 
         label = 'scheduler'
         stacked_type = 'nested'

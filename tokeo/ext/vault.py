@@ -82,10 +82,10 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
     """
 
     class Meta:
-        """Meta configuration for the vault config handler."""
+        """Handler meta-data configuration."""
 
+        # Label of this handler
         label = 'tokeo.vault'
-        """The unique string identifier of this handler in the application."""
 
     def _setup(self, app):
         """
@@ -281,7 +281,7 @@ class TokeoVaultController(Controller):
     """
 
     class Meta:
-        """Meta configuration for the vault controller."""
+        """Controller meta-data configuration."""
 
         label = 'vault'
         stacked_type = 'nested'

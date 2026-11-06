@@ -802,9 +802,9 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
     """
 
     class Meta:
-        """Handler meta-data and configuration defaults."""
+        """Handler meta-data configuration."""
 
-        # Unique identifier for this handler
+        # Label of this handler
         label = 'tokeo.diskcache'
 
         # Name of the config section
@@ -814,7 +814,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         config_defaults = dict(
             # Directory where cache db files are stored. When using
             # diskcache to synchronize processes, make sure that all
-            # pointed to the same directory. Must be set, a temp dir per
+            # processes point to the same directory. Must be set, a temp dir per
             # process would split the locks between the workers.
             directory=None,
             # Default timeout for cache operations in seconds
@@ -1201,7 +1201,7 @@ class TokeoDiskCacheController(Controller):
     """
 
     class Meta:
-        """Meta configuration for the DiskCache controller."""
+        """Controller meta-data configuration."""
 
         label = 'cache'
         stacked_type = 'nested'

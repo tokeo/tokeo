@@ -1,7 +1,7 @@
 ### **The Tokeo Main Configuration**<br/>
 ### <p>
 ### The tokeo.ext.appenv module handles the configuration loading and overriding mechanism for
-### Tokeo and derivated applications. Each configuration file is based on YAML files with a
+### Tokeo and derived applications. Each configuration file is based on YAML files with a
 ### hierarchical structure that supports environment-specific config and local overrides.
 ### </p>
 ###
