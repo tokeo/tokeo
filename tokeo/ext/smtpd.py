@@ -352,7 +352,7 @@ class TokeoSmtpd(MetaMixin):
     """
 
     class Meta:
-        """Extension meta-data configuration."""
+        """Extension meta-data."""
 
         # Label of this extension
         label = 'tokeo.smtpd'
@@ -647,7 +647,7 @@ class TokeoSmtpdController(Controller):
     """
 
     class Meta:
-        """Controller meta-data configuration."""
+        """Controller meta-data."""
 
         label = 'smtpd'
         stacked_type = 'nested'

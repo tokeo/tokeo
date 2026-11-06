@@ -35,7 +35,7 @@ class BaseController(Controller):
     """
 
     class Meta:
-        """Controller meta-data configuration."""
+        """Controller meta-data."""
 
         label = 'base'
 

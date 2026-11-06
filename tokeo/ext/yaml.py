@@ -86,7 +86,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
     """
 
     class Meta:
-        """Handler meta-data configuration."""
+        """Handler meta-data."""
 
         # Label of this handler
         label = 'tokeo.yaml'

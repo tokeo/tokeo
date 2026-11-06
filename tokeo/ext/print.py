@@ -157,7 +157,7 @@ class TokeoPrintOutputHandler(output.OutputHandler):
     """
 
     class Meta(output.OutputHandler.Meta):
-        """Handler meta-data configuration."""
+        """Handler meta-data."""
 
         # Label of this handler
         label = 'print'
@@ -284,7 +284,7 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
     """
 
     class Meta(output.OutputHandler.Meta):
-        """Handler meta-data configuration."""
+        """Handler meta-data."""
 
         # Label of this handler
         label = 'print_dict'
@@ -350,7 +350,7 @@ class TokeoInspectOutputHandler(output.OutputHandler):
     """
 
     class Meta(output.OutputHandler.Meta):
-        """Handler meta-data configuration."""
+        """Handler meta-data."""
 
         # Label of this handler
         label = 'inspect'

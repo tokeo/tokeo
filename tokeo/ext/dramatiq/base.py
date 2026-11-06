@@ -253,7 +253,7 @@ class TokeoDramatiq(MetaMixin):
     """
 
     class Meta:
-        """Extension meta-data configuration."""
+        """Extension meta-data."""
 
         # Label of this extension
         label = 'tokeo.dramatiq'

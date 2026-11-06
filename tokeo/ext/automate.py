@@ -668,7 +668,7 @@ class TokeoAutomate(MetaMixin):
     """
 
     class Meta:
-        """Extension meta-data configuration."""
+        """Extension meta-data."""
 
         # Label of this extension
         label = 'tokeo.automate'
@@ -2328,7 +2328,7 @@ class TokeoAutomateController(Controller):
     """
 
     class Meta:
-        """Controller meta-data configuration."""
+        """Controller meta-data."""
 
         label = 'automate'
         stacked_type = 'nested'

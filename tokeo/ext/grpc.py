@@ -78,7 +78,7 @@ class TokeoGrpc(MetaMixin):
     """
 
     class Meta:
-        """Extension meta-data configuration."""
+        """Extension meta-data."""
 
         # Label of this extension
         label = 'tokeo.grpc'
@@ -474,7 +474,7 @@ class TokeoGrpcController(Controller):
     """
 
     class Meta:
-        """Controller meta-data configuration."""
+        """Controller meta-data."""
 
         label = 'grpc'
         stacked_type = 'nested'

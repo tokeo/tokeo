@@ -106,7 +106,7 @@ class TokeoPocketBaseHandler(MetaMixin):
     """
 
     class Meta:
-        """Handler meta-data configuration."""
+        """Handler meta-data."""
 
         # Label of this handler
         label = 'tokeo.pocketbase'

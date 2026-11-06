@@ -117,6 +117,6 @@ class Controller(ArgparseController):
     """
 
     class Meta:
-        """Controller meta-data configuration."""
+        """Controller meta-data."""
 
         argument_formatter = TokeoHelpFormatter

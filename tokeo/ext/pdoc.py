@@ -177,7 +177,7 @@ class TokeoPdoc(Handler):
     """Render and serve API documentation via pdoc."""
 
     class Meta:
-        """Handler meta-data configuration."""
+        """Handler meta-data."""
 
         # Label of this handler
         label = 'pdoc'
@@ -1773,7 +1773,7 @@ class TokeoPdocController(Controller):
     """CLI: ```tokeo pdoc render``` / ```tokeo pdoc serve``` (unchanged surface)."""
 
     class Meta:
-        """Controller meta-data configuration."""
+        """Controller meta-data."""
 
         label = 'pdoc'
         stacked_type = 'nested'

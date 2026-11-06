@@ -802,7 +802,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
     """
 
     class Meta:
-        """Handler meta-data configuration."""
+        """Handler meta-data."""
 
         # Label of this handler
         label = 'tokeo.diskcache'
@@ -1201,7 +1201,7 @@ class TokeoDiskCacheController(Controller):
     """
 
     class Meta:
-        """Controller meta-data configuration."""
+        """Controller meta-data."""
 
         label = 'cache'
         stacked_type = 'nested'

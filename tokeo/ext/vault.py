@@ -82,7 +82,7 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
     """
 
     class Meta:
-        """Handler meta-data configuration."""
+        """Handler meta-data."""
 
         # Label of this handler
         label = 'tokeo.vault'
@@ -281,7 +281,7 @@ class TokeoVaultController(Controller):
     """
 
     class Meta:
-        """Controller meta-data configuration."""
+        """Controller meta-data."""
 
         label = 'vault'
         stacked_type = 'nested'

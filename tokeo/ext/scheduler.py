@@ -223,7 +223,7 @@ class TokeoScheduler(MetaMixin):
     """
 
     class Meta:
-        """Extension meta-data configuration."""
+        """Extension meta-data."""
 
         # Label of this extension
         label = 'tokeo.scheduler'
@@ -1070,7 +1070,7 @@ class TokeoSchedulerController(Controller):
     """
 
     class Meta:
-        """Controller meta-data configuration."""
+        """Controller meta-data."""
 
         label = 'scheduler'
         stacked_type = 'nested'

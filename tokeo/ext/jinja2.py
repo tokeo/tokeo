@@ -59,7 +59,7 @@ class TokeoJinja2OutputHandler(Jinja2OutputHandler):
     """
 
     class Meta(OutputHandler.Meta):
-        """Handler meta-data configuration."""
+        """Handler meta-data."""
 
         # Label of this handler
         label = 'tokeo.jinja2'
@@ -121,7 +121,7 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
     """
 
     class Meta(TemplateHandler.Meta):
-        """Handler meta-data configuration."""
+        """Handler meta-data."""
 
         # Label of this handler
         label = 'tokeo.jinja2'
