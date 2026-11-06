@@ -4,7 +4,6 @@ temper (concurrency limit) and throttle (rate limit), alone, across threads
 and across processes.
 """
 
-import re
 import time
 import sqlite3
 import threading
@@ -745,4 +744,13 @@ def test_cache_locks_lists_a_held_lock_with_its_expire(tmp, capsys):
         app.run()
     out = capsys.readouterr().out
     assert f'Locks using the tag: {app.cache.locks._tag}' in out
-    assert re.search(r'job.* \((60|59)s\) \[', out)
+    lock_line = f'{app.cache.locks._key_prefix}job (60s) [{app.cache.locks._tag}]'
+    assert lock_line in out.splitlines() or lock_line.replace('60s', '59s') in out.splitlines()
+
+
+def test_cache_list_shows_a_value_of_none_with_its_type(tmp, capsys):
+    """cache list --with-values --with-types shows None, not an empty str."""
+    with DiskcacheTest(tmp.dir, argv=['cache', 'list', '--with-values', '--with-types']) as app:
+        app.cache.set('nothing', None)
+        app.run()
+    assert 'nothing = None |:NoneType|' in capsys.readouterr().out.splitlines()

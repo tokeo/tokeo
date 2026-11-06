@@ -1347,8 +1347,6 @@ class TokeoDiskCacheController(Controller):
                 if out != '{key}' or self.app.pargs.tag is not None:
                     # read the full content from key
                     value, expire_time, tag = self.app.cache._cache.get(key, default=None, expire_time=True, tag=True, retry=False)
-                    if value is None:
-                        value = ''
                     # the whole seconds until the key expires
                     expire_str = 'no expire' if expire_time is None else f'{max(0, round(expire_time - time.time()))}s'
                     if tag is None:
@@ -1408,9 +1406,10 @@ class TokeoDiskCacheController(Controller):
             # use the list command to show the locks
             self.app.print(f'Locks using the tag: {self.app.cache.locks._tag}')
             self.app.pargs.keys = ''
-            self.app.pargs.with_values = True
+            # a lock holds no value, it is the key with its expire
+            self.app.pargs.with_values = False
             self.app.pargs.with_tags = True
-            self.app.pargs.with_types = True
+            self.app.pargs.with_types = False
             self.app.pargs.with_expires = True
             self.app.pargs.tag = self.app.cache.locks._tag
             self.list()
