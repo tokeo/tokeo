@@ -12,14 +12,14 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from tokeo.core.utils.memfd import memory_paths, MemfdUnavailable
+from tokeo.core.utils.memfd import open_memory_paths, MemfdUnavailable
 
 needs_devfd = pytest.mark.skipif(not os.path.isdir('/dev/fd'), reason='needs /dev/fd')
 
 
 def test_single_blob_is_readable():
     """The path of one blob reads back its bytes."""
-    with memory_paths(b'hello world') as (path,):
+    with open_memory_paths(b'hello world') as (path,):
         with open(path, 'rb') as f:
             assert f.read() == b'hello world'
 
@@ -27,14 +27,14 @@ def test_single_blob_is_readable():
 @pytest.mark.skipif(not hasattr(os, 'memfd_create'), reason='memfd_create is linux only')
 def test_memory_file_is_closed_on_exec():
     """The fd of the blob is not inherited by a program started meanwhile."""
-    with memory_paths(b'key') as (path,):
+    with open_memory_paths(b'key') as (path,):
         fd = int(os.path.basename(path))
         assert os.get_inheritable(fd) is False
 
 
 def test_multiple_blobs_are_independent():
     """Each blob gets its own path with its own bytes."""
-    with memory_paths(b'first', b'second') as (a, b):
+    with open_memory_paths(b'first', b'second') as (a, b):
         assert a != b
         with open(a, 'rb') as f:
             assert f.read() == b'first'
@@ -44,14 +44,14 @@ def test_multiple_blobs_are_independent():
 
 def test_str_is_encoded_utf8():
     """A str blob reads back as its utf-8 bytes."""
-    with memory_paths('grüße') as (path,):
+    with open_memory_paths('grüße') as (path,):
         with open(path, 'rb') as f:
             assert f.read() == 'grüße'.encode('utf-8')
 
 
 def test_no_blobs_yields_empty():
-    """Without blobs memory_paths yields an empty tuple."""
-    with memory_paths() as paths:
+    """Without blobs open_memory_paths yields an empty tuple."""
+    with open_memory_paths() as paths:
         assert paths == ()
 
 
@@ -89,7 +89,7 @@ def test_loads_ssl_cert_chain_from_memory():
     """ssl loads a certificate and key from the paths in memory."""
     cert_pem, key_pem = _make_self_signed_pem()
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    with memory_paths(cert_pem, key_pem) as (cert_ref, key_ref):
+    with open_memory_paths(cert_pem, key_pem) as (cert_ref, key_ref):
         context.load_cert_chain(cert_ref, key_ref)  # must not raise
 
 
@@ -97,7 +97,7 @@ def test_loads_ssl_cert_chain_from_memory():
 def test_devfd_pipe_backing_when_no_memfd(monkeypatch):
     """Without memfd_create, as on macOS, the paths are /dev/fd pipes."""
     monkeypatch.delattr(os, 'memfd_create', raising=False)
-    with memory_paths(b'over a pipe') as (path,):
+    with open_memory_paths(b'over a pipe') as (path,):
         assert path.startswith('/dev/fd/')
         with open(path, 'rb') as f:
             assert f.read() == b'over a pipe'
@@ -108,5 +108,5 @@ def test_raises_when_no_backing(monkeypatch):
     monkeypatch.delattr(os, 'memfd_create', raising=False)
     monkeypatch.setattr(os.path, 'isdir', lambda p: False)
     with pytest.raises(MemfdUnavailable):
-        with memory_paths(b'x'):
+        with open_memory_paths(b'x'):
             pass

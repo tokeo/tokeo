@@ -141,12 +141,12 @@ def find_module_dir(name):
     return os.path.dirname(os.path.abspath(spec.origin))
 
 
-def get_module_path(module):
+def get_module_dir(module):
     """
-    Retrieves the absolute filesystem path for a given Python module.
+    Retrieves the absolute directory of a given Python module.
 
     Accepts either a module object or a string module name, imports the module
-    if necessary, and returns its absolute path on the filesystem.
+    if necessary, and returns its absolute directory on the filesystem.
 
     ### Args
 

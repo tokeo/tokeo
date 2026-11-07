@@ -13,7 +13,7 @@ import time
 import multiprocessing
 from os.path import basename, dirname, abspath
 from cement import ex
-from tokeo.core.utils.json import json_dump
+from tokeo.core.utils.json import dump_json
 from dramatiq import cli
 from tokeo.ext.argparse import Controller
 from tokeo.ext.dramatiq.base import _check_number
@@ -186,7 +186,7 @@ class TokeoDramatiqController(Controller):
                 output = self.app.tui.output
                 output.print(_format_queue_table(output, result), *_format_dead_letter_tables(output, result))
                 return
-        self.app.print(json_dump(result, indent=2) if pargs.json else '\n'.join(lines))
+        self.app.print(dump_json(result, indent=2) if pargs.json else '\n'.join(lines))
 
     # ---- monitor ------------------------------------------------------------
 
@@ -214,7 +214,7 @@ class TokeoDramatiqController(Controller):
         monitor = self.app.dramatiq.monitor
         interval = monitor.interval if pargs.interval is None else _check_number('switch', '--interval', pargs.interval)
         if pargs.json and not pargs.follow:
-            self.app.print(json_dump(monitor.snapshot(), indent=2))
+            self.app.print(dump_json(monitor.snapshot(), indent=2))
             return
         output = self.app.tui.output
         if not pargs.follow:

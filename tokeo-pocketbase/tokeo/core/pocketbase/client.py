@@ -9,7 +9,7 @@ import time
 import base64
 import threading
 import httpx
-from tokeo.core.utils.jwt import token_expires_within
+from tokeo.core.utils.jwt import is_token_valid
 from .exc import TokeoPocketBaseError, TokeoPocketBaseAuthError
 from .record import Record
 from .filter import build_filter, path_segment
@@ -221,7 +221,7 @@ class PocketBase:
             token without ```exp``` or a broken one is not valid
 
         """
-        return bool(self.token) and not token_expires_within(self.token, min_valid_seconds)
+        return bool(self.token) and is_token_valid(self.token, min_valid_seconds)
 
     def auth_with_password(self, collection, identity, password):
         """

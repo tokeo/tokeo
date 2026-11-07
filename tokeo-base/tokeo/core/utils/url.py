@@ -9,7 +9,7 @@ authentication credentials into a url's userinfo.
 from urllib.parse import urlsplit, urlunsplit, quote, unquote
 
 
-def overload_with_auth(url=None, auth_identity=None, auth_password=None):
+def format_auth_url(url=None, auth_identity=None, auth_password=None):
     """
     Merge credentials into the userinfo part of a url.
 

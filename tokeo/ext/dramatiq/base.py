@@ -16,7 +16,7 @@ from dramatiq.brokers.rabbitmq import RabbitmqBroker
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
 from dramatiq.common import q_name
 import pika
-from tokeo.core.utils.url import overload_with_auth as url_overload_with_auth
+from tokeo.core.utils.url import format_auth_url
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
 from tokeo.core.utils.validate import is_bool, as_int_or_auto
 from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError, TokeoDramatiqConnectionError
@@ -114,7 +114,7 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
 
     Accepts the standard RabbitmqBroker keyword arguments plus the auth and
     tls options below. Credentials are merged into the url userinfo (see
-    overload_with_auth). For an amqps url the tls options build an ssl
+    format_auth_url). For an amqps url the tls options build an ssl
     context (see create_ssl_context); when one is needed the url is
     decomposed and handed to the parent as pika parameters, since
     RabbitmqBroker cannot take a url and pika parameters together.
@@ -156,7 +156,7 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
     def __init__(
         self, *, url=None, auth_identity=None, auth_password=None, tls_verify_hostname=True, tls_verify_cert=True, tls_ca=None, **kwargs
     ):
-        url = url_overload_with_auth(url, auth_identity, auth_password)
+        url = format_auth_url(url, auth_identity, auth_password)
         # tls is driven by the amqps scheme; the tls_* options only customize
         # it, so a plain amqp url ignores them
         context = server_hostname = None

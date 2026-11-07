@@ -3,7 +3,7 @@ Hand back a value, or a default when the value is missing, empty or blank.
 """
 
 
-def value_or_default(value, default=None):
+def get_value_or_default(value, default=None):
     """
     Return default value if the input is None, blank, or empty.
 
@@ -44,7 +44,7 @@ def value_or_default(value, default=None):
     return value
 
 
-def filled_str_or_default(value, default=None):
+def get_filled_str_or_default(value, default=None):
     """
     Return default value if the input string is None or blank.
 
@@ -69,7 +69,7 @@ def filled_str_or_default(value, default=None):
 
     # test correct instance type
     if not isinstance(value, str):
-        raise TypeError('filled_str_or_default expects a string as input arg')
+        raise TypeError('get_filled_str_or_default expects a string as input arg')
 
     if str.strip(value) == '':
         return default
@@ -78,7 +78,7 @@ def filled_str_or_default(value, default=None):
     return value
 
 
-def first_value_or_default(values, default=None):
+def get_first_value_or_default(values, default=None):
     """
     Return the first non-None value from a list of values.
 
@@ -97,7 +97,7 @@ def first_value_or_default(values, default=None):
 
     """
     if not isinstance(values, (list, tuple)):
-        raise TypeError('first_value_or_default expects a list or tuple as input arg')
+        raise TypeError('get_first_value_or_default expects a list or tuple as input arg')
 
     for value in values:
         if value is not None:
@@ -106,7 +106,7 @@ def first_value_or_default(values, default=None):
     return default
 
 
-def first_filled_str_or_default(values, default=None):
+def get_first_filled_str_or_default(values, default=None):
     """
     Return the first non-blank string from a list of values.
 
@@ -128,13 +128,13 @@ def first_filled_str_or_default(values, default=None):
 
     """
     if not isinstance(values, (list, tuple)):
-        raise TypeError('first_filled_str_or_default expects a list or tuple as input arg')
+        raise TypeError('get_first_filled_str_or_default expects a list or tuple as input arg')
 
     for value in values:
         if value is not None:
             # test correct instance type
             if not isinstance(value, str):
-                raise TypeError('first_filled_str_or_default expects strings as values')
+                raise TypeError('get_first_filled_str_or_default expects strings as values')
 
             if str.strip(value) != '':
                 return value

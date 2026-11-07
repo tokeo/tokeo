@@ -12,9 +12,9 @@ import secrets
 import uuid
 
 
-def get_token_hex(length=8, prefix=None):
+def get_token_hex(token_bytes=8, prefix=None):
     """
-    Hand out a random hex token of ```length``` bytes, optionally prefixed.
+    Hand out a random hex token of ```token_bytes``` bytes, optionally prefixed.
 
     The byte count sets the collision margin: 4 bytes (32 bit) is plenty for a
     handful of ids that only need to be unique within one turn; 8 bytes
@@ -23,8 +23,8 @@ def get_token_hex(length=8, prefix=None):
 
     ### Args
 
-    - **length** (int): The number of random bytes; use 4, 8 or 16. The hex
-        string is twice that many characters
+    - **token_bytes** (int): The number of random bytes; use 4, 8 or 16. The
+        hex string is twice that many characters
     - **prefix** (str, optional): Prepended to the token when it is a string;
         with ```None``` or ```''``` the bare token is returned
 
@@ -37,7 +37,7 @@ def get_token_hex(length=8, prefix=None):
     - **TypeError**: If prefix is neither a string nor None
 
     """
-    token = secrets.token_hex(length)
+    token = secrets.token_hex(token_bytes)
     if prefix is None:
         return token
     if isinstance(prefix, str):

@@ -32,7 +32,7 @@ from datetime import datetime, timedelta, timezone
 
 
 from .logger import Severity
-from tokeo.core.utils.memfd import memory_paths
+from tokeo.core.utils.memfd import open_memory_paths
 
 # Cipher strings and TLS floor presets, roughly Mozilla Modern / Intermediate /
 # Old. The defaults (ADVANCED*) follow the current "Intermediate" profile (ECDHE
@@ -168,13 +168,13 @@ class TlsTransport:
         Load an in-memory PEM certificate (+ key) via RAM-backed paths.
 
         ```ssl.SSLContext.load_cert_chain``` only accepts filesystem paths;
-        ```memory_paths``` bridges that with an anonymous, RAM-backed fd so the
-        certificate never touches disk. When ```key``` is None the key is read
-        from the ```cert``` content (embedded key).
+        ```open_memory_paths``` bridges that with an anonymous, RAM-backed fd
+        so the certificate never touches disk. When ```key``` is None the key
+        is read from the ```cert``` content (embedded key).
 
         """
         blobs = (cert,) if key is None else (cert, key)
-        with memory_paths(*blobs) as paths:
+        with open_memory_paths(*blobs) as paths:
             self.context.load_cert_chain(paths[0], paths[1] if key is not None else None)
 
     def _log(self, severity, msg):

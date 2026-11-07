@@ -32,7 +32,7 @@ pip install tokeo-base
 ```python
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.dict import deep_merge
-from tokeo.core.utils.sort import sort_key_by_lex_and_num_ordered
+from tokeo.core.utils.sort import get_natural_sort_key
 from tokeo.core.utils.timelimit import timelimit
 from tokeo.core.utils.validate import is_number_gt
 
@@ -44,7 +44,7 @@ if not is_number_gt(config['retries'], 0):
     raise TokeoError('retries must be above 0')
 
 # sort names with numbers as people read them
-print(sorted(['host10', 'host2', 'host1'], key=sort_key_by_lex_and_num_ordered))
+print(sorted(['host10', 'host2', 'host1'], key=get_natural_sort_key))
 
 
 @timelimit(5)

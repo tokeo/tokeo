@@ -5,7 +5,7 @@ Sorts strings with embedded numbers in natural order.
 import re
 
 
-def sort_key_by_lex_and_num_ordered(x):
+def get_natural_sort_key(x):
     """
     Build a sort key that orders strings lexicographically while keeping
     embedded numbers in natural numeric order.

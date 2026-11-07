@@ -6,7 +6,7 @@ from datetime import date as date_type, time as time_type, datetime as datetime_
 from .date_compat import fromisoformat
 
 
-def utc_now():
+def get_utc_now():
     """
     Get the current UTC datetime.
 

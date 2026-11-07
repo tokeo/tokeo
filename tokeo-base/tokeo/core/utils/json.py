@@ -67,7 +67,7 @@ class TokeoJsonUnknownNoneEncoder(TokeoJsonEncoder):
     Encoder that renders an unknown object as ```null``` (the default).
 
     Identical to ```TokeoJsonEncoder```; named for use as the explicit default
-    in ```json_dump``` and to make the unknown-object policy readable at the
+    in ```dump_json``` and to make the unknown-object policy readable at the
     call site.
 
     """
@@ -106,7 +106,7 @@ class TokeoJsonUnknownNameEncoder(TokeoJsonEncoder):
         return result if result is not None else type(obj).__name__
 
 
-def json_dump(obj, encoder=None, encoding=None, **kwargs):
+def dump_json(obj, encoder=None, encoding=None, **kwargs):
     """
     Serialize an object to a JSON string with Tokeo-specific type handling.
 

@@ -15,7 +15,7 @@ from tokeo.core.exc import TokeoError
 from tokeo.core.utils.modules import (
     TokeoModulesLoadError,
     find_module_dir,
-    get_module_path,
+    get_module_dir,
     resolve_module,
     resolve_object,
 )
@@ -110,7 +110,7 @@ def test_resolve_object_does_not_hide_an_import_error_inside_the_module(pkg):
         resolve_object(f'{pkg}.broken:run')
 
 
-# find_module_dir and get_module_path
+# find_module_dir and get_module_dir
 
 
 def test_find_module_dir_finds_a_module_without_running_it(pkg, tmp_path):
@@ -125,9 +125,9 @@ def test_find_module_dir_of_a_missing_module_is_none(pkg, name):
     assert find_module_dir(name.format(pkg)) is None
 
 
-def test_get_module_path_gives_the_dir_of_a_module_and_a_package(pkg):
-    """get_module_path gives the dir of a plain module and of a package."""
-    assert get_module_path(f'{pkg}.inner') == get_module_path(pkg)
+def test_get_module_dir_gives_the_dir_of_a_module_and_a_package(pkg):
+    """get_module_dir gives the dir of a plain module and of a package."""
+    assert get_module_dir(f'{pkg}.inner') == get_module_dir(pkg)
 
 
 # override_module

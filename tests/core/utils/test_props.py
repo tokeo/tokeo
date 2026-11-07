@@ -7,7 +7,7 @@ from collections import UserDict
 
 import pytest
 
-from tokeo.core.utils.props import hasprop, hasprops, anyprop, getprop
+from tokeo.core.utils.props import hasprop, hasprops, hasanyprop, getprop
 
 
 class Sample:
@@ -44,13 +44,13 @@ def test_hasprops():
     assert hasprops(NoContains(), ('a',)) is False
 
 
-def test_anyprop():
+def test_hasanyprop():
     """One found name is enough."""
-    assert anyprop(Sample(), ('c', 'b')) is True
-    assert anyprop(Sample(), ('c', 'd')) is False
-    assert anyprop({'a': 1}, ('c', 'a')) is True
-    assert anyprop({'a': 1}, ('c',)) is False
-    assert anyprop(NoContains(), ('a',)) is False
+    assert hasanyprop(Sample(), ('c', 'b')) is True
+    assert hasanyprop(Sample(), ('c', 'd')) is False
+    assert hasanyprop({'a': 1}, ('c', 'a')) is True
+    assert hasanyprop({'a': 1}, ('c',)) is False
+    assert hasanyprop(NoContains(), ('a',)) is False
 
 
 def test_getprop():

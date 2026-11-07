@@ -1,7 +1,7 @@
 """
 Tests for tokeo.core.utils.validate: the checks tell by True or False whether
 a value fits, refuse bool, inf and nan as number, never convert a string and
-never raise. ```valid_or_default``` hands back the value or a default,
+never raise. ```get_valid_or_default``` hands back the value or a default,
 ```as_int_or_auto``` and ```as_list``` convert a value into one form.
 """
 
@@ -23,7 +23,7 @@ from tokeo.core.utils.validate import (
     is_filled_str,
     is_list,
     is_list_of,
-    valid_or_default,
+    get_valid_or_default,
 )
 
 # values that are never a number
@@ -133,13 +133,13 @@ def test_is_basetype_refuses_other_types(value):
     assert is_basetype(value) is False
 
 
-def test_valid_or_default():
+def test_get_valid_or_default():
     """A fitting value comes back, else the default, None by default."""
-    assert valid_or_default(['a'], is_list, []) == ['a']
-    assert valid_or_default(None, is_list, []) == []
-    assert valid_or_default('a', is_list) is None
-    assert valid_or_default(0.5, lambda value: is_number_gt(value, 0), 1) == 0.5
-    assert valid_or_default(True, lambda value: is_number_gt(value, 0), 1) == 1
+    assert get_valid_or_default(['a'], is_list, []) == ['a']
+    assert get_valid_or_default(None, is_list, []) == []
+    assert get_valid_or_default('a', is_list) is None
+    assert get_valid_or_default(0.5, lambda value: is_number_gt(value, 0), 1) == 0.5
+    assert get_valid_or_default(True, lambda value: is_number_gt(value, 0), 1) == 1
 
 
 @pytest.mark.parametrize('value', ['auto', 'AUTO', ' Auto '])

@@ -83,7 +83,7 @@ def hasprops(obj, names):
     return True
 
 
-def anyprop(obj, names):
+def hasanyprop(obj, names):
     """
     Check if an object has any of the properties or keys in the given list.
 

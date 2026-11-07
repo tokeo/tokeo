@@ -46,15 +46,15 @@ class TokeoModulesOverrideFinder(importlib.abc.MetaPathFinder):
     ### Args
 
     - **name** (str): The dotted name of the overridden module
-    - **file** (Path): The python file to load as that module
+    - **file_path** (Path): The python file to load as that module
 
     """
 
-    def __init__(self, name, file):
+    def __init__(self, name, file_path):
         #: The dotted name of the overridden module
         self.name = name
         #: The python file to load as that module
-        self.file = file
+        self.file_path = file_path
 
     def find_spec(self, fullname, path=None, target=None):
         """
@@ -75,17 +75,17 @@ class TokeoModulesOverrideFinder(importlib.abc.MetaPathFinder):
         # only the overridden name, every other import goes its usual way
         if fullname != self.name:
             return None
-        return importlib.util.spec_from_file_location(fullname, self.file)
+        return importlib.util.spec_from_file_location(fullname, self.file_path)
 
 
-def override_module(name, file):
+def override_module(name, file_path):
     """
     Load a local file as the module name, in place of the installed one.
 
     ### Args
 
     - **name** (str): The dotted name of the module, e.g. ```pocketbase.utils```
-    - **file** (str|Path): The python file to load as that module
+    - **file_path** (str|Path): The python file to load as that module
 
     ### Returns
 
@@ -97,12 +97,12 @@ def override_module(name, file):
         imported already
 
     """
-    file = Path(file)
-    if not file.is_file():
-        raise TokeoModulesLoadError(f'file {str(file)!r} to override {name!r} does not exist')
+    file_path = Path(file_path)
+    if not file_path.is_file():
+        raise TokeoModulesLoadError(f'file {str(file_path)!r} to override {name!r} does not exist')
     if name in sys.modules:
         raise TokeoModulesLoadError(f'module {name!r} is imported already, override it before its first import')
-    finder = TokeoModulesOverrideFinder(name, file)
+    finder = TokeoModulesOverrideFinder(name, file_path)
     sys.meta_path.insert(0, finder)
     try:
         # load it now, so an error shows here and not at a later import

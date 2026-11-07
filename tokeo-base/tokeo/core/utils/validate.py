@@ -1,18 +1,18 @@
 """
 The ```is_``` checks tell by True or False whether a value fits. They never
 raise and never convert, so the caller raises its own error with its own
-message. ```valid_or_default``` hands back a value that passes a check, else
+message. ```get_valid_or_default``` hands back a value that passes a check, else
 a default. The ```as_``` functions convert a value into one form.
 
 ### Example
 
 ```python
-from tokeo.core.utils.validate import is_number_gt, is_list, valid_or_default
+from tokeo.core.utils.validate import is_number_gt, is_list, get_valid_or_default
 
 if not is_number_gt(sleep_time, 0):
     raise ValueError(f'sleep_time must be a number above 0, not {sleep_time!r}')
 
-names = valid_or_default(app.cache.get('names'), is_list, [])
+names = get_valid_or_default(app.cache.get('names'), is_list, [])
 ```
 
 ### Notes
@@ -270,7 +270,7 @@ def is_list_of(value, check):
     return is_list(value) and all(check(entry) for entry in value)
 
 
-def valid_or_default(value, check, default=None):
+def get_valid_or_default(value, check, default=None):
     """
     Hand back the value when it passes check, else default.
 

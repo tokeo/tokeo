@@ -10,7 +10,7 @@ well-tested implementation.
 import ssl
 
 
-def create_ssl_context(verify_hostname=True, verify_cert=True, ca=None):
+def create_ssl_context(verify_hostname=True, verify_cert=True, ca_path=None):
     """
     Build a client ssl context from simple verification options.
 
@@ -28,8 +28,8 @@ def create_ssl_context(verify_hostname=True, verify_cert=True, ca=None):
         server_hostname for the caller to apply at connect time
     - **verify_cert** (bool): True requires a valid certificate chain; False
         disables verification entirely (CERT_NONE)
-    - **ca** (str, optional): Path to a CA bundle to trust instead of the
-        system store (load_verify_locations)
+    - **ca_path** (str, optional): Path to a CA bundle to trust instead of
+        the system store (load_verify_locations)
 
     ### Returns
 
@@ -45,9 +45,9 @@ def create_ssl_context(verify_hostname=True, verify_cert=True, ca=None):
     """
     server_hostname = verify_hostname if isinstance(verify_hostname, str) else None
     # all secure defaults: let the caller's own library build the context
-    if verify_hostname is True and verify_cert is True and ca is None:
+    if verify_hostname is True and verify_cert is True and ca_path is None:
         return None, None
-    context = ssl.create_default_context(cafile=ca)
+    context = ssl.create_default_context(cafile=ca_path)
     if not verify_cert:
         # order matters: check_hostname must be off before relaxing verify_mode
         context.check_hostname = False

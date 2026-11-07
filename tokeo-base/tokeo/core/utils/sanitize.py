@@ -7,7 +7,7 @@ import shlex
 from .props import hasprop
 
 
-def keyword(s):
+def to_keyword(s):
     """
     Reduce a string to a safe keyword by stripping every character that
     is not a letter, digit or underscore.
@@ -41,17 +41,17 @@ def is_keyword(s):
 
     ### Returns
 
-    - **bool**: True if s is left unchanged by keyword(), False otherwise
+    - **bool**: True if s is left unchanged by to_keyword(), False otherwise
 
     ### Raises
 
-    - **ValueError**: If s is not a string (raised by keyword())
+    - **ValueError**: If s is not a string (raised by to_keyword())
 
     """
-    return s == keyword(s)
+    return s == to_keyword(s)
 
 
-def quoted(s):
+def quote_shell_arg(s):
     """
     Shell-quote a value so it can be embedded safely in a command line.
 
@@ -77,7 +77,7 @@ def quoted(s):
         raise ValueError(f'Error to sanitize by quote. {e}')
 
 
-def keywords_only(d):
+def filter_keyword_keys(d):
     """
     Build a copy of a mapping with only its keyword keys, values unchanged.
 
@@ -97,7 +97,7 @@ def keywords_only(d):
     ### Notes
 
     : For values that go on without a shell, e.g. the environment of a local
-        process; ```keyword_dict``` quotes them too, for a shell line
+        process; ```quote_keyword_dict``` quotes them too, for a shell line
 
     """
     if d is None:
@@ -109,7 +109,7 @@ def keywords_only(d):
     return {k: v for k, v in d.items() if is_keyword(k)}
 
 
-def keyword_dict(d):
+def quote_keyword_dict(d):
     """
     Build a sanitized copy of a mapping with keyword keys and shell-quoted
     values.
@@ -137,4 +137,4 @@ def keyword_dict(d):
     if d is None:
         return d
 
-    return {k: quoted(v) for k, v in keywords_only(d).items()}
+    return {k: quote_shell_arg(v) for k, v in filter_keyword_keys(d).items()}

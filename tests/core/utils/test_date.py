@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 from tokeo.core.utils.date import (
-    utc_now,
+    get_utc_now,
     to_utc,
     to_utc_timestring,
     to_utc_datestring,
@@ -40,20 +40,20 @@ def tokyo():
     time.tzset()
 
 
-# ---- utc_now ----------------------------------------------------------------
-# utc_now returns an aware UTC datetime at roughly the current instant.
+# ---- get_utc_now ------------------------------------------------------------
+# get_utc_now returns an aware UTC datetime at roughly the current instant.
 
 
-def test_utc_now_is_aware_utc():
-    """utc_now returns a datetime with tzinfo UTC."""
-    now = utc_now()
+def test_get_utc_now_is_aware_utc():
+    """get_utc_now returns a datetime with tzinfo UTC."""
+    now = get_utc_now()
     assert isinstance(now, datetime)
     assert now.tzinfo == timezone.utc
 
 
-def test_utc_now_is_close_to_now():
-    """utc_now is within 5 seconds of the real now."""
-    delta = abs((utc_now() - datetime.now(timezone.utc)).total_seconds())
+def test_get_utc_now_is_close_to_now():
+    """get_utc_now is within 5 seconds of the real now."""
+    delta = abs((get_utc_now() - datetime.now(timezone.utc)).total_seconds())
     assert delta < 5
 
 

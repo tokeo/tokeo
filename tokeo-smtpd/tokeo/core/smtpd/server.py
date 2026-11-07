@@ -31,7 +31,7 @@ import ipaddress
 import time
 from enum import Enum, auto
 
-from tokeo.core.utils.date import utc_now
+from tokeo.core.utils.date import get_utc_now
 from tokeo.core.utils.dict import deep_merge
 from tokeo.core.utils.validate import is_int_gt, is_number_ge, is_number_between, is_filled_str, is_list_of
 from .context import SmtpdContext, ServerCtx, EnvelopeCtx, MessageCtx, MessageSpooler
@@ -1033,7 +1033,7 @@ class SmtpdServer:
                     ctx.server.local_host = await self._reverse_lookup(ctx.server.local_ip) or ctx.server.local_ip
                     ctx.server.remote_host = await self._reverse_lookup(ctx.server.remote_ip) or ctx.server.remote_ip
 
-                ctx.server.connected = utc_now()
+                ctx.server.connected = get_utc_now()
 
                 local_name = (
                     (f'[IPv6:{ctx.server.local_ip}]' if ':' in ctx.server.local_ip else f'[{ctx.server.local_ip}]')
@@ -1092,7 +1092,7 @@ class SmtpdServer:
                         if buffered and self.encrypt_mode is not EncryptMode.TLS_IMMEDIATE:
                             del buffered[:]
                         await writer.start_tls(self.tls.context, ssl_handshake_timeout=self.io_cmd_timeout)
-                        ctx.server.encrypted = utc_now()
+                        ctx.server.encrypted = get_utc_now()
                         # client must re-HELO; HELO, AUTH and the transaction are
                         # dropped (RFC 3207 4.2)
                         session.cmd_sequence = CMD_HELO
@@ -1817,7 +1817,7 @@ class SmtpdServer:
                 if session.cmd_sequence is not CMD_RCPT:
                     raise Smtpd503Exception
                 session.cmd_sequence = CMD_DATA
-                ctx.message.received = utc_now()
+                ctx.message.received = get_utc_now()
                 return '354 Enter message, ending with "." on a line by itself'
 
             elif re.match(r'^VRFY(\ .*)?$', line, self._RE_CMD_FLAGS):
@@ -1964,7 +1964,7 @@ class SmtpdServer:
             ctx.message.chomp()
 
             # save delivered UTC time
-            ctx.message.delivered = utc_now()
+            ctx.message.delivered = get_utc_now()
 
             # end of data dialog processing
             try:
@@ -2091,7 +2091,7 @@ class SmtpdServer:
             ctx = session.ctx
             ctx.server.authorization_id = return_value
             ctx.server.authentication_id = auth_values[1]
-            ctx.server.authenticated = utc_now()
+            ctx.server.authenticated = get_utc_now()
             # response code
             return '235 OK'
 
@@ -2164,7 +2164,7 @@ class SmtpdServer:
             ctx = session.ctx
             ctx.server.authorization_id = return_value
             ctx.server.authentication_id = auth_values[1]
-            ctx.server.authenticated = utc_now()
+            ctx.server.authenticated = get_utc_now()
             # response code
             return '235 OK'
 

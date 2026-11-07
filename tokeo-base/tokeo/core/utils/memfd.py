@@ -36,7 +36,7 @@ def _feed_and_close(fd, data):
 
 
 @contextmanager
-def memory_paths(*blobs):
+def open_memory_paths(*blobs):
     """
     Yield one RAM-backed filesystem path per blob; nothing touches disk.
 

@@ -12,7 +12,7 @@ import pytest
 from tokeo.core.smtpd.context import SmtpdContext
 from tokeo.core.smtpd.events import SmtpdEvents, threaded
 from tokeo.core.smtpd.exc import SmtpdContractError
-from tokeo.core.utils.date import utc_now
+from tokeo.core.utils.date import get_utc_now
 
 
 def test_threaded_on_an_async_event_is_refused():
@@ -40,8 +40,8 @@ def test_authenticated_and_encrypted_follow_the_context():
     ctx = SmtpdContext(id='x')
     assert SmtpdEvents.authenticated(ctx) is False
     assert SmtpdEvents.encrypted(ctx) is False
-    ctx.server.authenticated = utc_now()
-    ctx.server.encrypted = utc_now()
+    ctx.server.authenticated = get_utc_now()
+    ctx.server.encrypted = get_utc_now()
     assert SmtpdEvents.authenticated(ctx) is True
     assert SmtpdEvents.encrypted(ctx) is True
 

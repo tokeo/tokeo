@@ -11,14 +11,14 @@ import json
 import time
 
 
-def token_expires_within(token, min_valid_seconds):
+def is_token_valid(token, min_valid_seconds):
     """
-    Return whether a JWT is unusable within a safety margin.
+    Return whether a JWT stays valid for at least a safety margin.
 
     Decodes the token's payload and compares its ```exp``` claim against the
-    current time plus a margin. A token is considered unusable (returns True)
-    when it is malformed, carries no ```exp```, is already expired, or expires
-    within ```min_valid_seconds```.
+    current time plus a margin. A token is considered valid (returns True) only
+    when it is well formed, carries an ```exp``` and expires later than
+    ```min_valid_seconds``` from now.
 
     ### Args
 
@@ -27,16 +27,17 @@ def token_expires_within(token, min_valid_seconds):
 
     ### Returns
 
-    - **bool**: True if the token is malformed or expires within the margin
+    - **bool**: True if the token stays valid longer than the margin; False if
+        it is malformed, carries no ```exp``` or expires within the margin
 
     """
     parts = token.split('.')
     if len(parts) != 3:
-        return True
+        return False
     try:
         pad = parts[1] + '=' * (-len(parts[1]) % 4)
         payload = json.loads(base64.urlsafe_b64decode(pad).decode('utf-8'))
         exp = int(payload['exp'])
     except (ValueError, KeyError, TypeError):
-        return True
-    return exp <= time.time() + min_valid_seconds
+        return False
+    return exp > time.time() + min_valid_seconds

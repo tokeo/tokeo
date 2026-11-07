@@ -59,10 +59,10 @@ import shlex
 from cement.core.meta import MetaMixin
 from cement import ex
 from tokeo.core.exc import TokeoError
-from tokeo.core.utils.base import filled_str_or_default
+from tokeo.core.utils.base import get_filled_str_or_default
 from tokeo.core.utils.props import hasprops, getprop
 from tokeo.core.utils.validate import is_filled_str, is_list, is_number_gt
-from tokeo.core.utils.json import json_dump, TokeoJsonUnknownNoneEncoder
+from tokeo.core.utils.json import dump_json, TokeoJsonUnknownNoneEncoder
 from tokeo.core.utils import sanitize
 from tokeo.core.vaults import redact_vault
 from tokeo.ext.argparse import Controller
@@ -191,7 +191,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         # quoted only for the export line of a remote shell, a local process
         # gets them without a shell and so as they are
         if env and self.sanitize:
-            env = sanitize.keywords_only(env)
+            env = sanitize.filter_keyword_keys(env)
         # if strict protected, remove all kwargs, except safe ones
         if self.protect == 'strict':
             for k in kwargs.keys() - {'hide', 'warn'}:
@@ -229,7 +229,7 @@ class TokeoInvokeLocalContext(invoke.Context):
 
         : Env vars reach the local process without a shell, so their values
             stay as they are; with sanitize enabled only names that are
-            keywords pass, by sanitize.keywords_only().
+            keywords pass, by sanitize.filter_keyword_keys().
 
         : A sudo password (sudo.password) is injected reactively when the
             configured prompt is seen in the last tail chars of stdout or
@@ -411,7 +411,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
 
         : Env vars are exported into the remote shell; with sanitize enabled
             only names that are keywords pass and the values are quoted by
-            sanitize.keyword_dict(), otherwise they are exported as-is.
+            sanitize.quote_keyword_dict(), otherwise they are exported as-is.
 
         : A sudo password (sudo.password) is injected reactively when the
             configured prompt is seen in the last tail chars of stdout or
@@ -472,7 +472,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         env = kwargs.get('env', {})
         # the export line is read by the remote shell, so its values are quoted
         if env and self.sanitize:
-            env = sanitize.keyword_dict(env)
+            env = sanitize.quote_keyword_dict(env)
         if env:
             env_exports = 'export ' + ' '.join(f'{k}={str(v)}' for k, v in env.items()) + ' ; '
         else:
@@ -1385,7 +1385,7 @@ class TokeoAutomate(MetaMixin):
                 func=func,
                 module=module,
                 id=key,
-                name=filled_str_or_default(_config_task.get('name'), key),
+                name=get_filled_str_or_default(_config_task.get('name'), key),
                 kwargs=kwargs,
                 kwprotected=kwprotected,
             )
@@ -2137,7 +2137,7 @@ class TokeoAutomateShell:
             )
         if args.as_json:
             self.app.print(
-                json_dump(
+                dump_json(
                     res['results'],
                     encoder=TokeoJsonAutomateEncoder(),
                     encoding=None,
@@ -2459,7 +2459,7 @@ class TokeoAutomateController(Controller):
         # check for json and encoding
         if self.app.pargs.as_json:
             self.app.print(
-                json_dump(
+                dump_json(
                     res['results'],
                     encoder=TokeoJsonAutomateEncoder(),
                     encoding='utf-8' if self.app.pargs.encode_utf8 else None,

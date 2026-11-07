@@ -10,7 +10,7 @@ from unittest import mock
 import invoke
 import pytest
 from cement.utils.misc import init_defaults
-from tokeo.core.utils.props import hasprops, anyprop, getprop
+from tokeo.core.utils.props import hasprops, hasanyprop, getprop
 from tokeo.ext.automate import TokeoAutomateError, TokeoAutomateResult, TokeoInvokeLocalContext, TokeoInvokeRemoteContext
 from tests.ext.automate.automate_tests_helper import (
     AutomateTest,
@@ -157,7 +157,7 @@ def test_result_is_read_by_attributes_not_as_dict():
         assert getprop(res, 'stdout', fallback='Fallback') == 'Out'
         assert getattr(res, 'stderr') == 'Err'
         assert hasprops(res, ('stdout', 'stderr')) is True
-        assert anyprop(res, ('miss', 'stderr')) is True
+        assert hasanyprop(res, ('miss', 'stderr')) is True
         with pytest.raises(TypeError):
             app.inspect(res['stderr'])
         with pytest.raises(AttributeError):
