@@ -890,7 +890,7 @@ def tokeo_nicegui_pdoc_render_decorator(app, func, decorator, args, kwargs):
     return dict(
         decorator=decorator,
         params=_get_decorator_path_param(args),
-        docstring=app.pdoc.docstrings('decorator', key),
+        docstring=app.pdoc.find_docstring('decorator', key),
     )
 
 

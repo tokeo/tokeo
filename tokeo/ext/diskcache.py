@@ -1725,7 +1725,7 @@ def tokeo_diskcache_pdoc_render_decorator(app, func, decorator, args, kwargs):
         return dict(
             decorator=decorator,
             params=params,
-            docstring=app.pdoc.docstrings('decorator', 'locks.throttle'),
+            docstring=app.pdoc.find_docstring('decorator', 'locks.throttle'),
         )
     elif re.match(r'@app\.[^.]+\.locks\.temper', decorator):
         params = None
@@ -1747,7 +1747,7 @@ def tokeo_diskcache_pdoc_render_decorator(app, func, decorator, args, kwargs):
         return dict(
             decorator=decorator,
             params=params,
-            docstring=app.pdoc.docstrings('decorator', 'locks.temper'),
+            docstring=app.pdoc.find_docstring('decorator', 'locks.temper'),
         )
 
 

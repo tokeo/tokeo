@@ -108,7 +108,7 @@ def tokeo_dramatiq_pdoc_render_decorator(app, func, decorator, args, kwargs):
         return dict(
             decorator=decorator,
             params=params,
-            docstring=app.pdoc.docstrings('decorator', 'dramatiq.actor'),
+            docstring=app.pdoc.find_docstring('decorator', 'dramatiq.actor'),
         )
 
 

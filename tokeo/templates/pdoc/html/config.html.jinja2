@@ -1,6 +1,6 @@
 {% extends "frame.html.jinja2" %}
 {#- the way back to the root of the docs, so every path is relative -#}
-{% set root = "../" %}
+{% set docs_root_path = "../" %}
 
 {#- =================================================================== -#}
 {#- Tokeo configuration page: same shell, sidebar and type scale as     -#}
@@ -10,7 +10,7 @@
 {#- =================================================================== -#}
 
 {% block title %}Configuration · {{ doc_title | default("Tokeo API") }}{% endblock %}
-{% block style %}<link rel="stylesheet" href="{{ root }}assets/tailwind.min.css"><link rel="stylesheet" href="{{ root }}assets/tokeo.theme.css">{% endblock %}
+{% block style %}<link rel="stylesheet" href="{{ docs_root_path }}assets/tailwind.min.css"><link rel="stylesheet" href="{{ docs_root_path }}assets/tokeo.theme.css">{% endblock %}
 {% block head %}{% include "head.html" %}{% endblock %}
 
 {#- ---------- helpers ---------- -#}
@@ -35,7 +35,7 @@
   <div id="section-{{ section }}" class="scroll-mt-6 target:ring-2 target:ring-brand-highlight rounded-lg">
     {{ namebox(section) }}
     <div class="mt-3 pl-5 tk-member-doc">
-      {% for f, data in configdict.items() if section in data.sections %}
+      {% for f, data in config_dict.items() if section in data.sections %}
         {% set entry = data.sections[section] %}
         <div class="{% if not loop.first %}{{ 'mt-6' if entry.intro else 'mt-1' }}{% endif %}">
           {% if entry.intro %}<div class="tk-doc">{{ entry.intro | to_html }}</div>{% endif %}
@@ -53,23 +53,23 @@
 
     {# ---- sidebar -------------------------------------------------------- #}
     <aside class="md:w-72 md:shrink-0 md:h-screen md:sticky md:top-0 md:overflow-auto border-b md:border-b-0 md:border-r tk-line tk-surface px-6 py-7">
-      <a href="{{ root }}index.html" class="tk-header block !py-3 !px-4 !mb-7 !text-left"><span class="text-lg font-semibold">{{ brand | default("🚀 " + (app_name | default("tokeo")), true) }}</span></a>
+      <a href="{{ docs_root_path }}index.html" class="tk-header block !py-3 !px-4 !mb-7 !text-left"><span class="text-lg font-semibold">{{ brand | default("🚀 " + (app_label | default("tokeo")), true) }}</span></a>
       {% include "mode.html" %}
       <nav class="space-y-7 text-[0.95rem] font-sans whitespace-nowrap">
         <div>
           <h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Home</h3>
-          <a href="{{ root }}index.html" class="text-brand-primary hover:text-brand-accent">All packages</a>
+          <a href="{{ docs_root_path }}index.html" class="text-brand-primary hover:text-brand-accent">All packages</a>
         </div>
-        {% if configenvs %}
+        {% if config_envs %}
         <div>
           <h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Environments</h3>
-          <ul class="space-y-1">{% for name in configenvs %}<li><a class="text-brand-primary hover:text-brand-accent" href="#env-{{ name }}">{{ name }}</a></li>{% endfor %}</ul>
+          <ul class="space-y-1">{% for name in config_envs %}<li><a class="text-brand-primary hover:text-brand-accent" href="#env-{{ name }}">{{ name }}</a></li>{% endfor %}</ul>
         </div>
         {% endif %}
-        {% if configsections %}
+        {% if config_sections %}
         <div>
           <h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Sections</h3>
-          <ul class="space-y-1">{% for section in configsections %}<li><a class="text-brand-primary hover:text-brand-accent" href="#section-{{ section }}">{{ section }}</a></li>{% endfor %}</ul>
+          <ul class="space-y-1">{% for section in config_sections %}<li><a class="text-brand-primary hover:text-brand-accent" href="#section-{{ section }}">{{ section }}</a></li>{% endfor %}</ul>
         </div>
         {% endif %}
       </nav>
@@ -80,20 +80,20 @@
       <div class="max-w-5xl">
         <header class="mb-8">
           <nav class="font-mono text-[0.95rem] text-brand-muted mb-3">
-            <a href="{{ root }}index.html" class="text-brand-primary hover:text-brand-accent">All packages</a>
+            <a href="{{ docs_root_path }}index.html" class="text-brand-primary hover:text-brand-accent">All packages</a>
           </nav>
-          <h1 class="text-4xl font-light">Configuration <code class="font-bold">{{ app_name | default("tokeo") }}</code></h1>
+          <h1 class="text-4xl font-light">Configuration <code class="font-bold">{{ app_label | default("tokeo") }}</code></h1>
         </header>
 
-        {% if configenvs %}
+        {% if config_envs %}
         <section class="mt-12">
           <h2 class="text-2xl font-light mb-5 text-brand-primary">Environments</h2>
           <div class="space-y-10">
-            {% for name in configenvs %}
+            {% for name in config_envs %}
               <div id="env-{{ name }}" class="scroll-mt-6 target:ring-2 target:ring-brand-highlight rounded-lg">
                 {{ namebox(name) }}
                 <div class="mt-3 pl-5 tk-member-doc">
-                  <div class="tk-doc">{{ configdict[name].description | to_html }}</div>
+                  <div class="tk-doc">{{ config_dict[name].description | to_html }}</div>
                 </div>
               </div>
             {% endfor %}
@@ -101,10 +101,10 @@
         </section>
         {% endif %}
 
-        <section class="{{ 'mt-24' if configenvs else 'mt-12' }}">
+        <section class="{{ 'mt-24' if config_envs else 'mt-12' }}">
           <h2 class="text-2xl font-light mb-5 text-brand-primary" id="header-sections">Sections</h2>
           <div class="space-y-10">
-            {% for section in configsections %}{{ show_section(section) }}{% endfor %}
+            {% for section in config_sections %}{{ show_section(section) }}{% endfor %}
           </div>
         </section>
       </div>

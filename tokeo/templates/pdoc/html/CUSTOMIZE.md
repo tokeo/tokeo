@@ -21,9 +21,9 @@ Set in the ```[pdoc]``` section of the app config, e.g.
 pdoc:
   title: "Spiral Docs"                 # suffix in <title>: "module · Spiral Docs"
   brand: "🍒 Spiral"                   # sidebar label; null => "🚀 <app label>"
-  favicon: public/spiral-favicon.ico   # project path, copied to the root of the docs
+  favicon_path: public/spiral-favicon.ico  # project path, copied to the root of the docs
   html_lang: de                        # lang attribute of <html>
-  show_config: true                    # render the yaml config page
+  config_page: true                    # render the yaml config page
   ancestors_max_depth: 2               # class hierarchy levels in the docs
 ```
 
@@ -127,10 +127,11 @@ variants.
 
 Every page loads its assets and links the other pages by relative paths: a
 module page ```a.b.c``` reaches the root with ```../../```, the config page with
-```../```. The templates set this as ```root``` at the top and put it in front of
-every path; ```tokeo.theme.css``` loads its fonts relative to itself. So the docs
-work from any sub path, for example a GitHub Page under ```<user>.github.io/tokeo/```,
-and opened as files. A page of your own sets ```root``` the same way.
+```../```. The templates set this as ```docs_root_path``` at the top and put it
+in front of every path; ```tokeo.theme.css``` loads its fonts relative to itself.
+So the docs work from any sub path, for example a GitHub Page under
+```<user>.github.io/tokeo/```, and opened as files. A page of your own sets
+```docs_root_path``` the same way.
 
 ### Fonts
 
@@ -214,21 +215,21 @@ Available in every template, on top of pdoc's own
 | Global | Type | Meaning |
 |---|---|---|
 | ```app``` | object | The cement app instance |
-| ```app_name``` | str | App label |
+| ```app_label``` | str | App label |
 | ```doc_title``` | str | Configured ```title``` |
 | ```brand``` | str | Configured ```brand```, empty when unset |
 | ```html_lang``` | str | Configured ```html_lang``` |
 | ```has_config``` | bool | Whether a config page will be written |
 | ```tokeo_version```, ```pdoc_version``` | str | For the footer credit |
-| ```decorators(func)``` | callable | Decorator metadata for a function |
-| ```ancestors(cls, depth)``` | callable | MRO above a class, at most depth levels |
+| ```get_decorators(func)``` | callable | Decorator metadata for a function |
+| ```get_ancestors(cls, depth)``` | callable | MRO above a class, at most depth levels |
 | ```ancestors_max_depth``` | int | Configured maximum of levels |
-| ```subclasses(cls)``` | callable | Loaded direct subclasses, sorted |
-| ```own_init(cls)``` | callable | The class's own ```__init__```, or None |
+| ```get_subclasses(cls)``` | callable | Loaded direct subclasses, sorted |
+| ```find_own_init(cls)``` | callable | The class's own ```__init__```, or None |
 | ```is_namespace(mod)``` | callable | True for PEP 420 namespace packages |
 | ```is_enum(cls)``` | callable | True for ```enum.Enum``` subclasses |
 | ```all_modules``` | set | Names of every documented module |
-| ```configdict```, ```configsections```, ```configenvs``` | - | Config page data |
+| ```config_dict```, ```config_sections```, ```config_envs``` | - | Config page data |
 | ```redact_data(data)``` | callable | Replaces every value, keeps the structure |
 | ```math```, ```mermaid``` | bool | Both False: pdoc's own includes target markup this layout does not use; ```head.html``` wires up mermaid itself |
 
@@ -269,7 +270,7 @@ def my_pdoc_render_decorator(app, func, decorator, args, kwargs):
         return dict(
             decorator=decorator,
             params=None,
-            docstring=app.pdoc.docstrings('decorator', 'my.thing'),
+            docstring=app.pdoc.find_docstring('decorator', 'my.thing'),
         )
 
 app.hook.register('tokeo_pdoc_render_decorator', my_pdoc_render_decorator)

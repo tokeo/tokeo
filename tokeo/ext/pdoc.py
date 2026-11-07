@@ -3,8 +3,8 @@ Wraps pdoc (https://pdoc.dev, MIT-0) behind the existing Tokeo extension
 surface. The controller commands (```pdoc render```, ```pdoc serve```),
 their arguments (```--clean```, ```--serve```, positional ```modules```) and
 the config keys (```modules```, ```output_dir```, ```host```, ```port```,
-```favicon```, ```templates```) are kept identical to the previous
-pdoc3-based extension, so ```tokeo pdoc``` keeps working unchanged.
+```templates```) are kept identical to the previous pdoc3-based extension, so
+```tokeo pdoc``` keeps working unchanged.
 
 The rendering itself uses pdoc's public API: ```pdoc.doc.Module```,
 ```pdoc.render```, ```pdoc.render.env``` for custom globals, and pdoc's built-in
@@ -193,7 +193,7 @@ class TokeoPdoc(Handler):
             # modules to render (str or list), None renders the app and tests
             modules=None,
             # module prefixes skipped during the discovery
-            exclude=[],
+            excludes=[],
             # directory the html is rendered into
             output_dir='html',
             # host the documentation is served on
@@ -201,7 +201,7 @@ class TokeoPdoc(Handler):
             # port the documentation is served on
             port=9999,
             # project path of the favicon, copied into the root of the docs
-            favicon='public/favicon.ico',
+            favicon_path='public/favicon.ico',
             # lang attribute of <html>
             lang='en',
             # suffix of the page titles
@@ -213,7 +213,7 @@ class TokeoPdoc(Handler):
             # modules or directories of the markdown docstrings of decorators
             docstrings=['tokeo.templates.pdoc.docstrings'],
             # render the yaml config page
-            show_config=True,
+            config_page=True,
             # levels of the class hierarchy shown above a class
             ancestors_max_depth=2,
             # file patterns that trigger a new render with --watch
@@ -221,9 +221,9 @@ class TokeoPdoc(Handler):
             # file patterns ignored by --watch
             watch_excludes='.*',
             # seconds between two checks for changes with --watch
-            watch_interval=2.0,
+            watch_interval_seconds=2.0,
             # seconds without a change before --watch renders again
-            watch_settle=1.5,
+            watch_settle_seconds=1.5,
         )
 
     #: (Application) The Cement application instance, set on setup
@@ -240,11 +240,11 @@ class TokeoPdoc(Handler):
         )
         self._output_dir = fs.abspath(self._config('output_dir'))
         self.set_modules(self._config('modules'))
-        self.set_show_config(self._config('show_config'))
-        # external decorator/docstring markdown snippets (see `docstrings()`)
+        self.set_config_page(self._config('config_page'))
+        # external decorator/docstring markdown snippets (see `find_docstring()`)
         self._docstrings_cache = dict()
         self._docstrings_dirs = None
-        # aliases of the docstring snippets per group (see `alias()`)
+        # aliases of the docstring snippets per group (see `resolve_alias()`)
         self._aliases_cache = dict()
         # watchdog files components
         self._watchdog_observer = None
@@ -300,13 +300,13 @@ class TokeoPdoc(Handler):
         self._docstrings_dirs = dirs
         return dirs
 
-    def docstrings(self, group, identifier):
+    def find_docstring(self, group, identifier):
         """Retrieve a docstring from external Markdown files.
 
         Loads ```{dir}/{group}/{identifier}.md``` from the configured docstrings
         directories and caches the result, also a missing one. Used by the
         extensions' decorator hooks (e.g.
-        ```docstrings('decorator', 'dramatiq.actor')```) and for any other
+        ```find_docstring('decorator', 'dramatiq.actor')```) and for any other
         decorator by its name, to document what a decorator does without
         repeating it in every docstring.
 
@@ -329,7 +329,7 @@ class TokeoPdoc(Handler):
         self._docstrings_cache[key] = None
         return None
 
-    def alias(self, group, name):
+    def resolve_alias(self, group, name):
         """Resolve a name to the docstring identifier it is an alias of.
 
         Merges ```{dir}/{group}/aliases.yaml``` of the configured docstrings
@@ -377,7 +377,7 @@ class TokeoPdoc(Handler):
         attrs = vars(cls.obj)
         return var.name not in attrs or isinstance(attrs[var.name], types.MemberDescriptorType)
 
-    def decorators(self, func):
+    def get_decorators(self, func):
         """Decorator metadata for a pdoc function, for use from templates.
 
         Wraps the function in ```DecoratedFunction```, which AST-parses the source
@@ -394,8 +394,8 @@ class TokeoPdoc(Handler):
             decorated = DecoratedFunction(
                 self.app,
                 func,
-                update_func_docstring=True,
-                prepend_docstrings='\n\n---\n\n',
+                docstring_prefix='\n\n---\n\n',
+                with_docstring_update=True,
             )
             return decorated.decorators
         except Exception as err:
@@ -422,7 +422,7 @@ class TokeoPdoc(Handler):
         else:
             self._modules = list(modules)
 
-    def set_show_config(self, show=None):
+    def set_config_page(self, is_shown=None):
         """Set whether the yaml config page is rendered.
 
         Called once at setup from the config and again from the CLI for
@@ -431,14 +431,14 @@ class TokeoPdoc(Handler):
 
         ### Args
 
-        - **show** (bool|str): Truthy to render the page, or None to take
+        - **is_shown** (bool|str): Truthy to render the page, or None to take
             the configured value
 
         """
-        if show is None:
-            self._show_config = self._config('show_config')
+        if is_shown is None:
+            self._is_config_page_shown = self._config('config_page')
         else:
-            self._show_config = is_true(show)
+            self._is_config_page_shown = is_true(is_shown)
 
     def _get_template_dirs(self):
         """Resolve configured template modules/paths to filesystem dirs.
@@ -526,7 +526,7 @@ class TokeoPdoc(Handler):
 
         # the favicon, a path in the project, is copied into the root of the
         # docs below, where browsers look for it; without the file no link
-        favicon_file = self._config('favicon')
+        favicon_file = self._config('favicon_path')
         favicon = 'favicon' + os.path.splitext(favicon_file)[1] if favicon_file and os.path.isfile(favicon_file) else None
 
         # pdoc render configuration
@@ -553,7 +553,7 @@ class TokeoPdoc(Handler):
 
         # ---- custom globals available to every template ---------------------
         pdoc.render.env.globals['app'] = self.app
-        pdoc.render.env.globals['app_name'] = getattr(self.app._meta, 'label', 'app')
+        pdoc.render.env.globals['app_label'] = getattr(self.app._meta, 'label', 'app')
 
         # branding, overridable from a derived project's [pdoc] config without
         # touching templates: `title` is the <title> suffix, `brand` the sidebar
@@ -563,12 +563,12 @@ class TokeoPdoc(Handler):
         # decorator metadata for the templates (also appends the decorators'
         # docstrings to the documented function, so call it before rendering
         # the function's docstring)
-        pdoc.render.env.globals['decorators'] = self.decorators
+        pdoc.render.env.globals['get_decorators'] = self.get_decorators
         # instance attributes are shown only with a text, see is_instance_attribute
         pdoc.render.env.globals['is_instance_attribute'] = self.is_instance_attribute
 
         # is a config page going to be written? (index links to it)
-        pdoc.render.env.globals['has_config'] = bool(self._show_config and getattr(self.app, 'env', None) is not None)
+        pdoc.render.env.globals['has_config'] = bool(self._is_config_page_shown and getattr(self.app, 'env', None) is not None)
 
         pdoc.render.env.globals['html_lang'] = self._config('lang')
         pdoc.render.env.globals['doc_title'] = self._config('title')
@@ -616,7 +616,7 @@ class TokeoPdoc(Handler):
                     break
             return out
 
-        pdoc.render.env.globals['ancestors'] = _get_ancestors
+        pdoc.render.env.globals['get_ancestors'] = _get_ancestors
 
         # subclasses: the loaded direct subclasses (type.__subclasses__()).
         # Because the render imports every module first, subclasses defined in
@@ -634,7 +634,7 @@ class TokeoPdoc(Handler):
                 out.append((mod, qual, f'{mod}.{qual}' if mod else qual))
             return sorted(out, key=lambda t: t[1].lower())
 
-        pdoc.render.env.globals['subclasses'] = _get_subclasses
+        pdoc.render.env.globals['get_subclasses'] = _get_subclasses
 
         pdoc.render.env.globals['ancestors_max_depth'] = int(self._config('ancestors_max_depth'))
 
@@ -649,7 +649,7 @@ class TokeoPdoc(Handler):
                         return mem
             return None
 
-        pdoc.render.env.globals['own_init'] = _find_own_init
+        pdoc.render.env.globals['find_own_init'] = _find_own_init
 
         def _is_enum(cls):
             # true when the documented class derives from enum.Enum, so the
@@ -836,12 +836,12 @@ class TokeoPdoc(Handler):
 
         Reproduces the prior pdoc3 ```show_config``` feature: it collects the
         config files cement actually loads (via appenv's resolver), reads
-        each into ```configdict[config_file] = {content: [lines], yaml: parsed}```,
+        each into ```config_dict[config_file] = {content: [lines], yaml: parsed}```,
         masks the ```!vault:``` values, and renders a synthetic
         ```config/index.html```.
         Requires the appenv extension (```app.env```); skipped otherwise.
         """
-        if not self._show_config:
+        if not self._is_config_page_shown:
             return
         env = getattr(self.app, 'env', None)
         if env is None:
@@ -853,7 +853,7 @@ class TokeoPdoc(Handler):
 
         suffix = self.app._meta.config_file_suffix
         config_dir = env.APP_CONFIG_DIR
-        configdict = {}
+        config_dict = {}
         for app_env in ('base', *ENVIRONMENTS):
             try:
                 file_list = env.get_config_files(
@@ -874,7 +874,7 @@ class TokeoPdoc(Handler):
                     lines = content.split('\n')
                     # a !vault: value loads as VaultRef, it is never decrypted
                     parsed = yaml.load(content, Loader=VaultLoader)
-                    configdict[config_file] = {
+                    config_dict[config_file] = {
                         'content': lines,
                         'yaml': parsed,
                         'description': _strip_comment_markers('\n'.join(lines[: _get_yaml_header_end(lines)])),
@@ -887,36 +887,36 @@ class TokeoPdoc(Handler):
                 except Exception as err:
                     self.app.log.warning(f'pdoc: config file "{config_file}": {err}')
 
-        if not configdict:
+        if not config_dict:
             return
 
         # union of the top-level keys (config sections) across all files
-        configsections = []
-        for data in configdict.values():
+        config_sections = []
+        for data in config_dict.values():
             if data['yaml']:
                 for key in data['yaml']:
-                    if key not in configsections:
-                        configsections.append(key)
+                    if key not in config_sections:
+                        config_sections.append(key)
 
         # top-level environment files in documentation order, used for the
         # intro section. `ENVIRONMENTS` already reads production, staging,
         # development, testing; entries appear only when the file exists.
         # `.d/` partials and `.local` overrides stay out on purpose: the
         # intro is meant to be a short, hand-written orientation.
-        configenvs = [app_env for app_env in ('base', *ENVIRONMENTS) if app_env in configdict and configdict[app_env]['description']]
+        config_envs = [app_env for app_env in ('base', *ENVIRONMENTS) if app_env in config_dict and config_dict[app_env]['description']]
 
         import pdoc.render
 
-        pdoc.render.env.globals['configdict'] = configdict
-        pdoc.render.env.globals['configsections'] = configsections
-        pdoc.render.env.globals['configenvs'] = configenvs
+        pdoc.render.env.globals['config_dict'] = config_dict
+        pdoc.render.env.globals['config_sections'] = config_sections
+        pdoc.render.env.globals['config_envs'] = config_envs
         from tokeo.core.utils.dict import redact_data
 
         pdoc.render.env.globals['redact_data'] = redact_data
 
         try:
             tmpl = pdoc.render.env.get_template('config.html.jinja2')
-            html = tmpl.render(app_name=self.app._meta.label)
+            html = tmpl.render(app_label=self.app._meta.label)
             out = Path(output_dir) / 'config' / 'index.html'
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(html, encoding='utf-8')
@@ -1098,10 +1098,10 @@ class TokeoPdoc(Handler):
                 break
 
     def _get_excludes(self):
-        """Module prefixes to skip during discovery (from the ```exclude```
+        """Module prefixes to skip during discovery (from the ```excludes```
         config key). Submodule-level exclusion is additionally driven by each
         package's own ```__pdoc__``` overrides (see ```_discover```)."""
-        ex = self._config('exclude')
+        ex = self._config('excludes')
         if isinstance(ex, str):
             ex = [ex]
         return list(ex)
@@ -1421,7 +1421,7 @@ class TokeoPdoc(Handler):
         # mirror the condition in `_render_config_page`, so the line never
         # claims a config page that was not written. `app.env` comes from the
         # optional appenv extension, hence getattr rather than attribute access
-        if self._show_config and getattr(self.app, 'env', None):
+        if self._is_config_page_shown and getattr(self.app, 'env', None):
             documented.append('config')
         return documented
 
@@ -1527,7 +1527,7 @@ class TokeoPdoc(Handler):
             self._watchdog_last_event_time = monotonic()
             self._watchdog_last_path = path
 
-    def _watch(self, restarted=False):
+    def _watch(self, is_restarted=False):
         """Start the observer and returns the monitor
 
         On a settled change the monitor stops the server, ```serve()``` returns,
@@ -1538,7 +1538,7 @@ class TokeoPdoc(Handler):
 
         ### Args
 
-        - **restarted** (bool): Suppress the startup output. Set after a
+        - **is_restarted** (bool): Suppress the startup output. Set after a
             process replacement, where repeating it would bury the one line
             that says what changed
 
@@ -1566,7 +1566,7 @@ class TokeoPdoc(Handler):
         # observer is touched
         self._setup_watchdog(dirs)
 
-        if not restarted:
+        if not is_restarted:
             self.app.log.info('pdoc watching for changes on project files')
             # the paths are noise on info level, but the only way to tell why
             # an edit does nothing, so they go to debug rather than nowhere
@@ -1601,8 +1601,8 @@ class TokeoPdoc(Handler):
             # inside the try on purpose: a nonsense value in the config would
             # otherwise kill this thread before the handler below exists, and
             # the session would look alive while nothing is being watched
-            interval = float(self._config('watch_interval'))
-            settle = float(self._config('watch_settle'))
+            interval = float(self._config('watch_interval_seconds'))
+            settle = float(self._config('watch_settle_seconds'))
             while not self._watchdog_stop.wait(interval):
                 with self._watchdog_lock:
                     if self._watchdog_stop.is_set():
@@ -1684,7 +1684,7 @@ class TokeoPdoc(Handler):
 
     # ---- serving ------------------------------------------------------------
 
-    def serve(self, watch=False, restarted=False):
+    def serve(self, watch=False, is_restarted=False):
         """Serve the rendered documentation directory over HTTP.
 
         The render step already produced static HTML in ```output_dir```. Serving
@@ -1700,7 +1700,7 @@ class TokeoPdoc(Handler):
             server, mirroring nicegui's ```fastapi_app.on_startup(...)```: the
             server keeps the foreground, so Ctrl+C lands where expected and
             the monitor ends the session by stopping the server.
-        - **restarted** (bool): Suppress the startup output, because this
+        - **is_restarted** (bool): Suppress the startup output, because this
             process came out of a ```--watch``` restart and the interesting line
             is the one naming the change.
 
@@ -1738,7 +1738,7 @@ class TokeoPdoc(Handler):
                 f'Another process may already use that port; stop it or set a '
                 f'different "port" in the [pdoc] config section.'
             ) from err
-        if not restarted:
+        if not is_restarted:
             self.app.log.info(f'pdoc serving at http://{host}:{port}')
             self.app.log.info(f'pdoc explaining modules: {", ".join(self._get_documented_names())}')
         # the monitor needs the running server to stop it later, so the
@@ -1748,7 +1748,7 @@ class TokeoPdoc(Handler):
         # is left unclosed because the `try/finally` starts below. Harmless
         # at process exit, but the messages read out of order.
         if watch:
-            watch_daemon = self._watch(restarted=restarted)
+            watch_daemon = self._watch(is_restarted=is_restarted)
             Thread(
                 target=watch_daemon,
                 args=(httpd,),
@@ -1756,7 +1756,7 @@ class TokeoPdoc(Handler):
                 name='tokeo-pdoc-watch-daemon',
             ).start()
 
-        if not restarted:
+        if not is_restarted:
             self.app.log.info('press Ctrl+C to stop')
 
         try:
@@ -1802,15 +1802,15 @@ class TokeoPdocController(Controller):
         ],
     )
     def render(self):
-        # both switches are always offered, whatever `show_config` says, so a
+        # both switches are always offered, whatever `config_page` says, so a
         # command line keeps working when the config default is flipped. They
         # override the option for this run only; the config stays untouched
         if self.app.pargs.config and self.app.pargs.no_config:
             raise TokeoPdocError('pdoc render: --config and --no-config exclude each other')
         if self.app.pargs.config:
-            self.app.pdoc.set_show_config(show=True)
+            self.app.pdoc.set_config_page(is_shown=True)
         elif self.app.pargs.no_config:
-            self.app.pdoc.set_show_config(show=False)
+            self.app.pdoc.set_config_page(is_shown=False)
         if self.app.pargs.modules:
             self.app.pdoc.set_modules(self.app.pargs.modules)
         self.app.pdoc.render(
@@ -1821,7 +1821,7 @@ class TokeoPdocController(Controller):
             # the modules were resolved and remembered by the render above
             self.app.pdoc.serve(
                 watch=self.app.pargs.watch,
-                restarted=self.app.pargs.restart,
+                is_restarted=self.app.pargs.restart,
             )
 
     @ex(

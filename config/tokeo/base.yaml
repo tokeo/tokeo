@@ -98,7 +98,7 @@ pdoc:
   ### port for serving the pdoc service
   port: 9999
   ### relative project path of the favicon, copied into the root of the docs
-  favicon: public/favicon.ico
+  favicon_path: public/favicon.ico
   ### module or absolute path to the jinja2 templates
   templates:
     - tokeo.templates.pdoc.html

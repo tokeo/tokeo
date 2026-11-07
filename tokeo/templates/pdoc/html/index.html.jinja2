@@ -1,9 +1,9 @@
 {% extends "frame.html.jinja2" %}
 {#- the way back to the root of the docs, so every path is relative -#}
-{% set root = "" %}
+{% set docs_root_path = "" %}
 
-{% block title %}{{ app_name | default("tokeo") }} · {{ doc_title }}{% endblock %}
-{% block style %}<link rel="stylesheet" href="{{ root }}assets/tailwind.min.css"><link rel="stylesheet" href="{{ root }}assets/tokeo.theme.css">{% endblock %}
+{% block title %}{{ app_label | default("tokeo") }} · {{ doc_title }}{% endblock %}
+{% block style %}<link rel="stylesheet" href="{{ docs_root_path }}assets/tailwind.min.css"><link rel="stylesheet" href="{{ docs_root_path }}assets/tokeo.theme.css">{% endblock %}
 {% block head %}{% include "head.html" %}{% endblock %}
 
 {% block body %}
@@ -11,25 +11,25 @@
     <main class="flex-1 w-full max-w-6xl mx-auto px-6 py-12">
       <div class="tk-mode-row">{% include "mode.html" %}</div>
       <div class="tk-header">
-        <h1>🚀 {{ app_name | default("tokeo") }} modules</h1>
+        <h1>🚀 {{ app_label | default("tokeo") }} modules</h1>
         <p>Explore the API documentation of project modules</p>
       </div>
 
       {# top-level packages only: a module whose parent is not itself documented #}
-      {% set roots = [] %}
+      {% set top_modules = [] %}
       {% for name, mod in all_modules.items() %}
         {% set parent = name.rsplit('.', 1)[0] if '.' in name else '' %}
-        {% if mod and parent not in all_modules %}{% set _ = roots.append((name, mod)) %}{% endif %}
+        {% if mod and parent not in all_modules %}{% set _ = top_modules.append((name, mod)) %}{% endif %}
       {% endfor %}
 
-      {% if not roots and not has_config %}
+      {% if not top_modules and not has_config %}
         <p class="text-brand-muted mt-8">No modules found.</p>
       {% else %}
         <div class="grid gap-8 mt-10 grid-cols-1 md:grid-cols-2">
-          {% for name, mod in roots %}
+          {% for name, mod in top_modules %}
             <div class="relative overflow-hidden rounded-xl border tk-line tk-surface p-7 shadow-md transition-transform hover:-translate-y-1 hover:shadow-xl">
               <div class="absolute inset-x-0 top-0 h-1" style="background: var(--gradient-brand)"></div>
-              <a href="{{ root }}{{ name.replace(".", "/") }}.html" class="text-xl font-semibold text-brand-secondary hover:text-brand-accent break-all">{{ name }}</a>
+              <a href="{{ docs_root_path }}{{ name.replace(".", "/") }}.html" class="text-xl font-semibold text-brand-secondary hover:text-brand-accent break-all">{{ name }}</a>
               {% set _w = (mod.docstring or "").split("\n\n")[0].split() %}{% set _summary = _w[:75] | join(" ") %}{% if _w | length > 75 %}{% set _summary = _summary ~ " …" %}{% endif %}<div class="tk-doc mt-4 text-brand-muted leading-relaxed">{{ _summary | to_html }}</div>
             </div>
           {% endfor %}
@@ -37,7 +37,7 @@
           {% if has_config %}
             <div class="relative overflow-hidden rounded-xl border tk-line tk-surface p-7 shadow-md transition-transform hover:-translate-y-1 hover:shadow-xl">
               <div class="absolute inset-x-0 top-0 h-1" style="background: var(--gradient-brand)"></div>
-              <a href="{{ root }}config/index.html" class="text-xl font-semibold text-brand-secondary hover:text-brand-accent break-all">config</a>
+              <a href="{{ docs_root_path }}config/index.html" class="text-xl font-semibold text-brand-secondary hover:text-brand-accent break-all">config</a>
               <div class="tk-doc mt-4 text-brand-muted leading-relaxed"><p>The configuration files and their sections.</p></div>
             </div>
           {% endif %}

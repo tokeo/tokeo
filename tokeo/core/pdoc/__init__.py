@@ -54,16 +54,16 @@ class DecoratedFunction:
 
     - **app** (object): The application instance
     - **func** (object): The function object to analyze
-    - **update_func_docstring** (bool, optional): Whether to update the
+    - **docstring_prefix** (str, optional): Text to prepend to each
+        decorator's docstring
+    - **docstring_suffix** (str, optional): Text to append to each
+        decorator's docstring
+    - **with_docstring_update** (bool, optional): Whether to update the
         function's docstring with decorator docs. Defaults to True.
-    - **prepend_docstrings** (str, optional): Text to prepend to each
-        decorator's docstring
-    - **append_docstrings** (str, optional): Text to append to each
-        decorator's docstring
 
     """
 
-    def __init__(self, app, func, update_func_docstring=True, prepend_docstrings=None, append_docstrings=None):
+    def __init__(self, app, func, docstring_prefix=None, docstring_suffix=None, with_docstring_update=True):
         #: The application instance
         self.app = app
         #: The function object that is analyzed
@@ -72,8 +72,8 @@ class DecoratedFunction:
         #: function
         self.decorators = []
         self._setup_decorators()
-        if update_func_docstring:
-            self._update_func_docstring(prepend_docstrings=prepend_docstrings, append_docstrings=append_docstrings)
+        if with_docstring_update:
+            self._update_func_docstring(docstring_prefix=docstring_prefix, docstring_suffix=docstring_suffix)
 
     def __getattr__(self, attr):
         """
@@ -202,7 +202,7 @@ class DecoratedFunction:
                     break
             else:
                 # no hook knows the decorator, use the snippet of its name or alias
-                _docstring = self.app.pdoc.docstrings('decorator', self.app.pdoc.alias('decorator', _decorator[1:]))
+                _docstring = self.app.pdoc.find_docstring('decorator', self.app.pdoc.resolve_alias('decorator', _decorator[1:]))
 
             # append to stack
             if _decorator is not None:
@@ -217,15 +217,15 @@ class DecoratedFunction:
         # signal success
         return True
 
-    def _update_func_docstring(self, prepend_docstrings=None, append_docstrings=None):
+    def _update_func_docstring(self, docstring_prefix=None, docstring_suffix=None):
         """
         Update the function's docstring with documentation from its decorators.
 
         ### Args
 
-        - **prepend_docstrings** (str, optional): Text to prepend to each
+        - **docstring_prefix** (str, optional): Text to prepend to each
             decorator's docstring
-        - **append_docstrings** (str, optional): Text to append to each
+        - **docstring_suffix** (str, optional): Text to append to each
             decorator's docstring
 
         ### Notes
@@ -245,9 +245,9 @@ class DecoratedFunction:
                 _unique[decorator['decorator']] = True
                 # update _docstring
                 _docstring += (
-                    f'{"" if prepend_docstrings is None else prepend_docstrings}'
+                    f'{"" if docstring_prefix is None else docstring_prefix}'
                     f'{decorator["docstring"]}'
-                    f'{"" if append_docstrings is None else append_docstrings}'
+                    f'{"" if docstring_suffix is None else docstring_suffix}'
                 )
 
         # check for content

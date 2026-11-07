@@ -509,7 +509,7 @@ def test_pdoc_render_decorator_shows_path_and_docstring(source, decorator, param
     with NiceguiPdocTest() as app:
         rendered = tokeo_nicegui_pdoc_render_decorator(app, None, decorator, call.args, call.keywords)
         key = 'nicegui.page' if 'page' in decorator else 'fastapi.' + decorator.rsplit('.', 1)[1]
-        assert rendered == dict(decorator=decorator, params=params, docstring=app.pdoc.docstrings('decorator', key))
+        assert rendered == dict(decorator=decorator, params=params, docstring=app.pdoc.find_docstring('decorator', key))
     assert rendered['docstring']
 
 

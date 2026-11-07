@@ -15,7 +15,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="generator" content="tokeo pdoc {{ tokeo_version }}"/>
   <title>{% block title %}{% endblock %}</title>
-  {% block favicon %}{% if favicon %}<link rel="icon" href="{{ root | default('') }}{{ favicon }}"/>{% endif %}{% endblock %}
+  {% block favicon %}{% if favicon %}<link rel="icon" href="{{ docs_root_path | default('') }}{{ favicon }}"/>{% endif %}{% endblock %}
   {% block head %}{% endblock %}
   {% block style %}{% endblock %}
 </head>

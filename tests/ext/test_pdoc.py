@@ -56,8 +56,8 @@ class PdocTest(TokeoTest):
             output_dir=str(tmp_path / 'html'),
             host='127.0.0.1',
             port=0,
-            watch_interval=0.05,
-            watch_settle=0.05,
+            watch_interval_seconds=0.05,
+            watch_settle_seconds=0.05,
         )
         config['pdoc'].update(overrides)
         super().__init__(config_defaults=config)
@@ -331,7 +331,7 @@ def test_render_shows_values_by_their_documentation(tmp_path, monkeypatch, name,
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc.doc.Module.from_name.cache_clear()
 
-    with PdocTest(tmp_path, modules=['visibility'], show_config=False) as booted:
+    with PdocTest(tmp_path, modules=['visibility'], config_page=False) as booted:
         booted.run()
         booted.pdoc.render()
 
@@ -385,7 +385,7 @@ def _render_page(tmp_path, monkeypatch, package_name, files):
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc.doc.Module.from_name.cache_clear()
 
-    with PdocTest(tmp_path, modules=[package_name], show_config=False) as booted:
+    with PdocTest(tmp_path, modules=[package_name], config_page=False) as booted:
         booted.run()
         booted.pdoc.render()
 
@@ -526,7 +526,7 @@ def _collect_config_sections(app, tmp_path, monkeypatch):
         ),
         raising=False,
     )
-    app.pdoc.set_show_config(show=True)
+    app.pdoc.set_config_page(is_shown=True)
 
     import pdoc.render
 
@@ -536,7 +536,7 @@ def _collect_config_sections(app, tmp_path, monkeypatch):
         lambda name: types.SimpleNamespace(render=lambda **kw: '<html></html>'),
     )
     app.pdoc._render_config_page(str(tmp_path / 'out'))
-    seen = pdoc.render.env.globals.get('configdict', {})
+    seen = pdoc.render.env.globals.get('config_dict', {})
     return list(seen)
 
 
@@ -585,7 +585,7 @@ def test_config_page_shows_a_file_with_vault_values_masked(app, tmp_path, monkey
     import pdoc.render
 
     assert 'production.local' in _collect_config_sections(app, tmp_path, monkeypatch)
-    source = pdoc.render.env.globals['configdict']['production.local']['sections']['smtp']['source']
+    source = pdoc.render.env.globals['config_dict']['production.local']['sections']['smtp']['source']
     assert source == 'smtp:\n  password: ***'
 
 
@@ -840,16 +840,16 @@ def test_init_md_does_not_override_an_existing_docstring(app, tmp_path, monkeypa
 def test_decorator_docstrings_are_read_from_the_configured_packages(app):
     """The docstring of argparse.expose is found in the packages."""
     # `docstrings` feeds the decorator documentation the extensions ask for
-    # via `app.pdoc.docstrings('decorator', ...)`; unlike the removed
+    # via `app.pdoc.find_docstring('decorator', ...)`; unlike the removed
     # `docstrings_dir` it is a search path with first-wins order
-    text = app.pdoc.docstrings('decorator', 'argparse.expose')
+    text = app.pdoc.find_docstring('decorator', 'argparse.expose')
 
     assert text and text.strip()
 
 
 def test_decorator_docstrings_return_none_when_missing(app):
     """A missing docstring gives None."""
-    assert app.pdoc.docstrings('decorator', 'does.not.exist') is None
+    assert app.pdoc.find_docstring('decorator', 'does.not.exist') is None
 
 
 # ---- sidebar rendering: class entries and their indentation -----------------
@@ -1160,7 +1160,7 @@ def test_serve_answers_and_stops_via_the_started_monitor(app, tmp_path, monkeypa
     monkeypatch.setattr(
         app.pdoc,
         '_watch',
-        lambda restarted=False: monitor,
+        lambda is_restarted=False: monitor,
     )
 
     thread = threading.Thread(target=lambda: app.pdoc.serve(watch=True))
@@ -1219,7 +1219,7 @@ def test_get_documented_names_appends_config_when_the_page_is_written(app, monke
     import types
 
     app.pdoc.set_modules(['spiral'])
-    app.pdoc.set_show_config(show=True)
+    app.pdoc.set_config_page(is_shown=True)
     monkeypatch.setattr(
         app,
         'env',
@@ -1235,7 +1235,7 @@ def test_get_documented_names_omits_config_when_disabled(app, monkeypatch):
     import types
 
     app.pdoc.set_modules(['spiral'])
-    app.pdoc.set_show_config(show=False)
+    app.pdoc.set_config_page(is_shown=False)
     monkeypatch.setattr(
         app,
         'env',
@@ -1293,16 +1293,16 @@ def test_setup_reads_the_configured_modules(tmp_path):
         assert booted.pdoc._modules == ['alpha', 'beta']
 
 
-def test_setup_reads_the_configured_show_config(tmp_path):
-    """setup takes show_config from the config, True and False."""
+def test_setup_reads_the_configured_config_page(tmp_path):
+    """setup takes config_page from the config, True and False."""
     for configured in (True, False):
-        with PdocTest(tmp_path / str(configured), show_config=configured) as booted:
+        with PdocTest(tmp_path / str(configured), config_page=configured) as booted:
             booted.run()
 
-            assert booted.pdoc._show_config is configured
+            assert booted.pdoc._is_config_page_shown is configured
 
 
-def test_set_show_config_accepts_truthy_strings(app):
+def test_set_config_page_accepts_truthy_strings(app):
     """ "yes" and "1" switch the page on, "no" and "off" off."""
     for value, expected in (
         (True, True),
@@ -1312,19 +1312,19 @@ def test_set_show_config_accepts_truthy_strings(app):
         ('no', False),
         ('off', False),
     ):
-        app.pdoc.set_show_config(show=value)
-        assert app.pdoc._show_config is expected
+        app.pdoc.set_config_page(is_shown=value)
+        assert app.pdoc._is_config_page_shown is expected
 
 
-def test_set_show_config_without_argument_takes_the_config(app):
-    """Without argument show_config comes from the config."""
-    app.pdoc.set_show_config(show=False)
-    app.pdoc.set_show_config()
+def test_set_config_page_without_argument_takes_the_config(app):
+    """Without argument config_page comes from the config."""
+    app.pdoc.set_config_page(is_shown=False)
+    app.pdoc.set_config_page()
 
-    assert app.pdoc._show_config == app.config.get('pdoc', 'show_config')
+    assert app.pdoc._is_config_page_shown == app.config.get('pdoc', 'config_page')
 
 
-def _collect_watch_output(app, monkeypatch, tmp_path, restarted=False):
+def _collect_watch_output(app, monkeypatch, tmp_path, is_restarted=False):
     """Start a watch and return the lines it logged, by level."""
     pytest.importorskip('watchdog')
     project = tmp_path / 'project'
@@ -1342,7 +1342,7 @@ def _collect_watch_output(app, monkeypatch, tmp_path, restarted=False):
             lambda msg, *a, _l=level, **k: lines[_l].append(str(msg)),
         )
 
-    app.pdoc._watch(restarted=restarted)
+    app.pdoc._watch(is_restarted=is_restarted)
     app.pdoc.shutdown()
     return lines
 
@@ -1369,7 +1369,7 @@ def test_watch_stays_quiet_after_a_restart(app, monkeypatch, tmp_path):
     """After a restart the watch logs nothing."""
     # a restart replays the whole command, and repeating the startup output
     # would bury the one line that says what changed
-    lines = _collect_watch_output(app, monkeypatch, tmp_path, restarted=True)
+    lines = _collect_watch_output(app, monkeypatch, tmp_path, is_restarted=True)
 
     assert lines['info'] == []
     assert lines['debug'] == []
@@ -1441,7 +1441,7 @@ def _render_minimal(tmp_path, monkeypatch, package_name, clean):
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc.doc.Module.from_name.cache_clear()
 
-    with PdocTest(tmp_path, modules=[package_name], show_config=False) as booted:
+    with PdocTest(tmp_path, modules=[package_name], config_page=False) as booted:
         booted.run()
         booted.pdoc.render(clean=clean)
 
@@ -1461,7 +1461,7 @@ def test_render_logs_the_skipped_modules_with_their_reason(tmp_path, monkeypatch
     pdoc.doc.Module.from_name.cache_clear()
 
     lines = []
-    with PdocTest(tmp_path, modules=['skippkg'], show_config=False) as booted:
+    with PdocTest(tmp_path, modules=['skippkg'], config_page=False) as booted:
         booted.run()
         for level in ('info', 'warning'):
             monkeypatch.setattr(booted.log, level, lambda msg, level=level, **kw: lines.append((level, str(msg))))
@@ -1638,25 +1638,25 @@ def _run_cli(tmp_path, monkeypatch, argv):
 
 def test_config_switch_turns_the_page_on(tmp_path, monkeypatch):
     """--config shows the page for this run, the config stays False."""
-    with PdocTest(tmp_path, show_config=False) as booted:
+    with PdocTest(tmp_path, config_page=False) as booted:
         monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
         monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--config'])
         booted.run()
 
-        assert booted.pdoc._show_config is True
+        assert booted.pdoc._is_config_page_shown is True
         # the switch is for one run; the configured value stays as written
-        assert booted.config.get('pdoc', 'show_config') is False
+        assert booted.config.get('pdoc', 'config_page') is False
 
 
 def test_no_config_switch_turns_the_page_off(tmp_path, monkeypatch):
     """--no-config hides the page for this run, the config stays True."""
-    with PdocTest(tmp_path, show_config=True) as booted:
+    with PdocTest(tmp_path, config_page=True) as booted:
         monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
         monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--no-config'])
         booted.run()
 
-        assert booted.pdoc._show_config is False
-        assert booted.config.get('pdoc', 'show_config') is True
+        assert booted.pdoc._is_config_page_shown is False
+        assert booted.config.get('pdoc', 'config_page') is True
 
 
 def test_both_config_switches_are_a_contradiction(tmp_path, monkeypatch):
@@ -1676,22 +1676,22 @@ def test_both_config_switches_are_a_contradiction(tmp_path, monkeypatch):
 
 
 def test_config_switches_leave_the_option_alone_when_unused(tmp_path, monkeypatch):
-    """Without a switch show_config stays as configured."""
+    """Without a switch config_page stays as configured."""
     # both switches are always offered, so the one matching the current
     # option must simply do nothing
-    with PdocTest(tmp_path, show_config=True) as booted:
+    with PdocTest(tmp_path, config_page=True) as booted:
         monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
         monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render'])
         booted.run()
 
-        assert booted.pdoc._show_config is True
+        assert booted.pdoc._is_config_page_shown is True
 
 
 def test_no_config_switch_removes_config_from_the_summary(tmp_path, monkeypatch):
     """--no-config drops "config" from the summary."""
     import types
 
-    with PdocTest(tmp_path, show_config=True) as booted:
+    with PdocTest(tmp_path, config_page=True) as booted:
         monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
         monkeypatch.setattr(
             booted,
@@ -1823,8 +1823,8 @@ def test_pages_carry_the_mode_switch_and_the_early_script(tmp_path, monkeypatch)
 
     module = _render_page(tmp_path, monkeypatch, 'darkmode_pages', {'sample': '"""A module."""\n'})['sample']
     start = (tmp_path / 'html' / 'index.html').read_text()
-    pdoc.render.env.globals.update(configdict={}, configsections=[], configenvs=[])
-    config = pdoc.render.env.get_template('config.html.jinja2').render(app_name='darkmode')
+    pdoc.render.env.globals.update(config_dict={}, config_sections=[], config_envs=[])
+    config = pdoc.render.env.get_template('config.html.jinja2').render(app_label='darkmode')
 
     for html in (start, module, config):
         _assert_mode_switch(html)
