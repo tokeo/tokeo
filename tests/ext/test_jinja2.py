@@ -238,30 +238,30 @@ def test_config_passes_the_fallback_on():
         assert app.template._config('missing', fallback='fallback') == 'fallback'
 
 
-# tokeo_jinja2_config
+# tokeo_jinja2_extend_app
 
 
-def test_tokeo_jinja2_config_adds_a_template_dir_given_as_str(tmp_path):
+def test_tokeo_jinja2_extend_app_adds_a_template_dir_given_as_str(tmp_path):
     """A str in jinja2.template_dirs is added as template dir."""
     templates = _write_templates(tmp_path / 'templates')
     with Jinja2Test({'template_dirs': templates}) as app:
         assert app._meta.template_dirs == [templates]
 
 
-def test_tokeo_jinja2_config_adds_template_dirs_given_as_list(tmp_path):
+def test_tokeo_jinja2_extend_app_adds_template_dirs_given_as_list(tmp_path):
     """The dirs of a list in jinja2.template_dirs are added in their order."""
     templates = [_write_templates(tmp_path / 'one'), _write_templates(tmp_path / 'two')]
     with Jinja2Test({'template_dirs': templates}) as app:
         assert app._meta.template_dirs == templates
 
 
-def test_tokeo_jinja2_config_adds_no_template_dir_for_none():
+def test_tokeo_jinja2_extend_app_adds_no_template_dir_for_none():
     """jinja2.template_dirs None adds no template dir."""
     with Jinja2Test() as app:
         assert app._meta.template_dirs == []
 
 
-def test_tokeo_jinja2_config_dirs_come_after_the_template_dirs_of_the_app(tmp_path):
+def test_tokeo_jinja2_extend_app_dirs_come_after_the_template_dirs_of_the_app(tmp_path):
     """A template of the app's own template_dirs wins over one of jinja2."""
     own = _write_templates(tmp_path / 'own', hello='own')
     configured = _write_templates(tmp_path / 'configured', hello='configured')
@@ -270,7 +270,7 @@ def test_tokeo_jinja2_config_dirs_come_after_the_template_dirs_of_the_app(tmp_pa
         assert app.render({}, 'hello.jinja2', out=None) == 'own'
 
 
-def test_tokeo_jinja2_config_takes_template_dirs_of_a_yaml_file(tmp_path):
+def test_tokeo_jinja2_extend_app_takes_template_dirs_of_a_yaml_file(tmp_path):
     """A yaml list in jinja2.template_dirs is added as template dirs."""
     templates = [_write_templates(tmp_path / 'one'), _write_templates(tmp_path / 'two')]
     config = tmp_path / 'config.yaml'

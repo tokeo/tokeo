@@ -220,7 +220,7 @@ class TokeoJinja2TemplateHandler(Jinja2TemplateHandler):
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
 
-def tokeo_jinja2_config(app):
+def tokeo_jinja2_extend_app(app):
     """
     Configure Jinja2 for the Tokeo application.
 
@@ -271,7 +271,7 @@ def load(app):
         the application has only the dummy handlers of cement
 
     """
-    app.hook.register('post_setup', tokeo_jinja2_config)
+    app.hook.register('post_setup', tokeo_jinja2_extend_app)
     app.handler.register(TokeoJinja2OutputHandler)
     app.handler.register(TokeoJinja2TemplateHandler)
     # jinja2 becomes the default, a handler the app chose itself stays
