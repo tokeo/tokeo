@@ -105,13 +105,13 @@ class Participant:
         self.app.log.warning = lambda msg, **kw: self.record_lost(msg)
 
     def make_tempered(self, name, count):
-        @self.app.cache.locks.temper(count=count, name=name, sleep_time=0.005, verbose=False)
+        @self.app.cache.locks.temper(max_calls=count, name=name, sleep_seconds=0.005, verbose=False)
         def job(hold):
             start = time.time()
             time.sleep(hold)
             return start, time.time()
 
-        @self.app.cache.locks.temper(count=count, name=name, cb_on_locked=lambda **kw: None, verbose=False)
+        @self.app.cache.locks.temper(max_calls=count, name=name, cb_on_locked=lambda **kw: None, verbose=False)
         def job_or_skip(hold):
             return job.__wrapped__(hold)
 

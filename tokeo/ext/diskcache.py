@@ -32,7 +32,7 @@ suitable for web applications, microservices, and other distributed systems.
         # Limited to 5 calls per minute
         return make_external_api_request(resource_id)
 
-    @app.cache.locks.temper(count=3)
+    @app.cache.locks.temper(max_calls=3)
     def heavy_operation(data):
         # Limited to 3 concurrent executions
         return process_large_dataset(data)
@@ -162,13 +162,13 @@ class TokeoDiskCacheLocksHandler:
     - **cache** (diskcache.Cache): The diskcache.Cache instance to use
     - **tag** (str): Tag to identify locks in the cache
     - **key_prefix** (str): Prefix for lock keys
-    - **sleep_time** (float, optional): Seconds a waiting ```lock``` or
+    - **sleep_seconds** (float, optional): Seconds a waiting ```lock``` or
         ```temper``` call sleeps between two checks of the cache. Defaults
         to 0.1.
 
     ### Raises
 
-    - **ValueError**: If sleep_time is not a number greater than 0
+    - **ValueError**: If sleep_seconds is not a number greater than 0
 
     ### Notes
 
@@ -177,20 +177,20 @@ class TokeoDiskCacheLocksHandler:
         lock on sooner when few calls wait, at the cost of more checks; many
         waiting calls hand it on quickly anyway.
 
-    : ```throttle``` does not use sleep_time, it waits exactly until its
+    : ```throttle``` does not use sleep_seconds, it waits exactly until its
         next token.
 
     """
 
-    def __init__(self, app, cache, tag, key_prefix, sleep_time=0.1):
+    def __init__(self, app, cache, tag, key_prefix, sleep_seconds=0.1):
         #: The Cement application instance
         self.app = app
         self._cache = cache
         self._tag = tag
         self._key_prefix = key_prefix
-        if not is_number_gt(sleep_time, 0):
-            raise ValueError(_ERR_SECONDS_GT_0.format('sleep_time', sleep_time))
-        self._sleep_time = sleep_time
+        if not is_number_gt(sleep_seconds, 0):
+            raise ValueError(_ERR_SECONDS_GT_0.format('sleep_seconds', sleep_seconds))
+        self._sleep_seconds = sleep_seconds
 
     # ---- purge --------------------------------------------------------------
 
@@ -284,7 +284,7 @@ class TokeoDiskCacheLocksHandler:
         return lock.locked()
 
     @contextmanager
-    def lock(self, key, expire=3600, sleep_time=None):
+    def lock(self, key, expire=3600, sleep_seconds=None):
         """
         Context manager for acquiring and releasing a lock.
 
@@ -297,9 +297,9 @@ class TokeoDiskCacheLocksHandler:
         - **expire** (float, optional): Seconds after which the lock expires,
             also when its holder died within the block. Must be longer than
             the block runs. Defaults to 3600.
-        - **sleep_time** (float, optional): Seconds to wait between two checks
+        - **sleep_seconds** (float, optional): Seconds to wait between two checks
             while the lock is held by another. Defaults to the config
-            ```locks_sleep_time```, 0.1.
+            ```locks_sleep_seconds```, 0.1.
 
         ### Yields
 
@@ -330,9 +330,9 @@ class TokeoDiskCacheLocksHandler:
         key = self._key_prefix + key
         # the own token tells on release whether the lock is still ours
         token = uuid.uuid4().hex
-        sleep_time = self._sleep_time if sleep_time is None else sleep_time
+        sleep_seconds = self._sleep_seconds if sleep_seconds is None else sleep_seconds
         while not self._cache.add(key, token, expire=expire, tag=self._tag, retry=True):
-            time.sleep(sleep_time)
+            time.sleep(sleep_seconds)
         try:
             yield
         finally:
@@ -545,12 +545,12 @@ class TokeoDiskCacheLocksHandler:
 
     def temper(
         self,
-        count=1,
+        max_calls=1,
         name=None,
         name_format=None,
         expire=3600,
         sleep_func=time.sleep,
-        sleep_time=None,
+        sleep_seconds=None,
         cb_on_locked=None,
         verbose=False,
     ):
@@ -567,7 +567,7 @@ class TokeoDiskCacheLocksHandler:
 
         The decorator keeps the sorted expire times of the holders. Acquiring a
         slot drops the past expire times and adds its own, now plus expire,
-        when fewer than count are left; finishing the call removes its own
+        when fewer than max_calls are left; finishing the call removes its own
         expire time again. A holder that was killed keeps its slot only until
         its own expire time. When no slot is free, the call either waits and
         retries or, if cb_on_locked is set, runs that callback instead of
@@ -575,7 +575,7 @@ class TokeoDiskCacheLocksHandler:
 
         ### Args
 
-        - **count** (int): Maximum number of concurrent calls allowed, at
+        - **max_calls** (int): Maximum number of concurrent calls allowed, at
             least 1. Defaults to 1.
         - **name** (str, optional): Custom cache key name for this temper
             instance.
@@ -587,8 +587,8 @@ class TokeoDiskCacheLocksHandler:
             waiting for a free slot. Defaults to time.sleep. If falsy and
             no cb_on_locked is set, a blocked call returns immediately
             without running the wrapped function.
-        - **sleep_time** (float, optional): Seconds to wait between retries
-            while blocked. Defaults to the config ```locks_sleep_time```, 0.1.
+        - **sleep_seconds** (float, optional): Seconds to wait between retries
+            while blocked. Defaults to the config ```locks_sleep_seconds```, 0.1.
         - **cb_on_locked** (callable, optional): Function to call when no
             slot is free, instead of waiting. It receives the unpacked
             function arguments and never consumes a slot.
@@ -602,13 +602,13 @@ class TokeoDiskCacheLocksHandler:
 
         ### Raises
 
-        - **ValueError**: If count is not an integer greater than 0, expire
-            or sleep_time not a number greater than 0
+        - **ValueError**: If max_calls is not an integer greater than 0, expire
+            or sleep_seconds not a number greater than 0
 
         ### Example
 
         ```python
-        @app.cache.locks.temper(count=3)
+        @app.cache.locks.temper(max_calls=3)
         def resource_intensive_operation(data):
             # At most 3 instances of this function can run concurrently
             # across all processes/threads that share the same cache
@@ -653,14 +653,14 @@ class TokeoDiskCacheLocksHandler:
             release of a call that lost it.
 
         """
-        if not is_int_gt(count, 0):
-            raise ValueError(_ERR_INT_GT_0.format('count', count))
+        if not is_int_gt(max_calls, 0):
+            raise ValueError(_ERR_INT_GT_0.format('max_calls', max_calls))
         if not is_number_gt(expire, 0):
             raise ValueError(_ERR_SECONDS_GT_0.format('expire', expire))
-        if sleep_time is None:
-            sleep_time = self._sleep_time
-        elif not is_number_gt(sleep_time, 0):
-            raise ValueError(_ERR_SECONDS_GT_0.format('sleep_time', sleep_time))
+        if sleep_seconds is None:
+            sleep_seconds = self._sleep_seconds
+        elif not is_number_gt(sleep_seconds, 0):
+            raise ValueError(_ERR_SECONDS_GT_0.format('sleep_seconds', sleep_seconds))
 
         def decorator(func):
             # create the full name of the @decorated function
@@ -711,7 +711,7 @@ class TokeoDiskCacheLocksHandler:
                         # drop the past expire times, they block temper otherwise
                         del expire_times[:expired]
                         # check for a free slot
-                        acquired = len(expire_times) < count
+                        acquired = len(expire_times) < max_calls
                         if acquired:
                             # add our own expire time to the sorted list
                             expire_time = now + expire
@@ -740,7 +740,7 @@ class TokeoDiskCacheLocksHandler:
                         break
 
                     # wait before the next attempt
-                    sleep_func(sleep_time)
+                    sleep_func(sleep_seconds)
 
                 if acquired:
                     try:
@@ -824,7 +824,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
             # Prefix added to all lock keys for namespace isolation
             locks_key_prefix='dc_',
             # Seconds between two checks of a waiting lock or temper call
-            locks_sleep_time=0.1,
+            locks_sleep_seconds=0.1,
         )
 
     #: (TokeoDiskCacheLocksHandler) Handler for locks and rate limiting, set on
@@ -871,7 +871,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         # the connection of this thread when the app is never closed
         weakref.finalize(self, self._cache.close)
         # create a locks handler for cache
-        self.locks = self.locks_handler(
+        self.locks = self.create_locks_handler(
             self._config('locks_tag'),
             self._config('locks_key_prefix'),
         )
@@ -897,7 +897,7 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
-    def locks_handler(self, tag, locks_key_prefix, sleep_time=None):
+    def create_locks_handler(self, tag, key_prefix, sleep_seconds=None):
         """
         Create a new locks handler instance.
 
@@ -907,18 +907,18 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
         ### Args
 
         - **tag** (str): Tag to identify locks in the cache
-        - **locks_key_prefix** (str): Prefix for lock keys
-        - **sleep_time** (float, optional): Seconds between two checks of a
+        - **key_prefix** (str): Prefix for lock keys
+        - **sleep_seconds** (float, optional): Seconds between two checks of a
             waiting ```lock``` or ```temper``` call. Defaults to the config
-            ```locks_sleep_time```.
+            ```locks_sleep_seconds```.
 
         ### Returns
 
         - **TokeoDiskCacheLocksHandler**: The locks handler instance
 
         """
-        sleep_time = self._config('locks_sleep_time') if sleep_time is None else sleep_time
-        return TokeoDiskCacheLocksHandler(self.app, self._cache, tag, locks_key_prefix, sleep_time)
+        sleep_seconds = self._config('locks_sleep_seconds') if sleep_seconds is None else sleep_seconds
+        return TokeoDiskCacheLocksHandler(self.app, self._cache, tag, key_prefix, sleep_seconds)
 
     def get(self, key, default=None, **kw):
         """
@@ -1738,8 +1738,8 @@ def tokeo_diskcache_pdoc_render_decorator(app, func, decorator, args, kwargs):
                 else:
                     params = f'name="{func.name}"'
 
-                if 'count' in kwargs:
-                    params += f', count={kwargs["count"].value}'
+                if 'max_calls' in kwargs:
+                    params += f', max_calls={kwargs["max_calls"].value}'
 
             except Exception:
                 pass
@@ -1771,10 +1771,10 @@ def load(app):
     app.handler.register(TokeoDiskCacheCacheHandler)
     app.handler.register(TokeoDiskCacheController)
     app.hook.register('tokeo_pdoc_render_decorator', tokeo_diskcache_pdoc_render_decorator)
-    app.hook.register('pre_close', tokeo_diskcache_pre_close)
+    app.hook.register('pre_close', tokeo_diskcache_shutdown)
 
 
-def tokeo_diskcache_pre_close(app):
+def tokeo_diskcache_shutdown(app):
     """
     Close the connection of the app to the cache when the app closes.
 

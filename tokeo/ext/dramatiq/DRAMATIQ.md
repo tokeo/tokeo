@@ -629,7 +629,7 @@ def call_api(resource_id):
 
 
 @app.dramatiq.actor(queue_name='exports')
-@app.dramatiq.locks.temper(count=2)                       # at most 2 at once
+@app.dramatiq.locks.temper(max_calls=2)                   # at most 2 at once
 def export(customer_id):
     ...
 ```
@@ -642,7 +642,7 @@ starts, ```dramatiq locks --purge``` does it by hand. Neither runs while another
 instance of the same machine still holds its locks.
 
 A call that waits for a lock or a free slot of ```temper``` checks the cache
-every ```locks_sleep_time``` seconds (section 7), ```sleep_time``` of the call
+every ```locks_sleep_time``` seconds (section 7), ```sleep_seconds``` of the call
 overrides it.
 
 ## 11. Errors

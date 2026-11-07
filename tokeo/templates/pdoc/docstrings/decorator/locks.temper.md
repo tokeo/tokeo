@@ -17,7 +17,7 @@ expire time, now plus expire, and removes it when the function completes.
 
 ### Args
 
-- **count** (int): Maximum number of concurrent calls allowed, at least 1
+- **max_calls** (int): Maximum number of concurrent calls allowed, at least 1
 - **name** (str, optional): Custom cache key name for this temper instance
 - **name_format** (str, optional): Format string to generate key name based on function
     arguments
@@ -25,6 +25,8 @@ expire time, now plus expire, and removes it when the function completes.
     the longest call. Defaults to 3600.
 - **sleep_func** (callable, optional): Sleep function on resource limit. Defaults to
     time.sleep.
+- **sleep_seconds** (float, optional): Seconds to wait between retries while
+    blocked. Defaults to the config ```locks_sleep_seconds```, 0.1.
 - **cb_on_locked** (callable, optional): Function to call on limit instead of
     waiting
 - **verbose** (bool, optional): Whether to log tempering information. Defaults to
@@ -37,7 +39,7 @@ expire time, now plus expire, and removes it when the function completes.
 ### Example
 
 ```python
-@app.cache.locks.temper(count=3)
+@app.cache.locks.temper(max_calls=3)
 def resource_intensive_operation(data):
     # At most 3 instances of this function can run concurrently
     # across all processes/threads that share the same cache
@@ -57,7 +59,7 @@ def resource_intensive_operation(data):
     ```@timelimit``` or the time_limit of a dramatiq actor
 
 : Unlike throttle, temper has a fixed delay when blocked
-    (0.05 seconds by default)
+    (sleep_seconds, 0.1 seconds by default)
 
 : The function will automatically restore slots when complete, ensuring
     resources become available again

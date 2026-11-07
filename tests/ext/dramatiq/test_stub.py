@@ -258,7 +258,7 @@ def test_locks_temper_keeps_worker_threads_apart(tmp, start_worker):
         runs = []
 
         @app.dramatiq.actor(actor_name='export')
-        @app.dramatiq.locks.temper(count=1, name='export', verbose=False)
+        @app.dramatiq.locks.temper(max_calls=1, name='export', verbose=False)
         def export(value):
             start = time.monotonic()
             time.sleep(0.05)

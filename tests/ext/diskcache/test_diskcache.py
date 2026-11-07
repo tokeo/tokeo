@@ -31,7 +31,7 @@ def _temper_worker(directory, count, hold, result_queue):
     try:
         with DiskcacheTest(directory) as app:
 
-            @app.cache.locks.temper(count=count, name='mp_temper', verbose=False)
+            @app.cache.locks.temper(max_calls=count, name='mp_temper', verbose=False)
             def job():
                 start = time.time()
                 time.sleep(hold)
@@ -93,7 +93,7 @@ def test_connections_of_threads_close_after_temper_and_throttle(tmp, monkeypatch
     connections = Connections(monkeypatch)
     with DiskcacheTest(tmp.dir) as app:
 
-        @app.cache.locks.temper(count=4, name='threads', verbose=False)
+        @app.cache.locks.temper(max_calls=4, name='threads', verbose=False)
         def tempered():
             return 'ran'
 
@@ -240,30 +240,30 @@ def _collect_sleeps_of_a_waiting_lock(app, monkeypatch, **kw):
     return slept
 
 
-def test_locks_lock_waits_by_locks_sleep_time(tmp, monkeypatch):
+def test_locks_lock_waits_by_locks_sleep_seconds(tmp, monkeypatch):
     """A waiting lock sleeps 0.1 seconds, unless the config or call set it."""
     with DiskcacheTest(tmp.dir) as app:
         assert _collect_sleeps_of_a_waiting_lock(app, monkeypatch) == [0.1]
-        assert _collect_sleeps_of_a_waiting_lock(app, monkeypatch, sleep_time=0.01) == [0.01]
-    with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_time': 0.2}) as app:
+        assert _collect_sleeps_of_a_waiting_lock(app, monkeypatch, sleep_seconds=0.01) == [0.01]
+    with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_seconds': 0.2}) as app:
         assert _collect_sleeps_of_a_waiting_lock(app, monkeypatch) == [0.2]
 
 
-def test_temper_waits_by_locks_sleep_time(tmp):
-    """A blocked temper call sleeps locks_sleep_time of the config by default."""
+def test_temper_waits_by_locks_sleep_seconds(tmp):
+    """A blocked temper call sleeps locks_sleep_seconds of the config by default."""
     slept = []
 
     def sleep(seconds):
         slept.append(seconds)
         raise RuntimeError('stop waiting')
 
-    with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_time': 0.2}) as app:
+    with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_seconds': 0.2}) as app:
 
-        @app.cache.locks.temper(count=1, name='busy', sleep_func=sleep, verbose=False)
+        @app.cache.locks.temper(max_calls=1, name='busy', sleep_func=sleep, verbose=False)
         def inner():
             pass
 
-        @app.cache.locks.temper(count=1, name='busy', verbose=False)
+        @app.cache.locks.temper(max_calls=1, name='busy', verbose=False)
         def outer():
             # the slot is taken by outer, inner has to wait
             with pytest.raises(RuntimeError):
@@ -273,11 +273,11 @@ def test_temper_waits_by_locks_sleep_time(tmp):
     assert slept == [0.2]
 
 
-@pytest.mark.parametrize('sleep_time', [0, -1, True, '0.05'], ids=['zero', 'negative', 'bool', 'str'])
-def test_locks_sleep_time_must_be_a_number_greater_than_0(tmp, sleep_time):
-    """A locks_sleep_time not greater than 0 stops the setup of the cache."""
-    with pytest.raises(ValueError, match='sleep_time must be a number of seconds greater than 0'):
-        with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_time': sleep_time}):
+@pytest.mark.parametrize('sleep_seconds', [0, -1, True, '0.05'], ids=['zero', 'negative', 'bool', 'str'])
+def test_locks_sleep_seconds_must_be_a_number_greater_than_0(tmp, sleep_seconds):
+    """A locks_sleep_seconds not greater than 0 stops the setup of the cache."""
+    with pytest.raises(ValueError, match='sleep_seconds must be a number of seconds greater than 0'):
+        with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_seconds': sleep_seconds}):
             pass
 
 
@@ -288,7 +288,7 @@ def test_temper_acquire_and_release(tmp):
     """A call runs, returns its result and gives its slot back."""
     with DiskcacheTest(tmp.dir) as app:
 
-        @app.cache.locks.temper(count=1, name='single', verbose=False)
+        @app.cache.locks.temper(max_calls=1, name='single', verbose=False)
         def job():
             return 'ran'
 
@@ -307,7 +307,7 @@ def test_temper_callback_when_no_slot(tmp):
         release = threading.Event()
 
         @app.cache.locks.temper(
-            count=1,
+            max_calls=1,
             name='mutex',
             cb_on_locked=lambda **kw: 'locked',
             verbose=False,
@@ -334,7 +334,7 @@ def test_temper_releases_on_exception(tmp):
     """An exception in the function still gives the slot back."""
     with DiskcacheTest(tmp.dir) as app:
 
-        @app.cache.locks.temper(count=1, name='boom', verbose=False)
+        @app.cache.locks.temper(max_calls=1, name='boom', verbose=False)
         def boom():
             raise ValueError('intended failure')
 
@@ -344,7 +344,7 @@ def test_temper_releases_on_exception(tmp):
         # the slot must be released despite the exception
         assert app.cache.get('dc_boom') is None
 
-        @app.cache.locks.temper(count=1, name='boom', verbose=False)
+        @app.cache.locks.temper(max_calls=1, name='boom', verbose=False)
         def job():
             return 'ran'
 
@@ -353,7 +353,7 @@ def test_temper_releases_on_exception(tmp):
 
 
 def test_temper_thread_max_concurrency(tmp):
-    """Of 8 threads with count 2 never more than 2 run at once."""
+    """Of 8 threads with max_calls 2 never more than 2 run at once."""
     count = 2
     workers = 8
     with DiskcacheTest(tmp.dir) as app:
@@ -361,9 +361,9 @@ def test_temper_thread_max_concurrency(tmp):
         guard = threading.Lock()
 
         @app.cache.locks.temper(
-            count=count,
+            max_calls=count,
             name='threads',
-            sleep_time=0.01,
+            sleep_seconds=0.01,
             verbose=False,
         )
         def job():
@@ -382,7 +382,7 @@ def test_temper_thread_max_concurrency(tmp):
 
 
 def test_temper_process_max_concurrency(tmp):
-    """Of 6 processes with count 2 never more than 2 run at once."""
+    """Of 6 processes with max_calls 2 never more than 2 run at once."""
     count = 2
     workers = 6
     ctx = get_spawn_context()
@@ -617,7 +617,7 @@ def test_temper_holds_its_slot_by_an_expire_time(tmp):
     """A call holds one expire time of now plus expire, the key lives as long."""
     with DiskcacheTest(tmp.dir) as app:
 
-        @app.cache.locks.temper(count=2, name='expire_time', expire=60, verbose=False)
+        @app.cache.locks.temper(max_calls=2, name='expire_time', expire=60, verbose=False)
         def job():
             return app.cache.get('dc_expire_time'), _get_expire_seconds(app, 'dc_expire_time')
 
@@ -636,7 +636,7 @@ def test_temper_drops_an_expired_holder_while_others_run(tmp, monkeypatch):
         # count 2 is full: a killed holder and one still running
         app.cache.set('dc_dead', [now - 1, now + 100], expire=100)
 
-        @app.cache.locks.temper(count=2, name='dead', cb_on_locked=lambda **kw: 'locked', verbose=False)
+        @app.cache.locks.temper(max_calls=2, name='dead', cb_on_locked=lambda **kw: 'locked', verbose=False)
         def job():
             return len(app.cache.get('dc_dead'))
 
@@ -652,7 +652,7 @@ def test_temper_key_lives_until_the_latest_expire_time(tmp):
         # another call with expire 3600 holds a slot under the same name
         app.cache.set('dc_shared', [now + 3600], expire=3600)
 
-        @app.cache.locks.temper(count=2, name='shared', expire=60, verbose=False)
+        @app.cache.locks.temper(max_calls=2, name='shared', expire=60, verbose=False)
         def job():
             return _get_expire_seconds(app, 'dc_shared')
 
@@ -694,20 +694,20 @@ def test_temper_takes_another_value_as_no_holder(tmp, value):
         assert app.cache.get('dc_other') is None
 
 
-@pytest.mark.parametrize('sleep_time', [0, -1, True, '0.1', float('inf')], ids=['zero', 'negative', 'bool', 'str', 'inf'])
-def test_temper_sleep_time_must_be_a_number_greater_than_0(tmp, sleep_time):
-    """temper refuses an own sleep_time that is no number greater than 0."""
+@pytest.mark.parametrize('sleep_seconds', [0, -1, True, '0.1', float('inf')], ids=['zero', 'negative', 'bool', 'str', 'inf'])
+def test_temper_sleep_seconds_must_be_a_number_greater_than_0(tmp, sleep_seconds):
+    """temper refuses an own sleep_seconds that is no number greater than 0."""
     with DiskcacheTest(tmp.dir) as app:
-        with pytest.raises(ValueError, match='sleep_time must be a number of seconds greater than 0'):
-            app.cache.locks.temper(sleep_time=sleep_time)
+        with pytest.raises(ValueError, match='sleep_seconds must be a number of seconds greater than 0'):
+            app.cache.locks.temper(sleep_seconds=sleep_seconds)
 
 
-@pytest.mark.parametrize('count', [0, -1, True, 1.5, '2'], ids=['zero', 'negative', 'bool', 'float', 'str'])
-def test_temper_count_must_be_an_integer_greater_than_0(tmp, count):
-    """temper refuses a count that is no integer greater than 0."""
+@pytest.mark.parametrize('max_calls', [0, -1, True, 1.5, '2'], ids=['zero', 'negative', 'bool', 'float', 'str'])
+def test_temper_max_calls_must_be_an_integer_greater_than_0(tmp, max_calls):
+    """temper refuses a max_calls that is no integer greater than 0."""
     with DiskcacheTest(tmp.dir) as app:
-        with pytest.raises(ValueError, match='count must be an integer greater than 0'):
-            app.cache.locks.temper(count=count)
+        with pytest.raises(ValueError, match='max_calls must be an integer greater than 0'):
+            app.cache.locks.temper(max_calls=max_calls)
 
 
 @pytest.mark.parametrize('text, value', [('False', False), ('no', False), ('0', False), ('True', True), ('on', True)])

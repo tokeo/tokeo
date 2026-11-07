@@ -362,12 +362,12 @@ class TokeoDramatiq(MetaMixin):
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
         # initialize locks handler
         self._locks = None
-        # only attach locks when diskcache provides locks_handler; other
+        # only attach locks when diskcache provides create_locks_handler; other
         # cache backends (memcached, etc.) don't expose that method, so
         # we skip silently and rely on the locks property to raise on use
         if getattr(self.app._meta, 'cache_handler', None):
             try:
-                self._locks = self.app.cache.locks_handler(
+                self._locks = self.app.cache.create_locks_handler(
                     self._config('locks_tag'),
                     self._config('locks_key_prefix'),
                     self._config('locks_sleep_time'),
