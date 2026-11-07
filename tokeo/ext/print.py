@@ -27,13 +27,13 @@ app.print("Section start", divider="-", name="section-header")
 
 # Detailed object inspection
 user = {'name': 'John', 'age': 30}
-app.inspect(user, methods=True, attributes=True)
+app.inspect(user, with_methods=True, with_attributes=True)
 
 # Inspect multiple objects with type information
-app.inspect(user, "string value", 42, types=True)
+app.inspect(user, "string value", 42, with_types=True)
 
 # Debug output
-app.inspect(complex_object, debug=True)
+app.inspect(complex_object, with_debug_log=True)
 ```
 
 """
@@ -88,12 +88,12 @@ def register_tokeo_print(app):
     def _inspect(
         *args,
         name=None,
-        system=False,
-        methods=False,
-        attributes=False,
-        values=True,
-        types=True,
-        debug=False,
+        with_system=False,
+        with_methods=False,
+        with_attributes=False,
+        with_values=True,
+        with_types=True,
+        with_debug_log=False,
         divider=None,
     ):
         """
@@ -106,13 +106,14 @@ def register_tokeo_print(app):
 
         - **args**: Objects to inspect
         - **name** (str, optional): Name to identify this inspection in output
-        - **system** (bool): Whether to include system methods/attributes
+        - **with_system** (bool): Whether to include system methods/attributes
             (those whose name starts and ends with __)
-        - **methods** (bool): Whether to display object methods
-        - **attributes** (bool): Whether to display object attributes
-        - **values** (bool): Whether to display object values
-        - **types** (bool): Whether to display object types
-        - **debug** (bool): Whether to output to debug log instead of stdout
+        - **with_methods** (bool): Whether to display object methods
+        - **with_attributes** (bool): Whether to display object attributes
+        - **with_values** (bool): Whether to display object values
+        - **with_types** (bool): Whether to display object types
+        - **with_debug_log** (bool): Whether to output to debug log instead of
+            stdout
         - **divider** (str, optional): Character to use for divider line
             (prints 40 of these)
 
@@ -121,12 +122,12 @@ def register_tokeo_print(app):
             dict(
                 args=args,
                 name=name,
-                system=system,
-                methods=methods,
-                attributes=attributes,
-                values=values,
-                types=types,
-                debug=debug,
+                with_system=with_system,
+                with_methods=with_methods,
+                with_attributes=with_attributes,
+                with_values=with_values,
+                with_types=with_types,
+                with_debug_log=with_debug_log,
                 divider=divider,
             ),
             # the current stdout, render binds its default on import
@@ -363,11 +364,11 @@ class TokeoInspectOutputHandler(output.OutputHandler):
         self,
         args,
         name=None,
-        system=False,
-        methods=False,
-        attributes=False,
-        values=True,
-        types=True,
+        with_system=False,
+        with_methods=False,
+        with_attributes=False,
+        with_values=True,
+        with_types=True,
         divider=None,
     ):
         """
@@ -381,12 +382,12 @@ class TokeoInspectOutputHandler(output.OutputHandler):
 
         - **args** (tuple): Objects to inspect
         - **name** (str, optional): Optional name for the inspection
-        - **system** (bool): Whether to include system methods/attributes
+        - **with_system** (bool): Whether to include system methods/attributes
             (those whose name starts and ends with __)
-        - **methods** (bool): Whether to display object methods
-        - **attributes** (bool): Whether to display object attributes
-        - **values** (bool): Whether to display object values
-        - **types** (bool): Whether to display object types
+        - **with_methods** (bool): Whether to display object methods
+        - **with_attributes** (bool): Whether to display object attributes
+        - **with_values** (bool): Whether to display object values
+        - **with_types** (bool): Whether to display object types
         - **divider** (str, optional): Character to use for divider line
 
         ### Returns
@@ -419,23 +420,23 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             line = prepend
             prepend = ''
             # add value content
-            if name or values:
+            if name or with_values:
                 if name:
                     line += f'Inspect: {name} = '
                 line += f'{arg}'
-                if types:
+                if with_types:
                     t_arg = type(arg).__name__
                     line += f' |:{t_arg}|'
-                if name or methods or attributes:
+                if name or with_methods or with_attributes:
                     prepend = '\n'
-                elif types:
+                elif with_types:
                     prepend = ', '
                 else:
                     prepend = ' | '
             # inspect methods
-            if methods:
+            if with_methods:
                 m_inspect = inspect.getmembers(arg, lambda attr: inspect.isroutine(attr))
-                if system:
+                if with_system:
                     m_system = [m[0] for m in m_inspect if (m[0].startswith('__') and m[0].endswith('__'))]
                     line += f'{prepend}System methods: {m_system}'
                     prepend = '\n'
@@ -443,9 +444,9 @@ class TokeoInspectOutputHandler(output.OutputHandler):
                 line += f'{prepend}Methods: {m_filtered}'
                 prepend = '\n'
             # inspect attributes
-            if attributes:
+            if with_attributes:
                 a_inspect = inspect.getmembers(arg, lambda attr: not (inspect.isroutine(attr)))
-                if system:
+                if with_system:
                     a_system = [a[0] for a in a_inspect if (a[0].startswith('__') and a[0].endswith('__'))]
                     line += f'{prepend}System attributes: {a_system}'
                     prepend = '\n'
@@ -472,12 +473,12 @@ class TokeoInspectOutputHandler(output.OutputHandler):
 
             - args: Objects to inspect
             - name: Optional name for the inspection
-            - system: Whether to include system methods/attributes
-            - methods: Whether to display object methods
-            - attributes: Whether to display object attributes
-            - values: Whether to display object values
-            - types: Whether to display object types
-            - debug: Whether to output to debug log instead of stdout
+            - with_system: Whether to include system methods/attributes
+            - with_methods: Whether to display object methods
+            - with_attributes: Whether to display object attributes
+            - with_values: Whether to display object values
+            - with_types: Whether to display object types
+            - with_debug_log: Whether to output to debug log instead of stdout
             - divider: Character to use for divider line
 
         - **args**: Variable length argument list
@@ -497,8 +498,8 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             dictionary and logs a debug message if it's missing. When rendering,
             it passes the arguments and inspection options to the _inspect method.
 
-        : When the 'debug' flag is set, the inspection results are logged to
-            the debug log instead of being returned for display.
+        : When the 'with_debug_log' flag is set, the inspection results are
+            logged to the debug log instead of being returned for display.
 
         """
         if 'args' in data.keys():
@@ -507,14 +508,14 @@ class TokeoInspectOutputHandler(output.OutputHandler):
             out = self._inspect(
                 data['args'],
                 name=data.get('name'),
-                system=data.get('system', False),
-                methods=data.get('methods', False),
-                attributes=data.get('attributes', False),
-                values=data.get('values', True),
-                types=data.get('types', True),
+                with_system=data.get('with_system', False),
+                with_methods=data.get('with_methods', False),
+                with_attributes=data.get('with_attributes', False),
+                with_values=data.get('with_values', True),
+                with_types=data.get('with_types', True),
                 divider=data.get('divider'),
             )
-            if 'debug' in data.keys() and data['debug'] is not None and data['debug']:
+            if data.get('with_debug_log'):
                 self.app.log.debug(f'>>>\n{out}')
                 return ''
             else:
