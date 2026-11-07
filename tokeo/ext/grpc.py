@@ -89,7 +89,7 @@ class TokeoGrpc(MetaMixin):
         # Defaults of the config section
         config_defaults = dict(
             # address and port to run the service on
-            url='localhost:50051',
+            address='localhost:50051',
             # number of concurrent workers
             max_workers=1,
             # module:method that adds the servicer to the server (generated
@@ -100,17 +100,17 @@ class TokeoGrpc(MetaMixin):
             # module:method that returns the chain of interceptors, optional
             grpc_interceptor=None,
             # tls is opt-in; while disabled no tls code or library is touched
-            tls_enabled=False,
+            tls=False,
             # custom cert: path to the pem file of the cert (both or none)
-            tls_certificate=None,
+            tls_cert_path=None,
             # custom cert: path to the pem file of the key (both or none)
-            tls_key=None,
+            tls_key_path=None,
             # validity for the in-memory auto cert when no custom cert is set
             tls_valid_days=90,
-            # auto cert subject common name (cosmetic); None -> from url host
-            tls_cn=None,
-            # auto cert extra names/ips for SAN (url host is always included)
-            tls_sans=None,
+            # auto cert subject common name (cosmetic); None -> from address host
+            tls_cert_cn=None,
+            # auto cert extra names/ips for SAN (address host is always included)
+            tls_cert_sans=None,
             # auto cert key: 'rsa' (size in bits) or 'ec' (size = curve 256/384),
             # grpc does no tls handshake with a P-521 key
             tls_key_type='ec',
@@ -118,7 +118,7 @@ class TokeoGrpc(MetaMixin):
             tls_key_size=384,
             # client ca: when set, only clients with a valid cert of this ca
             # pass the tls handshake, the interceptors still decide each call
-            tls_client_ca=None,
+            tls_client_ca_path=None,
         )
 
     def __init__(self, app, *args, **kw):
@@ -196,14 +196,14 @@ class TokeoGrpc(MetaMixin):
                 and passes it to the server at construction
             - Registers the servicer with the server using the
                 add_servicer_to_server function
-            - Binds the listen url, either as a TLS secured port when
-                tls_enabled is set or as a plain insecure port otherwise
+            - Binds the listen address, either as a TLS secured port when
+                tls is set or as a plain insecure port otherwise
 
-        : TLS is fully opt-in. With tls_enabled false the server never imports
-            or calls any TLS code. With it true, a custom tls_certificate /
-            tls_key pair is used when both are given, otherwise an in-memory
-            self signed cert (valid for tls_valid_days) is generated and never
-            written to disk
+        : TLS is fully opt-in. With tls false the server never imports
+            or calls any TLS code. With it true, a custom tls_cert_path /
+            tls_key_path pair is used when both are given, otherwise an
+            in-memory self signed cert (valid for tls_valid_days) is generated
+            and never written to disk
 
         """
         if self._server is None:
@@ -219,13 +219,13 @@ class TokeoGrpc(MetaMixin):
                 server = grpc.server(self._executor, interceptors=interceptors)
                 # bind the listen port; tls is opt-in and only that branch pulls
                 # in any tls machinery, so a plain server never touches tls code
-                tls_enabled = self._config('tls_enabled')
-                if not is_bool(tls_enabled):
-                    raise TokeoGrpcError(f'tls_enabled must be true or false, not {tls_enabled!r}')
-                if tls_enabled:
-                    server.add_secure_port(self._config('url'), self._build_tls_server_credentials())
+                tls = self._config('tls')
+                if not is_bool(tls):
+                    raise TokeoGrpcError(f'tls must be true or false, not {tls!r}')
+                if tls:
+                    server.add_secure_port(self._config('address'), self._build_tls_server_credentials())
                 else:
-                    server.add_insecure_port(self._config('url'))
+                    server.add_insecure_port(self._config('address'))
                 # append services
                 proto_add_servicer_to_server(grpc_servicer(), server)
             except Exception as err:
@@ -234,7 +234,7 @@ class TokeoGrpc(MetaMixin):
                 self._executor = None
                 if isinstance(err, TokeoGrpcError):
                     raise
-                raise TokeoGrpcError(f'grpc server could not be built on {self._config("url")}: {err}') from err
+                raise TokeoGrpcError(f'grpc server could not be built on {self._config("address")}: {err}') from err
             # keep the server only once it is complete, a failed build is retried
             self._server = server
 
@@ -245,10 +245,10 @@ class TokeoGrpc(MetaMixin):
         Build the gRPC server credentials for a TLS secured port.
 
         Two modes are selected by configuration: a custom certificate when
-        both tls_certificate and tls_key point to PEM files, otherwise an
-        auto generated in-memory self signed certificate. When tls_client_ca
-        is set, mutual TLS is enabled on top and every client must present a
-        valid cert of that ca.
+        both tls_cert_path and tls_key_path point to PEM files, otherwise an
+        auto generated in-memory self signed certificate. When
+        tls_client_ca_path is set, mutual TLS is enabled on top and every
+        client must present a valid cert of that ca.
 
         ### Returns
 
@@ -256,7 +256,7 @@ class TokeoGrpc(MetaMixin):
 
         ### Raises
 
-        - **TokeoGrpcError**: If only one of tls_certificate / tls_key is set
+        - **TokeoGrpcError**: If only one of tls_cert_path / tls_key_path is set
 
         ### Notes
 
@@ -264,14 +264,14 @@ class TokeoGrpc(MetaMixin):
             things read from disk; the auto cert path keeps everything in
             memory
 
-        : mTLS is opt-in via tls_client_ca and then requires a client cert;
+        : mTLS is opt-in via tls_client_ca_path and then requires a client cert;
             grpc knows no optional client cert, without a ca it asks for none.
             The interceptors decide each call in both cases, with mTLS they
             also get the identity of the client cert
 
         """
-        cert = self._config('tls_certificate')
-        key = self._config('tls_key')
+        cert = self._config('tls_cert_path')
+        key = self._config('tls_key_path')
         if cert and key:
             # custom cert: read the configured pem files as given
             with open(key, 'rb') as f:
@@ -279,12 +279,12 @@ class TokeoGrpc(MetaMixin):
             with open(cert, 'rb') as f:
                 cert_pem = f.read()
         elif cert or key:
-            raise TokeoGrpcError('tls_certificate and tls_key must both be set to use a custom certificate')
+            raise TokeoGrpcError('tls_cert_path and tls_key_path must both be set to use a custom certificate')
         else:
             # auto cert: generate a self signed certificate in memory
             key_pem, cert_pem = self._generate_self_signed_cert()
         # optional mtls: a client ca requires a valid client cert of it
-        ca = self._config('tls_client_ca')
+        ca = self._config('tls_client_ca_path')
         if ca:
             with open(ca, 'rb') as f:
                 ca_pem = f.read()
@@ -318,12 +318,12 @@ class TokeoGrpc(MetaMixin):
         : The cryptography package is imported lazily here, so it stays out
             of the non-tls and custom-cert code paths entirely
 
-        : The host from the url plus every tls_sans entry become SANs, each
-            added as an ip address when it parses as one, otherwise as a dns
-            name; client validation uses these SANs, not the CN
+        : The host from the address plus every tls_cert_sans entry become SANs,
+            each added as an ip address when it parses as one, otherwise as a
+            dns name; client validation uses these SANs, not the CN
 
-        : ```tls_cn``` only sets the (cosmetic) subject common name; when unset the
-            url host is used
+        : ```tls_cert_cn``` only sets the (cosmetic) subject common name; when
+            unset the address host is used
 
         """
         # lazy import: cryptography is only needed for the auto cert path
@@ -334,9 +334,9 @@ class TokeoGrpc(MetaMixin):
         from cryptography.hazmat.primitives import hashes, serialization
         from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
-        # derive the host from a "host:port" url (strip ipv6 brackets); the
+        # derive the host from a "host:port" address (strip ipv6 brackets); the
         # host is both the cn fallback and the first san
-        host = self._config('url').rsplit(':', 1)[0].strip('[]') or 'localhost'
+        host = self._config('address').rsplit(':', 1)[0].strip('[]') or 'localhost'
         # private key: rsa by bit size, or ec by curve (256, 384); the tls of
         # grpc offers no P-521 signature, a P-521 server finds no common one
         key_type = self._config('tls_key_type')
@@ -359,14 +359,14 @@ class TokeoGrpc(MetaMixin):
         else:
             raise TokeoGrpcError(f"tls_key_type '{key_type}' is not supported (use 'rsa' or 'ec')")
 
-        # subject/issuer cn: tls_cn override or the url host
-        cn = self._config('tls_cn') or host
+        # subject/issuer cn: tls_cert_cn override or the address host
+        cn = self._config('tls_cert_cn') or host
         name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
 
-        # build sans from host + tls_sans, dedup, typed as ip or dns name
+        # build sans from host + tls_cert_sans, dedup, typed as ip or dns name
         sans = []
         seen = set()
-        for entry in [host, *as_list(self._config('tls_sans'))]:
+        for entry in [host, *as_list(self._config('tls_cert_sans'))]:
             if not entry or entry in seen:
                 continue
             seen.add(entry)
@@ -454,7 +454,7 @@ class TokeoGrpc(MetaMixin):
 
         """
         self.startup()
-        self.app.log.info('Grpc server started, listening on ' + self._config('url'))
+        self.app.log.info('Grpc server started, listening on ' + self._config('address'))
         try:
             self.server.wait_for_termination()
         except (KeyboardInterrupt, CaughtSignal):
