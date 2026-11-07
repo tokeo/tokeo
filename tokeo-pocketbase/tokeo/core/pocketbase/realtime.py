@@ -36,11 +36,10 @@ with Realtime(pb) as realtime:
     channel connects again after the callbacks caught up
 
 : A lost connection is opened again after a growing delay, up to
-    ```max_delay``` seconds, and the subscriptions are sent again; events
-    in between are lost, reload what you show in ```on_connect```. A
-    connection that served at least ```STABLE_SECONDS``` and was ended by
-    the server is opened again at once, so the gap is only the time to
-    connect
+    ```max_delay_seconds```, and the subscriptions are sent again; events in
+    between are lost, reload what you show in ```on_connect```. A connection
+    that served at least ```MIN_STABLE_SECONDS``` and was ended by the server
+    is opened again at once, so the gap is only the time to connect
 
 : PocketBase ends a connection without events after 5 minutes, any one
     after 30 minutes, the channel then connects again; a connection silent
@@ -48,7 +47,7 @@ with Realtime(pb) as realtime:
     went away without closing it
 
 : PocketBase takes a refused token as a guest, without an error. Before it
-    sends its subscriptions and every ```auth_check``` seconds the channel
+    sends its subscriptions and every ```auth_check_seconds``` the channel
     makes sure the login holds, by ```confirm_login()```; a login that
     cannot be confirmed hangs up the channel with an error instead of a
     silent guest
@@ -89,7 +88,7 @@ MAX_SUBSCRIPTIONS = 1000
 #: the server ended it, e.g. after its idle or its longest time; a shorter
 #: one waits the growing delay, so a server ending each connection at once
 #: is not asked without pause
-STABLE_SECONDS = 10.0
+MIN_STABLE_SECONDS = 10.0
 
 #: The states of a channel: live while connected with its subscriptions
 #: sent, connecting while it tries, stopped before start and after stop
@@ -99,7 +98,7 @@ STATUSES = ('live', 'connecting', 'stopped')
 _CONNECTED = object()
 
 
-def topic_key(topic, options=None):
+def format_topic_key(topic, options=None):
     """
     Build the name of a subscription, the topic with its options.
 
@@ -227,19 +226,19 @@ class _Subscriptions:
         self.on_connect = None
         #: The id PocketBase gave the current connection
         self.client_id = None
-        #: The logins of the client when the subscriptions were sent last
-        self.logins = None
+        #: The login count of the client when the subscriptions were sent last
+        self.login_cnt = None
 
     def add(self, topic, callback, options):
         # add a callback, True when the subscription is new
-        key = topic_key(topic, options)
+        key = format_topic_key(topic, options)
         new = key not in self.callbacks
         self.callbacks.setdefault(key, []).append(callback)
         return new
 
     def remove(self, topic, callback, options):
         # remove one callback or all of a subscription, True when it is gone
-        key = topic_key(topic, options)
+        key = format_topic_key(topic, options)
         if key not in self.callbacks:
             return False
         if callback is not None and callback in self.callbacks[key]:
@@ -264,13 +263,13 @@ class Realtime:
 
     ### Keyword Args
 
-    - **max_delay** (float): The longest delay in seconds before a new try
+    - **max_delay_seconds** (float): The longest delay in seconds before a new try
         to connect, also the pause after the callbacks fell behind
     - **read_timeout** (float): Seconds without data until a connection
         counts as lost
     - **max_pending** (int): The events that may wait for the callbacks
         before the channel hangs up, at least 1
-    - **auth_check** (float): Seconds between two checks that the login
+    - **auth_check_seconds** (float): Seconds between two checks that the login
         still holds
 
     ### Notes
@@ -287,21 +286,21 @@ class Realtime:
 
     """
 
-    def __init__(self, client, max_delay=30.0, read_timeout=READ_TIMEOUT, max_pending=1000, auth_check=60.0):
+    def __init__(self, client, max_delay_seconds=30.0, read_timeout=READ_TIMEOUT, max_pending=1000, auth_check_seconds=60.0):
         if max_pending < 1:
             raise ValueError('max_pending must be at least 1')
         #: The client whose login the channel uses
         self.client = client
         #: The longest delay in seconds before a new try to connect
-        self.max_delay = max_delay
+        self.max_delay_seconds = max_delay_seconds
         #: Seconds without data until a connection counts as lost
         self.read_timeout = read_timeout
         #: The events that may wait for the callbacks before the channel hangs up
         self.max_pending = max_pending
         #: Seconds between two checks that the login still holds
-        self.auth_check = auth_check
+        self.auth_check_seconds = auth_check_seconds
         #: Set while a connection is open and its subscriptions are sent
-        self.connected = threading.Event()
+        self.connected_event = threading.Event()
         #: The last failure of the channel, None since it connected
         self.error = None
         self._subscriptions = _Subscriptions()
@@ -335,7 +334,7 @@ class Realtime:
     @property
     def status(self):
         """The state of the channel, one of ```STATUSES```."""
-        if self.connected.is_set():
+        if self.connected_event.is_set():
             return 'live'
         return 'stopped' if self._thread is None else 'connecting'
 
@@ -361,7 +360,7 @@ class Realtime:
 
         """
         with self._lock:
-            if self._subscriptions.add(topic, callback, options) and self.connected.is_set():
+            if self._subscriptions.add(topic, callback, options) and self.connected_event.is_set():
                 self._send_subscriptions()
         return self
 
@@ -381,7 +380,7 @@ class Realtime:
 
         """
         with self._lock:
-            if self._subscriptions.remove(topic, callback, options) and self.connected.is_set():
+            if self._subscriptions.remove(topic, callback, options) and self.connected_event.is_set():
                 self._send_subscriptions()
         return self
 
@@ -439,7 +438,7 @@ class Realtime:
                 thread.join(timeout)
         self._thread = self._dispatcher = None
         self._response = None
-        self.connected.clear()
+        self.connected_event.clear()
 
     def _close_connection(self):
         # end the current connection at once; a read blocked on its socket
@@ -458,7 +457,7 @@ class Realtime:
         # with the lock held: confirm the login, then set all subscriptions
         confirm_login(self.client)
         self.client._send('POST', REALTIME_PATH, json=self._subscriptions.body())
-        self._subscriptions.logins = self.client.logins
+        self._subscriptions.login_cnt = self.client.login_cnt
 
     def _run(self, stop, http, pending):
         # reader: connect, read and connect again until stopped
@@ -478,14 +477,14 @@ class Realtime:
                     LOG.warning('pocketbase realtime: %s', self.error)
             if stop.is_set():
                 return
-            served = is_ended and self.connected.is_set() and time.monotonic() - start_time >= STABLE_SECONDS
-            self.connected.clear()
+            served = is_ended and self.connected_event.is_set() and time.monotonic() - start_time >= MIN_STABLE_SECONDS
+            self.connected_event.clear()
             # the server ended a connection that served: connect at once
             if served:
                 continue
-            if stop.wait(self.max_delay if overflow else self._delay):
+            if stop.wait(self.max_delay_seconds if overflow else self._delay):
                 return
-            self._delay = min(self._delay * 2, self.max_delay)
+            self._delay = min(self._delay * 2, self.max_delay_seconds)
 
     def _listen(self, stop, http, pending):
         # one connection: subscribe on its connect event, then queue the
@@ -512,7 +511,7 @@ class Realtime:
                             return False
                         self._subscriptions.client_id = data['clientId']
                         self._send_subscriptions()
-                        self.connected.set()
+                        self.connected_event.set()
                     self.error = None
                     # a connection that came up starts the delays anew
                     self._delay = 0.5
@@ -531,7 +530,7 @@ class Realtime:
         # dispatcher: hand each event to its callbacks, check the login
         last_check_time = time.monotonic()
         while not stop.is_set():
-            if self.connected.is_set() and time.monotonic() - last_check_time >= self.auth_check:
+            if self.connected_event.is_set() and time.monotonic() - last_check_time >= self.auth_check_seconds:
                 last_check_time = time.monotonic()
                 try:
                     with self._lock:
@@ -539,15 +538,15 @@ class Realtime:
                             return
                         confirm_login(self.client)
                         # a new login: PocketBase dropped the old one
-                        if self.client.logins != self._subscriptions.logins:
+                        if self.client.login_cnt != self._subscriptions.login_cnt:
                             self._send_subscriptions()
                 except Exception as err:
                     self.error = f'login not confirmed, {err}'
                     LOG.error('pocketbase realtime: %s', self.error)
-                    self.connected.clear()
+                    self.connected_event.clear()
                     self._close_connection()
             try:
-                item = pending.get(timeout=min(1.0, self.auth_check))
+                item = pending.get(timeout=min(1.0, self.auth_check_seconds))
             except queue.Empty:
                 continue
             # a thread past its stop() hands on nothing more
@@ -579,13 +578,13 @@ class AsyncRealtime:
 
     ### Keyword Args
 
-    - **max_delay** (float): The longest delay in seconds before a new try
+    - **max_delay_seconds** (float): The longest delay in seconds before a new try
         to connect, also the pause after the callbacks fell behind
     - **read_timeout** (float): Seconds without data until a connection
         counts as lost
     - **max_pending** (int): The events that may wait for the callbacks
         before the channel hangs up, at least 1
-    - **auth_check** (float): Seconds between two checks that the login
+    - **auth_check_seconds** (float): Seconds between two checks that the login
         still holds
 
     ### Example
@@ -614,21 +613,21 @@ class AsyncRealtime:
 
     """
 
-    def __init__(self, client, max_delay=30.0, read_timeout=READ_TIMEOUT, max_pending=1000, auth_check=60.0):
+    def __init__(self, client, max_delay_seconds=30.0, read_timeout=READ_TIMEOUT, max_pending=1000, auth_check_seconds=60.0):
         if max_pending < 1:
             raise ValueError('max_pending must be at least 1')
         #: The client whose login the channel uses
         self.client = client
         #: The longest delay in seconds before a new try to connect
-        self.max_delay = max_delay
+        self.max_delay_seconds = max_delay_seconds
         #: Seconds without data until a connection counts as lost
         self.read_timeout = read_timeout
         #: The events that may wait for the callbacks before the channel hangs up
         self.max_pending = max_pending
         #: Seconds between two checks that the login still holds
-        self.auth_check = auth_check
+        self.auth_check_seconds = auth_check_seconds
         #: Set while a connection is open and its subscriptions are sent
-        self.connected = asyncio.Event()
+        self.connected_event = asyncio.Event()
         #: The last failure of the channel, None since it connected
         self.error = None
         #: Called after each connect and reconnect, a function or coroutine
@@ -648,7 +647,7 @@ class AsyncRealtime:
     @property
     def status(self):
         """The state of the channel, one of ```STATUSES```."""
-        if self.connected.is_set():
+        if self.connected_event.is_set():
             return 'live'
         return 'connecting' if self._task is not None and not self._task.done() else 'stopped'
 
@@ -677,7 +676,7 @@ class AsyncRealtime:
             running loop, ```flush()``` waits for it
 
         """
-        if self._subscriptions.add(topic, callback, options) and self.connected.is_set():
+        if self._subscriptions.add(topic, callback, options) and self.connected_event.is_set():
             self._resend_subscriptions()
         return self
 
@@ -696,7 +695,7 @@ class AsyncRealtime:
         - **AsyncRealtime**: The channel
 
         """
-        if self._subscriptions.remove(topic, callback, options) and self.connected.is_set():
+        if self._subscriptions.remove(topic, callback, options) and self.connected_event.is_set():
             self._resend_subscriptions()
         return self
 
@@ -733,18 +732,18 @@ class AsyncRealtime:
                 else:
                     overflow = listen.result()
                     is_ended = not overflow
-                served = is_ended and self.connected.is_set() and time.monotonic() - start_time >= STABLE_SECONDS
-                self.connected.clear()
+                served = is_ended and self.connected_event.is_set() and time.monotonic() - start_time >= MIN_STABLE_SECONDS
+                self.connected_event.clear()
                 # the server ended a connection that served: connect at once
                 if served:
                     continue
-                await asyncio.sleep(self.max_delay if overflow else self._delay)
-                self._delay = min(self._delay * 2, self.max_delay)
+                await asyncio.sleep(self.max_delay_seconds if overflow else self._delay)
+                self._delay = min(self._delay * 2, self.max_delay_seconds)
         except asyncio.CancelledError:
             if not self._is_stopping:
                 raise
         finally:
-            self.connected.clear()
+            self.connected_event.clear()
             tasks = [task for task in (listen, dispatcher) if task is not None]
             for task in tasks:
                 task.cancel()
@@ -772,7 +771,7 @@ class AsyncRealtime:
                     f'POST {self.client.url}{REALTIME_PATH} failed with {response.status_code}: {response.text[:200]}',
                     status=response.status_code,
                 )
-            self._subscriptions.logins = self.client.logins
+            self._subscriptions.login_cnt = self.client.login_cnt
 
     def _resend_subscriptions(self):
         # a change of the subscriptions while connected, sent by a task of the
@@ -801,7 +800,7 @@ class AsyncRealtime:
                 if name == 'PB_CONNECT':
                     self._subscriptions.client_id = data['clientId']
                     await self._send_subscriptions()
-                    self.connected.set()
+                    self.connected_event.set()
                     self.error = None
                     # a connection that came up starts the delays anew
                     self._delay = 0.5
@@ -820,21 +819,21 @@ class AsyncRealtime:
         # dispatcher: hand each event to its callbacks, check the login
         last_check_time = time.monotonic()
         while True:
-            if self.connected.is_set() and time.monotonic() - last_check_time >= self.auth_check:
+            if self.connected_event.is_set() and time.monotonic() - last_check_time >= self.auth_check_seconds:
                 last_check_time = time.monotonic()
                 try:
                     await asyncio.to_thread(confirm_login, self.client)
                     # a new login: PocketBase dropped the old one
-                    if self.client.logins != self._subscriptions.logins:
+                    if self.client.login_cnt != self._subscriptions.login_cnt:
                         await self._send_subscriptions()
                 except Exception as err:
                     self.error = f'login not confirmed, {err}'
                     LOG.error('pocketbase realtime: %s', self.error)
-                    self.connected.clear()
+                    self.connected_event.clear()
                     if self._listen_task is not None:
                         self._listen_task.cancel()
             try:
-                item = await asyncio.wait_for(pending.get(), timeout=min(1.0, self.auth_check))
+                item = await asyncio.wait_for(pending.get(), timeout=min(1.0, self.auth_check_seconds))
             except TimeoutError:
                 continue
             if item is _CONNECTED:

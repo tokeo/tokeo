@@ -106,7 +106,7 @@ def _is_healthy(url):
     # whether the server answers its health check
     try:
         with PocketBase(url) as pb:
-            return pb.health()['code'] == 200
+            return pb.check_health()['code'] == 200
     except TokeoPocketBaseError:
         return False
 

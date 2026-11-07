@@ -24,7 +24,7 @@ from tokeo.core.pocketbase import (
     Record,
     TokeoPocketBaseAuthError,
     TokeoPocketBaseError,
-    build_filter,
+    format_filter,
 )
 
 URL = 'http://pocketbase.test:8090'
@@ -90,7 +90,7 @@ def _make_auth(token, record_id='u1'):
     return {'token': token, 'record': {'id': record_id, 'email': 'anna@tokeo.test'}}
 
 
-# build_filter
+# format_filter
 
 
 @pytest.mark.parametrize(
@@ -109,9 +109,9 @@ def _make_auth(token, record_id='u1'):
     ],
     ids=['str', 'quote', 'backslash', 'breakout', 'double_quote', 'true', 'false', 'none', 'int', 'float'],
 )
-def test_build_filter_quotes_each_value_for_the_filter_syntax(value, literal):
+def test_format_filter_quotes_each_value_for_the_filter_syntax(value, literal):
     """Strings get \\ and ' escaped in single quotes, the others their literal."""
-    assert build_filter('title = {:v}', {'v': value}) == f'title = {literal}'
+    assert format_filter('title = {:v}', {'v': value}) == f'title = {literal}'
 
 
 @pytest.mark.parametrize(
@@ -119,19 +119,19 @@ def test_build_filter_quotes_each_value_for_the_filter_syntax(value, literal):
     [datetime(2026, 10, 31, 9, 5, 7, 123456, tzinfo=timezone(timedelta(hours=2))), datetime(2026, 10, 31, 7, 5, 7, 123456)],
     ids=['aware', 'naive'],
 )
-def test_build_filter_takes_a_datetime_as_utc(value):
+def test_format_filter_takes_a_datetime_as_utc(value):
     """A datetime becomes the utc format of PocketBase, a naive one is utc."""
-    assert build_filter('created > {:d}', {'d': value}) == "created > '2026-10-31 07:05:07.123Z'"
+    assert format_filter('created > {:d}', {'d': value}) == "created > '2026-10-31 07:05:07.123Z'"
 
 
-def test_build_filter_replaces_each_placeholder_once():
+def test_format_filter_replaces_each_placeholder_once():
     """A value that looks like a placeholder is not replaced again."""
-    assert build_filter('a = {:a} && b = {:b}', {'a': '{:b}', 'b': 'x'}) == "a = '{:b}' && b = 'x'"
+    assert format_filter('a = {:a} && b = {:b}', {'a': '{:b}', 'b': 'x'}) == "a = '{:b}' && b = 'x'"
 
 
-def test_build_filter_without_placeholders_keeps_the_expression():
+def test_format_filter_without_placeholders_keeps_the_expression():
     """A filter without placeholders and without params stays as it is."""
-    assert build_filter('views > 3') == 'views > 3'
+    assert format_filter('views > 3') == 'views > 3'
 
 
 @pytest.mark.parametrize(
@@ -143,15 +143,15 @@ def test_build_filter_without_placeholders_keeps_the_expression():
     ],
     ids=['missing', 'list', 'dict'],
 )
-def test_build_filter_refuses_a_missing_or_unsupported_value(expr, params, message):
+def test_format_filter_refuses_a_missing_or_unsupported_value(expr, params, message):
     """A placeholder without value or a value of another type raises."""
     with pytest.raises(TokeoPocketBaseError, match=message):
-        build_filter(expr, params)
+        format_filter(expr, params)
 
 
-def test_filter_of_the_client_is_build_filter(pb):
-    """pb.filter builds the same filter as build_filter."""
-    assert pb.filter('t = {:t}', {'t': "it's"}) == build_filter('t = {:t}', {'t': "it's"})
+def test_filter_of_the_client_is_format_filter(pb):
+    """pb.filter builds the same filter as format_filter."""
+    assert pb.filter('t = {:t}', {'t': "it's"}) == format_filter('t = {:t}', {'t': "it's"})
 
 
 # Record and ListResult
@@ -236,7 +236,7 @@ def test_send_failed_connection_raises_with_status_0(pb, server):
 
     server.respond = refuse
     with pytest.raises(TokeoPocketBaseError, match='connection refused') as err_info:
-        pb.health()
+        pb.check_health()
     assert err_info.value.status == 0 and isinstance(err_info.value.__cause__, httpx.ConnectError)
 
 
@@ -252,10 +252,10 @@ def test_before_request_runs_before_each_request_but_auth_and_health(server):
     with PocketBase(URL, before_request=lambda: calls.append(True), transport=httpx.MockTransport(server.handle)) as client:
         client.auth_with_password('users', 'anna@tokeo.test', 'pass')
         client.auth_refresh()
-        client.health()
+        client.check_health()
         assert calls == []
         client.collection('posts').get_list()
-        client.batch().send()
+        client.create_batch().send()
         client.send('GET', '/api/x')
         assert len(calls) == 3
 
@@ -486,10 +486,10 @@ def test_logins_count_each_login_but_no_refresh(pb, server):
     server.answers[('POST', '/api/collections/users/impersonate/u2')] = _make_auth('imp', 'u2')
     pb.auth_with_password('users', 'anna@tokeo.test', 'pass')
     pb.auth_refresh()
-    assert pb.logins == 1
+    assert pb.login_cnt == 1
     with PocketBase(URL, transport=httpx.MockTransport(server.handle)) as other:
         assert pb.impersonate('users', 'u2', client=other) is other
-        assert (other.logins, other.token, pb.logins) == (1, 'imp', 1)
+        assert (other.login_cnt, other.token, pb.login_cnt) == (1, 'imp', 1)
 
 
 def test_auth_refresh_takes_the_collection_of_a_token_from_elsewhere(pb, server):
@@ -523,14 +523,14 @@ def test_close_forgets_the_login_and_closes_the_client(server):
 @pytest.fixture
 def keeper(pb, server):
     """An AuthKeeper of the client whose login sets a token valid for an hour."""
-    logins = []
+    login_calls = []
 
     def login():
-        logins.append(1)
+        login_calls.append(1)
         pb.token, pb.auth_collection = _make_jwt(3600), 'users'
 
     keeper = AuthKeeper(pb, login, min_valid_seconds=60, check_seconds=60)
-    keeper.logins = logins
+    keeper.login_calls = login_calls
     pb.before_request = keeper
     return keeper
 
@@ -539,7 +539,7 @@ def test_auth_keeper_logs_in_once_and_trusts_the_login_for_check_seconds(keeper,
     """It logs in once, then asks the server nothing within check_seconds."""
     pb.collection('posts').get_list()
     pb.collection('posts').get_list()
-    assert len(keeper.logins) == 1
+    assert len(keeper.login_calls) == 1
     assert [request.url.path for request in server.requests] == ['/api/collections/posts/records'] * 2
 
 
@@ -551,7 +551,7 @@ def test_auth_keeper_asks_the_server_once_check_seconds_passed(keeper, pb, serve
     pb.collection('posts').get_list()
     paths = [request.url.path for request in server.requests]
     assert paths == ['/api/collections/posts/records', '/api/collections/users/auth-refresh', '/api/collections/posts/records']
-    assert len(keeper.logins) == 1
+    assert len(keeper.login_calls) == 1
 
 
 def test_auth_keeper_logs_in_anew_when_the_server_refuses_the_login(keeper, pb, server):
@@ -559,7 +559,7 @@ def test_auth_keeper_logs_in_anew_when_the_server_refuses_the_login(keeper, pb, 
     server.answers[('POST', '/api/collections/users/auth-refresh')] = httpx.Response(401, json={'message': 'refused'})
     pb.token, pb.auth_collection = _make_jwt(3600), 'users'
     pb.collection('posts').get_list()
-    assert len(keeper.logins) == 1 and server.requests[0].url.path.endswith('/auth-refresh')
+    assert len(keeper.login_calls) == 1 and server.requests[0].url.path.endswith('/auth-refresh')
 
 
 def test_auth_keeper_renews_a_token_near_its_expiry_by_a_refresh(keeper, pb, server):
@@ -567,7 +567,7 @@ def test_auth_keeper_renews_a_token_near_its_expiry_by_a_refresh(keeper, pb, ser
     server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth(_make_jwt(3600))
     pb.token, pb.auth_collection = _make_jwt(30), 'users'
     pb.collection('posts').get_list()
-    assert keeper.logins == [] and pb.is_token_valid(3000)
+    assert keeper.login_calls == [] and pb.is_token_valid(3000)
 
 
 def test_auth_keeper_logs_in_when_the_refresh_keeps_a_short_token(keeper, pb, server):
@@ -576,21 +576,21 @@ def test_auth_keeper_logs_in_when_the_refresh_keeps_a_short_token(keeper, pb, se
     server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth(short)
     pb.token, pb.auth_collection = short, 'users'
     pb.collection('posts').get_list()
-    assert len(keeper.logins) == 1 and pb.is_token_valid(3000)
+    assert len(keeper.login_calls) == 1 and pb.is_token_valid(3000)
 
 
 @pytest.mark.parametrize(
-    'logins, refreshes',
+    'login_cnt, refresh_cnt',
     [(0, 1), (1, 0)],
     ids=['token_from_elsewhere', 'new_login'],
 )
-def test_auth_keeper_trusts_a_new_login_but_checks_a_token_from_elsewhere(pb, server, logins, refreshes):
+def test_auth_keeper_trusts_a_new_login_but_checks_a_token_from_elsewhere(pb, server, login_cnt, refresh_cnt):
     """A new login of the client needs no refresh, a token from elsewhere does."""
     server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth(_make_jwt(3600))
     pb.before_request = AuthKeeper(pb, lambda: None)
-    pb.token, pb.auth_collection, pb.logins = _make_jwt(3600), 'users', logins
+    pb.token, pb.auth_collection, pb.login_cnt = _make_jwt(3600), 'users', login_cnt
     pb.collection('posts').get_list()
-    assert sum(request.url.path.endswith('/auth-refresh') for request in server.requests) == refreshes
+    assert sum(request.url.path.endswith('/auth-refresh') for request in server.requests) == refresh_cnt
 
 
 def test_auth_keeper_raises_when_the_login_fails(pb, server):
@@ -616,7 +616,7 @@ def test_batch_sends_all_changes_in_one_request(pb, server):
         {'status': 200, 'body': {'id': 'c'}},
         {'status': 204, 'body': None},
     ]
-    batch = pb.batch()
+    batch = pb.create_batch()
     assert isinstance(batch, Batch)
     batch.create('posts', {'title': 'A'}).update('posts', 'b', {'views': 1}).upsert('posts', {'id': 'c'}).delete('posts', 'd')
     results = batch.send()
@@ -636,11 +636,11 @@ def test_batch_failed_raises_with_the_failed_request(pb, server):
     failed = {'requests': {'1': {'code': 'batch_request_failed', 'response': {'status': 404}}}}
     server.answers[('POST', '/api/batch')] = httpx.Response(400, json={'message': 'Batch transaction failed.', 'data': failed})
     with pytest.raises(TokeoPocketBaseError, match='Batch transaction failed.') as err_info:
-        pb.batch().create('posts', {}).delete('posts', 'x').send()
+        pb.create_batch().create('posts', {}).delete('posts', 'x').send()
     assert err_info.value.data['requests']['1']['response']['status'] == 404
 
 
-def test_health_gives_the_answer_of_the_server(pb, server):
+def test_check_health_gives_the_answer_of_the_server(pb, server):
     """health sends GET /api/health and gives its answer."""
     server.answers[('GET', '/api/health')] = {'code': 200, 'message': 'API is healthy.'}
-    assert pb.health()['code'] == 200
+    assert pb.check_health()['code'] == 200

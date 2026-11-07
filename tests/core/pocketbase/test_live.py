@@ -70,7 +70,7 @@ def _is_healthy(url):
     # whether the server answers its health check
     try:
         with PocketBase(url) as pb:
-            return pb.health()['code'] == 200
+            return pb.check_health()['code'] == 200
     except TokeoPocketBaseError:
         return False
 
@@ -172,11 +172,11 @@ def test_live_batch_is_all_or_nothing(pb):
     """A batch with a failing change creates nothing, a valid one does all."""
     posts = pb.collection('posts')
     with pytest.raises(TokeoPocketBaseError) as err_info:
-        pb.batch().create('posts', {'title': 'batch-lost'}).update('posts', 'nope12345678901', {'title': 'x'}).send()
+        pb.create_batch().create('posts', {'title': 'batch-lost'}).update('posts', 'nope12345678901', {'title': 'x'}).send()
     assert err_info.value.data['requests']['1']['response']['status'] == 404
     assert posts.get_list(filter="title = 'batch-lost'").total_items == 0
     created, upserted = (
-        pb.batch().create('posts', {'title': 'batch-a'}).upsert('posts', {'id': 'batchupsert0001', 'title': 'batch-b'}).send()
+        pb.create_batch().create('posts', {'title': 'batch-a'}).upsert('posts', {'id': 'batchupsert0001', 'title': 'batch-b'}).send()
     )
     assert (created.title, upserted.id) == ('batch-a', 'batchupsert0001')
 
@@ -203,10 +203,10 @@ def test_live_impersonate_acts_as_the_user(su, pb, live):
     assert err_info.value.status == 403
 
 
-def test_live_health(live):
+def test_live_check_health(live):
     """health of the running server answers code 200."""
     with PocketBase(live[0]) as client:
-        assert client.health()['code'] == 200
+        assert client.check_health()['code'] == 200
 
 
 # Realtime
@@ -227,7 +227,7 @@ def test_live_realtime_events_by_topic_options_and_rules(pb, live):
         channel.subscribe('posts/*', lambda e: events.append((e.action, e.record.title)))
         channel.subscribe('posts/*', lambda e: expanded.append(e.record.expand.owner.name), {'query': {'expand': 'owner'}})
         guest_channel.subscribe('posts/*', anonymous.append)
-        assert channel.connected.wait(5) and guest_channel.connected.wait(5)
+        assert channel.connected_event.wait(5) and guest_channel.connected_event.wait(5)
         post = posts.create({'title': 'rt', 'owner': live[1]})
         channel.subscribe(f'posts/{post.id}', lambda e: one.append(e.action))
         posts.update(post.id, {'title': 'rt2'})
@@ -243,7 +243,7 @@ def test_live_realtime_events_by_topic_options_and_rules(pb, live):
 def test_live_realtime_stop_ends_a_waiting_channel_at_once(pb):
     """stop() of a channel waiting for events ends its thread within a second."""
     channel = Realtime(pb).subscribe('posts/*', print).start()
-    assert channel.connected.wait(5)
+    assert channel.connected_event.wait(5)
     thread, start_time = channel._thread, time.monotonic()
     channel.stop()
     assert (thread.is_alive(), time.monotonic() - start_time < 1) == (False, True)
@@ -257,18 +257,18 @@ def test_live_realtime_start_and_stop_leave_no_thread_or_socket(pb):
     before.
     """
     # the pooled connection of the client is open before counting
-    pb.health()
+    pb.check_health()
     before = (threading.active_count(), _count_sockets())
     for _ in range(20):
         with Realtime(pb) as channel:
             channel.subscribe('posts/*', print)
-            assert channel.connected.wait(5)
+            assert channel.connected_event.wait(5)
 
     async def go():
         for _ in range(20):
             realtime = AsyncRealtime(pb).subscribe('posts/*', print)
             asyncio.create_task(realtime.run())
-            assert await wait_until_async(realtime.connected.is_set)
+            assert await wait_until_async(realtime.connected_event.is_set)
             await realtime.stop()
 
     asyncio.run(go())
@@ -286,7 +286,7 @@ def test_live_async_realtime_awaits_a_coroutine_for_each_event(pb):
     async def go():
         realtime = AsyncRealtime(pb).subscribe('posts/*', follow)
         task = asyncio.create_task(realtime.run())
-        assert await wait_until_async(realtime.connected.is_set)
+        assert await wait_until_async(realtime.connected_event.is_set)
         post = await asyncio.to_thread(posts.create, {'title': 'async'})
         await asyncio.to_thread(posts.update, post.id, {'title': 'async2'})
         await asyncio.to_thread(posts.delete, post.id)
@@ -313,10 +313,10 @@ def test_live_realtime_hanging_callback_hangs_up_and_catches_up_after(pb, su):
             release.wait(30)
 
     posts = su.collection('posts')
-    with Realtime(pb, max_pending=50, max_delay=0.5) as channel:
+    with Realtime(pb, max_pending=50, max_delay_seconds=0.5) as channel:
         channel.on_connect = lambda: connects.append(1)
         channel.subscribe('posts/*', follow)
-        assert channel.connected.wait(5)
+        assert channel.connected_event.wait(5)
         for n in range(300):
             posts.create({'title': f'hang-{n}'})
         assert wait_until(lambda: 'events wait' in (channel.error or ''))
@@ -334,7 +334,7 @@ def test_live_realtime_expired_token_without_hook_shows_the_error(su, rando):
     client = su.impersonate('users', user.id, duration=1)
     try:
         time.sleep(1.5)
-        with Realtime(client, max_delay=0.2) as channel:
+        with Realtime(client, max_delay_seconds=0.2) as channel:
             channel.subscribe('posts/*', print)
             assert wait_until(lambda: channel.error and '401' in channel.error)
             assert channel.status == 'connecting'
@@ -353,11 +353,11 @@ def test_live_realtime_changed_password_renews_the_login_and_the_events_go_on(su
     client = _make_impersonating_client(su, user, 0.2)
     seen = []
     try:
-        with Realtime(client, auth_check=0.2) as channel:
+        with Realtime(client, auth_check_seconds=0.2) as channel:
             channel.subscribe('posts/*', lambda event: seen.append(event.record.title))
-            assert channel.connected.wait(5)
+            assert channel.connected_event.wait(5)
             su.collection('users').update(user.id, {'password': 'other-pass-456', 'passwordConfirm': 'other-pass-456'})
-            assert wait_until(lambda: client.logins == 2)
+            assert wait_until(lambda: client.login_cnt == 2)
             su.collection('posts').create({'title': 'after-password'})
             assert wait_until(lambda: seen == ['after-password'])
             assert channel.status == 'live'
@@ -370,9 +370,9 @@ def test_live_realtime_deleted_user_shows_the_error(su, rando):
     user = _create_user(su, rando)
     client = _make_impersonating_client(su, user, 0.2)
     try:
-        with Realtime(client, auth_check=0.2, max_delay=0.2) as channel:
+        with Realtime(client, auth_check_seconds=0.2, max_delay_seconds=0.2) as channel:
             channel.subscribe('posts/*', print)
-            assert channel.connected.wait(5)
+            assert channel.connected_event.wait(5)
             su.collection('users').delete(user.id)
             assert wait_until(lambda: channel.status == 'connecting' and '404' in (channel.error or ''))
     finally:
@@ -392,9 +392,9 @@ def test_live_async_realtime_hanging_coroutine_hangs_up_and_catches_up_after(pb,
             if len(seen) == 1:
                 await release.wait()
 
-        realtime = AsyncRealtime(pb, max_pending=50, max_delay=0.5).subscribe('posts/*', follow)
+        realtime = AsyncRealtime(pb, max_pending=50, max_delay_seconds=0.5).subscribe('posts/*', follow)
         asyncio.create_task(realtime.run())
-        assert await wait_until_async(realtime.connected.is_set)
+        assert await wait_until_async(realtime.connected_event.is_set)
         for n in range(300):
             await asyncio.to_thread(posts.create, {'title': f'ahang-{n}'})
         assert await wait_until_async(lambda: 'events wait' in (realtime.error or ''))
@@ -444,7 +444,7 @@ def short(tmp_path_factory):
 
 def test_live_hook_file_ends_silent_connections_and_the_channel_comes_back(short, monkeypatch):
     """Without events each connection ends after 1 s, the channel comes back."""
-    monkeypatch.setattr('tokeo.core.pocketbase.realtime.STABLE_SECONDS', 0.5)
+    monkeypatch.setattr('tokeo.core.pocketbase.realtime.MIN_STABLE_SECONDS', 0.5)
     connect_times = []
     with PocketBase(short) as client, Realtime(client) as channel:
         channel.on_connect = lambda: connect_times.append(time.monotonic())
@@ -460,14 +460,14 @@ def test_live_hook_file_ends_busy_connections_and_events_go_on_at_once(short, mo
     seconds; the channel connects again at once, so no two ticks are more
     than 0.4 seconds apart, as the delay of 0.5 seconds would make them.
     """
-    monkeypatch.setattr('tokeo.core.pocketbase.realtime.STABLE_SECONDS', 0.5)
+    monkeypatch.setattr('tokeo.core.pocketbase.realtime.MIN_STABLE_SECONDS', 0.5)
     connects, ticks = [], []
     with PocketBase(short) as su, PocketBase(short) as client:
         su.auth_with_password('_superusers', *SUPERUSER)
         with Realtime(client) as channel:
             channel.on_connect = lambda: connects.append(1)
             channel.subscribe('ticks/*', lambda event: ticks.append(time.monotonic()))
-            assert channel.connected.wait(5)
+            assert channel.connected_event.wait(5)
             for n in range(70):
                 su.collection('ticks').create({'n': n})
                 time.sleep(0.1)

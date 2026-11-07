@@ -7,7 +7,7 @@ create, update and delete, with files along with the fields.
 import json
 from .exc import TokeoPocketBaseError
 from .record import Record, ListResult
-from .filter import path_segment
+from .filter import quote_path_segment
 
 
 class Collection:
@@ -31,11 +31,11 @@ class Collection:
         self.client = client
         #: The name or id of the collection
         self.collection = collection
-        self._path = f'/api/collections/{path_segment(collection)}/records'
+        self._path = f'/api/collections/{quote_path_segment(collection)}/records'
 
     def _get_record_path(self, record_id):
         # the path of one record
-        return f'{self._path}/{path_segment(record_id)}'
+        return f'{self._path}/{quote_path_segment(record_id)}'
 
     def get_list(self, page=1, per_page=30, filter=None, sort=None, expand=None, fields=None, skip_total=False, query=None):
         """

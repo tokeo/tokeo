@@ -25,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import httpx
 import pytest
 from tokeo.core.pocketbase import PocketBase, TokeoPocketBaseAuthError, TokeoPocketBaseError
-from tokeo.core.pocketbase.realtime import STATUSES, AsyncRealtime, Realtime, RealtimeEvent, SseParser, confirm_login, topic_key
+from tokeo.core.pocketbase.realtime import STATUSES, AsyncRealtime, Realtime, RealtimeEvent, SseParser, confirm_login, format_topic_key
 from tests.utils import wait_until, wait_until_async
 
 URL = 'http://pocketbase.test:8090'
@@ -182,7 +182,7 @@ def pb(server):
 @pytest.fixture
 def realtime(pb, server):
     """A channel in a thread of the client, stopped after the test."""
-    channel = Realtime(pb, max_delay=0.04)
+    channel = Realtime(pb, max_delay_seconds=0.04)
     yield channel
     server.release.set()
     channel.stop()
@@ -201,18 +201,18 @@ def async_pb(async_server):
         yield client
 
 
-# topic_key
+# format_topic_key
 
 
-def test_topic_key_without_options_is_the_topic():
+def test_format_topic_key_without_options_is_the_topic():
     """posts/* stays posts/* without options."""
-    assert topic_key('posts/*') == 'posts/*'
-    assert topic_key('posts/*', {}) == 'posts/*'
+    assert format_topic_key('posts/*') == 'posts/*'
+    assert format_topic_key('posts/*', {}) == 'posts/*'
 
 
-def test_topic_key_adds_the_options_as_quoted_json():
+def test_format_topic_key_adds_the_options_as_quoted_json():
     """The options follow as ?options= with their json quoted for the url."""
-    assert topic_key('posts/*', EXPAND) == 'posts/*?options=%7B%22query%22%3A%20%7B%22expand%22%3A%20%22owner%22%7D%7D'
+    assert format_topic_key('posts/*', EXPAND) == 'posts/*?options=%7B%22query%22%3A%20%7B%22expand%22%3A%20%22owner%22%7D%7D'
 
 
 # SseParser
@@ -259,11 +259,11 @@ def test_realtime_subscribes_on_connect_by_the_login_of_the_client(realtime, ser
     """PB_CONNECT sends clientId and topics with the token, then on_connect runs."""
     server.connections = [[_make_connect_event('c1')]]
     calls = []
-    realtime.on_connect = lambda: calls.append(realtime.connected.is_set())
+    realtime.on_connect = lambda: calls.append(realtime.connected_event.is_set())
     realtime.subscribe('posts/*', print).subscribe('posts/*', print, EXPAND)
     realtime.start()
-    assert realtime.connected.wait(5)
-    assert server.posts() == [{'clientId': 'c1', 'subscriptions': ['posts/*', topic_key('posts/*', EXPAND)]}]
+    assert realtime.connected_event.wait(5)
+    assert server.posts() == [{'clientId': 'c1', 'subscriptions': ['posts/*', format_topic_key('posts/*', EXPAND)]}]
     assert server.requests[-1].headers['Authorization'] == 'tok'
     assert wait_until(lambda: calls == [True])
     assert realtime.on_connect is not None
@@ -309,7 +309,7 @@ def test_realtime_changes_while_connected_send_the_subscriptions_again(realtime,
     """Only a new or a gone subscription is sent again, a second callback is not."""
     server.connections = [[_make_connect_event('c1')]]
     realtime.subscribe('posts/*', print).start()
-    assert realtime.connected.wait(5)
+    assert realtime.connected_event.wait(5)
     realtime.subscribe('users/*', print)
     realtime.subscribe('users/*', repr)
     realtime.unsubscribe('users/*', print)
@@ -332,10 +332,10 @@ def test_realtime_reconnects_and_subscribes_again_with_the_new_client_id(realtim
 @pytest.mark.parametrize('stable, at_once', [(0, True), (60, False)], ids=['served', 'too_short'])
 def test_realtime_connects_again_at_once_only_after_a_connection_that_served(realtime, server, monkeypatch, stable, at_once):
     """
-    The server ends c1 cleanly: after STABLE_SECONDS of service the channel
+    The server ends c1 cleanly: after MIN_STABLE_SECONDS of service the channel
     connects c2 at once, a shorter connection waits the delay of 0.5 seconds.
     """
-    monkeypatch.setattr('tokeo.core.pocketbase.realtime.STABLE_SECONDS', stable)
+    monkeypatch.setattr('tokeo.core.pocketbase.realtime.MIN_STABLE_SECONDS', stable)
     server.connections = [[_make_connect_event('c1')], [_make_connect_event('c2')]]
     connect_times = []
     realtime.on_connect = lambda: connect_times.append(time.monotonic())
@@ -351,7 +351,7 @@ def test_realtime_retries_after_a_doubling_delay_up_to_max_delay(realtime, serve
     realtime._delay = 0.01
     with caplog.at_level(logging.WARNING, logger='tokeo.core.pocketbase.realtime'):
         realtime.subscribe('posts/*', print).start()
-        assert realtime.connected.wait(5)
+        assert realtime.connected_event.wait(5)
     assert delays == [0.01, 0.02, 0.04, 0.04, 0.04]
     assert realtime._delay == 0.5
     assert sum('connection lost' in record.message for record in caplog.records) == 4
@@ -364,7 +364,7 @@ def test_realtime_refused_subscriptions_connect_again(realtime, server, caplog):
     realtime._delay = 0.01
     with caplog.at_level(logging.WARNING, logger='tokeo.core.pocketbase.realtime'):
         realtime.subscribe('posts/*', print).start()
-        assert realtime.connected.wait(5)
+        assert realtime.connected_event.wait(5)
     assert [body['clientId'] for body in server.posts()] == ['c1', 'c2']
     assert any('403' in record.message for record in caplog.records)
 
@@ -405,7 +405,7 @@ def test_realtime_stop_leaves_a_hanging_callback_and_a_new_start_runs_alone(real
     assert wait_until(lambda: seen == ['r1', 'r3'])
     hang.set()
     old.join(5)
-    assert (old.is_alive(), seen, realtime.connected.is_set()) == (False, ['r1', 'r3'], True)
+    assert (old.is_alive(), seen, realtime.connected_event.is_set()) == (False, ['r1', 'r3'], True)
     assert [body['clientId'] for body in server.posts()] == ['c1', 'c2']
 
 
@@ -425,7 +425,7 @@ def test_realtime_stop_called_by_a_callback_ends_the_thread(realtime, server):
 
     realtime.subscribe('posts/*', follow).start()
     assert wait_until(lambda: threads and not threads[0].is_alive())
-    assert (seen, realtime.connected.is_set(), realtime._thread) == (['r1'], False, None)
+    assert (seen, realtime.connected_event.is_set(), realtime._thread) == (['r1'], False, None)
 
 
 def test_realtime_refuses_max_pending_below_one(pb):
@@ -440,9 +440,9 @@ def test_realtime_status_and_topics_follow_the_channel(realtime, server):
     server.connections = [[_make_connect_event('c1')]]
     assert realtime.status == 'stopped'
     realtime.subscribe('posts/*', print).subscribe('posts/*', print, EXPAND)
-    assert realtime.topics == ['posts/*', topic_key('posts/*', EXPAND)]
+    assert realtime.topics == ['posts/*', format_topic_key('posts/*', EXPAND)]
     realtime.start()
-    assert realtime.connected.wait(5) and (realtime.status, realtime.error) == ('live', None)
+    assert realtime.connected_event.wait(5) and (realtime.status, realtime.error) == ('live', None)
     server.release.set()
     realtime.stop()
     assert realtime.status == 'stopped' and set(STATUSES) == {'live', 'connecting', 'stopped'}
@@ -452,7 +452,7 @@ def test_realtime_confirms_the_login_before_it_subscribes(realtime, server):
     """The refresh of the login goes before the POST of the subscriptions."""
     server.connections = [[_make_connect_event('c1')]]
     realtime.subscribe('posts/*', print).start()
-    assert realtime.connected.wait(5)
+    assert realtime.connected_event.wait(5)
     paths = [request.url.path for request in server.requests if request.method == 'POST']
     assert paths == ['/api/collections/users/auth-refresh', '/api/realtime']
 
@@ -481,10 +481,10 @@ def test_realtime_checks_the_login_while_connected_and_subscribes_again_after_a_
         calls.append(1)
         if len(calls) == 3:
             # a new login, e.g. after the password of the identity changed
-            pb.logins += 1
+            pb.login_cnt += 1
 
     pb.before_request = hook
-    realtime.auth_check = 0.1
+    realtime.auth_check_seconds = 0.1
     realtime.subscribe('posts/*', print).start()
     assert wait_until(lambda: len(server.posts()) == 2)
     assert [body['clientId'] for body in server.posts()] == ['c1', 'c1']
@@ -510,7 +510,7 @@ def test_realtime_lost_login_while_connected_hangs_up_and_shows_the_error(silent
             raise TokeoPocketBaseAuthError('login refused')
 
     with caplog.at_level(logging.WARNING, logger='tokeo.core.pocketbase.realtime'):
-        with PocketBase(url, before_request=hook) as client, Realtime(client, auth_check=0.1, max_delay=0.05) as channel:
+        with PocketBase(url, before_request=hook) as client, Realtime(client, auth_check_seconds=0.1, max_delay_seconds=0.05) as channel:
             channel.subscribe('posts/*', print)
             assert wait_until(lambda: len(gets) >= 2 and channel.status == 'connecting')
             assert 'login refused' in channel.error
@@ -521,7 +521,7 @@ def test_realtime_hangs_up_when_the_callbacks_fall_behind_and_connects_once_they
     """
     With max_pending 2 a callback hangs on r1 while r2 to r5 arrive: the
     channel hangs up at r4 and connects no more until the callback ends;
-    then it hands on the queued r2 and r3, connects c2 after max_delay and
+    then it hands on the queued r2 and r3, connects c2 after max_delay_seconds and
     calls on_connect again.
     """
     hanging = threading.Event()
@@ -542,7 +542,7 @@ def test_realtime_hangs_up_when_the_callbacks_fall_behind_and_connects_once_they
             hanging.set()
             release.wait(5)
 
-    channel = Realtime(pb, max_delay=0.05, max_pending=2).subscribe('posts/*', follow)
+    channel = Realtime(pb, max_delay_seconds=0.05, max_pending=2).subscribe('posts/*', follow)
     channel.on_connect = lambda: connects.append(1)
     try:
         with caplog.at_level(logging.WARNING, logger='tokeo.core.pocketbase.realtime'):
@@ -564,10 +564,10 @@ def test_realtime_as_context_manager_runs_one_thread_until_stop(pb, server):
     with Realtime(pb) as channel:
         thread = channel._thread
         assert channel.start()._thread is thread
-        assert channel.connected.wait(5)
+        assert channel.connected_event.wait(5)
         # the fake stream has no socket to shut down, it ends by itself
         server.release.set()
-    assert (thread.is_alive(), channel.connected.is_set()) == (False, False)
+    assert (thread.is_alive(), channel.connected_event.is_set()) == (False, False)
     channel.stop()
 
 
@@ -598,7 +598,7 @@ def test_async_realtime_subscribes_by_the_hook_and_awaits_coroutines(async_pb, a
         task = asyncio.create_task(realtime.run())
         assert await wait_until_async(lambda: len(seen) == 3)
         await realtime.stop()
-        assert task.done() and not realtime.connected.is_set()
+        assert task.done() and not realtime.connected_event.is_set()
 
     asyncio.run(go())
     assert seen == ['connect', ('function', 'delete'), ('coroutine', 'delete')]
@@ -615,7 +615,7 @@ def test_async_realtime_changes_while_connected_send_the_subscriptions_again(asy
     async def go():
         realtime = AsyncRealtime(async_pb).subscribe('posts/*', print)
         asyncio.create_task(realtime.run())
-        assert await wait_until_async(realtime.connected.is_set)
+        assert await wait_until_async(realtime.connected_event.is_set)
         realtime.subscribe('users/*', print)
         assert await wait_until_async(lambda: len(async_server.posts()) == 2)
         realtime.unsubscribe('users/*')
@@ -652,8 +652,8 @@ def test_async_realtime_failing_callback_is_logged_and_the_channel_goes_on(async
 
 @pytest.mark.parametrize('stable, at_once', [(0, True), (60, False)], ids=['served', 'too_short'])
 def test_async_realtime_connects_again_at_once_only_after_a_connection_that_served(async_pb, async_server, monkeypatch, stable, at_once):
-    """After STABLE_SECONDS c2 comes at once, else after 0.5 seconds."""
-    monkeypatch.setattr('tokeo.core.pocketbase.realtime.STABLE_SECONDS', stable)
+    """After MIN_STABLE_SECONDS c2 comes at once, else after 0.5 seconds."""
+    monkeypatch.setattr('tokeo.core.pocketbase.realtime.MIN_STABLE_SECONDS', stable)
     async_server.connections = [[_make_connect_event('c1')], [_make_connect_event('c2')]]
     connect_times = []
 
@@ -675,7 +675,7 @@ def test_async_realtime_retries_after_a_doubling_delay_and_subscribes_again(asyn
     calls = []
 
     async def go():
-        realtime = AsyncRealtime(async_pb, max_delay=0.02).subscribe('posts/*', print)
+        realtime = AsyncRealtime(async_pb, max_delay_seconds=0.02).subscribe('posts/*', print)
         realtime.on_connect = lambda: calls.append(realtime._delay)
         realtime._delay = 0.01
         asyncio.create_task(realtime.run())
@@ -713,7 +713,7 @@ def test_async_realtime_runs_once_at_a_time(async_pb, async_server):
     async def go():
         realtime = AsyncRealtime(async_pb)
         task = asyncio.create_task(realtime.run())
-        assert await wait_until_async(realtime.connected.is_set)
+        assert await wait_until_async(realtime.connected_event.is_set)
         with pytest.raises(TokeoPocketBaseError, match='runs already'):
             await realtime.run()
         assert not task.done()
@@ -729,7 +729,7 @@ def test_async_realtime_stop_cancels_the_pending_sends(async_pb, async_server):
     async def go():
         realtime = AsyncRealtime(async_pb)
         asyncio.create_task(realtime.run())
-        assert await wait_until_async(realtime.connected.is_set)
+        assert await wait_until_async(realtime.connected_event.is_set)
         realtime.subscribe('users/*', print)
         sends = set(realtime._sends)
         await realtime.stop()
@@ -747,7 +747,7 @@ def test_async_realtime_flush_waits_for_the_changed_subscriptions(async_pb, asyn
         realtime = AsyncRealtime(async_pb).subscribe('posts/*', print)
         assert realtime.status == 'stopped'
         asyncio.create_task(realtime.run())
-        assert await wait_until_async(realtime.connected.is_set)
+        assert await wait_until_async(realtime.connected_event.is_set)
         assert realtime.status == 'live'
         realtime.subscribe('users/*', print)
         await realtime.flush()
@@ -767,12 +767,12 @@ def test_async_realtime_checks_the_login_and_subscribes_again_after_a_new_login(
     def hook():
         calls.append(1)
         if len(calls) == 3:
-            async_pb.logins += 1
+            async_pb.login_cnt += 1
 
     async_pb.before_request = hook
 
     async def go():
-        realtime = AsyncRealtime(async_pb, auth_check=0.1).subscribe('posts/*', print)
+        realtime = AsyncRealtime(async_pb, auth_check_seconds=0.1).subscribe('posts/*', print)
         asyncio.create_task(realtime.run())
         assert await wait_until_async(lambda: len(async_server.posts()) == 2)
         await realtime.stop()
@@ -794,7 +794,7 @@ def test_async_realtime_lost_login_hangs_up_and_shows_the_error(async_pb, async_
     async_pb.before_request = hook
 
     async def go():
-        realtime = AsyncRealtime(async_pb, auth_check=0.1, max_delay=0.05).subscribe('posts/*', print)
+        realtime = AsyncRealtime(async_pb, auth_check_seconds=0.1, max_delay_seconds=0.05).subscribe('posts/*', print)
         asyncio.create_task(realtime.run())
         assert await wait_until_async(lambda: realtime.error and 'login refused' in realtime.error)
         assert await wait_until_async(lambda: sum(request.method == 'GET' for request in async_server.requests) >= 2)
@@ -832,7 +832,7 @@ def test_async_realtime_hangs_up_when_the_callbacks_fall_behind(async_pb, async_
                 hanging.set()
                 await release.wait()
 
-        realtime = AsyncRealtime(async_pb, max_delay=0.05, max_pending=2).subscribe('posts/*', follow)
+        realtime = AsyncRealtime(async_pb, max_delay_seconds=0.05, max_pending=2).subscribe('posts/*', follow)
         realtime.on_connect = lambda: connects.append(1)
         asyncio.create_task(realtime.run())
         assert await wait_until_async(lambda: 'events wait' in (realtime.error or ''))

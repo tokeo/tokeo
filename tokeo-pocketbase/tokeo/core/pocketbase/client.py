@@ -12,7 +12,7 @@ import httpx
 from tokeo.core.utils.jwt import is_token_valid
 from .exc import TokeoPocketBaseError, TokeoPocketBaseAuthError
 from .record import Record
-from .filter import build_filter, path_segment
+from .filter import format_filter, quote_path_segment
 from .collection import Collection
 from .batch import Batch
 
@@ -57,7 +57,7 @@ class PocketBase:
         self.auth_collection = None
         #: The number of logins of this client, a refresh does not count; a
         #: realtime channel sends its subscriptions again after a new login
-        self.logins = 0
+        self.login_cnt = 0
         # kept to build the client of an impersonation the same way
         self._httpx_kwargs = httpx_kwargs
         #: The httpx client of the requests
@@ -146,7 +146,7 @@ class PocketBase:
         - **str**: The filter with each value quoted and escaped
 
         """
-        return build_filter(expr, params)
+        return format_filter(expr, params)
 
     def collection(self, name):
         """
@@ -165,7 +165,7 @@ class PocketBase:
             self._collections[name] = Collection(self, name)
         return self._collections[name]
 
-    def batch(self):
+    def create_batch(self):
         """
         Start a batch of record changes sent in one transaction.
 
@@ -176,7 +176,7 @@ class PocketBase:
         """
         return Batch(self)
 
-    def health(self):
+    def check_health(self):
         """
         Check the health of the server.
 
@@ -244,14 +244,14 @@ class PocketBase:
         - **TokeoPocketBaseError**: If the request fails otherwise
 
         """
-        path = f'/api/collections/{path_segment(collection)}/auth-with-password'
+        path = f'/api/collections/{quote_path_segment(collection)}/auth-with-password'
         try:
             result = self._send('POST', path, json={'identity': identity, 'password': password}, headers={'Authorization': None})
         except TokeoPocketBaseError as err:
             if err.status in (400, 401, 403):
                 raise TokeoPocketBaseAuthError(str(err), status=err.status, url=err.url, data=err.data) from err
             raise
-        self.logins += 1
+        self.login_cnt += 1
         return self._set_auth(collection, result)
 
     def auth_refresh(self):
@@ -286,7 +286,7 @@ class PocketBase:
                 collection = None
         if not self.token or not collection:
             raise TokeoPocketBaseAuthError('auth_refresh needs a login first')
-        path = f'/api/collections/{path_segment(collection)}/auth-refresh'
+        path = f'/api/collections/{quote_path_segment(collection)}/auth-refresh'
         try:
             result = self._send('POST', path)
         except TokeoPocketBaseError as err:
@@ -327,7 +327,7 @@ class PocketBase:
             holds, it answers with the same token
 
         """
-        path = f'/api/collections/{path_segment(collection)}/impersonate/{path_segment(record_id)}'
+        path = f'/api/collections/{quote_path_segment(collection)}/impersonate/{quote_path_segment(record_id)}'
         try:
             result = self.send('POST', path, json={'duration': duration})
         except TokeoPocketBaseError as err:
@@ -335,7 +335,7 @@ class PocketBase:
                 raise TokeoPocketBaseAuthError(str(err), status=err.status, url=err.url, data=err.data) from err
             raise
         client = client or PocketBase(self.url, **self._httpx_kwargs)
-        client.logins += 1
+        client.login_cnt += 1
         client._set_auth(collection, result)
         return client
 
@@ -394,15 +394,15 @@ class AuthKeeper:
         self.lock = threading.Lock()
         # when the server confirmed the login last, by time.monotonic()
         self._last_check_time = None
-        # the logins of the client at the last check
-        self._logins = None
+        # the login count of the client at the last check
+        self._login_cnt = None
 
     def __call__(self):
         with self.lock:
             # a login since the last check, e.g. a new impersonation, comes
             # just from the server; a token from elsewhere is no login
-            if self.client.logins and self.client.logins != self._logins:
-                self._logins, self._last_check_time = self.client.logins, time.monotonic()
+            if self.client.login_cnt and self.client.login_cnt != self._login_cnt:
+                self._login_cnt, self._last_check_time = self.client.login_cnt, time.monotonic()
             is_fresh = self._last_check_time is not None and time.monotonic() - self._last_check_time < self.check_seconds
             if is_fresh and self.client.is_token_valid(self.min_valid_seconds):
                 return
@@ -421,4 +421,4 @@ class AuthKeeper:
                         self._last_check_time = time.monotonic()
                         return
             self.login()
-            self._logins, self._last_check_time = self.client.logins, time.monotonic()
+            self._login_cnt, self._last_check_time = self.client.login_cnt, time.monotonic()

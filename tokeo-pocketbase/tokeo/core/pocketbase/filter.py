@@ -32,7 +32,7 @@ def _filter_value(value):
     raise TokeoPocketBaseError(f'filter value of type {type(value).__name__} is not supported: {value!r}')
 
 
-def build_filter(expr, params=None):
+def format_filter(expr, params=None):
     """
     Build a filter expression with its placeholders replaced by values.
 
@@ -60,7 +60,7 @@ def build_filter(expr, params=None):
     ### Example
 
     ```python
-    build_filter('title = {:t} && views > {:v}', {'t': "it's", 'v': 3})
+    format_filter('title = {:t} && views > {:v}', {'t': "it's", 'v': 3})
     # title = 'it\\'s' && views > 3
     ```
 
@@ -76,7 +76,7 @@ def build_filter(expr, params=None):
     return _PLACEHOLDER.sub(replace, expr)
 
 
-def path_segment(value):
+def quote_path_segment(value):
     """
     Quote a value for one segment of a path of the api.
 
@@ -91,7 +91,7 @@ def path_segment(value):
     ### Example
 
     ```python
-    pb.send('GET', f'/api/collections/{path_segment(name)}/records')
+    pb.send('GET', f'/api/collections/{quote_path_segment(name)}/records')
     ```
 
     """

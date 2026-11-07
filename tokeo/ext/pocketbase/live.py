@@ -61,7 +61,7 @@ from collections import namedtuple
 from nicegui import ui, app as nicegui_app, background_tasks, context
 from tokeo.ext.nicegui import guard_user_context
 from tokeo.core.pocketbase import TokeoPocketBaseError
-from tokeo.core.pocketbase.realtime import MAX_SUBSCRIPTIONS, AsyncRealtime, topic_key
+from tokeo.core.pocketbase.realtime import MAX_SUBSCRIPTIONS, AsyncRealtime, format_topic_key
 
 #: The logger of this module
 LOG = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class LiveFeed:
     - **max_subscriptions** (int): The subscriptions of one channel, another
         channel opens beyond
     - **channel_kwargs**: Options of each ```AsyncRealtime```, e.g.
-        ```max_pending``` or ```auth_check```
+        ```max_pending``` or ```auth_check_seconds```
 
     """
 
@@ -204,7 +204,7 @@ class LiveFeed:
         if filter:
             options = dict(options or {})
             options['query'] = {**options.get('query', {}), 'filter': filter}
-        key = topic_key(topic, options)
+        key = format_topic_key(topic, options)
         # the channel that has the subscription, else one with room, else a new one
         channel = next((channel for channel in self.channels if key in channel.topics), None)
         channel = channel or next((channel for channel in self.channels if len(channel.topics) < self.max_subscriptions), None)
@@ -221,7 +221,7 @@ class LiveFeed:
         channel.subscribe(topic, on_event, options)
         self._followers.append(_Follower(page.id, channel, topic, options, on_event, reload))
         # a new channel reloads the page on its connect, a live one now
-        if reload and channel.connected.is_set():
+        if reload and channel.connected_event.is_set():
             await channel.flush()
             await _call(reload)
 

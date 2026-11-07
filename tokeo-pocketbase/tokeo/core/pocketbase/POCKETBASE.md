@@ -23,7 +23,7 @@ binary and its source.
 | ```Collection``` | ```collection``` | the records of a collection: list, get, create, update, delete |
 | ```Batch``` | ```batch``` | record changes in one transaction |
 | ```Record```, ```ListResult``` | ```record``` | a record with its fields as attributes, a page of records |
-| ```build_filter``` / ```pb.filter()```, ```path_segment``` | ```filter``` | values from outside quoted for a filter and for a path |
+| ```format_filter``` / ```pb.filter()```, ```quote_path_segment``` | ```filter``` | values from outside quoted for a filter and for a path |
 | ```TokeoPocketBaseError```, ```TokeoPocketBaseAuthError``` | ```exc``` | the errors |
 | ```Realtime```, ```AsyncRealtime``` | ```realtime``` | the realtime events, in threads for plain functions or as tasks of asyncio, e.g. of nicegui |
 
@@ -95,7 +95,7 @@ pb.before_request = AuthKeeper(pb, login, min_valid_seconds=60, check_seconds=60
 ```
 
 A login of the client itself, e.g. a new impersonation, counts as
-confirmed; ```pb.logins``` counts them, a refresh does not.
+confirmed; ```pb.login_cnt``` counts them, a refresh does not.
 
 ### Impersonation
 
@@ -142,7 +142,7 @@ posts.delete(post.id)
   batch api on in the settings of PocketBase first, it is off by default
 
 ```python
-created, upserted = pb.batch().create('posts', {'title': 'a'}).upsert('posts', {'id': 'post00000000001', 'title': 'b'}).send()
+created, upserted = pb.create_batch().create('posts', {'title': 'a'}).upsert('posts', {'id': 'post00000000001', 'title': 'b'}).send()
 ```
 
 Every error raises ```TokeoPocketBaseError``` with ```status``` (0 without an
@@ -194,12 +194,13 @@ What a channel guarantees:
   3000 events of 20 KB with a hanging callback grew PocketBase by 52 MB, as
   much as without any realtime client; before, by 105 MB and on without end
 - **No silent guest.** Before it sends its subscriptions and every
-  ```auth_check``` seconds the channel confirms its login, by the
+  ```auth_check_seconds``` the channel confirms its login, by the
   ```before_request``` of the client or by a refresh. A login that cannot be
   confirmed shows as ```error``` with ```status``` connecting
 - **Back after each loss.** A lost connection is opened again after a delay
-  growing from 0.5 seconds up to ```max_delay```; one the server ended after it
-  served at least ```STABLE_SECONDS``` (10) is opened again at once
+  growing from 0.5 seconds up to ```max_delay_seconds```; one the server ended
+  after it served at least ```MIN_STABLE_SECONDS``` (10) is opened again at
+  once
 - **Nothing left behind.** ```stop()``` ends the connection at once, also a
   read that waits; no thread, task or socket stays
 
@@ -463,9 +464,9 @@ The options of a channel, within a Tokeo app the ```realtime_*``` config:
 | Option | Config of Tokeo | Default | Meaning |
 |---|---|---|---|
 | ```max_pending``` | ```realtime_max_pending``` | 1000 | events that may wait for the callbacks before the channel hangs up |
-| ```auth_check``` | ```realtime_auth_check``` | 60 s | seconds between two confirmations of the login |
+| ```auth_check_seconds``` | ```realtime_auth_check``` | 60 s | seconds between two confirmations of the login |
 | ```read_timeout``` | ```realtime_read_timeout``` | 330 s | a connection silent longer counts as lost, 30 s above idle |
-| ```max_delay``` | ```realtime_max_delay``` | 30 s | the longest delay before a new try, doubled from 0.5 s; also the pause after the callbacks fell behind |
+| ```max_delay_seconds``` | ```realtime_max_delay``` | 30 s | the longest delay before a new try, doubled from 0.5 s; also the pause after the callbacks fell behind |
 
 ## 11. Tips for running it
 

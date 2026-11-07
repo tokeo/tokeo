@@ -5,7 +5,7 @@ PocketBase; it must be switched on in the settings of PocketBase.
 """
 
 from .record import Record
-from .filter import path_segment
+from .filter import quote_path_segment
 
 
 class Batch:
@@ -19,7 +19,7 @@ class Batch:
     ### Example
 
     ```python
-    batch = pb.batch()
+    batch = pb.create_batch()
     batch.create('posts', {'title': 'A'})
     batch.update('posts', post_id, {'views': 4})
     batch.delete('posts', old_id)
@@ -43,9 +43,9 @@ class Batch:
 
     def _add(self, method, collection, record_id, data):
         # one request of the batch
-        url = f'/api/collections/{path_segment(collection)}/records'
+        url = f'/api/collections/{quote_path_segment(collection)}/records'
         if record_id is not None:
-            url = f'{url}/{path_segment(record_id)}'
+            url = f'{url}/{quote_path_segment(record_id)}'
         request = {'method': method, 'url': url}
         if data is not None:
             request['body'] = data

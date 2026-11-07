@@ -40,7 +40,7 @@ with PocketBase('http://127.0.0.1:8090') as pb:
 
 from .exc import TokeoPocketBaseError, TokeoPocketBaseAuthError
 from .record import Record, ListResult
-from .filter import build_filter, path_segment
+from .filter import format_filter, quote_path_segment
 from .client import PocketBase, AuthKeeper
 from .collection import Collection
 from .batch import Batch
@@ -50,8 +50,8 @@ __all__ = [
     'TokeoPocketBaseAuthError',
     'Record',
     'ListResult',
-    'build_filter',
-    'path_segment',
+    'format_filter',
+    'quote_path_segment',
     'PocketBase',
     'AuthKeeper',
     'Collection',

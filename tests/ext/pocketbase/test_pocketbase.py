@@ -236,7 +236,7 @@ def test_setup_fills_the_missing_options_with_the_defaults(server):
 def test_setup_gives_the_realtime_options_of_the_config(server):
     """The realtime_* config becomes the options of a channel, as numbers."""
     with PocketbaseTest(dict(realtime_read_timeout='90', realtime_max_pending='50')) as app:
-        assert app.db.realtime_options == dict(read_timeout=90.0, max_pending=50, auth_check=60.0, max_delay=30.0)
+        assert app.db.realtime_options == dict(read_timeout=90.0, max_pending=50, auth_check_seconds=60.0, max_delay_seconds=30.0)
 
 
 def test_setup_sends_no_request(server):
@@ -760,7 +760,7 @@ def test_impersonate_renews_a_login_refused_on_the_server_by_a_new_impersonation
         old = client.token
         del server.tokens[old]
         client.collection('posts').get_list()
-        assert (client.logins, server.requests[-1].headers['Authorization']) == (2, client.token)
+        assert (client.login_cnt, server.requests[-1].headers['Authorization']) == (2, client.token)
         assert client.token != old
         client.close()
     assert ('POST', '/api/collections/users/impersonate/u1') in server.calls[-3:]

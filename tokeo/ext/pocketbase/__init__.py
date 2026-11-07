@@ -232,8 +232,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         self.realtime_options = dict(
             read_timeout=float(self._config('realtime_read_timeout')),
             max_pending=int(self._config('realtime_max_pending')),
-            auth_check=float(self._config('realtime_auth_check')),
-            max_delay=float(self._config('realtime_max_delay')),
+            auth_check_seconds=float(self._config('realtime_auth_check')),
+            max_delay_seconds=float(self._config('realtime_max_delay')),
         )
 
     def _config(self, key, **kwargs):
