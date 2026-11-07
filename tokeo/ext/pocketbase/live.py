@@ -59,7 +59,7 @@ import asyncio
 import logging
 from collections import namedtuple
 from nicegui import ui, app as nicegui_app, background_tasks, context
-from tokeo.ext.nicegui import guard_user_context
+from tokeo.ext.nicegui import check_user_context
 from tokeo.core.pocketbase import TokeoPocketBaseError
 from tokeo.core.pocketbase.realtime import MAX_SUBSCRIPTIONS, AsyncRealtime, format_topic_key
 
@@ -196,7 +196,7 @@ class LiveFeed:
         - **TokeoPocketBaseError**: If the feed is closed
 
         """
-        guard_user_context()
+        check_user_context()
         if self.is_closed:
             raise TokeoPocketBaseError('tokeo live: the feed is closed')
         page = context.client
@@ -248,7 +248,7 @@ class LiveFeed:
         : nicegui reads ```state``` every ```binding_refresh_interval```
 
         """
-        guard_user_context()
+        check_user_context()
         labels = {**LIVE_LABELS, **(labels or {})}
         with ui.element('span') as box:
             for state in LIVE_STATES:
@@ -346,7 +346,7 @@ class LiveHub:
             visitor, never from the request
 
         """
-        guard_user_context()
+        check_user_context()
         page = context.client
         key = (collection, record_id)
         async with self._lock:

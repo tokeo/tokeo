@@ -167,9 +167,9 @@ except ImportError:
             pass
 
 
-def guard_user_context():
+def check_user_context():
     """
-    Ensure that UI elements are only instantiated inside a user's active page route.
+    Check that UI elements are only instantiated inside a user's active page route.
     Stores the validation flag directly on the NiceGUI client object to eliminate
     the need for external ContextVars.
 
@@ -265,7 +265,7 @@ class NiceguiElementHelper:
 
         def wrapper(text=None, *args, **kwargs):
             # check multi-user safety BEFORE creating the new element
-            guard_user_context()
+            check_user_context()
 
             if text is None:
                 return Element(tag=tag)
@@ -364,9 +364,9 @@ class TokeoNicegui(MetaMixin):
             # file patterns ignored by the hotload
             hotload_excludes='.*, .py[cod], .sw.*, ~*',
             # seconds between two checks for changes
-            hotload_interval=2.0,
+            hotload_interval_seconds=2.0,
             # seconds without a change before the hotload restarts
-            hotload_settle=1.5,
+            hotload_settle_seconds=1.5,
             # log level of uvicorn
             logging_level='warning',
             # dict of arguments of ui.run that replace the ones above
@@ -535,14 +535,14 @@ class TokeoNicegui(MetaMixin):
         ### Notes
 
         - Runs as an asynchronous task in the FastAPI event loop
-        - Checks the flag every ```hotload_interval``` seconds
-        - Waits for ```hotload_settle``` seconds of quiet, so a burst of writes
+        - Checks the flag every ```hotload_interval_seconds```
+        - Waits for ```hotload_settle_seconds``` of quiet, so a burst of writes
             collapses into a single restart
         - Triggers FastAPI shutdown, which restarts the app through the hooks
 
         """
-        interval = float(self._config('hotload_interval'))
-        settle = float(self._config('hotload_settle'))
+        interval = float(self._config('hotload_interval_seconds'))
+        settle = float(self._config('hotload_settle_seconds'))
         while True:
             if self._watchdog_hotload_requested and monotonic() - self._watchdog_last_event_time >= settle:
                 fastapi_app.shutdown()

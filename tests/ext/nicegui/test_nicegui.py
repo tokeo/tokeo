@@ -386,10 +386,10 @@ def test_watchdog_handler_reports_changes_of_included_files(event, reported):
 
 
 def test_hotload_loop_shuts_nicegui_down_after_the_settle_time(monkeypatch):
-    """A change shuts nicegui down once 0.2 s of hotload_settle passed."""
+    """A change shuts nicegui down once 0.2 s of hotload_settle_seconds passed."""
     shutdowns = []
     monkeypatch.setattr(nicegui_app, 'shutdown', lambda: shutdowns.append(time.monotonic()))
-    with NiceguiTest(hotload_interval=0.01, hotload_settle=0.2) as app:
+    with NiceguiTest(hotload_interval_seconds=0.01, hotload_settle_seconds=0.2) as app:
         app.nicegui._watchdog_on_event()
         changed = time.monotonic()
         asyncio.run(app.nicegui._watch_file_changes())
