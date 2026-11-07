@@ -12,10 +12,10 @@ nothing outlives the pages.
 ```python
 @ui.page('/orders')
 async def orders_page():
-    feed = app.nicegui.pb.live.service()
+    feed = app.nicegui.pb.live.get_service_feed()
     orders = feed.pb.collection('orders')
     table = ui.table(columns=COLUMNS, rows=[], row_key='id')
-    feed.badge()
+    feed.show_badge()
 
     async def reload():
         records = await asyncio.to_thread(orders.get_full_list)
@@ -32,15 +32,17 @@ async def orders_page():
 
 : Three kinds of pages:
 
-    - ```service()```: one feed by the service identity of ```app.db```,
-        shared by all pages, e.g. for dashboards everybody sees alike
-    - ```await user(collection, id)```: a feed of a user by an impersonation
-        of the service identity; PocketBase applies its rules to the user, so
-        the data is separated at the source, in the records and the events
+    - ```get_service_feed()```: one feed by the service identity of
+        ```app.db```, shared by all pages, e.g. for dashboards everybody sees
+        alike
+    - ```await get_user_feed(collection, id)```: a feed of a user by an
+        impersonation of the service identity; PocketBase applies its rules to
+        the user, so the data is separated at the source, in the records and
+        the events
     - ```follow(..., filter=...)``` on the service feed: each page gets only
         the events whose records match its filter, checked by PocketBase; it
-        separates by the filter, not by the rules, so take ```user()``` where
-        the separation must be safe
+        separates by the filter, not by the rules, so take
+        ```get_user_feed()``` where the separation must be safe
 
 : A feed opens a channel for up to ```max_subscriptions``` subscriptions,
     PocketBase takes no more on one connection, and another one beyond;
@@ -101,23 +103,23 @@ class LiveFeed:
 
     ### Keyword Args
 
-    - **owns_client** (bool): Close the client with the feed
     - **max_subscriptions** (int): The subscriptions of one channel, another
         channel opens beyond
-    - **channel_kwargs**: Options of each ```AsyncRealtime```, e.g.
+    - **has_own_client** (bool): Close the client with the feed
+    - **channel_options**: Options of each ```AsyncRealtime```, e.g.
         ```max_pending``` or ```auth_check_seconds```
 
     """
 
-    def __init__(self, pb, owns_client=False, max_subscriptions=MAX_SUBSCRIPTIONS, **channel_kwargs):
+    def __init__(self, pb, max_subscriptions=MAX_SUBSCRIPTIONS, has_own_client=False, **channel_options):
         #: The client of the login, for the requests of the pages
         self.pb = pb
-        #: Close the client with the feed
-        self.owns_client = owns_client
         #: The subscriptions of one channel
         self.max_subscriptions = max_subscriptions
+        #: Close the client with the feed
+        self.has_own_client = has_own_client
         #: Options of each channel
-        self.channel_kwargs = channel_kwargs
+        self.channel_options = channel_options
         #: The realtime channels of the feed
         self.channels = []
         #: Called without arguments once the last page left
@@ -209,7 +211,7 @@ class LiveFeed:
         channel = next((channel for channel in self.channels if key in channel.topics), None)
         channel = channel or next((channel for channel in self.channels if len(channel.topics) < self.max_subscriptions), None)
         if channel is None:
-            channel = AsyncRealtime(self.pb, **self.channel_kwargs)
+            channel = AsyncRealtime(self.pb, **self.channel_options)
 
             async def reload_pages(channel=channel):
                 # events may be missing after a (re)connect: its pages load anew
@@ -225,7 +227,7 @@ class LiveFeed:
             await channel.flush()
             await _call(reload)
 
-    def badge(self, labels=None):
+    def show_badge(self, labels=None):
         """
         Show the state of the feed on the current page.
 
@@ -264,7 +266,7 @@ class LiveFeed:
         channels, self.channels = self.channels, []
         self._followers.clear()
         await asyncio.gather(*(channel.stop() for channel in channels))
-        if self.owns_client:
+        if self.has_own_client:
             self.pb.close()
 
 
@@ -279,7 +281,7 @@ class LiveHub:
 
     ### Keyword Args
 
-    - **channel_kwargs**: Options of each ```AsyncRealtime```, over the
+    - **channel_options**: Options of each ```AsyncRealtime```, over the
         ```realtime_*``` options of the pocketbase config
 
     ### Notes
@@ -289,17 +291,17 @@ class LiveHub:
 
     """
 
-    def __init__(self, app, **channel_kwargs):
+    def __init__(self, app, **channel_options):
         #: The Cement application
         self.app = app
         #: Options of each channel
-        self.channel_kwargs = {**app.db.realtime_options, **channel_kwargs}
+        self.channel_options = {**app.db.realtime_options, **channel_options}
         self._service = None
         self._users = {}
         self._lock = asyncio.Lock()
-        nicegui_app.on_shutdown(self.stop)
+        nicegui_app.on_shutdown(self.close)
 
-    def service(self):
+    def get_service_feed(self):
         """
         Get the feed of the service identity, shared by all pages.
 
@@ -314,10 +316,10 @@ class LiveHub:
 
         """
         if self._service is None or self._service.is_closed:
-            self._service = LiveFeed(self.app.db.pb, **self.channel_kwargs)
+            self._service = LiveFeed(self.app.db.pb, **self.channel_options)
         return self._service
 
-    async def user(self, collection, record_id):
+    async def get_user_feed(self, collection, record_id):
         """
         Get the feed of a user, held by the current page.
 
@@ -353,7 +355,7 @@ class LiveHub:
             feed = self._users.get(key)
             if feed is None:
                 pb = await asyncio.to_thread(self.app.db.impersonate, collection, record_id)
-                feed = LiveFeed(pb, owns_client=True, **self.channel_kwargs)
+                feed = LiveFeed(pb, has_own_client=True, **self.channel_options)
 
                 def close_idle_feed(feed=feed):
                     # the last page of the user left: free channels and client
@@ -366,7 +368,7 @@ class LiveHub:
             feed.hold(page)
         return feed
 
-    async def stop(self):
+    async def close(self):
         """Close all feeds, called when nicegui shuts down."""
         feeds = [feed for feed in (self._service, *self._users.values()) if feed is not None]
         self._service, self._users = None, {}

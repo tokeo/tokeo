@@ -224,12 +224,12 @@ def test_setup_fills_the_missing_options_with_the_defaults(server):
             auth_check_seconds=60,
             realtime_read_timeout=330,
             realtime_max_pending=1000,
-            realtime_auth_check=60,
-            realtime_max_delay=30,
+            realtime_auth_check_seconds=60,
+            realtime_max_delay_seconds=30,
             max_connections=None,
             tls_verify_cert=True,
             tls_verify_hostname=True,
-            tls_ca=None,
+            tls_ca_path=None,
         )
 
 
@@ -275,7 +275,7 @@ def test_setup_https_url_with_secure_defaults_keeps_the_httpx_default(server):
     [
         (dict(tls_verify_cert=False), ssl.CERT_NONE, False),
         (dict(tls_verify_hostname=False), ssl.CERT_REQUIRED, False),
-        (dict(tls_ca=certifi.where()), ssl.CERT_REQUIRED, True),
+        (dict(tls_ca_path=certifi.where()), ssl.CERT_REQUIRED, True),
     ],
     ids=['no_cert_check', 'no_hostname_check', 'own_ca'],
 )
@@ -293,10 +293,10 @@ def test_setup_https_scheme_in_capitals_enables_tls(server):
         assert server.client_kwargs['verify'].verify_mode == ssl.CERT_NONE
 
 
-def test_setup_missing_tls_ca_fails(server, tmp_path):
-    """A tls_ca that does not exist fails the setup with FileNotFoundError."""
+def test_setup_missing_tls_ca_path_fails(server, tmp_path):
+    """A tls_ca_path that does not exist fails the setup with FileNotFoundError."""
     with pytest.raises(FileNotFoundError):
-        with PocketbaseTest(dict(url='https://pocketbase.test', tls_ca=str(tmp_path / 'missing.pem'))):
+        with PocketbaseTest(dict(url='https://pocketbase.test', tls_ca_path=str(tmp_path / 'missing.pem'))):
             pass
 
 

@@ -138,9 +138,9 @@ class TokeoPocketBaseHandler(MetaMixin):
             # up, so PocketBase never holds events for it
             realtime_max_pending=1000,
             # seconds between two confirmations of the login of a channel
-            realtime_auth_check=60,
+            realtime_auth_check_seconds=60,
             # the longest delay in seconds before a channel connects again
-            realtime_max_delay=30,
+            realtime_max_delay_seconds=30,
             # max concurrent http connections per process (httpx
             # max_connections); unset uses the httpx default and excess
             # requests wait for a free connection
@@ -151,7 +151,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             # the hostname check while still verifying the chain
             tls_verify_hostname=True,
             # path to a CA bundle to trust instead of the system store
-            tls_ca=None,
+            tls_ca_path=None,
         )
 
     #: (tokeo.core.pocketbase.PocketBase) The PocketBase client, set on setup
@@ -203,7 +203,7 @@ class TokeoPocketBaseHandler(MetaMixin):
             context, _ = tls_create_ssl_context(
                 self._config('tls_verify_hostname'),
                 self._config('tls_verify_cert'),
-                self._config('tls_ca'),
+                self._config('tls_ca_path'),
             )
         # build the httpx client kwargs: a custom tls context (custom ca or
         # relaxed verification) and an optional max of concurrent connections
@@ -232,8 +232,8 @@ class TokeoPocketBaseHandler(MetaMixin):
         self.realtime_options = dict(
             read_timeout=float(self._config('realtime_read_timeout')),
             max_pending=int(self._config('realtime_max_pending')),
-            auth_check_seconds=float(self._config('realtime_auth_check')),
-            max_delay_seconds=float(self._config('realtime_max_delay')),
+            auth_check_seconds=float(self._config('realtime_auth_check_seconds')),
+            max_delay_seconds=float(self._config('realtime_max_delay_seconds')),
         )
 
     def _config(self, key, **kwargs):
@@ -379,7 +379,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         Close the PocketBase connection.
 
         Lifecycle hook required by the database handler contract and wired
-        to the pre_close hook via pocketbase_close(). It clears any stored
+        to the pre_close hook via tokeo_pocketbase_shutdown(). It clears any stored
         auth token so the identity does not outlive the handler, and closes
         the connection pool of the http client; the handler is not usable
         afterwards.
@@ -641,7 +641,7 @@ class TokeoPocketBaseHandler(MetaMixin):
         return self.collection(collection).delete(record_id, query)
 
 
-def pocketbase_extend_app(app):
+def tokeo_pocketbase_extend_app(app):
     """
     Extend the application with PocketBase functionality.
 
@@ -662,10 +662,10 @@ def pocketbase_extend_app(app):
     app.extend('db', TokeoPocketBaseHandler(app))
     app.db._setup(app)
     # nicegui defines its hook only when it is loaded, else this is ignored
-    app.hook.register('tokeo_nicegui_extend', pocketbase_extend_nicegui)
+    app.hook.register('tokeo_nicegui_extend', tokeo_pocketbase_extend_nicegui)
 
 
-def pocketbase_extend_nicegui(app):
+def tokeo_pocketbase_extend_nicegui(app):
     """
     Add the live data of PocketBase to nicegui as app.nicegui.pb.
 
@@ -683,7 +683,7 @@ def pocketbase_extend_nicegui(app):
     app.nicegui.extend('pb', NiceguiPocketBase(app))
 
 
-def pocketbase_close(app):
+def tokeo_pocketbase_shutdown(app):
     """
     Handle application shutdown for PocketBase.
 
@@ -743,5 +743,5 @@ def load(app):
     app._meta.db_handler = TokeoPocketBaseHandler.Meta.label
 
     # Register hooks for initialization and cleanup
-    app.hook.register('post_setup', pocketbase_extend_app)
-    app.hook.register('pre_close', pocketbase_close)
+    app.hook.register('post_setup', tokeo_pocketbase_extend_app)
+    app.hook.register('pre_close', tokeo_pocketbase_shutdown)

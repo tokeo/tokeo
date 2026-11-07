@@ -297,8 +297,8 @@ pocketbase:
   # realtime channels, e.g. of app.nicegui.pb.live
   realtime_read_timeout: 330
   realtime_max_pending: 1000
-  realtime_auth_check: 60
-  realtime_max_delay: 30
+  realtime_auth_check_seconds: 60
+  realtime_max_delay_seconds: 30
 ```
 
 - The service identity logs in on first use and is kept by an
@@ -335,7 +335,7 @@ async def orders_view(feed, filter=None):
     # the orders the feed lets the page see, with the badge of its state
     orders = feed.pb.collection('orders')
     table = ui.table(columns=COLUMNS, rows=[], row_key='id')
-    feed.badge()
+    feed.show_badge()
 
     async def reload():
         records = await asyncio.to_thread(orders.get_full_list, filter=filter, sort='invoice')
@@ -354,7 +354,7 @@ async def orders_view(feed, filter=None):
 
 @ui.page('/dashboard')
 async def dashboard():
-    await orders_view(app.nicegui.pb.live.service())
+    await orders_view(app.nicegui.pb.live.get_service_feed())
 ```
 
 All dashboards of the process share one channel.
@@ -365,7 +365,7 @@ All dashboards of the process share one channel.
 @ui.page('/my-orders')
 async def my_orders():
     user_id = app.storage.user['id']             # from the login of your site
-    await orders_view(await app.nicegui.pb.live.user('users', user_id))
+    await orders_view(await app.nicegui.pb.live.get_user_feed('users', user_id))
 ```
 
 The feed acts as the user by an impersonation: PocketBase applies its rules
@@ -378,7 +378,7 @@ closes with its client after the last page of the user left.
 ```python
 @ui.page('/team/{team}')
 async def team_orders(team: str):
-    feed = app.nicegui.pb.live.service()
+    feed = app.nicegui.pb.live.get_service_feed()
     await orders_view(feed, filter=feed.pb.filter('team = {:team}', {'team': team}))
 ```
 
@@ -397,7 +397,7 @@ page as the user where the separation must be safe.
   pages closes with its client. A dead tab is served no longer
 - ```on_event``` runs in the event loop and must be quick, reload more in a
   task of its own
-- ```feed.badge(labels={'live': 'aktuell'})``` shows live, connecting,
+- ```feed.show_badge(labels={'live': 'aktuell'})``` shows live, connecting,
   offline with the error as tooltip, or off; the labels are free
 
 ### Cost
@@ -464,9 +464,9 @@ The options of a channel, within a Tokeo app the ```realtime_*``` config:
 | Option | Config of Tokeo | Default | Meaning |
 |---|---|---|---|
 | ```max_pending``` | ```realtime_max_pending``` | 1000 | events that may wait for the callbacks before the channel hangs up |
-| ```auth_check_seconds``` | ```realtime_auth_check``` | 60 s | seconds between two confirmations of the login |
+| ```auth_check_seconds``` | ```realtime_auth_check_seconds``` | 60 s | seconds between two confirmations of the login |
 | ```read_timeout``` | ```realtime_read_timeout``` | 330 s | a connection silent longer counts as lost, 30 s above idle |
-| ```max_delay_seconds``` | ```realtime_max_delay``` | 30 s | the longest delay before a new try, doubled from 0.5 s; also the pause after the callbacks fell behind |
+| ```max_delay_seconds``` | ```realtime_max_delay_seconds``` | 30 s | the longest delay before a new try, doubled from 0.5 s; also the pause after the callbacks fell behind |
 
 ## 11. Tips for running it
 

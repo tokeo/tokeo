@@ -63,7 +63,7 @@ async def _show_orders_page(feed, filter=None):
     orders = feed.pb.collection('orders')
     titles = {}
     label = ui.label()
-    feed.badge()
+    feed.show_badge()
 
     def show():
         label.text = f'orders: [{",".join(sorted(titles.values()))}]'
@@ -90,15 +90,15 @@ def _map_pages():
 
     @ui.page('/dashboard')
     async def dashboard():
-        await _show_orders_page(live.service())
+        await _show_orders_page(live.get_service_feed())
 
     @ui.page('/mine/{user_id}')
     async def mine(user_id: str):
-        await _show_orders_page(await live.user('users', user_id))
+        await _show_orders_page(await live.get_user_feed('users', user_id))
 
     @ui.page('/split/{user_id}')
     async def split(user_id: str):
-        feed = live.service()
+        feed = live.get_service_feed()
         await _show_orders_page(feed, filter=feed.pb.filter('owner = {:id}', {'id': user_id}))
 
 
@@ -195,7 +195,7 @@ def test_live_pages_share_a_channel_and_leave_nothing_behind(server, su):
             first, second = simulation.user(), simulation.user()
             await first.open('/dashboard')
             await second.open('/dashboard')
-            feed = app.nicegui.pb.live.service()
+            feed = app.nicegui.pb.live.get_service_feed()
             assert await wait_until_async(lambda: feed.state == 'live')
             channel = feed.channels[0]
             assert (len(feed.channels), channel.topics) == (1, ['orders/*'])
@@ -256,7 +256,7 @@ def test_live_user_page_shows_offline_once_the_user_is_deleted(server, su):
     with the error instead of running on as a silent guest.
     """
     gone = su.collection('users').create({'email': 'gone@tokeo.test', 'password': 'user-pass-123', 'passwordConfirm': 'user-pass-123'})
-    with LiveTest(server['url'], auth_check_seconds=0.2, realtime_auth_check=0.2, realtime_max_delay=0.2) as app:
+    with LiveTest(server['url'], auth_check_seconds=0.2, realtime_auth_check_seconds=0.2, realtime_max_delay_seconds=0.2) as app:
 
         async def visit(simulation):
             user = simulation.user()
@@ -295,7 +295,7 @@ def test_live_feed_opens_another_channel_beyond_max_subscriptions(server, su):
     with LiveTest(server['url']) as app:
 
         async def visit(simulation):
-            feed = app.nicegui.pb.live.service()
+            feed = app.nicegui.pb.live.get_service_feed()
             feed.max_subscriptions = 1
             anna, bert = simulation.user(), simulation.user()
             await anna.open(f'/split/{server["anna"]}')
@@ -312,17 +312,17 @@ def test_live_feed_opens_another_channel_beyond_max_subscriptions(server, su):
 # outside a page
 
 
-def test_live_follow_badge_and_user_refuse_to_run_outside_a_page(server):
-    """follow, user and the badge raise outside of a page while nicegui runs."""
+def test_live_follow_show_badge_and_get_user_feed_refuse_to_run_outside_a_page(server):
+    """follow, get_user_feed and show_badge raise outside of a page of nicegui."""
     with LiveTest(server['url']) as app:
 
         async def visit(simulation):
-            feed = app.nicegui.pb.live.service()
+            feed = app.nicegui.pb.live.get_service_feed()
             with pytest.raises(TokeoNiceguiError):
                 await feed.follow('orders/*', print)
             with pytest.raises(TokeoNiceguiError):
-                await app.nicegui.pb.live.user('users', server['anna'])
+                await app.nicegui.pb.live.get_user_feed('users', server['anna'])
             with pytest.raises(TokeoNiceguiError):
-                feed.badge()
+                feed.show_badge()
 
         NiceguiSimulation(app).run(visit)
