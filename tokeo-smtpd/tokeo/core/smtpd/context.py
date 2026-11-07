@@ -8,11 +8,12 @@ the Ruby code assigns into the hash.
 ### Notes
 
 : Conventions kept: string fields default to ```''```; ```proxy``` and
-    ```message.spooler``` are ```None```; ```received```/```delivered```/
-    ```bytesize``` start at ```-1```; ```encrypted```/```authenticated```
-    are a single field each: empty while off, a UTC timestamp once on;
-    ```headers``` flips from ```False``` to ```True```; ```data``` is the
-    raw message and is appended to directly
+    ```message.spooler``` are ```None```; ```bytesize``` starts at ```-1```;
+    the points in time ```connected_at```, ```authenticated_at```,
+    ```encrypted_at```, ```received_at``` and ```delivered_at``` are
+    ```None``` until set, then a UTC ```datetime``` (ISO 8601 text in a
+    JSON dump); ```headers``` flips from ```False``` to ```True```;
+    ```data``` is the raw message and is appended to directly
 : Python keyword clash: the Ruby ```ctx[:envelope][:from]``` / ```[:to]``` are
     ```ctx.envelope.mail_from``` / ```ctx.envelope.rcpt_tos``` (```from``` and
     ```to``` are reserved words); every other name is unchanged. The body is
@@ -54,20 +55,20 @@ class ServerCtx:
     helo: str = ''
     #: Writable EHLO/HELO greeting text
     helo_response: str = ''
-    #: When the connection was established (UTC)
-    connected: object = ''
+    #: When the connection was established (UTC datetime), None before
+    connected_at: object = None
     #: Count of exceptions seen on this connection
-    exceptions: int = 0
+    exception_cnt: int = 0
     #: Collected error objects for logging
     errors: list = field(default_factory=list)
     #: SASL authorization id set on a successful AUTH
     authorization_id: str = ''
     #: SASL authentication id set on a successful AUTH
     authentication_id: str = ''
-    #: When AUTH succeeded (UTC); empty/None while unauthenticated
-    authenticated: object = ''
-    #: When STARTTLS completed (UTC); empty/None while plain
-    encrypted: object = ''
+    #: When AUTH succeeded (UTC datetime), None while unauthenticated
+    authenticated_at: object = None
+    #: When STARTTLS completed (UTC datetime), None while plain
+    encrypted_at: object = None
 
     def reset_on_starttls(self):
         """Drop the HELO and the AUTH state the client gave before TLS."""
@@ -78,7 +79,7 @@ class ServerCtx:
         """Drop the AUTH state, as after the start of a new TLS channel."""
         self.authorization_id = ''
         self.authentication_id = ''
-        self.authenticated = ''
+        self.authenticated_at = None
 
 
 @dataclass
@@ -116,8 +117,8 @@ class MessageSpooler:
 
     ### Args
 
-    - **dir** (str, optional): Directory of the spool file, None for the
-        temp directory of the system
+    - **spool_dir** (str, optional): Directory of the spool file, None for
+        the temp directory of the system
     - **prefix** (str, optional): Start of the name of the spool file
     - **debug** (bool, optional): Keep the spool file on disk when it is
         unlinked. Defaults to False.
@@ -126,11 +127,11 @@ class MessageSpooler:
 
     __slots__ = ('fd', 'file', 'path', 'last_line_break', 'debug')
 
-    def __init__(self, dir=None, prefix=None, debug=False):
-        # create spool temp file for dir + prefix
+    def __init__(self, spool_dir=None, prefix=None, debug=False):
+        # create spool temp file for spool_dir + prefix
         #: File descriptor and path of the spool file, the descriptor None once
         #: closed
-        self.fd, self.path = tempfile.mkstemp(dir=dir, prefix=prefix, suffix='.eml')
+        self.fd, self.path = tempfile.mkstemp(dir=spool_dir, prefix=prefix, suffix='.eml')
         # open file handle to write
         #: Writable binary handle of the spool file, None once closed
         self.file = os.fdopen(self.fd, 'wb')
@@ -227,10 +228,10 @@ class MessageCtx:
 
     """
 
-    #: When body reception started (UTC); initialized with -1
-    received: object = -1
-    #: When body reception completed (UTC); initialized with -1
-    delivered: object = -1
+    #: When body reception started (UTC datetime), None before
+    received_at: object = None
+    #: When body reception completed (UTC datetime), None before
+    delivered_at: object = None
     #: Running total size of the message in bytes while receiving (final
     #: after the closing dot); -1 until the first DATA line
     bytesize: int = -1

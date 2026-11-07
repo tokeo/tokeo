@@ -30,7 +30,7 @@ def test_chomp_removes_exactly_one_line_break(data, chomped):
 
 def test_chomp_of_a_closed_spool_file_keeps_the_size(tmp_path):
     """Once the spool file is closed, the chomp returns the given size."""
-    spooler = MessageSpooler(dir=str(tmp_path))
+    spooler = MessageSpooler(spool_dir=str(tmp_path))
     spooler.file.write(b'body\r\n')
     spooler.last_line_break = b'\r\n'
     spooler.close()

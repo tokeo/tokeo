@@ -139,12 +139,12 @@ def test_shared_limits_count_across_processes():
     proc = multiprocessing.get_context('fork').Process(target=run_child, args=(limits,))
     proc.start()
     proc.join(5)
-    assert limits.active == 2 and limits.active_processings == 1
+    assert limits.connection_cnt == 2 and limits.processing_cnt == 1
     limits.release()
     limits.end_processing()
     limits.release()
     limits.release()  # floor at 0
-    assert limits.active == 0 and limits.active_processings == 0
+    assert limits.connection_cnt == 0 and limits.processing_cnt == 0
 
 
 @isolated
@@ -166,17 +166,17 @@ def test_shared_limits_give_the_last_slot_to_one_process_only():
         proc.start()
     for proc in procs:
         proc.join(5)
-    assert taken.value == 1 and limits.active_processings == 1
+    assert taken.value == 1 and limits.processing_cnt == 1
 
 
-def test_shared_limits_slot_wait_recheck_interval():
-    """slot_wait returns by its poll within 0.5 s without an event."""
+def test_shared_limits_wait_for_slot_recheck_interval():
+    """wait_for_slot returns by its poll within 0.5 s without an event."""
     limits = SharedGlobalLimits(max_processings=1)
 
     async def go():
         limits.slot_free.clear()
         start = time.perf_counter()
-        await limits.slot_wait()  # nobody sets the event
+        await limits.wait_for_slot()  # nobody sets the event
         return time.perf_counter() - start
 
     assert asyncio.run(go()) < 0.5  # returns via the poll

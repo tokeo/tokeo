@@ -102,12 +102,12 @@ class DefaultEvents(SmtpdEvents):
 
 def test_logging_dispatched_when_handler_overrides():
     """An overridden on_logging_event gets a dispatch entry."""
-    assert SmtpdEvent.ON_LOGGING_EVENT in SmtpdServer(LoggingEvents()).emit_events
+    assert SmtpdEvent.ON_LOGGING_EVENT in SmtpdServer(LoggingEvents())._event_dispatch_dict
 
 
 def test_logging_dispatched_when_handler_does_not_override():
     """The default on_logging_event gets a dispatch entry too."""
-    assert SmtpdEvent.ON_LOGGING_EVENT in SmtpdServer(DefaultEvents()).emit_events
+    assert SmtpdEvent.ON_LOGGING_EVENT in SmtpdServer(DefaultEvents())._event_dispatch_dict
 
 
 class Recorder:
@@ -341,5 +341,5 @@ def test_a_handler_without_on_logging_event_logs_nothing():
         pass
 
     server = SmtpdServer(Bare())
-    assert SmtpdEvent.ON_LOGGING_EVENT not in server.emit_events
+    assert SmtpdEvent.ON_LOGGING_EVENT not in server._event_dispatch_dict
     server.logger.warning('nobody listens')

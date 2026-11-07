@@ -37,7 +37,7 @@ from tokeo.core.utils.validate import is_int_gt, is_number_ge, is_number_between
 from .context import SmtpdContext, ServerCtx, EnvelopeCtx, MessageCtx, MessageSpooler
 from .tls import TlsTransport, EncryptMode
 from .logger import Severity, ForwardingLogger
-from .events import SmtpdEvents, SmtpdEvent, SMTPD_EVENT_NAMES
+from .events import SmtpdEvents, SmtpdEvent, EVENT_METHOD_NAMES
 
 
 from .exc import (
@@ -176,7 +176,7 @@ def _parse_mode(enum_cls, value, default, label):
         raise ValueError(f'{label} must be one of {allowed}, got {value!r}')
 
 
-def tls_immediate_supported():
+def is_tls_immediate_supported():
     """
     Tell whether this Python supports the encrypt mode TLS_IMMEDIATE.
 
@@ -368,8 +368,8 @@ class GlobalLimits:
     """
     Process-wide limits shared across all services in one event loop.
 
-    Plain counters (one loop, no threads): ```active``` open connections and
-    ```active_processings``` in-progress dialogs, checked against the limits.
+    Plain counters (one loop, no threads): ```connection_cnt``` open connections
+    and ```processing_cnt``` in-progress dialogs, checked against the limits.
 
     ### Args
 
@@ -386,9 +386,9 @@ class GlobalLimits:
         #: Global max of open connections, None is unlimited
         self.max_connections = int(max_connections) if max_connections else None
         #: Open connections of all services
-        self.active = 0
+        self.connection_cnt = 0
         #: In-progress dialogs of all services
-        self.active_processings = 0
+        self.processing_cnt = 0
         #: @private Shared wake event: a slot released on any service wakes
         #: every waiter (each server with global_limits waits on this instead
         #: of a local one)
@@ -397,15 +397,15 @@ class GlobalLimits:
 
     def admit(self):
         """Count one more open connection."""
-        self.active += 1
+        self.connection_cnt += 1
 
     def release(self):
         """Drop one open connection."""
-        self.active = max(0, self.active - 1)
+        self.connection_cnt = max(0, self.connection_cnt - 1)
 
     def begin_processing(self):
         """Count one more in-progress dialog."""
-        self.active_processings += 1
+        self.processing_cnt += 1
 
     def try_begin_processing(self):
         """
@@ -416,16 +416,16 @@ class GlobalLimits:
         - **bool**: True when the dialog was counted, False at max_processings
 
         """
-        if self.max_processings is not None and self.active_processings >= self.max_processings:
+        if self.max_processings is not None and self.processing_cnt >= self.max_processings:
             return False
-        self.active_processings += 1
+        self.processing_cnt += 1
         return True
 
     def end_processing(self):
         """Drop one in-progress dialog."""
-        self.active_processings = max(0, self.active_processings - 1)
+        self.processing_cnt = max(0, self.processing_cnt - 1)
 
-    async def slot_wait(self):
+    async def wait_for_slot(self):
         """
         Wait until a slot may be free again (woken via ```slot_free```).
 
@@ -441,7 +441,7 @@ class GlobalLimits:
         await self.slot_free.wait()
 
 
-def _get_tls_cert_names(cert_cn, cert_san, hosts, addresses):
+def _get_tls_cert_names(cert_cn, cert_sans, hosts, addresses):
     """
     The CN and SAN for the self-signed certificate (reference parity).
 
@@ -454,7 +454,7 @@ def _get_tls_cert_names(cert_cn, cert_san, hosts, addresses):
 
     """
     if cert_cn is not None:
-        return cert_cn, cert_san
+        return cert_cn, cert_sans
     names = list(hosts) + [host for host, _port in addresses]
     # the wildcard binds all interfaces: name the local host instead (best effort)
     if '*' in hosts:
@@ -475,8 +475,8 @@ class SmtpdServer:
     The SMTP service: binds listeners and serves each client.
 
     The option names follow MidiSmtpServer wherever the principles of Tokeo
-    allow; ```data_size``` is a Tokeo-only option (a hard limit of the message
-    size while receiving DATA).
+    allow; ```max_data_bytes``` is a Tokeo-only option (a hard limit of the
+    message size while receiving DATA).
 
     ### Args
 
@@ -486,6 +486,8 @@ class SmtpdServer:
     - **logger** (optional): Target of the default ```on_logging_event```, any
         logger with ```debug```/```info```/```warning```/```error```/```critical```;
         when not given an own stderr logger with ```logger_severity``` is used
+    - **debug** (bool, optional): Debug mode, keeps the spool files on disk.
+        Defaults to False.
 
     """
 
@@ -501,7 +503,7 @@ class SmtpdServer:
         #: The bound handler implementation instance
         self.events_handler = events_handler
         #: The dispatch table of the events the handler overrides
-        self.emit_events = self._build_emit_events_dispatcher(events_handler)
+        self._event_dispatch_dict = self._build_event_dispatch_dict(events_handler)
         #: Whether the server runs in debug mode
         self.debug = bool(debug)
         #: Limits shared across services, None for none
@@ -570,12 +572,12 @@ class SmtpdServer:
         self.io_proxy_cmd_timeout = options.get('io_proxy_cmd_timeout', DEFAULT_IO_PROXY_CMD_TIMEOUT)
         # test for message spooling
         # value has to be an existing directory + file-name prefix
-        value = options.get('spool')
+        value = options.get('spool_path_prefix')
         if value:
             value = str(value)
             self._spool_dir, self._spool_prefix = os.path.split(value)
             if not os.path.isdir(self._spool_dir):
-                raise ValueError(f'spool: directory does not exist: {self._spool_dir!r}')
+                raise ValueError(f'spool_path_prefix: directory does not exist: {self._spool_dir!r}')
             self._is_spooling = True
         else:
             self._is_spooling = False
@@ -601,7 +603,7 @@ class SmtpdServer:
             CrlfDataMode.CRLF_DATA_STRICT_CLOSE,
         ):
             raise ValueError('Line breaks in DATA (crlf_data_mode) must be CRLF_DATA_STRICT or CRLF_DATA_STRICT_CLOSE with CRLF_STRICT!')
-        if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not tls_immediate_supported():
+        if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not is_tls_immediate_supported():
             raise ValueError('Immediate TLS (encrypt_mode TLS_IMMEDIATE) requires Python 3.13.13+ or 3.14.4+!')
         if not is_number_ge(self.io_cmd_timeout, 1):
             raise ValueError('Timeout for a command line (io_cmd_timeout) must be at least 1 second!')
@@ -625,15 +627,15 @@ class SmtpdServer:
                 )
         # Tokeo-only option: hard limit of the message size during DATA
         #: Max size in bytes of a message, None is unlimited
-        self.data_size = options.get('data_size', None)
+        self.max_data_bytes = options.get('max_data_bytes', None)
         #: TLS transport, built when encryption is allowed (else None and
         #: STARTTLS answers 500)
         self.tls = None
         if self.encrypt_mode is not EncryptMode.TLS_FORBIDDEN:
             # reference parity: without a configured common name the CN and
             # SAN of a self-signed certificate derive from hosts + addresses
-            tls_cert_cn, tls_cert_san = _get_tls_cert_names(
-                options.get('tls_cert_cn'), options.get('tls_cert_san'), self.hosts, self._addresses
+            tls_cert_cn, tls_cert_sans = _get_tls_cert_names(
+                options.get('tls_cert_cn'), options.get('tls_cert_sans'), self.hosts, self._addresses
             )
             self.tls = TlsTransport(
                 cert_path=options.get('tls_cert_path'),
@@ -643,7 +645,7 @@ class SmtpdServer:
                 ciphers=options.get('tls_ciphers'),
                 methods=options.get('tls_methods'),
                 cert_cn=tls_cert_cn,
-                cert_san=tls_cert_san,
+                cert_sans=tls_cert_sans,
                 logger=lambda severity, msg: self._emit_log_event(None, severity, msg),
             )
         self._servers = []
@@ -690,7 +692,7 @@ class SmtpdServer:
             the coroutine is run to completion in place
 
         """
-        if SmtpdEvent.ON_LOGGING_EVENT not in self.emit_events:
+        if SmtpdEvent.ON_LOGGING_EVENT not in self._event_dispatch_dict:
             return
         coro = self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, severity, msg, None)
         try:
@@ -914,7 +916,7 @@ class SmtpdServer:
         if self.max_connections is not None and self._connection_cnt > int(self.max_connections):
             return True
         gl = self.global_limits
-        if gl is not None and gl.max_connections is not None and gl.active > gl.max_connections:
+        if gl is not None and gl.max_connections is not None and gl.connection_cnt > gl.max_connections:
             return True
         return False
 
@@ -933,7 +935,7 @@ class SmtpdServer:
 
         def _has_free_slot():
             has_service_slot = max_processings is None or self._processing_cnt < max_processings
-            has_global_slot = global_max_processings is None or gl.active_processings < global_max_processings
+            has_global_slot = global_max_processings is None or gl.processing_cnt < global_max_processings
             return has_service_slot and has_global_slot
 
         while True:
@@ -951,8 +953,8 @@ class SmtpdServer:
             if gl is not None:
                 # the wait strategy belongs to the limits implementation: the
                 # in-process base waits on the event; a cross-process variant
-                # (shared counters under pre_fork) overrides slot_wait
-                await gl.slot_wait()
+                # (shared counters under pre_fork) overrides wait_for_slot
+                await gl.wait_for_slot()
             else:
                 await self._slot_free.wait()
 
@@ -972,7 +974,7 @@ class SmtpdServer:
         if self.auth_mode is AuthMode.AUTH_FORBIDDEN:
             return False
         # True, if wanting AUTH and the channel is already encrypted
-        if ctx.server.encrypted:
+        if ctx.server.encrypted_at:
             return True
         # False, if channel is not encrypted but AUTH needs it or TLS_REQUIRED
         if self.encrypt_mode in (EncryptMode.TLS_WHEN_AUTH, EncryptMode.TLS_REQUIRED):
@@ -1033,7 +1035,7 @@ class SmtpdServer:
                     ctx.server.local_host = await self._reverse_lookup(ctx.server.local_ip) or ctx.server.local_ip
                     ctx.server.remote_host = await self._reverse_lookup(ctx.server.remote_ip) or ctx.server.remote_ip
 
-                ctx.server.connected = get_utc_now()
+                ctx.server.connected_at = get_utc_now()
 
                 local_name = (
                     (f'[IPv6:{ctx.server.local_ip}]' if ':' in ctx.server.local_ip else f'[{ctx.server.local_ip}]')
@@ -1044,7 +1046,7 @@ class SmtpdServer:
                 ctx.server.helo_response = f'{local_name} at your service!'
 
                 # check if we want to let this remote client connect us
-                if SmtpdEvent.ON_CONNECT_EVENT in self.emit_events:
+                if SmtpdEvent.ON_CONNECT_EVENT in self._event_dispatch_dict:
                     await self._emit(SmtpdEvent.ON_CONNECT_EVENT, ctx)
 
                 # drop connection (respond 421) if too busy
@@ -1071,7 +1073,7 @@ class SmtpdServer:
 
                 while True:
                     if output:
-                        if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                        if SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
                             await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, f'>>> {output}')
 
                         await self._write_line(writer, output.encode('utf-8', 'surrogateescape') + b'\r\n')
@@ -1092,7 +1094,7 @@ class SmtpdServer:
                         if buffered and self.encrypt_mode is not EncryptMode.TLS_IMMEDIATE:
                             del buffered[:]
                         await writer.start_tls(self.tls.context, ssl_handshake_timeout=self.io_cmd_timeout)
-                        ctx.server.encrypted = get_utc_now()
+                        ctx.server.encrypted_at = get_utc_now()
                         # client must re-HELO; HELO, AUTH and the transaction are
                         # dropped (RFC 3207 4.2)
                         session.cmd_sequence = CMD_HELO
@@ -1176,7 +1178,7 @@ class SmtpdServer:
                         # log the received command line (never the DATA payload);
                         # the DATA check first: it skips the membership test and
                         # the decoding for every body line
-                        if session.cmd_sequence is not CMD_DATA and SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                        if session.cmd_sequence is not CMD_DATA and SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
                             await self._emit(
                                 SmtpdEvent.ON_LOGGING_EVENT,
                                 ctx,
@@ -1198,7 +1200,7 @@ class SmtpdServer:
                         if session.cmd_sequence is CMD_DATA:
                             if session.data_error is None:
                                 session.data_error = e
-                                if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                                if SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
                                     await self._emit(
                                         SmtpdEvent.ON_LOGGING_EVENT,
                                         ctx,
@@ -1212,9 +1214,9 @@ class SmtpdServer:
                         # exit the loop, the outer handler answers and closes
                         if isinstance(e, SmtpdCloseException):
                             raise
-                        ctx.server.exceptions += 1
+                        ctx.server.exception_cnt += 1
                         ctx.server.errors.append(e)
-                        if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                        if SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
                             await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.ERROR, f'{e} ({type(e).__name__})', e)
                         # respond the smtp error of the exception to the client
                         output = e.smtp_response if isinstance(e, SmtpdException) else Smtpd500Exception().smtp_response
@@ -1229,7 +1231,7 @@ class SmtpdServer:
 
             # the peer closed the connection, also within a line
             except EOFError as e:
-                if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                if SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
                     await self._emit(
                         SmtpdEvent.ON_LOGGING_EVENT, session.ctx, Severity.DEBUG, 'Connection lost due abort by client! (EOFError)', e
                     )
@@ -1238,9 +1240,9 @@ class SmtpdServer:
             # can not arrive any more
             except ConnectionError as e:
                 ctx = session.ctx
-                ctx.server.exceptions += 1
+                ctx.server.exception_cnt += 1
                 ctx.server.errors.append(e)
-                if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                if SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
                     await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.ERROR, 'Connection lost due reset by client!', e)
 
             except asyncio.CancelledError:
@@ -1258,9 +1260,9 @@ class SmtpdServer:
             # its code, else by 421
             except Exception as e:  # noqa: B902
                 ctx = session.ctx
-                ctx.server.exceptions += 1
+                ctx.server.exception_cnt += 1
                 ctx.server.errors.append(e)
-                if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                if SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
                     await self._emit(SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.ERROR, f'{e} ({type(e).__name__})', e)
                 _err = e if isinstance(e, SmtpdCloseException) else Smtpd421CloseException()
                 try:
@@ -1270,7 +1272,7 @@ class SmtpdServer:
                         raise ConnectionAbortedError('Client does not read its replies!')
                     await self._write_line(writer, _err.smtp_response.encode() + b'\r\n')
                 except (OSError, SmtpdAbortException) as e2:
-                    if SmtpdEvent.ON_LOGGING_EVENT in self.emit_events:
+                    if SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
                         await self._emit(
                             SmtpdEvent.ON_LOGGING_EVENT, ctx, Severity.DEBUG, f"Can't send {_err.smtp_code} abort code! (IOError)", e2
                         )
@@ -1278,7 +1280,7 @@ class SmtpdServer:
         finally:
             try:
                 # event for cleanup at end of communication
-                if SmtpdEvent.ON_DISCONNECT_EVENT in self.emit_events:
+                if SmtpdEvent.ON_DISCONNECT_EVENT in self._event_dispatch_dict:
                     await self._emit(SmtpdEvent.ON_DISCONNECT_EVENT, session.ctx)
             finally:
                 # also when on_disconnect_event failed
@@ -1553,7 +1555,7 @@ class SmtpdServer:
                     except (ValueError, IndexError):
                         # change exception into Smtpd exception and drop connection
                         raise Smtpd421CloseException('Abort connection for unsupported PROXY parameters!')
-                if SmtpdEvent.ON_PROXY_EVENT in self.emit_events:
+                if SmtpdEvent.ON_PROXY_EVENT in self._event_dispatch_dict:
                     return_value = await self._emit_and_return_value(
                         SmtpdEvent.ON_PROXY_EVENT, ctx, proxy_data, error_cls=Smtpd421CloseException
                     )
@@ -1585,7 +1587,7 @@ class SmtpdServer:
                 # with TLS_REQUIRED only EHLO, which offers STARTTLS is allowed
                 if (
                     self.encrypt_mode is EncryptMode.TLS_REQUIRED
-                    and not ctx.server.encrypted
+                    and not ctx.server.encrypted_at
                     and re.match(r'^HELO', line, self._RE_CMD_FLAGS)
                 ):
                     raise Tls530Exception
@@ -1594,7 +1596,7 @@ class SmtpdServer:
                 if session.cmd_sequence is not CMD_HELO:
                     self.process_reset_session(session)
                 cmd_data = re.sub(r'^(HELO|EHLO)\ ?', '', line, flags=self._RE_CMD_FLAGS)
-                if SmtpdEvent.ON_HELO_EVENT in self.emit_events:
+                if SmtpdEvent.ON_HELO_EVENT in self._event_dispatch_dict:
                     await self._emit(SmtpdEvent.ON_HELO_EVENT, ctx, cmd_data)
                 elif cmd_data == '':
                     # without a handler an empty domain is a syntax error
@@ -1612,7 +1614,7 @@ class SmtpdServer:
                         lines.append('PIPELINING')
                     if self._is_auth_available(ctx):
                         lines.append('AUTH LOGIN PLAIN')
-                    if self.encrypt_mode is not EncryptMode.TLS_FORBIDDEN and not ctx.server.encrypted:
+                    if self.encrypt_mode is not EncryptMode.TLS_FORBIDDEN and not ctx.server.encrypted_at:
                         lines.append('STARTTLS')
                     # the last line ends the reply without a dash (RFC 5321 4.1.1.1)
                     return '\r\n'.join([f'250-{text}' for text in lines[:-1]] + [f'250 {lines[-1]}'])
@@ -1630,7 +1632,7 @@ class SmtpdServer:
                     raise Smtpd503Exception
                 # no test for self.tls, it is built whenever encrypt_mode is not
                 # TLS_FORBIDDEN
-                if ctx.server.encrypted:
+                if ctx.server.encrypted_at:
                     raise Smtpd503Exception
                 session.cmd_sequence = CMD_STARTTLS
                 # return with new service ready message
@@ -1646,7 +1648,7 @@ class SmtpdServer:
                     # TLS_WHEN_AUTH asks for encryption by AUTH (RFC 4954 6),
                     # TLS_REQUIRED by every command (RFC 3207 4)
                     raise Smtpd538Exception if self.encrypt_mode is EncryptMode.TLS_WHEN_AUTH else Tls530Exception
-                if ctx.server.authenticated:
+                if ctx.server.authenticated_at:
                     raise Smtpd503Exception
                 # the mechanism and an optional initial response, split by
                 # whitespace_mode
@@ -1696,7 +1698,7 @@ class SmtpdServer:
                 # RSET takes no argument
                 if ' ' in line:
                     raise Smtpd501Exception
-                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
+                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted_at:
                     raise Tls530Exception
                 # continue with CMD_HELO when in it
                 previous_cmd_sequence = session.cmd_sequence
@@ -1718,9 +1720,9 @@ class SmtpdServer:
                 # MAIL
                 if session.cmd_sequence is not CMD_RSET:
                     raise Smtpd503Exception
-                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
+                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted_at:
                     raise Tls530Exception
-                if self.auth_mode is AuthMode.AUTH_REQUIRED and not ctx.server.authenticated:
+                if self.auth_mode is AuthMode.AUTH_REQUIRED and not ctx.server.authenticated_at:
                     raise Smtpd530Exception
                 # a new transaction, nothing of a rejected MAIL remains
                 ctx.reset_on_mail_from()
@@ -1769,7 +1771,7 @@ class SmtpdServer:
                     else:
                         # unknown or not announced here (RFC 5321 4.1.1.11)
                         raise Smtpd555Exception
-                if SmtpdEvent.ON_MAIL_FROM_EVENT in self.emit_events:
+                if SmtpdEvent.ON_MAIL_FROM_EVENT in self._event_dispatch_dict:
                     return_value = await self._emit_and_return_value(SmtpdEvent.ON_MAIL_FROM_EVENT, ctx, cmd_data)
                     # None/False refuses, True keeps, a stripped string replaces
                     if return_value is None or return_value is False:
@@ -1796,7 +1798,7 @@ class SmtpdServer:
                     cmd_data, params = re.match(r'[ \t]*(<[^>]*>|[^ \t]*)[ \t]*(.*)$', cmd_data).groups()
                 if params:
                     raise Smtpd555Exception
-                if SmtpdEvent.ON_RCPT_TO_EVENT in self.emit_events:
+                if SmtpdEvent.ON_RCPT_TO_EVENT in self._event_dispatch_dict:
                     return_value = await self._emit_and_return_value(SmtpdEvent.ON_RCPT_TO_EVENT, ctx, cmd_data)
                     # None/False refuses, True keeps, a stripped string replaces
                     if return_value is None or return_value is False:
@@ -1817,12 +1819,12 @@ class SmtpdServer:
                 if session.cmd_sequence is not CMD_RCPT:
                     raise Smtpd503Exception
                 session.cmd_sequence = CMD_DATA
-                ctx.message.received = get_utc_now()
+                ctx.message.received_at = get_utc_now()
                 return '354 Enter message, ending with "." on a line by itself'
 
             elif re.match(r'^VRFY(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # VRFY is valid at any time (RFC 5321 4.1.4)
-                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
+                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted_at:
                     raise Tls530Exception
                 cmd_data = re.sub(r'^VRFY\ ?', '', line, flags=self._RE_CMD_FLAGS)
                 # VRFY needs a string to look up (RFC 5321 4.1.1.6)
@@ -1841,7 +1843,7 @@ class SmtpdServer:
 
             elif re.match(r'^EXPN(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # EXPN is valid at any time (RFC 5321 4.1.4)
-                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
+                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted_at:
                     raise Tls530Exception
                 cmd_data = re.sub(r'^EXPN\ ?', '', line, flags=self._RE_CMD_FLAGS)
                 # EXPN needs a string to look up (RFC 5321 4.1.1.7)
@@ -1860,7 +1862,7 @@ class SmtpdServer:
             elif re.match(r'^HELP(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # HELP is valid at any time, its argument is optional
                 # (RFC 5321 4.1.4, 4.1.1.8)
-                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted:
+                if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted_at:
                     raise Tls530Exception
                 cmd_data = re.sub(r'^HELP\ ?', '', line, flags=self._RE_CMD_FLAGS)
                 return_value = await self._emit_and_return_value(SmtpdEvent.ON_HELP_EVENT, ctx, cmd_data)
@@ -1892,7 +1894,7 @@ class SmtpdServer:
 
             # the first line of DATA, not after an error
             if session.data_error is None and ctx.message.bytesize < 0:
-                if SmtpdEvent.ON_MESSAGE_DATA_START_EVENT in self.emit_events:
+                if SmtpdEvent.ON_MESSAGE_DATA_START_EVENT in self._event_dispatch_dict:
                     await self._emit(SmtpdEvent.ON_MESSAGE_DATA_START_EVENT, ctx)
                 # always initialize bytesize on data
                 ctx.message.bytesize = len(ctx.message.data)
@@ -1914,7 +1916,7 @@ class SmtpdServer:
                 if not ctx.message.headers and not line:
                     # change flag to do not signal this again
                     ctx.message.headers = True
-                    if SmtpdEvent.ON_MESSAGE_DATA_HEADERS_EVENT in self.emit_events:
+                    if SmtpdEvent.ON_MESSAGE_DATA_HEADERS_EVENT in self._event_dispatch_dict:
                         await self._emit(SmtpdEvent.ON_MESSAGE_DATA_HEADERS_EVENT, ctx)
                         # repair bytesize, maybe changed by headers
                         ctx.message.bytesize = len(ctx.message.data)
@@ -1922,9 +1924,11 @@ class SmtpdServer:
                     # create the spool file and handle if activated
                     if self._is_spooling:
                         # timestamp from the connection start
-                        stamp = ctx.server.connected.strftime('%Y%m%d-%H%M%S')
+                        stamp = ctx.server.connected_at.strftime('%Y%m%d-%H%M%S')
                         # create the spooler for message spooling
-                        ctx.message.spooler = MessageSpooler(dir=self._spool_dir, prefix=f'{self._spool_prefix}{stamp}-', debug=self.debug)
+                        ctx.message.spooler = MessageSpooler(
+                            spool_dir=self._spool_dir, prefix=f'{self._spool_prefix}{stamp}-', debug=self.debug
+                        )
                         # write current data completely into spool
                         ctx.message.spooler.file.write(ctx.message.data)
 
@@ -1943,13 +1947,13 @@ class SmtpdServer:
                 # update bytesize
                 ctx.message.bytesize += len(chunk)
 
-                # Tokeo-only option: enforce a hard data_size limit
-                if self.data_size and ctx.message.bytesize > int(self.data_size):
+                # Tokeo-only option: enforce a hard max_data_bytes limit
+                if self.max_data_bytes and ctx.message.bytesize > int(self.max_data_bytes):
                     raise Smtpd552Exception
 
                 # e.g. abort while receiving too big incoming mail or
                 # create a teergrube for spammers etc.
-                if SmtpdEvent.ON_MESSAGE_DATA_RECEIVING_EVENT in self.emit_events:
+                if SmtpdEvent.ON_MESSAGE_DATA_RECEIVING_EVENT in self._event_dispatch_dict:
                     await self._emit(SmtpdEvent.ON_MESSAGE_DATA_RECEIVING_EVENT, ctx)
 
                 # just return and stay on CMD_DATA
@@ -1964,7 +1968,7 @@ class SmtpdServer:
             ctx.message.chomp()
 
             # save delivered UTC time
-            ctx.message.delivered = get_utc_now()
+            ctx.message.delivered_at = get_utc_now()
 
             # end of data dialog processing
             try:
@@ -1973,7 +1977,7 @@ class SmtpdServer:
                     raise session.data_error
 
                 # call event to process message
-                if SmtpdEvent.ON_MESSAGE_DATA_EVENT in self.emit_events:
+                if SmtpdEvent.ON_MESSAGE_DATA_EVENT in self._event_dispatch_dict:
                     await self._emit(SmtpdEvent.ON_MESSAGE_DATA_EVENT, ctx)
 
                 # signal client successfully processed message
@@ -2091,7 +2095,7 @@ class SmtpdServer:
             ctx = session.ctx
             ctx.server.authorization_id = return_value
             ctx.server.authentication_id = auth_values[1]
-            ctx.server.authenticated = get_utc_now()
+            ctx.server.authenticated_at = get_utc_now()
             # response code
             return '235 OK'
 
@@ -2164,7 +2168,7 @@ class SmtpdServer:
             ctx = session.ctx
             ctx.server.authorization_id = return_value
             ctx.server.authentication_id = auth_values[1]
-            ctx.server.authenticated = get_utc_now()
+            ctx.server.authenticated_at = get_utc_now()
             # response code
             return '235 OK'
 
@@ -2221,7 +2225,7 @@ class SmtpdServer:
     #: Dispatch kinds, resolved once per handler class (see the builder below)
     _EMIT_SYNC, _EMIT_ASYNC, _EMIT_THREAD = 0, 1, 2
 
-    def _build_emit_events_dispatcher(self, events_handler):
+    def _build_event_dispatch_dict(self, events_handler):
         """
         Precompute the dispatch table ```SmtpdEvent -> (kind, bound method)```.
 
@@ -2241,14 +2245,14 @@ class SmtpdServer:
 
         : Events the handler did not override keep NO entry when their base is
             a no-op, so call sites skip ```_emit``` (and its coroutine) entirely
-            via ```in self.emit_events```; ```ON_AUTH_EVENT``` always keeps
-            an entry because its base carries behaviour (the default deny
-            raises 535 when not overridden)
+            via ```in self._event_dispatch_dict```; ```ON_AUTH_EVENT``` always
+            keeps an entry because its base carries behaviour (the default
+            deny raises 535 when not overridden)
 
         """
         dispatcher = {}
         for ev in SmtpdEvent:
-            name = SMTPD_EVENT_NAMES[ev]
+            name = EVENT_METHOD_NAMES[ev]
             method = getattr(events_handler, name, None)
             if method is None:
                 continue
@@ -2278,8 +2282,8 @@ class SmtpdServer:
         ```async def``` is awaited and a ```@threaded def``` runs in a worker
         thread. Exceptions propagate to the caller; the dialog loop translates
         them exactly like the rescue chain. The execution model per event is
-        precomputed in ```emit_events```; hot call sites test membership
-        first and skip the call entirely when the handler has no
+        precomputed in ```_event_dispatch_dict```; hot call sites test
+        membership first and skip the call entirely when the handler has no
         implementation.
 
         ### Args
@@ -2293,7 +2297,7 @@ class SmtpdServer:
         - **Any**: The event's return value (a replacement value or None)
 
         """
-        entry = self.emit_events.get(ev)
+        entry = self._event_dispatch_dict.get(ev)
         if entry is None:
             return None
         kind, method = entry

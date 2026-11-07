@@ -1,5 +1,5 @@
 """
-Tests for the precomputed event dispatch (SmtpdServer.emit_events).
+Tests for the precomputed event dispatch (SmtpdServer._event_dispatch_dict).
 
 The table is built once per handler class and keyed by ```SmtpdEvent```:
 overridden events get an entry with their resolved execution kind (sync /
@@ -16,7 +16,7 @@ from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import (
     SmtpdEvents,
     SmtpdEvent,
-    SMTPD_EVENT_NAMES,
+    EVENT_METHOD_NAMES,
     threaded,
 )
 from tokeo.core.smtpd.exc import Smtpd535Exception
@@ -53,14 +53,14 @@ def _make_ctx():
 
 def test_event_names_map_covers_every_event_and_existing_methods():
     """Every SmtpdEvent maps to an existing method of SmtpdEvents."""
-    assert set(SMTPD_EVENT_NAMES) == set(SmtpdEvent)
-    for ev, name in SMTPD_EVENT_NAMES.items():
+    assert set(EVENT_METHOD_NAMES) == set(SmtpdEvent)
+    for ev, name in EVENT_METHOD_NAMES.items():
         assert callable(getattr(SmtpdEvents, name)), f'{ev}: {name}'
 
 
 def test_base_noops_have_no_entry():
     """Without overrides only events with a behavioural default are dispatched."""
-    dispatch = SmtpdServer(BareEvents()).emit_events
+    dispatch = SmtpdServer(BareEvents())._event_dispatch_dict
     # only the behavioural base events stay dispatchable without an override
     assert set(dispatch) == {
         SmtpdEvent.ON_AUTH_EVENT,
@@ -73,7 +73,7 @@ def test_base_noops_have_no_entry():
 def test_overridden_events_get_entries_with_resolved_kind():
     """Overrides get entries as sync, async or thread, bound to the handler."""
     srv = SmtpdServer(MixedEvents())
-    dispatch = srv.emit_events
+    dispatch = srv._event_dispatch_dict
     assert dispatch[SmtpdEvent.ON_HELO_EVENT][0] == srv._EMIT_SYNC
     assert dispatch[SmtpdEvent.ON_MAIL_FROM_EVENT][0] == srv._EMIT_ASYNC
     assert dispatch[SmtpdEvent.ON_MESSAGE_DATA_EVENT][0] == srv._EMIT_THREAD
@@ -86,7 +86,7 @@ def test_overridden_events_get_entries_with_resolved_kind():
 def test_auth_default_deny_stays_dispatchable():
     """Without an override ON_AUTH_EVENT still denies by 535."""
     srv = SmtpdServer(BareEvents())
-    assert SmtpdEvent.ON_AUTH_EVENT in srv.emit_events
+    assert SmtpdEvent.ON_AUTH_EVENT in srv._event_dispatch_dict
 
     async def go():
         with pytest.raises(Smtpd535Exception):

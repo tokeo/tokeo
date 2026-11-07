@@ -33,7 +33,7 @@ class CaptureSmtpdEvents(SmtpdEvents):
         self.ev_auth_authentication = None
         self.ev_auth_authorization_id = None
         self.ev_message_data = None
-        self.ev_message_delivered = None
+        self.ev_message_delivered_at = None
         self.ev_message_bytesize = None
 
     def on_auth_event(self, ctx, authorization_id, authentication_id, authentication):
@@ -50,5 +50,5 @@ class CaptureSmtpdEvents(SmtpdEvents):
     def on_message_data_event(self, ctx):
         # save local event data (data byte-exact as bytes)
         self.ev_message_data = bytes(ctx.message.data)
-        self.ev_message_delivered = ctx.message.delivered
+        self.ev_message_delivered_at = ctx.message.delivered_at
         self.ev_message_bytesize = ctx.message.bytesize

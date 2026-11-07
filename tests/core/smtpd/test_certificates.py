@@ -163,7 +163,7 @@ def test_memory_only_certificate():
         'auth_mode': 'AUTH_OPTIONAL',
         'encrypt_mode': 'TLS_REQUIRED',
         'tls_cert_cn': '127.0.0.1',
-        'tls_cert_san': ['127.0.0.1'],
+        'tls_cert_sans': ['127.0.0.1'],
         'pipelining_extension': False,
         'internationalization_extensions': True,
     }
@@ -266,12 +266,12 @@ def test_self_signed_derives_names_from_hosts():
 
 
 def test_self_signed_uses_configured_names():
-    """tls_cert_cn and tls_cert_san become the CN and the SAN."""
+    """tls_cert_cn and tls_cert_sans become the CN and the SAN."""
     certificate = _get_peer_certificate(
         {
             'encrypt_mode': 'TLS_OPTIONAL',
             'tls_cert_cn': 'mx.tokeo.test',
-            'tls_cert_san': 'alt.tokeo.test',
+            'tls_cert_sans': 'alt.tokeo.test',
         }
     )
     cn, dns = _get_cert_names(certificate)

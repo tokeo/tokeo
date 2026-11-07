@@ -96,7 +96,7 @@ def test_20_auth_login_simulate_fail(shared):
     server = shared.session.ctx.server
     assert server.authorization_id == ''
     assert server.authentication_id == ''
-    assert str(server.authenticated) == ''
+    assert server.authenticated_at is None
 
 
 def test_21_auth_plain_authenticate_supervisor(shared):
@@ -111,7 +111,7 @@ def test_21_auth_plain_authenticate_supervisor(shared):
     server = shared.session.ctx.server
     assert server.authorization_id == 'supervisor'
     assert server.authentication_id == 'administrator'
-    assert str(server.authenticated) != ''
+    assert server.authenticated_at is not None
 
 
 def test_30_mail_from(shared):

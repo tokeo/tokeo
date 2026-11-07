@@ -45,7 +45,7 @@ class ClosingEvents(RecordingEvents):
         self.raise_in = raise_in
         self.exc = exc
         self.errors = None
-        self.exceptions = None
+        self.exception_cnt = None
         self.logged = []
 
     def on_connect_event(self, ctx):
@@ -69,7 +69,7 @@ class ClosingEvents(RecordingEvents):
     def on_disconnect_event(self, ctx):
         super().on_disconnect_event(ctx)
         self.errors = [type(e) for e in ctx.server.errors]
-        self.exceptions = ctx.server.exceptions
+        self.exception_cnt = ctx.server.exception_cnt
 
 
 def _run(events, options, run_client):
@@ -224,7 +224,7 @@ def test_session_timeout_ends_a_noop_loop():
 
 
 def test_session_timeout_ends_discarded_data():
-    """DATA discarded after data_size gets 421 after io_session_timeout of 1 s."""
+    """DATA over max_data_bytes is discarded, 421 after io_session_timeout 1 s."""
     events = ClosingEvents()
 
     async def run_client(reader, writer):
@@ -243,7 +243,7 @@ def test_session_timeout_ends_discarded_data():
         finally:
             feeding.cancel()
 
-    reply = _run(events, {'io_session_timeout': 1, 'data_size': 100}, run_client)
+    reply = _run(events, {'io_session_timeout': 1, 'max_data_bytes': 100}, run_client)
     assert reply[0].startswith('421')
     assert events.messages == []
     assert events.errors == [SmtpdIOSessionTimeoutException]
@@ -331,7 +331,7 @@ def test_reset_by_client_is_counted_and_logged_as_error():
         writer.transport.abort()
 
     _run(events, {}, run_client)
-    assert events.exceptions == 1
+    assert events.exception_cnt == 1
     assert events.errors == [ConnectionResetError]
     assert (Severity.ERROR, 'Connection lost due reset by client!') in events.logged
     assert not any(msg.startswith("Can't send") for _, msg in events.logged)

@@ -41,7 +41,7 @@ def test_context_encoder_keeps_the_body_out_of_the_json():
     assert 'data' not in ctx['message'] and 'spooler' not in ctx['message']
     assert ctx['message']['bytesize'] > 0
     # datetimes come as strings, the envelope as it was received
-    assert isinstance(ctx['message']['delivered'], str)
+    assert isinstance(ctx['message']['delivered_at'], str)
     assert (ctx['envelope']['mail_from'], ctx['envelope']['rcpt_tos']) == events.envelopes[0]
     assert ctx['server']['remote_ip'] == '127.0.0.1'
 

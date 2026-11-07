@@ -19,12 +19,12 @@ from email.header import decode_header, make_header
 
 import pytest
 
-from tokeo.core.smtpd import SmtpdServer, SmtpdEvents, Smtpd535Exception, Smtpd550Exception, tls_immediate_supported
+from tokeo.core.smtpd import SmtpdServer, SmtpdEvents, Smtpd535Exception, Smtpd550Exception, is_tls_immediate_supported
 from tests.utils import wait_until
 from tests.ext.smtp.smtp_tests_helper import SmtpTest, make_cert, SUBJECT, TEXT, HTML_WITH_IMAGE
 
 needs_tls_immediate = pytest.mark.skipif(
-    not tls_immediate_supported(),
+    not is_tls_immediate_supported(),
     reason=f'TLS_IMMEDIATE requires Python 3.13.13+ or 3.14.4+ (gh-142352), running {platform.python_version()}',
 )
 
@@ -52,7 +52,7 @@ class RecordingEvents(SmtpdEvents):
         return True
 
     def on_message_data_event(self, ctx):
-        self.messages.append((bytes(ctx.message.data), bool(ctx.server.encrypted)))
+        self.messages.append((bytes(ctx.message.data), ctx.server.encrypted_at is not None))
 
     def on_disconnect_event(self, ctx):
         self.disconnected.set()

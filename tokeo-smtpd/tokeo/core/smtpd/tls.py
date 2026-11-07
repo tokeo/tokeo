@@ -123,14 +123,14 @@ class TlsTransport:
         ```'TLSv1_3'``` (TLS 1.3 only) / ```'TLSv1'``` (opt-in, reaches
         deprecated TLS 1.0/1.1 clients). Unknown values fall back to TLS 1.2
     - **cert_cn** (str, optional): Common name for the self-signed certificate
-    - **cert_san** (list|str, optional): Subject alt names for the self-signed
+    - **cert_sans** (list|str, optional): Subject alt names for the self-signed
         certificate
     - **logger** (callable, optional): ```log(severity, msg)``` sink
 
     """
 
     def __init__(
-        self, cert_path=None, key_path=None, cert=None, key=None, ciphers=None, methods=None, cert_cn='', cert_san=None, logger=None
+        self, cert_path=None, key_path=None, cert=None, key=None, ciphers=None, methods=None, cert_cn='', cert_sans=None, logger=None
     ):
         self._logger = logger
         cert_path = (cert_path or '').strip() or None
@@ -153,7 +153,7 @@ class TlsTransport:
             self._load_from_memory(cert, key)
         elif cert_path is None:
             # if none cert_path was set, create a self signed test certificate
-            self._load_self_signed(str(cert_cn or '').strip(), cert_san)
+            self._load_self_signed(str(cert_cn or '').strip(), cert_sans)
         else:
             # if any is set, test the paths and load the certificate (+ chain)
             if not os.path.isfile(cert_path):
@@ -185,7 +185,7 @@ class TlsTransport:
             except Exception:  # noqa: B902 - logging must never break setup
                 pass
 
-    def _load_self_signed(self, cert_cn, cert_san):
+    def _load_self_signed(self, cert_cn, cert_sans):
         """
         Generate a self-signed test certificate and load it.
 
@@ -204,12 +204,12 @@ class TlsTransport:
         from cryptography.hazmat.primitives.asymmetric import ec
 
         # normalize the subject alt name list
-        if cert_san is None:
-            cert_san = []
-        elif isinstance(cert_san, str):
-            cert_san = [s.strip() for s in cert_san.split(',') if s.strip()]
+        if cert_sans is None:
+            cert_sans = []
+        elif isinstance(cert_sans, str):
+            cert_sans = [s.strip() for s in cert_sans.split(',') if s.strip()]
         cn = cert_cn or 'localhost'
-        sans = list(dict.fromkeys([cn] + list(cert_san)))
+        sans = list(dict.fromkeys([cn] + list(cert_sans)))
         # DNS for every SAN, plus IP entries for the ones that are IP addresses
         alt_names = [x509.DNSName(san) for san in sans]
         for san in sans:

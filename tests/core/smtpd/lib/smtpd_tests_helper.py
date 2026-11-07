@@ -368,7 +368,7 @@ class AuthEvents(RecordingEvents):
 
     def on_mail_from_event(self, ctx, mail_from):
         # capture the auth state as later events see it
-        self.ctx_auth = (ctx.server.authenticated, ctx.server.authentication_id, ctx.server.authorization_id)
+        self.ctx_auth = (ctx.server.authenticated_at, ctx.server.authentication_id, ctx.server.authorization_id)
         return super().on_mail_from_event(ctx, mail_from)
 
 
@@ -380,7 +380,7 @@ def make_auth_plain(authzid, authcid, password):
 # ---- tls client and raw wire ------------------------------------------------
 
 
-TLS_SERVER_OPTIONS = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
+TLS_SERVER_OPTIONS = {'encrypt_mode': 'TLS_OPTIONAL', 'tls_cert_cn': 'localhost', 'tls_cert_sans': ['127.0.0.1']}
 
 
 def run_wire(events, options, wire_body):

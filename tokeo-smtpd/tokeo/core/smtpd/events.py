@@ -6,8 +6,8 @@ dispatches to these methods and turns any raised SMTP exception into a response.
 
 ### Features
 
-- ```SmtpdEvent``` enum plus ```SMTPD_EVENT_NAMES``` mapping as the dispatch
-    source: the server precomputes ```emit_events``` from it and call sites
+- ```SmtpdEvent``` enum plus ```EVENT_METHOD_NAMES``` mapping as the dispatch
+    source: the server precomputes its dispatch dict from it and call sites
     test membership with enum keys before emitting
 - ```threaded``` decorator to mark a sync event method that may block, so the
     dispatcher runs it in a thread and never freezes the asyncio loop
@@ -39,7 +39,7 @@ from .logger import Severity
 
 
 class SmtpdEvent(Enum):
-    """The dispatchable handler events (keys of ```SmtpdServer.emit_events```)."""
+    """The dispatchable handler events (the keys of the server dispatch)."""
 
     #: A client connected
     ON_CONNECT_EVENT = auto()
@@ -76,7 +76,7 @@ class SmtpdEvent(Enum):
 
 
 #: Maps each ```SmtpdEvent``` to its handler method name on ```SmtpdEvents```
-SMTPD_EVENT_NAMES = {
+EVENT_METHOD_NAMES = {
     SmtpdEvent.ON_CONNECT_EVENT: 'on_connect_event',
     SmtpdEvent.ON_DISCONNECT_EVENT: 'on_disconnect_event',
     SmtpdEvent.ON_PROXY_EVENT: 'on_proxy_event',
@@ -202,10 +202,10 @@ class SmtpdEvents:
 
         ### Returns
 
-        - **bool**: Whether ```ctx.server.authenticated``` is set
+        - **bool**: Whether ```ctx.server.authenticated_at``` is not None
 
         """
-        return bool(ctx.server.authenticated) and str(ctx.server.authenticated) != ''
+        return ctx.server.authenticated_at is not None
 
     @staticmethod
     def encrypted(ctx):
@@ -218,10 +218,10 @@ class SmtpdEvents:
 
         ### Returns
 
-        - **bool**: Whether ```ctx.server.encrypted``` is set
+        - **bool**: Whether ```ctx.server.encrypted_at``` is not None
 
         """
-        return bool(ctx.server.encrypted) and str(ctx.server.encrypted) != ''
+        return ctx.server.encrypted_at is not None
 
     # ---- connection lifecycle -----------------------------------------------
 
@@ -259,6 +259,7 @@ class SmtpdEvents:
 
         ### Args
 
+        - **ctx** (SmtpdContext): The per-connection context
         - **proxy_data** (dict): The parsed PROXY v1 header (```proto```,
             ```source_ip```, ```source_host```, ```source_port```,
             ```dest_ip```, ```dest_host```, ```dest_port```)
@@ -362,7 +363,7 @@ class SmtpdEvents:
 
         : Header lines appended to ```ctx.message.data``` here become part
             of the message: they change ```bytesize``` (and count against a
-            ```data_size``` limit) and reach the spool file when spooling
+            ```max_data_bytes``` limit) and reach the spool file when spooling
 
         """
         pass

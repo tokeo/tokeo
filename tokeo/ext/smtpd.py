@@ -257,7 +257,7 @@ class SharedGlobalLimits(GlobalLimits):
     ### Notes
 
     : The wake event stays per process (an event cannot cross a fork), so
-        ```slot_wait``` re-checks the shared counters at a short interval, so
+        ```wait_for_slot``` re-checks the shared counters at a short interval, so
         a slot released in another process is seen at most 50 ms later
 
     """
@@ -271,33 +271,33 @@ class SharedGlobalLimits(GlobalLimits):
         #: slot may be free
         self.slot_free = asyncio.Event()
         self.slot_free.set()
-        self._shared_active = multiprocessing.Value('i', 0)
-        self._shared_processings = multiprocessing.Value('i', 0)
+        self._shared_connection_cnt = multiprocessing.Value('i', 0)
+        self._shared_processing_cnt = multiprocessing.Value('i', 0)
 
     @property
-    def active(self):
+    def connection_cnt(self):
         """Currently open connections over all processes."""
-        return self._shared_active.value
+        return self._shared_connection_cnt.value
 
     @property
-    def active_processings(self):
+    def processing_cnt(self):
         """Currently processed messages over all processes."""
-        return self._shared_processings.value
+        return self._shared_processing_cnt.value
 
     def admit(self):
         """Count one accepted connection."""
-        with self._shared_active.get_lock():
-            self._shared_active.value += 1
+        with self._shared_connection_cnt.get_lock():
+            self._shared_connection_cnt.value += 1
 
     def release(self):
         """Drop one connection."""
-        with self._shared_active.get_lock():
-            self._shared_active.value = max(0, self._shared_active.value - 1)
+        with self._shared_connection_cnt.get_lock():
+            self._shared_connection_cnt.value = max(0, self._shared_connection_cnt.value - 1)
 
     def begin_processing(self):
         """Count one in-progress dialog."""
-        with self._shared_processings.get_lock():
-            self._shared_processings.value += 1
+        with self._shared_processing_cnt.get_lock():
+            self._shared_processing_cnt.value += 1
 
     def try_begin_processing(self):
         """
@@ -313,18 +313,18 @@ class SharedGlobalLimits(GlobalLimits):
             take the last slot
 
         """
-        with self._shared_processings.get_lock():
-            if self.max_processings is not None and self._shared_processings.value >= self.max_processings:
+        with self._shared_processing_cnt.get_lock():
+            if self.max_processings is not None and self._shared_processing_cnt.value >= self.max_processings:
                 return False
-            self._shared_processings.value += 1
+            self._shared_processing_cnt.value += 1
             return True
 
     def end_processing(self):
         """Drop one in-progress dialog."""
-        with self._shared_processings.get_lock():
-            self._shared_processings.value = max(0, self._shared_processings.value - 1)
+        with self._shared_processing_cnt.get_lock():
+            self._shared_processing_cnt.value = max(0, self._shared_processing_cnt.value - 1)
 
-    async def slot_wait(self):
+    async def wait_for_slot(self):
         """Wait for a slot with the cross-process re-check interval."""
         try:
             await asyncio.wait_for(self.slot_free.wait(), 0.05)

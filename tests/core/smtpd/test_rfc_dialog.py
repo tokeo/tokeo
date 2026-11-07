@@ -258,7 +258,7 @@ class TraceEvents(RecordingEvents):
         ctx.message.data += (
             f'Received: from {server.helo} ({server.remote_host} [{server.remote_ip}])\r\n'
             f'\tby {server.local_host} with ESMTP id {ctx.id};\r\n'
-            f'\t{email.utils.format_datetime(ctx.message.received)}\r\n'
+            f'\t{email.utils.format_datetime(ctx.message.received_at)}\r\n'
         ).encode()
 
     def on_message_data_event(self, ctx):
@@ -283,7 +283,7 @@ def test_the_handler_writes_the_trace_header_at_the_start():
 def test_the_trace_header_reaches_the_spool_file(tmp):
     """With spooling the Received header heads the spool file too."""
     ev = TraceEvents()
-    _, r = run_dialog(ev, {'spool': f'{tmp.dir}/trace-'}, _TRACE_COMMANDS)
+    _, r = run_dialog(ev, {'spool_path_prefix': f'{tmp.dir}/trace-'}, _TRACE_COMMANDS)
     assert r[4][0].startswith('250')
     assert ev.spooled[0].startswith(b'Received: from me (')
     assert ev.spooled[0].endswith(b'\r\nSubject: hi\r\n\r\nHello')

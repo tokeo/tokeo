@@ -30,7 +30,7 @@ OPTIONS = {
     'auth_mode': 'AUTH_OPTIONAL',
     'encrypt_mode': 'TLS_OPTIONAL',
     'tls_cert_cn': '127.0.0.1',
-    'tls_cert_san': ['127.0.0.1'],
+    'tls_cert_sans': ['127.0.0.1'],
     'pipelining_extension': False,
     'internationalization_extensions': True,
 }

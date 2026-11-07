@@ -63,21 +63,21 @@ def test_session_status():
     assert server.proxy is None
     assert server.helo == ''
     assert server.helo_response == ''
-    assert server.connected == ''
-    assert server.exceptions == 0
+    assert server.connected_at is None
+    assert server.exception_cnt == 0
     assert len(server.errors) == 0
     assert server.authorization_id == ''
     assert server.authentication_id == ''
-    assert server.authenticated == ''
-    assert server.encrypted == ''
+    assert server.authenticated_at is None
+    assert server.encrypted_at is None
     envelope = session.ctx.envelope
     assert envelope.mail_from == ''
     assert len(envelope.rcpt_tos) == 0
     assert envelope.encoding_body == ''
     assert envelope.encoding_utf8 == ''
     message = session.ctx.message
-    assert message.received == -1
-    assert message.delivered == -1
+    assert message.received_at is None
+    assert message.delivered_at is None
     assert message.bytesize == -1
     assert message.headers is False
     assert message.crlf == b'\r\n'

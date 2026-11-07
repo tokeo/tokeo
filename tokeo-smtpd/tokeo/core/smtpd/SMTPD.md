@@ -174,7 +174,7 @@ Two conventions matter:
 
     An error within DATA (raised by ```on_message_data_start_event```,
     ```on_message_data_headers_event``` or ```on_message_data_receiving_event```,
-    or a message over ```data_size```) is answered once after the end of DATA;
+    or a message over ```max_data_bytes```) is answered once after the end of DATA;
     the server discards the rest of the message without further events
     (RFC 1870). Any other error than an ```Smtpd*Exception``` answers 451,
     the original error is its ```__cause__```. The error is logged as ERROR
@@ -200,11 +200,11 @@ class MyEvents(SmtpdEvents):
         ctx.message.data += (
             f'Received: from {server.helo} ({server.remote_host} [{server.remote_ip}])\r\n'
             f'\tby {server.local_host} with ESMTP id {ctx.id};\r\n'
-            f'\t{email.utils.format_datetime(ctx.message.received)}\r\n'
+            f'\t{email.utils.format_datetime(ctx.message.received_at)}\r\n'
         ).encode()
 ```
 
-The header counts against ```data_size``` like every other byte of the message.
+The header counts against ```max_data_bytes``` like every other byte of the message.
 
 ### Addresses with non-ASCII characters
 
@@ -253,9 +253,10 @@ per-line events and never to ```async def``` events (a coroutine can already
 Inside a handler, two helpers report connection state:
 ```self.authenticated(ctx)``` is true once the client has authenticated, and
 ```self.encrypted(ctx)``` is true once the connection is running over TLS.
-They only report ```ctx.server.authenticated``` and ```ctx.server.encrypted```:
-the server checks these fields itself, so overriding a helper does not change
-its decisions, unlike ```authenticated?```/```encrypted?``` of the original.
+They only report whether ```ctx.server.authenticated_at``` and
+```ctx.server.encrypted_at``` are set: the server checks these fields itself,
+so overriding a helper does not change its decisions, unlike
+```authenticated?```/```encrypted?``` of the original.
 
 ## 5. The context object
 
@@ -264,10 +265,10 @@ which carries the whole state of the conversation. It has three parts:
 
 ```ctx.server``` holds the connection and session:
 ```local_host```, ```local_ip```, ```local_port```, ```remote_host```,
-```remote_ip```, ```remote_port```, ```helo```, ```proxy```, ```connected```,
-```authorization_id```, ```authentication_id```, ```authenticated```,
-```encrypted```, plus ```exceptions``` and ```errors``` accumulated during the
-session.
+```remote_ip```, ```remote_port```, ```helo```, ```proxy```,
+```connected_at```, ```authorization_id```, ```authentication_id```,
+```authenticated_at```, ```encrypted_at```, plus ```exception_cnt``` and
+```errors``` accumulated during the session.
 
 ```ctx.envelope``` holds the current transaction:
 ```mail_from``` (the sender), ```rcpt_tos``` (the list of recipients),
@@ -276,7 +277,13 @@ session.
 
 ```ctx.message``` holds the message being received:
 ```data``` (a ```bytearray``` of the raw message), ```bytesize```,
-```received```, ```delivered```, ```headers``` and ```crlf```.
+```received_at```, ```delivered_at```, ```headers``` and ```crlf```.
+
+The points in time (```connected_at```, ```authenticated_at```,
+```encrypted_at```, ```received_at```, ```delivered_at```) are ```None```
+until they happen, then a UTC ```datetime```; a JSON dump with
+```SmtpdContextEncoder``` writes them as ISO 8601 text in UTC
+(```YYYY-MM-DD HH:MM:SS.MMMZ```) and ```None``` as ```null```.
 
 A transaction (envelope + message) resets after each delivered message or a
 ```RSET```, while the server/session part persists for the life of the connection.
@@ -564,7 +571,7 @@ SmtpdServer(handler, encrypt_mode='TLS_REQUIRED',
 
 # 3. nothing configured -> a self-signed test certificate is generated
 SmtpdServer(handler, encrypt_mode='TLS_OPTIONAL',
-            tls_cert_cn='mx.example.com', tls_cert_san=['mx.example.com', '127.0.0.1'])
+            tls_cert_cn='mx.example.com', tls_cert_sans=['mx.example.com', '127.0.0.1'])
 ```
 
 A combined ```.pem``` holding the trust chain and the private key in one file
@@ -581,7 +588,7 @@ like ```hostname does not match``` its CN and subject alt names derive from
 the hosts and addresses configured on the server (reference behaviour): every
 name becomes a subject alt name, a loopback-only setup gets the generic CN
 ```localhost.local```, otherwise the first name is used - and a configured
-```tls_cert_cn``` / ```tls_cert_san``` always wins over the derivation.
+```tls_cert_cn``` / ```tls_cert_sans``` always wins over the derivation.
 
 .. note::
 
@@ -686,12 +693,12 @@ The constructor keeps the original option names. Key ones:
 <tr><td>trusted_relay_auth_ids</td><td>[]</td><td>authorization ids (stripped, non-empty) of relays trusted to name the submitter by AUTH= (section 6)</td></tr>
 <tr><td>encrypt_mode</td><td>'TLS_FORBIDDEN'</td><td>TLS_OPTIONAL / TLS_WHEN_AUTH / TLS_REQUIRED / TLS_IMMEDIATE</td></tr>
 <tr><td>crlf_mode</td><td>'CRLF_ENSURE'</td><td>line breaks of all lines: CRLF_ENSURE ends each line with CRLF and drops a bare CR or LF, CRLF_LEAVE keeps the line break as received, CRLF_STRICT rejects a line without CRLF by 500</td></tr>
-<tr><td>data_size</td><td>None</td><td>maximum message size in bytes, a larger message is answered by 552 after the end of DATA (None = unlimited)</td></tr>
+<tr><td>max_data_bytes</td><td>None</td><td>maximum message size in bytes, a larger message is answered by 552 after the end of DATA (None = unlimited)</td></tr>
 <tr><td>crlf_data_mode</td><td>'CRLF_DATA_MODERATE', with CRLF_STRICT 'CRLF_DATA_STRICT'</td><td>line breaks in DATA against SMTP smuggling, only &lt;CRLF&gt;.&lt;CRLF&gt; ends DATA: CRLF_DATA_MODERATE keeps a bare CR or LF as data, CRLF_DATA_STRICT answers it by 554 after the end of DATA, CRLF_DATA_STRICT_CLOSE also by 554 and closes the connection then; CRLF_DATA_UNSAFE ends DATA on any dot line and logs a warning on start; CRLF_STRICT allows only the strict modes</td></tr>
 <tr><td>whitespace_mode</td><td>'WHITESPACE_MODERATE'</td><td>unusual whitespace and control chars in the command lines: WHITESPACE_MODERATE strips them at the edges, WHITESPACE_STRICT answers them by 501, WHITESPACE_UNSAFE hands them to the events and logs a warning on start (section 7)</td></tr>
 <tr><td>pipelining_extension</td><td>False</td><td>advertise PIPELINING</td></tr>
 <tr><td>internationalization_extensions</td><td>False</td><td>advertise 8BITMIME and SMTPUTF8</td></tr>
-<tr><td>spool</td><td>None</td><td>path and file name prefix for the spool temp files (section 11)</td></tr>
+<tr><td>spool_path_prefix</td><td>None</td><td>path and file name prefix for the spool temp files (section 11)</td></tr>
 <tr><td>do_dns_reverse_lookup</td><td>True</td><td>resolve the remote host name</td></tr>
 <tr><td>io_cmd_timeout</td><td>30</td><td>seconds to await a complete command line and for the client to take a reply, at least 1. When not set the default of DEFAULT_IO_CMD_TIMEOUT is used</td></tr>
 <tr><td>io_session_timeout</td><td>3600</td><td>seconds a session may last from the greeting on, never renewed, between 1 and 86400, then 421 and the connection is closed (None = default, section 7)</td></tr>
@@ -772,9 +779,9 @@ server_b = SmtpdServer(handler, ports=2526, global_limits=limits)
 
 ## 11. Message spooling
 
-With ```spool``` set (a directory ending in ```/```, or directory plus the
-start of a file name) every incoming message is streamed to a temp file
-named ```<prefix>YYYYMMDD-HHMMSS-<unique>.eml```. The timestamp comes from
+With ```spool_path_prefix``` set (a directory ending in ```/```, or
+directory plus the start of a file name) every incoming message is streamed
+to a temp file named ```<prefix>YYYYMMDD-HHMMSS-<unique>.eml```. The timestamp comes from
 the connection start (UTC), the unique part from ```mkstemp```, so parallel
 messages and pre-forked workers never collide.
 
@@ -785,7 +792,7 @@ the file only. At ```on_message_data_event``` the file holds the complete
 de-dot-stuffed, chomped message while ```ctx.message.data``` carries ONLY
 the headers (no separator line). ```ctx.message.bytesize``` always counts
 the whole message and equals the final file size. Header lines added by the
-handler change it too and count against a ```data_size``` limit.
+handler change it too and count against a ```max_data_bytes``` limit.
 
 ```ctx.message.spooler``` is the owning ```MessageSpooler``` (None without
 spooling, and None for a message that ends before a header/body separator).

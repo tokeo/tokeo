@@ -4,9 +4,10 @@ Tests for tokeo.core.smtpd.server (the own asyncio SMTP server).
 Everything is exercised over a real SMTP conversation against a live server:
 the full dialog and reference-faithful behaviour (null sender, de-dot-stuffing,
 byte-exact body, multiple transactions, sequence enforcement, handler rejects),
-the security enforcement we own (PIPELINING rejection, CRLF strictness, data_size,
-buffer overrun, command timeout), internationalization, the connection/processing
-limits, the PROXY protocol, the graceful shutdown, AUTH PLAIN/LOGIN and STARTTLS.
+the security enforcement we own (PIPELINING rejection, CRLF strictness,
+max_data_bytes, buffer overrun, command timeout), internationalization, the
+connection/processing limits, the PROXY protocol, the graceful shutdown, AUTH
+PLAIN/LOGIN and STARTTLS.
 """
 
 import base64
@@ -342,12 +343,12 @@ def test_crlf_strict_rejects_a_cr_within_a_command():
 DATA_ENVELOPE = [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n']
 
 
-def test_data_size_limit_552():
-    """A body over data_size answers 552 after the end of DATA, then goes on."""
+def test_max_data_bytes_limit_552():
+    """A body over max_data_bytes answers 552 after the end of DATA, goes on."""
     ev = RecordingEvents()
     _, r = run_dialog(
         ev,
-        {'data_size': 50},
+        {'max_data_bytes': 50},
         DATA_ENVELOPE + [b'X' * 200 + b'\r\nMAIL FROM:<c@x>\r\n.\r\n', b'MAIL FROM:<d@x>\r\n'],
     )
     assert r[4][0].startswith('552')
@@ -425,10 +426,10 @@ def test_a_failing_start_event_runs_once():
     assert ev.fired.count('start') == 1
 
 
-def test_spool_with_empty_first_line_starts_once_and_keeps_data_size(tmp_path):
-    """Spooling with an empty first DATA line starts once, data_size holds."""
+def test_spool_with_empty_first_line_starts_once_and_keeps_max_data_bytes(tmp_path):
+    """Spooling with an empty first DATA line starts once, max_data_bytes holds."""
     ev = RecordingEvents()
-    options = {'spool': str(tmp_path) + '/', 'data_size': 100}
+    options = {'spool_path_prefix': str(tmp_path) + '/', 'max_data_bytes': 100}
     _, r = run_dialog(ev, options, DATA_ENVELOPE + [b'\r\n' + b'X' * 60 + b'\r\n' + b'Y' * 60 + b'\r\n.\r\n'])
     assert r[4][0].startswith('552')
     assert ev.fired.count('start') == 1
@@ -441,7 +442,7 @@ def test_only_the_first_error_in_data_counts():
     class Count(RecordingEvents):
 
         def on_disconnect_event(self, ctx):
-            seen.append(ctx.server.exceptions)
+            seen.append(ctx.server.exception_cnt)
 
     _, r = run_dialog(Count(), {'crlf_data_mode': 'CRLF_DATA_STRICT'}, DATA_ENVELOPE + [b'A\nB\nC\nD\r\n.\r\n'])
     assert r[4][0].startswith('554')
@@ -901,14 +902,14 @@ def test_proxy_disabled_is_unknown_command():
 
 def test_unknown_command_counts_and_allows_abuse_abort():
     """
-    Unknown commands count in ctx.server.exceptions: two answer 500, the
+    Unknown commands count in ctx.server.exception_cnt: two answer 500, the
     third lets the handler abort by 421.
     """
 
     class AbuseGuard(RecordingEvents):
 
         def on_process_line_unknown_event(self, ctx, line):
-            if ctx.server.exceptions >= 2:
+            if ctx.server.exception_cnt >= 2:
                 raise Smtpd421CloseException
 
     _, r = run_dialog(AbuseGuard(), {}, [b'FOO one\r\n', b'BAR two\r\n', b'BAZ three\r\n'])
@@ -1712,7 +1713,7 @@ def test_auth_without_returned_authzid_535(mechanism, authz_return):
     assert r[-2][0].startswith('535')
     # not authenticated, MAIL still possible with AUTH_OPTIONAL
     assert r[-1][0] == '250 OK'
-    assert ev.ctx_auth == ('', '', '')
+    assert ev.ctx_auth == (None, '', '')
 
 
 @pytest.mark.parametrize('authz_return', [' user', 'user ', '  '])
@@ -1724,7 +1725,7 @@ def test_auth_not_stripped_authzid_is_a_handler_error(authz_return):
     _, r = run_dialog(ev, {'auth_mode': 'AUTH_OPTIONAL'}, [b'EHLO me\r\n', auth, b'MAIL FROM:<a@x>\r\n'])
     assert r[1][0].startswith('454')
     assert r[2][0] == '250 OK'
-    assert ev.ctx_auth == ('', '', '')
+    assert ev.ctx_auth == (None, '', '')
 
 
 @pytest.mark.parametrize('mechanism', ['plain', 'login'])
@@ -1814,10 +1815,10 @@ class TlsEvents(RecordingEvents):
 
     def __init__(self, options=None):
         super().__init__(options)
-        self.encrypted_at_mail = None
+        self.encrypted_at_on_mail = None
 
     def on_mail_from_event(self, ctx, mail_from):
-        self.encrypted_at_mail = ctx.server.encrypted
+        self.encrypted_at_on_mail = ctx.server.encrypted_at
         return super().on_mail_from_event(ctx, mail_from)
 
 
@@ -1852,7 +1853,7 @@ def test_starttls_full_flow_delivers_over_tls():
     assert not any('STARTTLS' in ln for ln in ehlo2)
     assert final[0].startswith('250')
     assert ev.messages and ev.messages[0][0] == b'body over tls'
-    assert ev.encrypted_at_mail
+    assert ev.encrypted_at_on_mail is not None
 
 
 def test_starttls_discards_a_plaintext_auth():

@@ -118,7 +118,7 @@ def test_file_is_byte_identical_to_ram_mode(tmp_path):
     ram = Capture()
     _run(ram, {})
     spool = Capture()
-    _run(spool, {'spool': str(tmp_path) + '/'})
+    _run(spool, {'spool_path_prefix': str(tmp_path) + '/'})
     assert spool.seen[0]['file'] == ram.seen[0]['data']
     assert spool.seen[0]['bytesize'] == ram.seen[0]['bytesize'] == len(ram.seen[0]['data'])
 
@@ -126,7 +126,7 @@ def test_file_is_byte_identical_to_ram_mode(tmp_path):
 def test_data_holds_only_headers_without_separator_line(tmp_path):
     """In spool mode data holds the headers only, without the empty line."""
     events = Capture()
-    _run(events, {'spool': str(tmp_path) + '/'})
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
     assert events.seen[0]['data'] == b'Subject: spool test\r\nFrom: a@x.org\r\n'
     import email
 
@@ -138,7 +138,7 @@ def test_injected_headers_reach_file_and_bytesize(tmp_path):
     ram = InjectingCapture()
     _run(ram, {})
     spool = InjectingCapture()
-    _run(spool, {'spool': str(tmp_path) + '/'})
+    _run(spool, {'spool_path_prefix': str(tmp_path) + '/'})
     # injected header sits before the separator, file identical to RAM mode
     assert b'X-inject: Y\r\n\r\n' in spool.seen[0]['file']
     assert spool.seen[0]['file'] == ram.seen[0]['data']
@@ -147,7 +147,7 @@ def test_injected_headers_reach_file_and_bytesize(tmp_path):
 
 def test_bytesize_runs_live_in_both_modes(tmp_path):
     """bytesize grows while receiving and ends 2 below, the chomped CRLF."""
-    for options in ({}, {'spool': str(tmp_path) + '/'}):
+    for options in ({}, {'spool_path_prefix': str(tmp_path) + '/'}):
         events = Capture()
         _run(events, options)
         sizes = events.receiving_sizes
@@ -161,7 +161,7 @@ def test_message_without_separator_gets_no_spooler(tmp_path):
     ram = Capture()
     _run(ram, {}, messages=('Subject: only headers\r\nX-test: 1',))
     spool = Capture()
-    _run(spool, {'spool': str(tmp_path) + '/'}, messages=('Subject: only headers\r\nX-test: 1',))
+    _run(spool, {'spool_path_prefix': str(tmp_path) + '/'}, messages=('Subject: only headers\r\nX-test: 1',))
     assert spool.seen[0]['path'] is None
     assert spool.seen[0]['data'] == ram.seen[0]['data']
     assert spool.seen[0]['bytesize'] == ram.seen[0]['bytesize']
@@ -174,19 +174,19 @@ def test_message_without_separator_gets_no_spooler(tmp_path):
 def test_file_name_pattern_and_prefix(tmp_path):
     """Files are named [prefix]YYYYMMDD-HHMMSS-<id>.eml."""
     events = Capture()
-    _run(events, {'spool': str(tmp_path) + '/mx1-'}, debug=True)
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/mx1-'}, debug=True)
     name = os.path.basename(events.seen[0]['path'])
     assert re.fullmatch(r'mx1-\d{8}-\d{6}-.+\.eml', name)
     # trailing slash = plain directory, no name prefix
     events = Capture()
-    _run(events, {'spool': str(tmp_path) + '/'}, debug=True)
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/'}, debug=True)
     assert re.fullmatch(r'\d{8}-\d{6}-.+\.eml', os.path.basename(events.seen[0]['path']))
 
 
 def test_file_deleted_after_event(tmp_path):
     """The file exists during the data event and is deleted after it."""
     events = Capture()
-    _run(events, {'spool': str(tmp_path) + '/'})
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
     assert events.seen[0]['file'] is not None  # existed during the event
     assert os.listdir(tmp_path) == []  # gone afterwards
 
@@ -194,7 +194,7 @@ def test_file_deleted_after_event(tmp_path):
 def test_debug_keeps_delivered_files(tmp_path):
     """With debug the delivered file stays with the message in it."""
     events = Capture()
-    _run(events, {'spool': str(tmp_path) + '/'}, debug=True)
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/'}, debug=True)
     files = os.listdir(tmp_path)
     assert len(files) == 1
     with open(tmp_path / files[0], 'rb') as f:
@@ -206,7 +206,7 @@ def test_two_messages_one_connection_get_fresh_files(tmp_path):
     events = Capture()
 
     async def go():
-        srv, port = await start_smtpd(events, options={'spool': str(tmp_path) + '/'}, debug=True)
+        srv, port = await start_smtpd(events, options={'spool_path_prefix': str(tmp_path) + '/'}, debug=True)
         loop = asyncio.get_event_loop()
 
         def run_client():
@@ -238,7 +238,7 @@ def test_two_messages_one_connection_get_fresh_files(tmp_path):
 def test_keep_returns_path_and_file_survives(tmp_path):
     """keep() returns the path and the file survives the event."""
     events = KeepCapture()
-    _run(events, {'spool': str(tmp_path) + '/'})
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
     kept = events.seen[0]['kept']
     assert kept is not None and os.path.exists(kept)
     with open(kept, 'rb') as f:
@@ -248,7 +248,7 @@ def test_keep_returns_path_and_file_survives(tmp_path):
 def test_keep_moves_to_target(tmp_path):
     """keep(target) moves the file there, the spool directory holds only it."""
     events = MoveCapture()
-    _run(events, {'spool': str(tmp_path) + '/'})
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
     target = events.seen[0]['target']
     assert os.path.exists(target)
     with open(target, 'rb') as f:
@@ -263,7 +263,7 @@ def test_early_keep_mid_stream_completes_at_target(tmp_path):
     """
     events = EarlyMoveCapture()
     body = 'X' * 20000
-    _run(events, {'spool': str(tmp_path) + '/'}, messages=(f'Subject: t\r\n\r\n{body}\r\nlast',))
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/'}, messages=(f'Subject: t\r\n\r\n{body}\r\nlast',))
     size = os.path.getsize(events.target)
     with open(events.target, 'rb') as f:
         content = f.read()
@@ -274,7 +274,7 @@ def test_early_keep_mid_stream_completes_at_target(tmp_path):
 def test_manual_rename_takeover_still_safe(tmp_path):
     """A file renamed by the handler itself is left alone, nothing raises."""
     events = RenameCapture()
-    _run(events, {'spool': str(tmp_path) + '/'})  # unlink must not raise
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/'})  # unlink must not raise
     target = events.seen[0]['target']
     assert os.path.exists(target)
     with open(target, 'rb') as f:
@@ -286,7 +286,7 @@ def test_manual_rename_takeover_still_safe(tmp_path):
 
 def _abort_mid_data(tmp_path, debug):
     async def go():
-        srv, port = await start_smtpd(Capture(), options={'spool': str(tmp_path) + '/'}, debug=debug)
+        srv, port = await start_smtpd(Capture(), options={'spool_path_prefix': str(tmp_path) + '/'}, debug=debug)
         loop = asyncio.get_event_loop()
 
         def run_client():
@@ -322,12 +322,12 @@ def test_abort_mid_data_debug_keeps_the_file(tmp_path):
     assert len(os.listdir(tmp_path)) == 1
 
 
-def test_data_size_cap_works_in_spool_mode(tmp_path):
-    """Over data_size in spool mode answers 552 and leaves no file."""
+def test_max_data_bytes_cap_works_in_spool_mode(tmp_path):
+    """Over max_data_bytes in spool mode answers 552 and leaves no file."""
     import smtplib
 
     async def go():
-        srv, port = await start_smtpd(Capture(), options={'spool': str(tmp_path) + '/', 'data_size': 64})
+        srv, port = await start_smtpd(Capture(), options={'spool_path_prefix': str(tmp_path) + '/', 'max_data_bytes': 64})
         loop = asyncio.get_event_loop()
 
         def run_client():
@@ -362,7 +362,7 @@ class DoubleKeep(Capture):
 def test_keep_called_twice_returns_none(tmp_path):
     """A second keep() returns None, the first path stays."""
     events = DoubleKeep()
-    _run(events, {'spool': str(tmp_path) + '/'})
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
     first, second = events.seen[0]['first'], events.seen[0]['second']
     assert first is not None and os.path.exists(first)
     assert second is None
@@ -374,7 +374,7 @@ def test_empty_body_message_matches_ram_mode(tmp_path):
     ram = Capture()
     assert run_wire(ram, {}, wire) == b'250'
     spool = Capture()
-    assert run_wire(spool, {'spool': str(tmp_path) + '/'}, wire) == b'250'
+    assert run_wire(spool, {'spool_path_prefix': str(tmp_path) + '/'}, wire) == b'250'
     assert spool.seen[0]['file'] == ram.seen[0]['data'] == b'Subject: t\r\n'
     assert spool.seen[0]['bytesize'] == ram.seen[0]['bytesize']
 
@@ -386,7 +386,7 @@ def test_crlf_leave_spool_file_is_byte_true(tmp_path):
     ram = Capture()
     assert run_wire(ram, {'crlf_mode': 'CRLF_LEAVE'}, wire) == b'250'
     spool = Capture()
-    assert run_wire(spool, {'crlf_mode': 'CRLF_LEAVE', 'spool': str(tmp_path) + '/'}, wire) == b'250'
+    assert run_wire(spool, {'crlf_mode': 'CRLF_LEAVE', 'spool_path_prefix': str(tmp_path) + '/'}, wire) == b'250'
     assert spool.seen[0]['file'] == ram.seen[0]['data']
     assert not spool.seen[0]['file'].endswith(b'\n')
     assert spool.seen[0]['bytesize'] == ram.seen[0]['bytesize']
@@ -395,7 +395,7 @@ def test_crlf_leave_spool_file_is_byte_true(tmp_path):
 def test_completely_empty_message(tmp_path):
     """A dot right after DATA gives no spooler, no file and bytesize 0."""
     events = Capture()
-    assert run_wire(events, {'spool': str(tmp_path) + '/'}, b'') == b'250'
+    assert run_wire(events, {'spool_path_prefix': str(tmp_path) + '/'}, b'') == b'250'
     assert events.seen[0]['path'] is None
     assert events.seen[0]['bytesize'] == 0
     assert os.listdir(tmp_path) == []
@@ -404,4 +404,4 @@ def test_completely_empty_message(tmp_path):
 def test_missing_spool_directory_fails_at_start(tmp_path):
     """A spool path in a missing directory raises ValueError at start."""
     with pytest.raises(ValueError):
-        SmtpdServer(Capture(), options={'spool': str(tmp_path / 'nope' / 'mx1-')})
+        SmtpdServer(Capture(), options={'spool_path_prefix': str(tmp_path / 'nope' / 'mx1-')})

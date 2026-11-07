@@ -57,7 +57,7 @@ def test_release_on_service_a_wakes_waiter_on_service_b():
         try:
             mail_a = loop.run_in_executor(None, lambda: send_mail(port_a, 'a@x.org', 'to@x.org', 'Subject: a\r\n\r\nA'))
             # wait until A really holds the one global slot
-            assert await wait_until_async(lambda: gl.active_processings == 1, timeout=3.0)
+            assert await wait_until_async(lambda: gl.processing_cnt == 1, timeout=3.0)
 
             mail_b = loop.run_in_executor(None, lambda: send_mail(port_b, 'b@x.org', 'to@x.org', 'Subject: b\r\n\r\nB'))
             # B is connected and waits for the slot ...
@@ -84,17 +84,17 @@ class PollingLimits(GlobalLimits):
     short interval while throttled.
     """
 
-    async def slot_wait(self):
+    async def wait_for_slot(self):
         try:
             await asyncio.wait_for(self.slot_free.wait(), 0.05)
         except asyncio.TimeoutError:
             pass
 
 
-def test_external_counter_release_is_seen_via_slot_wait_override():
+def test_external_counter_release_is_seen_via_wait_for_slot_override():
     """
     A slot freed by another process, without any event, still admits the
-    waiting client through the polling slot_wait.
+    waiting client through the polling wait_for_slot.
     """
     events = GatedEvents()
     events.gate.set()  # deliver immediately once admitted
@@ -104,12 +104,12 @@ def test_external_counter_release_is_seen_via_slot_wait_override():
         srv, port = await start_smtpd(events, global_limits=gl)
         loop = asyncio.get_event_loop()
         try:
-            gl.active_processings = 1  # as if another process holds the slot
+            gl.processing_cnt = 1  # as if another process holds the slot
             mail = loop.run_in_executor(None, lambda: send_mail(port, 'a@x.org', 'to@x.org', 'Subject: x\r\n\r\nhi'))
             assert await wait_until_async(lambda: srv.connections == 1)
             assert srv.processings == 0 and events.delivered == []  # throttled by the "foreign" slot
 
-            gl.active_processings = 0  # foreign process releases: NO event
+            gl.processing_cnt = 0  # foreign process releases: NO event
             code, _ = await asyncio.wait_for(mail, 5.0)
             assert code == 250 and len(events.delivered) == 1
         finally:
@@ -122,5 +122,5 @@ def test_try_begin_processing_counts_up_to_the_max():
     """try_begin_processing counts until the max, then refuses without counting."""
     gl = GlobalLimits(max_processings=2)
     assert [gl.try_begin_processing() for _ in range(3)] == [True, True, False]
-    assert gl.active_processings == 2
+    assert gl.processing_cnt == 2
     assert GlobalLimits().try_begin_processing() is True

@@ -12,7 +12,7 @@ import platform
 
 import pytest
 
-from tokeo.core.smtpd.server import SmtpdServer, tls_immediate_supported
+from tokeo.core.smtpd.server import SmtpdServer, is_tls_immediate_supported
 from tests.core.smtpd.lib.smtpd_tests_helper import (
     RecordingEvents,
     start_server,
@@ -23,11 +23,11 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
 )
 
 needs_tls_immediate = pytest.mark.skipif(
-    not tls_immediate_supported(),
+    not is_tls_immediate_supported(),
     reason=f'TLS_IMMEDIATE requires Python 3.13.13+ or 3.14.4+ (gh-142352), running {platform.python_version()}',
 )
 
-_SERVER_OPTIONS = {'encrypt_mode': 'TLS_IMMEDIATE', 'tls_cert_cn': 'localhost', 'tls_cert_san': ['127.0.0.1']}
+_SERVER_OPTIONS = {'encrypt_mode': 'TLS_IMMEDIATE', 'tls_cert_cn': 'localhost', 'tls_cert_sans': ['127.0.0.1']}
 
 
 class ImmediateEvents(RecordingEvents):
@@ -35,7 +35,7 @@ class ImmediateEvents(RecordingEvents):
 
     def __init__(self, options=None):
         super().__init__(options)
-        self.encrypted_at_mail = None
+        self.encrypted_at_on_mail = None
         self.proxy_at_mail = None
 
     async def on_connect_event(self, ctx):
@@ -44,7 +44,7 @@ class ImmediateEvents(RecordingEvents):
         await asyncio.sleep(0.2)
 
     def on_mail_from_event(self, ctx, mail_from):
-        self.encrypted_at_mail = ctx.server.encrypted
+        self.encrypted_at_on_mail = ctx.server.encrypted_at
         self.proxy_at_mail = ctx.server.proxy
         return super().on_mail_from_event(ctx, mail_from)
 
@@ -82,7 +82,7 @@ def test_delivers_over_tls():
     assert starttls[0].startswith('503')
     assert final[0].startswith('250')
     assert ev.messages and ev.messages[0][0] == b'body'
-    assert ev.encrypted_at_mail
+    assert ev.encrypted_at_on_mail is not None
 
 
 @needs_tls_immediate
@@ -110,7 +110,7 @@ def test_behind_proxy():
     greeting, replies = asyncio.run(go())
     assert greeting[0].startswith('220')
     assert replies[-1][0].startswith('250')
-    assert ev.encrypted_at_mail
+    assert ev.encrypted_at_on_mail is not None
     assert ev.proxy_at_mail['source_ip'] == '9.8.7.6'
 
 
@@ -147,7 +147,7 @@ def test_required_python_version(monkeypatch, version, supported):
     ],
     ids=lambda value: '.'.join(map(str, value)) if isinstance(value, tuple) else str(value),
 )
-def test_tls_immediate_supported(monkeypatch, version, supported):
+def test_is_tls_immediate_supported(monkeypatch, version, supported):
     """Only 3.13.13+ of the 3.13 line and 3.14.4+ onwards support TLS_IMMEDIATE."""
     monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', version + ('final', 0))
-    assert tls_immediate_supported() is supported
+    assert is_tls_immediate_supported() is supported

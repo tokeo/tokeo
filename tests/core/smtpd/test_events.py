@@ -40,8 +40,8 @@ def test_authenticated_and_encrypted_follow_the_context():
     ctx = SmtpdContext(id='x')
     assert SmtpdEvents.authenticated(ctx) is False
     assert SmtpdEvents.encrypted(ctx) is False
-    ctx.server.authenticated = get_utc_now()
-    ctx.server.encrypted = get_utc_now()
+    ctx.server.authenticated_at = get_utc_now()
+    ctx.server.encrypted_at = get_utc_now()
     assert SmtpdEvents.authenticated(ctx) is True
     assert SmtpdEvents.encrypted(ctx) is True
 

@@ -77,7 +77,7 @@ from .server import (
     SmtpdServer,
     GlobalLimits,
     AuthMode,
-    tls_immediate_supported,
+    is_tls_immediate_supported,
 )
 
 __all__ = [
@@ -132,7 +132,7 @@ __all__ = [
     'GlobalLimits',
     'EncryptMode',
     'AuthMode',
-    'tls_immediate_supported',
+    'is_tls_immediate_supported',
     'DEFAULT_SMTPD_HOST',
     'DEFAULT_SMTPD_PORT',
     'DEFAULT_SMTPD_MAX_PROCESSINGS',

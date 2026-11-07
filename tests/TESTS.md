@@ -363,7 +363,7 @@ start of the next run, the results stay for a look until then.
 
 ```python
 def test_file_deleted_after_event(tmp_path):     # a directory of the test
-    _run(events, {'spool': str(tmp_path) + '/'})
+    _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
 
 
 def test_temper_acquire_and_release(tmp):        # where a test app takes cement's fs.Tmp
