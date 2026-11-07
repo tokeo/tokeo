@@ -67,14 +67,15 @@ class TokeoCronAndFireTrigger(CronTrigger):
         the date/time calculations
     - **jitter** (int, optional): Advance or delay the job execution
         by jitter seconds at most
-    - **delay** (int, optional): Additional seconds to delay after
+    - **delay_seconds** (int, optional): Additional seconds to delay after
         the scheduled time
 
     ### Notes
 
-    : The delay parameter adds a fixed delay after the cron-calculated trigger time,
-        while jitter adds a random amount of time (up to the specified maximum).
-        Used together, they provide flexible control over task execution timing.
+    : The delay_seconds parameter adds a fixed delay after the cron-calculated
+        trigger time, while jitter adds a random amount of time (up to the
+        specified maximum). Used together, they provide flexible control over
+        task execution timing.
 
     : The cron parameters (year, month, etc.) support various formats including:
 
@@ -100,14 +101,14 @@ class TokeoCronAndFireTrigger(CronTrigger):
         end_date=None,
         timezone=None,
         jitter=None,
-        delay=None,
+        delay_seconds=None,
     ):
         super().__init__(year, month, day, week, day_of_week, hour, minute, second, start_date, end_date, timezone, jitter)
         #: Seconds the fire time is moved after the crontab time
-        self.delay = delay
+        self.delay_seconds = delay_seconds
 
     @classmethod
-    def from_crontab(cls, expr, timezone=None, jitter=None, delay=None):
+    def from_crontab(cls, expr, timezone=None, jitter=None, delay_seconds=None):
         """
         Create a trigger from a standard crontab expression.
 
@@ -123,8 +124,8 @@ class TokeoCronAndFireTrigger(CronTrigger):
             date/time calculations
         - **jitter** (int, optional): Random seconds to add or subtract
             from trigger time
-        - **delay** (int, optional): Fixed seconds to add after calculated
-            trigger time
+        - **delay_seconds** (int, optional): Fixed seconds to add after
+            calculated trigger time
 
         ### Returns
 
@@ -148,7 +149,7 @@ class TokeoCronAndFireTrigger(CronTrigger):
             day_of_week=values[4],
             timezone=timezone,
             jitter=jitter,
-            delay=delay,
+            delay_seconds=delay_seconds,
         )
 
     def get_next_fire_time(self, previous_fire_time, now):
@@ -185,10 +186,10 @@ class TokeoCronAndFireTrigger(CronTrigger):
         next_fire_time = super().get_next_fire_time(previous_fire_time, now)
         # if there is an additional delay, put it on top; without a next
         # fire time the task fires no more, so there is no delay either
-        if self.delay is None or next_fire_time is None:
+        if self.delay_seconds is None or next_fire_time is None:
             return next_fire_time
         else:
-            return next_fire_time + timedelta(seconds=self.delay)
+            return next_fire_time + timedelta(seconds=self.delay_seconds)
 
 
 class TokeoScheduler(MetaMixin):
@@ -247,7 +248,7 @@ class TokeoScheduler(MetaMixin):
         self.app = app
         self._command_parser = None
         self._scheduler = None
-        self._interactive = False
+        self._with_shell = False
         self._tasks = None
         self._taskid = 0
 
@@ -300,7 +301,7 @@ class TokeoScheduler(MetaMixin):
         Get the APScheduler instance.
 
         Lazily creates and configures the appropriate scheduler instance
-        (background or blocking) based on the interactive mode.
+        (background or blocking) based on with_shell of startup.
 
         ### Returns
 
@@ -310,14 +311,14 @@ class TokeoScheduler(MetaMixin):
         ### Notes
 
         : This property creates the scheduler on first access, configuring it
-            with the appropriate executor and thread pool size. In interactive
-            mode, it uses a BackgroundScheduler that doesn't block the main
-            thread. In non-interactive mode, it uses a BlockingScheduler that
-            keeps the application running.
+            with the appropriate executor and thread pool size. With the shell
+            it uses a BackgroundScheduler that doesn't block the main thread.
+            Without it uses a BlockingScheduler that keeps the application
+            running.
 
         """
         if self._scheduler is None:
-            self._scheduler = BackgroundScheduler() if self._interactive else BlockingScheduler()
+            self._scheduler = BackgroundScheduler() if self._with_shell else BlockingScheduler()
             self._scheduler.add_executor(ThreadPoolExecutor(max_workers=self._config('max_concurrent_jobs', fallback=10)), 'default')
         return self._scheduler
 
@@ -382,15 +383,15 @@ class TokeoScheduler(MetaMixin):
     def add_crontab_task(
         self,
         module,
-        func,
+        func_name,
         crontab,
+        kwargs=None,
+        name='',
         coalesce=True,
         misfire_grace_time=None,
-        delay=None,
-        max_jitter=None,
+        delay_seconds=None,
+        max_jitter_seconds=None,
         max_running_jobs=None,
-        kwargs=None,
-        title='',
     ):
         """
         Add a new cron-style task to the scheduler.
@@ -402,47 +403,45 @@ class TokeoScheduler(MetaMixin):
         ### Args
 
         - **module** (str): The module containing the function to run
-        - **func** (str): The function name to run
+        - **func_name** (str): The function name to run
         - **crontab** (str): Crontab expression for scheduling
             (format: "min hour day month day_of_week")
+        - **kwargs** (dict, optional): Keyword arguments to pass to the
+            function. Defaults to an empty dict.
+        - **name** (str): Human-readable name for the task, the function
+            name when empty
         - **coalesce** (bool): Whether to coalesce missed executions
             (True = run once, False = run all)
         - **misfire_grace_time** (int, optional): Seconds after the scheduled
             time that the job is
             still allowed to be run
-        - **delay** (int, optional): Seconds to delay execution after
+        - **delay_seconds** (int, optional): Seconds to delay execution after
             scheduled time
-        - **max_jitter** (int, optional): Maximum jitter in seconds to add to
-            the schedule
+        - **max_jitter_seconds** (int, optional): Maximum jitter in seconds to
+            add to the schedule
         - **max_running_jobs** (int, optional): Maximum number of concurrently
             running instances of this job
-        - **title** (str): Human-readable title for the task
-
-        ### Keyword Args
-
-        - **kwargs** (dict, optional): Keyword arguments to pass to the
-            function. Defaults to an empty dict.
 
         ### Notes
 
         : The function is identified by its fully qualified name in the format
-            'module:func' and must be importable by the application when the task
-            runs. The title is used for display purposes in logs and the interactive
-            shell.
+            'module:func_name' and must be importable by the application when the
+            task runs. The name is used for display purposes in logs and the
+            interactive shell.
 
         """
-        if title == '':
-            title = func
+        if name == '':
+            name = func_name
         self._taskid += 1
 
         kwargs = {} if kwargs is None else kwargs
         self.scheduler.add_job(
-            f'{module}:{func}',
+            f'{module}:{func_name}',
             kwargs=kwargs,
             trigger=TokeoCronAndFireTrigger.from_crontab(
-                crontab, jitter=max_jitter, delay=delay, timezone=self._config('timezone', fallback=None)
+                crontab, jitter=max_jitter_seconds, delay_seconds=delay_seconds, timezone=self._config('timezone', fallback=None)
             ),
-            name=f'{self._taskid}:{title}',
+            name=f'{self._taskid}:{name}',
             id=f'{self._taskid}',
             coalesce=coalesce,
             misfire_grace_time=misfire_grace_time,
@@ -476,8 +475,8 @@ class TokeoScheduler(MetaMixin):
                 identically (collapse to a single run) for now; they stay
                 distinct in anticipation of finer control in future releases.
             - misfire_grace_time: Seconds after scheduled time to still run
-            - delay: Fixed seconds to delay execution
-            - max_jitter: Random seconds to add to timing
+            - delay_seconds: Fixed seconds to delay execution
+            - max_jitter_seconds: Random seconds to add to timing
             - max_running_jobs: Maximum concurrent instances
 
           The task ID in the configuration becomes the function name to call.
@@ -510,15 +509,15 @@ class TokeoScheduler(MetaMixin):
                     key,
                     entry,
                     kwargs=task['kwargs'] if 'kwargs' in task else {},
-                    title=task['name'] if 'name' in task and task['name'] != '' else key,
+                    name=task['name'] if 'name' in task and task['name'] != '' else key,
                     coalesce=coalesce,
                     misfire_grace_time=task['misfire_grace_time'] if 'misfire_grace_time' in task else None,
-                    delay=task['delay'] if 'delay' in task else None,
-                    max_jitter=task['max_jitter'] if 'max_jitter' in task else None,
+                    delay_seconds=task['delay_seconds'] if 'delay_seconds' in task else None,
+                    max_jitter_seconds=task['max_jitter_seconds'] if 'max_jitter_seconds' in task else None,
                     max_running_jobs=task['max_running_jobs'] if 'max_running_jobs' in task else None,
                 )
 
-    def startup(self, interactive=False, paused=False):
+    def startup(self, with_shell=False, paused=False):
         """
         Start the scheduler.
 
@@ -528,20 +527,21 @@ class TokeoScheduler(MetaMixin):
 
         ### Args
 
-        - **interactive** (bool): Whether to run in interactive mode
+        - **with_shell** (bool): Whether to run in the background for the
+            interactive shell
         - **paused** (bool): Whether to start in paused state
 
         ### Notes
 
-        : In interactive mode, the scheduler runs in the background and doesn't
-            block the application's main thread. In non-interactive mode, it uses
-            a blocking scheduler that keeps the application running until shutdown.
+        : With the shell, the scheduler runs in the background and doesn't
+            block the application's main thread. Without it uses a blocking
+            scheduler that keeps the application running until shutdown.
 
         : Starting with paused=True allows you to load all tasks but defer their
             execution until explicitly resumed.
 
         """
-        self._interactive = interactive
+        self._with_shell = with_shell
         self.app.log.info('Adding all scheduler tasks from config')
         self.init_tasks()
         if paused:
@@ -570,7 +570,7 @@ class TokeoScheduler(MetaMixin):
             self._scheduler.shutdown()
             self._scheduler.remove_all_jobs()
 
-    def launch(self, interactive=False, paused=False):
+    def launch(self, with_shell=False, paused=False):
         """
         Launch the scheduler and optionally start the interactive shell.
 
@@ -579,19 +579,18 @@ class TokeoScheduler(MetaMixin):
 
         ### Args
 
-        - **interactive** (bool): Whether to run in interactive mode with
-            command shell
+        - **with_shell** (bool): Whether to run the interactive shell
         - **paused** (bool): Whether to start in paused state
 
         ### Notes
 
-        : Both modes block: with interactive until the shell ends, without
+        : Both modes block: with the shell until the shell ends, without
             until the scheduler is stopped.
 
         """
-        self.app.scheduler.startup(interactive=interactive, paused=paused)
-        if interactive:
-            self.shell()
+        self.app.scheduler.startup(with_shell=with_shell, paused=paused)
+        if with_shell:
+            self.run_shell()
 
     def shell_completion(self):
         """
@@ -780,7 +779,7 @@ class TokeoScheduler(MetaMixin):
         """
         self._scheduler.wakeup()
 
-    def handle_command_task_commands(self, args):
+    def handle_task_subcommands(self, args):
         """
         Handle task-specific commands (pause, resume, remove, fire).
 
@@ -916,28 +915,29 @@ class TokeoScheduler(MetaMixin):
             # tasks remove command
             cmd = nested.add_parser('remove', help='remove the task')
             cmd.add_argument('task', nargs='+', help='id of tasks to drop')
-            cmd.set_defaults(func=self.handle_command_task_commands, cmd='remove')
+            cmd.set_defaults(func=self.handle_task_subcommands, cmd='remove')
             # tasks pause command
             cmd = nested.add_parser('pause', help='pause the task')
             cmd.add_argument('task', nargs='+', help='id of tasks to pause')
-            cmd.set_defaults(func=self.handle_command_task_commands, cmd='pause')
+            cmd.set_defaults(func=self.handle_task_subcommands, cmd='pause')
             # tasks resume command
             cmd = nested.add_parser('resume', help='resume the task')
             cmd.add_argument('task', nargs='+', help='id of tasks to resume')
-            cmd.set_defaults(func=self.handle_command_task_commands, cmd='resume')
+            cmd.set_defaults(func=self.handle_task_subcommands, cmd='resume')
             # tasks fire command
             cmd = nested.add_parser('fire', help='fire the task')
             cmd.add_argument('task', nargs='+', help='id of tasks to fire')
-            cmd.set_defaults(func=self.handle_command_task_commands, cmd='fire')
+            cmd.set_defaults(func=self.handle_task_subcommands, cmd='fire')
 
         # return initialized parser
         return self._command_parser
 
-    def command(self, cmd=''):
+    def run_command(self, cmd=''):
         """
         Process a command string from the interactive shell.
 
-        Parses and executes a command entered by the user in the interactive shell.
+        Parses and executes a command entered by the user in the interactive
+        shell, an empty line follows each command.
 
         ### Args
 
@@ -969,28 +969,32 @@ class TokeoScheduler(MetaMixin):
             - Commands that fail to execute: Raise their error
 
         """
-        # signal bye bye to interactive shell
-        if cmd in ['exit', 'quit']:
-            raise EOFError('Command exit entered.')
-
-        # check command
-        cmd_args = shlex.split(cmd)
+        # an empty line between two commands
         try:
-            args = self.command_parser.parse_args(args=cmd_args)
-        except SystemExit as err:
-            # if parse was ok but only help, err == 0, else err != 0
-            return err.code == 0
+            # signal bye bye to interactive shell
+            if cmd in ['exit', 'quit']:
+                raise EOFError('Command exit entered.')
 
-        # a failing command raises, the shell shows the error and keeps the line
-        if 'func' in args:
-            print('')
-            args.func(args)
+            # check command
+            cmd_args = shlex.split(cmd)
+            try:
+                args = self.command_parser.parse_args(args=cmd_args)
+            except SystemExit as err:
+                # if parse was ok but only help, err == 0, else err != 0
+                return err.code == 0
+
+            # a failing command raises, the shell shows the error and keeps the line
+            if 'func' in args:
+                print('')
+                args.func(args)
+                return True
+
+            # unusual empty but valid command, can be added to history
             return True
+        finally:
+            print('')
 
-        # unusual empty but valid command, can be added to history
-        return True
-
-    def shell(self, **session):
+    def run_shell(self, **session_options):
         """
         Start the interactive shell for scheduler management.
 
@@ -999,7 +1003,7 @@ class TokeoScheduler(MetaMixin):
 
         ### Args
 
-        - **session**: More options for the shell of ```app.tui.input```
+        - **session_options**: More options for the shell of ```app.tui.input```
 
         ### Example
 
@@ -1022,16 +1026,13 @@ class TokeoScheduler(MetaMixin):
         def get_prompt():
             return 'Scheduler> ' if self._scheduler.state == STATE_RUNNING else '(not running) Scheduler> '
 
-        def run_command(line):
-            # an empty line between two commands
-            try:
-                return self.command(line)
-            finally:
-                print('')
-
         self.app.log.info('Welcome to scheduler interactive shell.')
         self.app.tui.input.run_shell(
-            run_command, prompt=get_prompt, completer=self.shell_completion(), history=self.shell_history(), **session
+            self.run_command,
+            prompt=get_prompt,
+            completer=self.shell_completion(),
+            history=self.shell_history(),
+            **session_options,
         )
         self.app.log.info('bye bye using scheduler...')
 
@@ -1133,7 +1134,7 @@ class TokeoSchedulerController(Controller):
         foreground.
 
         """
-        self.app.scheduler.launch(interactive=self.app.pargs.shell, paused=self.app.pargs.paused)
+        self.app.scheduler.launch(with_shell=self.app.pargs.shell, paused=self.app.pargs.paused)
 
 
 def tokeo_scheduler_extend_app(app):
