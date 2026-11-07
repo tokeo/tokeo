@@ -390,7 +390,7 @@ class TokeoSmtpd(MetaMixin):
         """Read a key from the extension's config section."""
         return self.app.config.get(self._meta.config_section, key)
 
-    def services(self, names=None):
+    def select_services(self, names=None):
         """
         Select the configured services to run.
 
@@ -542,7 +542,7 @@ class TokeoSmtpd(MetaMixin):
         - **names** (list, optional): Service names; None runs all
 
         """
-        services = self.services(names)
+        services = self.select_services(names)
         max_processings = self._config('max_processings')
         max_connections = self._config('max_connections')
         has_global_limit = bool(max_processings) or bool(max_connections)
@@ -628,7 +628,7 @@ class TokeoSmtpd(MetaMixin):
                 except ChildProcessError:
                     pass
 
-    def list(self):
+    def show_services(self):
         """Print the configured services."""
         for svc in self._config('services') or []:
             listeners_str = ', '.join(f"{lst.get('host')}:{lst.get('port')}" for lst in svc.get('listeners') or [])
@@ -667,7 +667,7 @@ class TokeoSmtpdController(Controller):
     )
     def list(self):
         """Print the configured services."""
-        self.app.smtpd.list()
+        self.app.smtpd.show_services()
 
     @ex(
         help='run smtpd receiving services',

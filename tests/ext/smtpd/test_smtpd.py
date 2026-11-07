@@ -200,14 +200,14 @@ def test_extension_loads_into_cement_app():
     )
     with SmtpdTest(config_defaults=config) as app:
         assert app.smtpd is not None
-        assert [svc['name'] for svc in app.smtpd.services()] == ['mx-a']
+        assert [svc['name'] for svc in app.smtpd.select_services()] == ['mx-a']
         with pytest.raises(TokeoSmtpdError):
-            app.smtpd.services(['nope'])
+            app.smtpd.select_services(['nope'])
         with pytest.raises(TokeoSmtpdError):
-            app.smtpd.services(['mx-a', 'mx-a'])  # named twice must not start twice
-        app.smtpd.list()  # must run without raising
+            app.smtpd.select_services(['mx-a', 'mx-a'])  # named twice must not start twice
+        app.smtpd.show_services()  # must run without raising
         # the listener hosts reach the server (feeds the self-signed CN/SAN)
-        server = app.smtpd._build_server(app.smtpd.services()[0], None)
+        server = app.smtpd._build_server(app.smtpd.select_services()[0], None)
         assert server.hosts == ['127.0.0.1']
         # the global smtpd config sizes the session id for every service
         assert server.session_id_bytes == 8
@@ -258,18 +258,18 @@ def test_build_server_leaves_out_logger_severity():
     assert server.events_handler._server_logger is app.log
 
 
-def test_services_need_a_configured_service():
-    """Without a configured service the services raise TokeoSmtpdError."""
+def test_select_services_needs_a_configured_service():
+    """Without a configured service select_services raises TokeoSmtpdError."""
     with SmtpdTest() as app:
         with pytest.raises(TokeoSmtpdError, match='no services configured'):
-            app.smtpd.services()
+            app.smtpd.select_services()
 
 
-def test_services_pick_the_named_ones_in_their_order():
+def test_select_services_picks_the_named_ones_in_their_order():
     """Named services come back in the order of the names."""
     config = dict(smtpd=dict(services=[_make_service('mx-a', 2525), _make_service('mx-b', 2526)]))
     with SmtpdTest(config_defaults=config) as app:
-        assert [svc['name'] for svc in app.smtpd.services(['mx-b', 'mx-a'])] == ['mx-b', 'mx-a']
+        assert [svc['name'] for svc in app.smtpd.select_services(['mx-b', 'mx-a'])] == ['mx-b', 'mx-a']
 
 
 @pytest.mark.parametrize(
