@@ -25,7 +25,7 @@ from tokeo.ext.dramatiq.base import (  # noqa: F401
     TokeoDramatiq,
 )
 from tokeo.ext.dramatiq.controller import TokeoDramatiqController
-from tokeo.core.cement.extensions import required as extensions_required
+from tokeo.core.cement.extensions import check_required_extensions
 
 
 def tokeo_dramatiq_pdoc_pre_render(app):
@@ -132,7 +132,7 @@ def tokeo_dramatiq_extend_app(app):
         as app.dramatiq
 
     """
-    extensions_required(app, 'tokeo.ext.dramatiq', 'tokeo.ext.tui.output')
+    check_required_extensions(app, 'tokeo.ext.dramatiq', 'tokeo.ext.tui.output')
     app.extend('dramatiq', TokeoDramatiq(app))
     app.dramatiq._setup(app)
 

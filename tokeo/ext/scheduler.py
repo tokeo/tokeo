@@ -37,7 +37,7 @@ from apscheduler.triggers.cron import CronTrigger
 from argparse import ArgumentParser
 import shlex
 from datetime import datetime, timezone, timedelta
-from tokeo.core.cement.extensions import required as extensions_required
+from tokeo.core.cement.extensions import check_required_extensions
 
 
 class TokeoCronAndFireTrigger(CronTrigger):
@@ -1155,7 +1155,7 @@ def tokeo_scheduler_extend_app(app):
         attaches it to the application as the 'scheduler' attribute.
 
     """
-    extensions_required(app, 'tokeo.ext.scheduler', 'tokeo.ext.tui.input', 'tokeo.ext.tui.output')
+    check_required_extensions(app, 'tokeo.ext.scheduler', 'tokeo.ext.tui.input', 'tokeo.ext.tui.output')
     app.extend('scheduler', TokeoScheduler(app))
     app.scheduler._setup(app)
 

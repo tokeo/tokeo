@@ -289,7 +289,7 @@ def start_worker(tmp_path):
   lower case or the name of its method takes the place of the function,
   e.g. ```test_worker_keeps_a_message_its_handler_failed_on```
 - A file covering several modules prefixes the module, e.g.
-  ```test_extensions_required_names_the_missing_ones```
+  ```test_check_required_extensions_names_the_missing_ones```
 - No path in the name, pytest shows it: ```tests/core/utils/test_date.py::test_...```
 - The caught exception of ```pytest.raises``` is ```err_info```:
   ```with pytest.raises(TokeoError) as err_info:```

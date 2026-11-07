@@ -4,7 +4,7 @@ controller, and logs the help of a subcommand.
 """
 
 
-def subcmdmeta(controller):
+def get_command_meta(controller):
     """
     Access the \\_\\_cement_meta\\_\\_ information of subcommand within the command.
 
@@ -25,7 +25,7 @@ def subcmdmeta(controller):
     return controller._command_meta
 
 
-def defaultmeta(controller):
+def get_default_command_meta(controller):
     """
     Access the \\_\\_cement_meta\\_\\_ information of default subcommand within the
     command.
@@ -61,4 +61,4 @@ def log_info_help(controller):
     :  Log the controller's ```Meta.help``` to the application info logger
 
     """
-    controller.app.log.info(subcmdmeta(controller).parser_options['help'])
+    controller.app.log.info(get_command_meta(controller).parser_options['help'])

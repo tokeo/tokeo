@@ -5,7 +5,7 @@ Checks that the extensions an extension builds on are enabled.
 from tokeo.core.exc import TokeoError
 
 
-def required(app, extension, *needed):
+def check_required_extensions(app, extension, *needed):
     """
     Check that the extensions an extension builds on are enabled.
 
