@@ -201,8 +201,8 @@ def test_serve_invalid_switches(serve, options):
         ('worker_shutdown_timeout', 'auto'),
         ('queue_prefetch', -1),
         ('delay_queue_prefetch', 'x'),
-        ('restart_delay', -1),
-        ('restart_delay', 'x'),
+        ('restart_delay_ms', -1),
+        ('restart_delay_ms', 'x'),
     ],
 )
 def test_serve_invalid_config(serve, key, value):
@@ -333,9 +333,9 @@ def test_serve_poll_interval_default_keeps_env(serve):
 
 
 def test_serve_poll_interval_from_config(serve, monkeypatch):
-    """worker_poll_interval wins over the env, even over an invalid one."""
+    """worker_poll_interval_ms wins over the env, even over an invalid one."""
     monkeypatch.setenv('dramatiq_worker_timeout', '0')
-    serve(config=dict(worker_poll_interval=250))
+    serve(config=dict(worker_poll_interval_ms=250))
     assert os.environ['dramatiq_worker_timeout'] == '250'
 
 
@@ -358,6 +358,6 @@ def test_serve_poll_interval_invalid_env(serve, monkeypatch, value):
 
 @pytest.mark.parametrize('value', [0, 'fast', True])
 def test_serve_poll_interval_invalid_config(serve, value):
-    """An invalid worker_poll_interval raises the config error."""
-    with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config worker_poll_interval'):
-        serve(config=dict(worker_poll_interval=value))
+    """An invalid worker_poll_interval_ms raises the config error."""
+    with pytest.raises(TokeoDramatiqConfigError, match='Invalid dramatiq config worker_poll_interval_ms'):
+        serve(config=dict(worker_poll_interval_ms=value))

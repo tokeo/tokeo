@@ -178,8 +178,8 @@ def load(app):
 
     """
     # Define hooks that can be used by other extensions
-    app.hook.define('tokeo_dramatiq_pre_start')
-    app.hook.define('tokeo_dramatiq_post_end')
+    app.hook.define('tokeo_dramatiq_pre_serve')
+    app.hook.define('tokeo_dramatiq_post_serve')
     # Register the command-line controller
     app.handler.register(TokeoDramatiqController)
     # Register initialization and shutdown hooks

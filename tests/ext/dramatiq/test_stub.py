@@ -254,7 +254,7 @@ def test_notify_shutdown_from_config(tmp, start_worker, notify_shutdown, ended):
 
 def test_locks_temper_keeps_worker_threads_apart(tmp, start_worker):
     """A temper of 1 runs 4 messages on 3 threads one after another."""
-    with DramatiqMiddlewareTest(tmp, locks_sleep_time=0.01) as app:
+    with DramatiqMiddlewareTest(tmp, locks_sleep_seconds=0.01) as app:
         runs = []
 
         @app.dramatiq.actor(actor_name='export')
@@ -294,7 +294,7 @@ def test_locks_throttle_hands_surplus_messages_to_the_callback(tmp, start_worker
 
 def test_locks_purge_command_frees_a_lock_an_actor_waits_for(tmp, start_worker, capsys):
     """dramatiq locks --purge drops a lock left behind, the waiting actor runs."""
-    with DramatiqMiddlewareTest(tmp, ['dramatiq', 'locks', '--purge'], locks_sleep_time=0.01) as app:
+    with DramatiqMiddlewareTest(tmp, ['dramatiq', 'locks', '--purge'], locks_sleep_seconds=0.01) as app:
         ran = threading.Event()
 
         def report():
@@ -322,7 +322,7 @@ def test_monitor_hears_a_worker_of_the_app(tmp, start_worker, monkeypatch):
     by rabbitmq, shows the worker running a task with its args and then
     stopped with 1 task done.
     """
-    config = dict(monitoring=True, monitoring_interval=1, monitoring_with_details='on')
+    config = dict(monitoring=True, monitoring_interval_seconds=1, monitoring_with_details='on')
     with DramatiqMiddlewareTest(tmp, **config) as app:
         monitor = app.dramatiq.monitor
         (heartbeat,) = [m for m in app.dramatiq.broker.middleware if isinstance(m, TokeoDramatiqHeartbeat)]
@@ -342,5 +342,5 @@ def test_monitor_hears_a_worker_of_the_app(tmp, start_worker, monkeypatch):
         worker.stop(timeout=5000)
         (stopped,) = monitor.workers()
     (task,) = running['heartbeat']['running']
-    assert (running['state'], task['actor'], task['args']) == ('ok', 'waits', '((2,), {})')
+    assert (running['state'], task['actor_name'], task['args']) == ('ok', 'waits', '((2,), {})')
     assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals'] == dict(done=1, failed=0, dead=0)

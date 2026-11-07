@@ -118,7 +118,7 @@ def test_purge_and_delete(live):
         with pytest.raises(TokeoDramatiqError, match='use force'):
             queues.delete(name)
         assert queues.purge(name) == [dict(name=name, purged=2)]
-        assert queues.delete(name) == [dict(name=name, deleted=True)]
+        assert queues.delete(name) == [dict(name=name, is_deleted=True)]
         assert queues.state(name)[0]['exists'] is False
 
 
@@ -148,7 +148,7 @@ def test_reconnect_after_idle(live):
 
 def test_monitor_hears_a_worker(tmp, rando):
     """The monitor sees a worker running a task and then stopped with 1 done."""
-    config = dict(monitoring=True, monitoring_interval=1, monitoring_with_details='on', rabbitmq=dict(url=RABBITMQ_URL))
+    config = dict(monitoring=True, monitoring_interval_seconds=1, monitoring_with_details='on', rabbitmq=dict(url=RABBITMQ_URL))
     with DramatiqMiddlewareTest(tmp, **config) as app:
         name = f'tokeo_test_{rando}'
         actor = dramatiq.actor(
@@ -173,7 +173,7 @@ def test_monitor_hears_a_worker(tmp, rando):
         finally:
             app.dramatiq.queues.delete(name, force=True)
     (task,) = running['heartbeat']['running']
-    assert running['state'] == 'ok' and task['actor'] == f'task_{rando}' and task['args'] == '((2,), {})'
+    assert running['state'] == 'ok' and task['actor_name'] == f'task_{rando}' and task['args'] == '((2,), {})'
     assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals']['done'] == 1
 
 

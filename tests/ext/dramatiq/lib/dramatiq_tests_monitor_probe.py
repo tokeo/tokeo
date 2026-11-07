@@ -17,11 +17,11 @@ class DramatiqMonitorProbeTest(DramatiqTest):
         label = 'probe'
 
 
-def snapshot(wait=0):
-    time.sleep(wait)
+def snapshot(wait_seconds=0):
+    time.sleep(wait_seconds)
     queues = [dict(name='mail', ready=0, delayed=0, dead=0, consumers=1)]
     totals = dict(ready=0, delayed=0, dead=0, consumers=1)
-    return dict(at=int(time.time() * 1000), monitoring=True, interval=1, workers=[], actors={}, queues=queues, queue_totals=totals)
+    return dict(at=int(time.time() * 1000), monitoring=True, interval_seconds=1, workers=[], actors={}, queues=queues, queue_totals=totals)
 
 
 if __name__ == '__main__':

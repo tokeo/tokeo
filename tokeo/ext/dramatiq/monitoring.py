@@ -1,7 +1,7 @@
 """
 Shows the workers of the app and the state of their queues. With
 ```monitoring: true``` each worker process sends a heartbeat every
-```monitoring_interval``` seconds to the fanout exchange
+```monitoring_interval_seconds``` seconds to the fanout exchange
 ```<app label>.dramatiq.monitoring```. A monitor listens on a queue of its own
 and shows the workers it heard of together with the state of the queues.
 
@@ -27,22 +27,22 @@ HEARTBEAT_TYPE = 'tokeo.dramatiq.heartbeat'
 #: Version of the format of the heartbeat messages
 HEARTBEAT_VERSION = 1
 
-#: Characters of the arguments and error texts in a heartbeat
-DETAILS_MAX_LENGTH = 500
+# characters of the arguments and error texts in a heartbeat or a dead letter
+_DETAILS_MAX_CHARS = 500
 
-#: Intervals without a heartbeat until a worker is late
-LATE_INTERVALS = 2
-#: Intervals without a heartbeat until a worker is gone
-GONE_INTERVALS = 3
+# intervals without a heartbeat until a worker is late
+_LATE_INTERVALS = 2
+# intervals without a heartbeat until a worker is gone
+_GONE_INTERVALS = 3
 
-#: Intervals a gone or stopped worker is still shown
-KEEP_INTERVALS = 10
+# intervals a gone or stopped worker is still shown
+_KEEP_INTERVALS = 10
 
-#: Heartbeats a monitor queue keeps at most while nobody reads it
-MONITOR_QUEUE_LENGTH = 1000
+# heartbeats a monitor queue keeps at most while nobody reads it
+_MONITOR_QUEUE_MAX_LENGTH = 1000
 
 
-def exchange_name(app):
+def get_exchange_name(app):
     """The name of the monitoring exchange of the app."""
     return f'{app._meta.label}.dramatiq.monitoring'
 
@@ -52,7 +52,8 @@ def _get_now_ms():
 
 
 def _cut(text):
-    return text if len(text) <= DETAILS_MAX_LENGTH else text[:DETAILS_MAX_LENGTH] + '...'
+    # the one place that shortens the details, for heartbeats and dead letters
+    return text if len(text) <= _DETAILS_MAX_CHARS else text[:_DETAILS_MAX_CHARS] + '...'
 
 
 def _get_app_version(app):
@@ -70,9 +71,9 @@ class TokeoDramatiqHeartbeat(Middleware):
     ### Args
 
     - **exchange** (str): The monitoring exchange
-    - **interval** (int): Seconds between two heartbeats
+    - **interval_seconds** (int): Seconds between two heartbeats
+    - **app_dict** (dict): Label and version of the app
     - **with_details** (bool): Whether to send arguments and error texts
-    - **app** (dict): Label and version of the app
 
     ### Notes
 
@@ -82,15 +83,15 @@ class TokeoDramatiqHeartbeat(Middleware):
 
     """
 
-    def __init__(self, exchange, interval, with_details, app):
+    def __init__(self, exchange, interval_seconds, app_dict, with_details):
         #: The monitoring exchange
         self.exchange = exchange
         #: Seconds between two heartbeats
-        self.interval = interval
+        self.interval_seconds = interval_seconds
+        #: Label and version of the app
+        self.app_dict = app_dict
         #: Whether to send arguments and error texts
         self.with_details = with_details
-        #: Label and version of the app
-        self.app = app
         self._lock = threading.Lock()
         self._running = {}
         self._totals = dict(done=0, failed=0, dead=0)
@@ -124,14 +125,14 @@ class TokeoDramatiqHeartbeat(Middleware):
         if self._thread.is_alive():
             return
         # a last heartbeat tells the monitors at once
-        self._send(self.heartbeat(state='stopped'))
+        self._send(self.build_heartbeat(state='stopped'))
         self._close()
 
     def before_process_message(self, broker, message):
         task = dict(
             message_id=message.message_id,
-            actor=message.actor_name,
-            queue=message.queue_name,
+            actor_name=message.actor_name,
+            queue_name=message.queue_name,
             retries=message.options.get('retries', 0),
             started_at=_get_now_ms(),
             start_time=time.monotonic(),
@@ -170,7 +171,7 @@ class TokeoDramatiqHeartbeat(Middleware):
 
     # ---- heartbeat ----------------------------------------------------------
 
-    def heartbeat(self, state='running'):
+    def build_heartbeat(self, state='running'):
         """
         Build the heartbeat of this worker process.
 
@@ -198,9 +199,9 @@ class TokeoDramatiqHeartbeat(Middleware):
             type=HEARTBEAT_TYPE,
             version=HEARTBEAT_VERSION,
             state=state,
-            interval=self.interval,
+            interval_seconds=self.interval_seconds,
             sent_at=_get_now_ms(),
-            app=self.app,
+            app=self.app_dict,
             worker=dict(
                 host=socket.gethostname(),
                 pid=os.getpid(),
@@ -217,9 +218,9 @@ class TokeoDramatiqHeartbeat(Middleware):
         )
 
     def _send_heartbeats(self):
-        self._send(self.heartbeat())
-        while not self._stop.wait(self.interval):
-            self._send(self.heartbeat())
+        self._send(self.build_heartbeat())
+        while not self._stop.wait(self.interval_seconds):
+            self._send(self.build_heartbeat())
 
     def _send(self, heartbeat):
         if self._parameters is None:
@@ -277,9 +278,9 @@ class TokeoDramatiqMonitor:
         self._workers = {}
 
     @property
-    def interval(self):
+    def interval_seconds(self):
         """Seconds between two heartbeats from the config."""
-        return self._dramatiq.config('monitoring_interval')
+        return self._dramatiq.config('monitoring_interval_seconds')
 
     def close(self):
         """Close the connection to rabbitmq, the next call opens a new one."""
@@ -298,9 +299,9 @@ class TokeoDramatiqMonitor:
         # a queue of this monitor, deleted by rabbitmq when it closes
         self._connection = pika.BlockingConnection(self._dramatiq.broker.parameters)
         self._channel = self._connection.channel()
-        exchange = exchange_name(self._dramatiq.app)
+        exchange = get_exchange_name(self._dramatiq.app)
         self._channel.exchange_declare(exchange, exchange_type='fanout')
-        arguments = {'x-message-ttl': GONE_INTERVALS * self.interval * 1000, 'x-max-length': MONITOR_QUEUE_LENGTH}
+        arguments = {'x-message-ttl': _GONE_INTERVALS * self.interval_seconds * 1000, 'x-max-length': _MONITOR_QUEUE_MAX_LENGTH}
         queue = self._channel.queue_declare('', exclusive=True, auto_delete=True, arguments=arguments).method.queue
         self._channel.queue_bind(queue, exchange)
         self._channel.basic_consume(queue, self._on_message, auto_ack=True)
@@ -308,14 +309,15 @@ class TokeoDramatiqMonitor:
     def _on_message(self, channel, method, properties, body):
         self.receive(body)
 
-    def receive(self, body, received=None):
+    def receive(self, body, received_time=None):
         """
         Take a heartbeat into the known workers.
 
         ### Args
 
         - **body** (bytes|str): The heartbeat as json
-        - **received** (float, optional): Receive time of ```time.monotonic```
+        - **received_time** (float, optional): Receive time of
+            ```time.monotonic```
 
         """
         try:
@@ -326,15 +328,15 @@ class TokeoDramatiqMonitor:
             # not a heartbeat of this format
             return
         if heartbeat.get('type') == HEARTBEAT_TYPE:
-            self._workers[key] = dict(heartbeat=heartbeat, received=time.monotonic() if received is None else received)
+            self._workers[key] = dict(heartbeat=heartbeat, received_time=time.monotonic() if received_time is None else received_time)
 
-    def _collect(self, wait):
+    def _collect(self, wait_seconds):
         try:
             if self._connection is None or self._connection.is_closed:
                 self._listen()
                 # each running worker sends within one interval
-                wait = max(wait, self.interval)
-            end_time = time.monotonic() + wait
+                wait_seconds = max(wait_seconds, self.interval_seconds)
+            end_time = time.monotonic() + wait_seconds
             while True:
                 self._connection.process_data_events(time_limit=max(0, end_time - time.monotonic()))
                 if time.monotonic() >= end_time:
@@ -343,14 +345,14 @@ class TokeoDramatiqMonitor:
             self._close()
             raise TokeoDramatiqConnectionError(self._dramatiq.broker.address, e) from e
 
-    def workers(self, wait=0):
+    def workers(self, wait_seconds=0):
         """
         Get the workers heard of with their state.
 
         ### Args
 
-        - **wait** (float, optional): Seconds to listen first; the first call
-            listens at least one interval
+        - **wait_seconds** (float, optional): Seconds to listen first; the
+            first call listens at least one interval
 
         ### Returns
 
@@ -360,44 +362,45 @@ class TokeoDramatiqMonitor:
 
         """
         with self._lock:
-            self._collect(wait)
+            self._collect(wait_seconds)
             now = time.monotonic()
             result = []
             for key, entry in list(self._workers.items()):
                 heartbeat = entry['heartbeat']
-                interval = heartbeat.get('interval') or self.interval
-                seen_seconds = now - entry['received']
+                interval = heartbeat.get('interval_seconds') or self.interval_seconds
+                seen_seconds = now - entry['received_time']
                 if heartbeat.get('state') == 'stopped':
-                    state, keep_intervals = 'stopped', KEEP_INTERVALS
-                elif seen_seconds <= LATE_INTERVALS * interval:
+                    state, keep_intervals = 'stopped', _KEEP_INTERVALS
+                elif seen_seconds <= _LATE_INTERVALS * interval:
                     state, keep_intervals = 'ok', None
-                elif seen_seconds <= GONE_INTERVALS * interval:
+                elif seen_seconds <= _GONE_INTERVALS * interval:
                     state, keep_intervals = 'late', None
                 else:
-                    state, keep_intervals = 'gone', GONE_INTERVALS + KEEP_INTERVALS
+                    state, keep_intervals = 'gone', _GONE_INTERVALS + _KEEP_INTERVALS
                 if keep_intervals is not None and seen_seconds > keep_intervals * interval:
                     del self._workers[key]
                     continue
                 result.append(dict(state=state, seen_ms=int(seen_seconds * 1000), heartbeat=heartbeat))
         return sorted(result, key=lambda w: (w['heartbeat']['worker']['host'], w['heartbeat']['worker']['pid']))
 
-    def snapshot(self, wait=0):
+    def snapshot(self, wait_seconds=0):
         """
         Get workers, actors and queues in one state.
 
         ### Args
 
-        - **wait** (float, optional): Seconds to listen first, see ```workers```
+        - **wait_seconds** (float, optional): Seconds to listen first, see
+            ```workers```
 
         ### Returns
 
-        - **dict**: ```at``` in ms, ```monitoring``` and ```interval``` of the
-            config, the ```workers```, the ```actors``` summed over the last
+        - **dict**: ```at``` in ms, ```monitoring``` and ```interval_seconds```
+            of the config, the ```workers```, the ```actors``` summed over the last
             heartbeat of each running worker, the ```queues``` and their
             ```queue_totals```
 
         """
-        workers = self.workers(wait)
+        workers = self.workers(wait_seconds)
         actors = {}
         for worker in workers:
             if worker['state'] not in ('ok', 'late'):
@@ -414,7 +417,7 @@ class TokeoDramatiqMonitor:
         return dict(
             at=_get_now_ms(),
             monitoring=self._dramatiq.config('monitoring'),
-            interval=self.interval,
+            interval_seconds=self.interval_seconds,
             workers=workers,
             actors=dict(sorted(actors.items())),
             queues=queues,

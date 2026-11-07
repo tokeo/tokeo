@@ -9,8 +9,8 @@ pickle, e.g. on their way out of a process pool.
 from dramatiq.errors import ConnectionClosed
 from tokeo.core.exc import TokeoError
 
-#: How a source of a value is named in the messages
-SOURCE_LABELS = {'config': 'dramatiq config', 'env': 'env', 'switch': 'switch'}
+# how a source of a value is named in the messages
+_SOURCE_LABELS = {'config': 'dramatiq config', 'env': 'env', 'switch': 'switch'}
 
 
 def _describe(cause):
@@ -45,7 +45,7 @@ class TokeoDramatiqConfigError(TokeoDramatiqError):
         self.value = value
         #: What is allowed, e.g. ```true or false```
         self.expected = expected
-        super().__init__(f'Invalid {SOURCE_LABELS.get(source, source)} {name}: Value {value!r} must be {expected}!')
+        super().__init__(f'Invalid {_SOURCE_LABELS.get(source, source)} {name}: Value {value!r} must be {expected}!')
 
     def __reduce__(self):
         return (type(self), (self.source, self.name, self.value, self.expected), self.__dict__)
@@ -110,17 +110,17 @@ class TokeoDramatiqQueueError(TokeoDramatiqError):
 
     ### Args
 
-    - **queue** (str): The queue name
-    - **reason** (str): Why, e.g. ```is missing, recreate it before the requeue```
+    - **queue_name** (str): The queue name
+    - **error** (str): Why, e.g. ```is missing, recreate it before the requeue```
 
     """
 
-    def __init__(self, queue, reason):
+    def __init__(self, queue_name, error):
         #: The queue name
-        self.queue = queue
+        self.queue_name = queue_name
         #: Why the state of the queue prevents the action
-        self.reason = reason
-        super().__init__(f'Queue {queue} {reason}!')
+        self.error = error
+        super().__init__(f'Queue {queue_name} {error}!')
 
     def __reduce__(self):
-        return (type(self), (self.queue, self.reason), self.__dict__)
+        return (type(self), (self.queue_name, self.error), self.__dict__)

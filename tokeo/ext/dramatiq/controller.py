@@ -131,7 +131,7 @@ class TokeoDramatiqController(Controller):
             (['--delete'], dict(action='store_true', help='delete the queues')),
             (['--recreate'], dict(action='store_true', help='delete the queues and declare them again')),
             (['--requeue-dead'], dict(action='store_true', help='move the dead letters back into their queue')),
-            (['--limit'], dict(metavar='N', help='dead letters to move by --requeue-dead, all without')),
+            (['--max-messages'], dict(metavar='N', help='dead letters to move by --requeue-dead, all without')),
             (['--yes'], dict(action='store_true', help='confirm a change of queues or messages')),
             (['--force'], dict(action='store_true', help='delete or recreate also queues with messages or consumers')),
         ],
@@ -168,12 +168,12 @@ class TokeoDramatiqController(Controller):
             lines = [f'{r["name"]}: purged {r["purged"]} messages' for r in result]
         elif actions == ['delete']:
             result = queues.delete(names, force=pargs.force)
-            lines = [f'{r["name"]}: {"deleted" if r["deleted"] else "not found"}' for r in result]
+            lines = [f'{r["name"]}: {"deleted" if r["is_deleted"] else "not found"}' for r in result]
         elif actions == ['recreate']:
             result = queues.recreate(names, force=pargs.force)
             lines = [f'{r["name"]}: recreated with {r["arguments"]}' for r in result]
         elif actions == ['requeue_dead']:
-            max_messages = _check_number('switch', '--limit', pargs.limit, allow_none=True)
+            max_messages = _check_number('switch', '--max-messages', pargs.max_messages, allow_none=True)
             result = [queues.requeue_dead(name, max_messages) for name in names]
             lines = [f'{r["name"]}: requeued {r["requeued"]} dead letters' for r in result]
         else:
@@ -197,7 +197,10 @@ class TokeoDramatiqController(Controller):
         arguments=[
             (['--follow'], dict(action='store_true', help='show the state again and again until Ctrl-C')),
             (['--json'], dict(action='store_true', help='print the state as json, with --follow one line each time')),
-            (['--interval'], dict(metavar='N', help='seconds between two displays of --follow, monitoring_interval without')),
+            (
+                ['--interval'],
+                dict(metavar='SECONDS', help='seconds between two displays of --follow, monitoring_interval_seconds without'),
+            ),
         ],
     )
     def monitor(self):
@@ -212,7 +215,7 @@ class TokeoDramatiqController(Controller):
         """
         pargs = self.app.pargs
         monitor = self.app.dramatiq.monitor
-        interval = monitor.interval if pargs.interval is None else _check_number('switch', '--interval', pargs.interval)
+        interval_seconds = monitor.interval_seconds if pargs.interval is None else _check_number('switch', '--interval', pargs.interval)
         if pargs.json and not pargs.follow:
             self.app.print(dump_json(monitor.snapshot(), indent=2))
             return
@@ -220,11 +223,13 @@ class TokeoDramatiqController(Controller):
         if not pargs.follow:
             output.print(*_format_monitor_view(output, monitor.snapshot(), self.app._meta.label))
         elif pargs.json:
-            output.follow(lambda: json.dumps(monitor.snapshot(wait=interval)), interval_seconds=0, with_repaint=False)
+            output.follow(lambda: json.dumps(monitor.snapshot(wait_seconds=interval_seconds)), interval_seconds=0, with_repaint=False)
         else:
             # listening fills the time between two displays
+            label = self.app._meta.label
             output.follow(
-                lambda: _format_monitor_view(output, monitor.snapshot(wait=interval), self.app._meta.label, interval), interval_seconds=0
+                lambda: _format_monitor_view(output, monitor.snapshot(wait_seconds=interval_seconds), label, interval_seconds),
+                interval_seconds=0,
             )
 
     # ---- serve --------------------------------------------------------------
@@ -385,10 +390,10 @@ class TokeoDramatiqController(Controller):
         shutdown_timeout = self._get_worker_option('worker_shutdown_timeout', 'worker_shutdown_timeout')
         queue_prefetch = self._get_worker_option('queue_prefetch', 'queue_prefetch', allow_auto=True, config_min_value=0)
         delay_queue_prefetch = self._get_worker_option('delay_queue_prefetch', 'delay_queue_prefetch', allow_auto=True, config_min_value=0)
-        worker_poll_interval = _check_number(
-            'config', 'worker_poll_interval', self.app.dramatiq.config('worker_poll_interval'), allow_none=True
+        worker_poll_interval_ms = _check_number(
+            'config', 'worker_poll_interval_ms', self.app.dramatiq.config('worker_poll_interval_ms'), allow_none=True
         )
-        if worker_poll_interval is None and 'dramatiq_worker_timeout' in os.environ:
+        if worker_poll_interval_ms is None and 'dramatiq_worker_timeout' in os.environ:
             # dramatiq takes the env then, check it before the workers start
             _check_number('env', 'dramatiq_worker_timeout', os.environ['dramatiq_worker_timeout'])
         use_spawn = self.app.pargs.use_spawn
@@ -413,17 +418,17 @@ class TokeoDramatiqController(Controller):
         argv.extend(
             ['--worker-shutdown-timeout', str(shutdown_timeout)],
         )
-        # restart_delay and prefetch are env-only on dramatiq's side, no
+        # the restart delay and prefetch are env-only on dramatiq's side, no
         # cli flags exist, so pass them via the environment
-        restart_delay = _check_number('config', 'restart_delay', self.app.dramatiq.config('restart_delay'), min_value=0)
+        restart_delay_ms = _check_number('config', 'restart_delay_ms', self.app.dramatiq.config('restart_delay_ms'), min_value=0)
         queue_prefetch = 0 if queue_prefetch == 'auto' else queue_prefetch
         delay_queue_prefetch = 0 if delay_queue_prefetch == 'auto' else delay_queue_prefetch
-        os.environ['dramatiq_restart_delay'] = str(restart_delay)
+        os.environ['dramatiq_restart_delay'] = str(restart_delay_ms)
         os.environ['dramatiq_queue_prefetch'] = str(queue_prefetch)
         os.environ['dramatiq_delay_queue_prefetch'] = str(delay_queue_prefetch)
         # only the env reaches the workers, they bind the value on import
-        if worker_poll_interval is not None:
-            os.environ['dramatiq_worker_timeout'] = str(worker_poll_interval)
+        if worker_poll_interval_ms is not None:
+            os.environ['dramatiq_worker_timeout'] = str(worker_poll_interval_ms)
         # check for logging parameter
         if self.app.pargs.skip_logging:
             # add logging parameter
@@ -476,12 +481,12 @@ class TokeoDramatiqController(Controller):
             start_method = 'spawn'
         multiprocessing.set_start_method(start_method, force=True)
         # signal hook
-        for res in self.app.hook.run('tokeo_dramatiq_pre_start', self.app):
+        for res in self.app.hook.run('tokeo_dramatiq_pre_serve', self.app):
             pass
         # go and run dramatiq workers with the parsed args (blocks)
         result = cli.main(args)
         # signal hook
-        for res in self.app.hook.run('tokeo_dramatiq_post_end', self.app):
+        for res in self.app.hook.run('tokeo_dramatiq_post_serve', self.app):
             pass
         # signal result as exit code
         self.app.exit_code = result
@@ -492,10 +497,10 @@ def _format_switch(action):
     return '--' + action.replace('_', '-')
 
 
-#: Hints on a queue and their style
-QUEUE_FLAGS = (
+# hints on a queue and their style
+_QUEUE_FLAGS = (
     ('missing', lambda q: q.get('exists') is False, 'bold red'),
-    ('unparalleled', lambda q: q.get('unparalleled'), None),
+    ('unparalleled', lambda q: q.get('is_unparalleled'), None),
     ('no consumer', lambda q: q.get('exists') is not False and q.get('consumers') == 0, 'yellow'),
     ('no actor', lambda q: q.get('actors') == [], 'yellow'),
 )
@@ -506,7 +511,7 @@ def _format_queue_table(output, states):
     keys = ('ready', 'delayed', 'dead', 'consumers')
     rows = []
     for state in states:
-        flags = [(flag, style) for flag, applies, style in QUEUE_FLAGS if applies(state)]
+        flags = [(flag, style) for flag, applies, style in _QUEUE_FLAGS if applies(state)]
         # the cell takes the style of its most severe hint
         style = next((style for _, style in flags if style), None)
         counts = ['-' if state.get(key) is None else state[key] for key in keys]
@@ -522,7 +527,7 @@ def _format_dead_letter_tables(output, states):
     return [
         output.build_table(
             columns,
-            [[d['message_id'], d['actor'], d['retries'], d['error'], d['args']] for d in s['dead_letters']],
+            [[d['message_id'], d['actor_name'], d['retries'], d['error'], d['args']] for d in s['dead_letters']],
             title=f'dead letters of {s["name"]}',
         )
         for s in states
@@ -588,9 +593,8 @@ def _format_monitor_view(output, snapshot, label, follow=None):
             since_heartbeat_ms = worker['seen_ms'] if worker['state'] in ('ok', 'late') else 0
             for task in beat['running']:
                 args = task.get('args', '' if beat['worker']['with_details'] else 'details off')
-                tasks.append(
-                    [name, task['actor'], task['queue'], _format_duration(task['runtime_ms'] + since_heartbeat_ms), task['retries'], args]
-                )
+                runtime = _format_duration(task['runtime_ms'] + since_heartbeat_ms)
+                tasks.append([name, task['actor_name'], task['queue_name'], runtime, task['retries'], args])
         columns = [
             ('worker', 'left', 'full'),
             'up',

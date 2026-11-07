@@ -25,7 +25,7 @@ from tokeo.ext.dramatiq import (
     [
         ('config', 'max_age', "Invalid dramatiq config max_age: Value 'x' must be null or an integer >= 1!"),
         ('env', 'dramatiq_worker_timeout', "Invalid env dramatiq_worker_timeout: Value 'x' must be null or an integer >= 1!"),
-        ('switch', '--limit', "Invalid switch --limit: Value 'x' must be null or an integer >= 1!"),
+        ('switch', '--max-messages', "Invalid switch --max-messages: Value 'x' must be null or an integer >= 1!"),
     ],
 )
 def test_config_error_names_source_value_and_expected(source, name, message):
@@ -59,7 +59,7 @@ def test_queue_error_names_queue_and_reason():
     """The queue error names the queue and the reason."""
     e = TokeoDramatiqQueueError('mail', 'has no actor, its arguments are unknown')
     assert str(e) == 'Queue mail has no actor, its arguments are unknown!'
-    assert (e.queue, e.reason) == ('mail', 'has no actor, its arguments are unknown')
+    assert (e.queue_name, e.error) == ('mail', 'has no actor, its arguments are unknown')
 
 
 @pytest.mark.parametrize(

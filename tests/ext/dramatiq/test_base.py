@@ -99,8 +99,8 @@ def test_register_confirm_delivery(tmp, rabbitmq, confirm):
 
 def test_register_confirm_delivery_with_tls_parameters(tmp):
     """amqps with a ca builds pika parameters with ssl, confirm stays on."""
-    rabbitmq = dict(url='amqps://localhost:5671/', tls_ca=os.path.join(tmp.dir, 'ca.pem'))
-    with open(rabbitmq['tls_ca'], 'w') as f:
+    rabbitmq = dict(url='amqps://localhost:5671/', tls_ca_path=os.path.join(tmp.dir, 'ca.pem'))
+    with open(rabbitmq['tls_ca_path'], 'w') as f:
         f.write(_make_ca_cert('localhost'))
     with DramatiqBrokerTest(tmp, rabbitmq):
         broker = dramatiq.get_broker()
@@ -111,8 +111,8 @@ def test_register_confirm_delivery_with_tls_parameters(tmp):
 def test_register_tls_parameters_keep_the_options_of_the_url(tmp):
     """With an own tls context the options of the url stay, e.g. heartbeat."""
     url = 'amqps://u:p@localhost:5671/vh?heartbeat=30&connection_attempts=3&blocked_connection_timeout=10'
-    rabbitmq = dict(url=url, tls_ca=os.path.join(tmp.dir, 'ca.pem'))
-    with open(rabbitmq['tls_ca'], 'w') as f:
+    rabbitmq = dict(url=url, tls_ca_path=os.path.join(tmp.dir, 'ca.pem'))
+    with open(rabbitmq['tls_ca_path'], 'w') as f:
         f.write(_make_ca_cert('localhost'))
     with DramatiqBrokerTest(tmp, rabbitmq):
         (params,) = dramatiq.get_broker().parameters
@@ -287,11 +287,11 @@ def test_register_dead_message_ttl_config_wins_over_env(tmp, monkeypatch):
 # ---- locks ------------------------------------------------------------------
 
 
-def test_locks_sleep_time_is_an_own_option_of_dramatiq(tmp):
-    """The dramatiq locks wait 0.1 seconds or locks_sleep_time of dramatiq."""
+def test_locks_sleep_seconds_is_an_own_option_of_dramatiq(tmp):
+    """The dramatiq locks wait 0.1 seconds or locks_sleep_seconds of dramatiq."""
     with DramatiqTest(tmp) as app:
         assert app.dramatiq.locks._sleep_seconds == 0.1
-    with DramatiqTest(tmp, locks_sleep_time=0.3) as app:
+    with DramatiqTest(tmp, locks_sleep_seconds=0.3) as app:
         assert app.dramatiq.locks._sleep_seconds == 0.3
         assert app.cache.locks._sleep_seconds == 0.1
 

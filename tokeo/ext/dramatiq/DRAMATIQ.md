@@ -422,7 +422,7 @@ knowing:
 </thead>
 <tbody>
 <tr><td>dramatiq_dead_message_ttl</td><td>lifetime of dead letters in milliseconds, used when rabbitmq.dead_message_ttl is null; dramatiq's default is 7 days. The extension checks it is an integer of at least 1, as 0 would drop every dead letter at once.</td></tr>
-<tr><td>dramatiq_worker_timeout</td><td>how often idle worker threads wake up, in milliseconds, used when worker_poll_interval is null; dramatiq's default is 1000. It is checked before the workers start.</td></tr>
+<tr><td>dramatiq_worker_timeout</td><td>how often idle worker threads wake up, in milliseconds, used when worker_poll_interval_ms is null; dramatiq's default is 1000. It is checked before the workers start.</td></tr>
 </tbody>
 </table>
 
@@ -445,8 +445,8 @@ with a ```TokeoDramatiqConfigError``` that names the key.
 <tr><td>worker_processes</td><td>2</td><td>worker processes, or auto for the number of CPUs</td></tr>
 <tr><td>worker_threads</td><td>1</td><td>worker threads per process</td></tr>
 <tr><td>worker_shutdown_timeout</td><td>600_000</td><td>milliseconds a stopping worker waits for running actors</td></tr>
-<tr><td>restart_delay</td><td>3_000</td><td>milliseconds before a consumer reconnects after losing RabbitMQ</td></tr>
-<tr><td>worker_poll_interval</td><td>None</td><td>milliseconds idle worker threads wake up; None uses dramatiq_worker_timeout or 1000</td></tr>
+<tr><td>restart_delay_ms</td><td>3_000</td><td>milliseconds before a consumer reconnects after losing RabbitMQ</td></tr>
+<tr><td>worker_poll_interval_ms</td><td>None</td><td>milliseconds idle worker threads wake up; None uses dramatiq_worker_timeout or 1000</td></tr>
 <tr><td>queue_prefetch</td><td>'auto'</td><td>messages fetched ahead per queue; auto (or 0) is threads × 2; unparalleled queues always fetch 1</td></tr>
 <tr><td>delay_queue_prefetch</td><td>'auto'</td><td>messages fetched ahead per DQ; auto (or 0) is threads × 1000</td></tr>
 <tr><td>use_spawn</td><td>False</td><td>start the worker processes by spawn instead of forkserver</td></tr>
@@ -457,12 +457,12 @@ with a ```TokeoDramatiqConfigError``` that names the key.
 <tr><td>min_backoff</td><td>15_000</td><td>default min_backoff in milliseconds</td></tr>
 <tr><td>max_backoff</td><td>604_800_000</td><td>default max_backoff in milliseconds, at most 7 days</td></tr>
 <tr><td>monitoring</td><td>False</td><td>send a heartbeat of each worker process for the monitor (section 9)</td></tr>
-<tr><td>monitoring_interval</td><td>5</td><td>seconds between two heartbeats</td></tr>
+<tr><td>monitoring_interval_seconds</td><td>5</td><td>seconds between two heartbeats</td></tr>
 <tr><td>monitoring_with_details</td><td>'debug'</td><td>send task arguments and error texts: off, on or debug (on with --debug)</td></tr>
 <tr><td>broker</td><td>'rabbitmq'</td><td>the broker, only rabbitmq</td></tr>
 <tr><td>locks_tag</td><td>'dramatiq_locks'</td><td>diskcache tag of the locks</td></tr>
 <tr><td>locks_key_prefix</td><td>'dq_'</td><td>prefix of the lock keys</td></tr>
-<tr><td>locks_sleep_time</td><td>0.1</td><td>seconds between two checks of a waiting lock or temper call</td></tr>
+<tr><td>locks_sleep_seconds</td><td>0.1</td><td>seconds between two checks of a waiting lock or temper call</td></tr>
 </tbody>
 </table>
 
@@ -478,7 +478,7 @@ The ```rabbitmq``` block:
 <tr><td>auth_password</td><td>None</td><td>password, overrides a password in the url</td></tr>
 <tr><td>tls_verify_hostname</td><td>True</td><td>check the certificate host name; a string pins the expected name</td></tr>
 <tr><td>tls_verify_cert</td><td>True</td><td>check the certificate chain</td></tr>
-<tr><td>tls_ca</td><td>None</td><td>CA bundle to trust instead of the system store</td></tr>
+<tr><td>tls_ca_path</td><td>None</td><td>CA bundle to trust instead of the system store</td></tr>
 <tr><td>confirm_delivery</td><td>True</td><td>send returns after RabbitMQ confirmed the message</td></tr>
 <tr><td>max_priority</td><td>None</td><td>highest broker_priority of the queues, 1 to 255; None for no priorities</td></tr>
 <tr><td>dead_message_ttl</td><td>None</td><td>lifetime of dead letters in milliseconds; None uses the env or 7 days</td></tr>
@@ -508,7 +508,7 @@ myapp dramatiq queues --json
 <tr><td>--purge</td><td>remove the messages of queue, DQ and XQ, keep the queues</td></tr>
 <tr><td>--dead-only</td><td>with --purge, only the dead letters</td></tr>
 <tr><td>--requeue-dead</td><td>move dead letters back into their queue, with fresh retries</td></tr>
-<tr><td>--limit N</td><td>dead letters to move by --requeue-dead, all without</td></tr>
+<tr><td>--max-messages N</td><td>dead letters to move by --requeue-dead, all without</td></tr>
 <tr><td>--delete</td><td>delete queue, DQ and XQ</td></tr>
 <tr><td>--recreate</td><td>delete and declare them again with the current arguments</td></tr>
 <tr><td>--force</td><td>delete or recreate also queues with messages or consumers</td></tr>
@@ -531,8 +531,8 @@ The same is available in code as ```app.dramatiq.queues```:
 </thead>
 <tbody>
 <tr><td>names()</td><td>the queue names of the actors</td></tr>
-<tr><td>state(names=None, cache_ttl=0)</td><td>one dict per queue; a cache_ttl keeps the state for further calls</td></tr>
-<tr><td>peek_dead(name, max_messages=10)</td><td>dead letters with message_id, actor, retries, error, args and timestamp</td></tr>
+<tr><td>state(names=None, cache_ttl_seconds=0)</td><td>one dict per queue; a cache_ttl_seconds keeps the state for further calls</td></tr>
+<tr><td>peek_dead(name, max_messages=10)</td><td>dead letters with message_id, actor_name, retries, error, args and enqueued_at (epoch ms)</td></tr>
 <tr><td>requeue_dead(name, max_messages=None)</td><td>move dead letters back, resetting retries and traceback</td></tr>
 <tr><td>purge(names=None, dead_only=False)</td><td>remove messages</td></tr>
 <tr><td>delete(names=None, force=False)</td><td>delete queues</td></tr>
@@ -546,7 +546,7 @@ RabbitMQ closed it in the meantime; it is safe to use from several threads.
 ## 9. Monitoring with ```dramatiq monitor```
 
 With ```monitoring: true``` every worker process sends a small heartbeat
-every ```monitoring_interval``` seconds to the fanout exchange
+every ```monitoring_interval_seconds``` seconds to the fanout exchange
 ```<app label>.dramatiq.monitoring```. Each running monitor listens on a queue of
 its own, so any number of monitors see the same workers:
 
@@ -561,7 +561,7 @@ flowchart LR
 ```bash
 myapp dramatiq monitor                      # one display
 myapp dramatiq monitor --follow             # display again and again until Ctrl-C
-myapp dramatiq monitor --follow --interval 2
+myapp dramatiq monitor --follow --interval 2  # display every 2 seconds
 myapp dramatiq monitor --json               # one line per display with --follow
 ```
 
@@ -589,12 +589,12 @@ only):
 ```json
 {
   "type": "tokeo.dramatiq.heartbeat", "version": 1, "state": "running",
-  "interval": 5, "sent_at": 1761100800000,
+  "interval_seconds": 5, "sent_at": 1761100800000,
   "app": {"label": "myapp", "version": "2.2.0"},
   "worker": {"host": "worker-01", "pid": 4711, "started_at": 1761097200000,
              "threads": 8, "queues": null, "queue_prefetch": 16,
              "delay_queue_prefetch": 8000, "with_details": true},
-  "running": [{"message_id": "3f2a9c1e-...", "actor": "send_mail", "queue": "mail",
+  "running": [{"message_id": "3f2a9c1e-...", "actor_name": "send_mail", "queue_name": "mail",
                "retries": 0, "started_at": 1761100798800, "runtime_ms": 1200,
                "args": "(('anna@example.com',), {})"}],
   "totals": {"done": 102, "failed": 3, "dead": 1},
@@ -612,9 +612,10 @@ of about 1 KB per interval. They are not confirmed, not written to disk and
 dropped at once while no monitor listens; a monitor queue limits its length and
 the age of its messages, so a stuck monitor piles nothing up.
 
-In code, ```app.dramatiq.monitor.workers(wait=0)``` returns the workers with their
-state and last heartbeat, ```app.dramatiq.monitor.snapshot(wait=0)``` adds the
-summed actors and the queues, the data of ```--json```.
+In code, ```app.dramatiq.monitor.workers(wait_seconds=0)``` returns the workers
+with their state and last heartbeat,
+```app.dramatiq.monitor.snapshot(wait_seconds=0)``` adds the summed actors and
+the queues, the data of ```--json```.
 
 ## 10. Locks and rate limits
 
@@ -642,7 +643,7 @@ starts, ```dramatiq locks --purge``` does it by hand. Neither runs while another
 instance of the same machine still holds its locks.
 
 A call that waits for a lock or a free slot of ```temper``` checks the cache
-every ```locks_sleep_time``` seconds (section 7), ```sleep_seconds``` of the call
+every ```locks_sleep_seconds``` seconds (section 7), ```sleep_seconds``` of the call
 overrides it.
 
 ## 11. Errors
@@ -658,7 +659,7 @@ their details as fields:
 <tr><td>TokeoDramatiqConfigError</td><td>a config value, env or switch is not allowed</td><td>source, name, value, expected</td></tr>
 <tr><td>TokeoDramatiqConnectionError</td><td>RabbitMQ is not reachable; also a dramatiq ConnectionClosed</td><td>address, cause, actor_name</td></tr>
 <tr><td>TokeoDramatiqRefusedError</td><td>RabbitMQ refused a request, e.g. missing permissions</td><td>address, cause</td></tr>
-<tr><td>TokeoDramatiqQueueError</td><td>the state of a queue prevents an action</td><td>queue, reason</td></tr>
+<tr><td>TokeoDramatiqQueueError</td><td>the state of a queue prevents an action</td><td>queue_name, error</td></tr>
 <tr><td>TokeoDramatiqError</td><td>switches that do not fit, locks without diskcache</td><td>-</td></tr>
 </tbody>
 </table>

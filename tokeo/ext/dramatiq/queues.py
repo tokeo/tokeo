@@ -20,9 +20,7 @@ from tokeo.ext.dramatiq.exc import (
     TokeoDramatiqRefusedError,
     TokeoDramatiqQueueError,
 )
-
-#: Characters of the arguments shown by peek_dead
-ARGS_PREVIEW_LENGTH = 500
+from tokeo.ext.dramatiq.monitoring import _cut
 
 
 class TokeoDramatiqQueues:
@@ -144,7 +142,7 @@ class TokeoDramatiqQueues:
 
     # ---- state --------------------------------------------------------------
 
-    def state(self, names=None, cache_ttl=0):
+    def state(self, names=None, cache_ttl_seconds=0):
         """
         Get the state of queues without creating missing ones.
 
@@ -152,14 +150,14 @@ class TokeoDramatiqQueues:
 
         - **names** (str|list, optional): Queue names, all queues of the app
             without
-        - **cache_ttl** (float, optional): Seconds a state is kept for further
-            calls. Defaults to 0, no cache
+        - **cache_ttl_seconds** (float, optional): Seconds a state is kept for
+            further calls. Defaults to 0, no cache
 
         ### Returns
 
         - **list**: One dict per queue with ```name```, ```exists```,
             ```ready```, ```delayed```, ```dead```, ```consumers```,
-            ```unparalleled``` and ```actors```
+            ```is_unparalleled``` and ```actors```
 
         ### Notes
 
@@ -172,7 +170,7 @@ class TokeoDramatiqQueues:
         # one lock for check and query, waiting callers get the fresh state
         with self._lock:
             cache_entry = self._cache.get(key)
-            if cache_entry is None or time.monotonic() - cache_entry[0] >= cache_ttl:
+            if cache_entry is None or time.monotonic() - cache_entry[0] >= cache_ttl_seconds:
                 cache_entry = (time.monotonic(), self._run(self._read_state, names, actors))
                 self._cache[key] = cache_entry
             # a copy, a caller may change its dicts
@@ -190,7 +188,7 @@ class TokeoDramatiqQueues:
                     delayed=delay.message_count if delay else None,
                     dead=dead.message_count if dead else None,
                     consumers=queue.consumer_count if queue else None,
-                    unparalleled='_unparalleled' in name.lower(),
+                    is_unparalleled='_unparalleled' in name.lower(),
                     actors=sorted(actors.get(name, [])),
                 )
             )
@@ -210,8 +208,8 @@ class TokeoDramatiqQueues:
         ### Returns
 
         - **list**: One dict per dead letter with ```message_id```,
-            ```actor```, ```retries```, ```error```, ```args``` and
-            ```timestamp```
+            ```actor_name```, ```retries```, ```error```, ```args``` and
+            ```enqueued_at```
 
         """
         return self._call(self._peek_dead, q_name(name), max_messages)
@@ -335,7 +333,7 @@ class TokeoDramatiqQueues:
 
         ### Returns
 
-        - **list**: One dict per queue with ```name``` and ```deleted```
+        - **list**: One dict per queue with ```name``` and ```is_deleted```
 
         ### Raises
 
@@ -354,12 +352,12 @@ class TokeoDramatiqQueues:
                     raise TokeoDramatiqQueueError(state['name'], f'has {", ".join(busy)}, use force to delete it anyway')
         result = []
         for name in names:
-            deleted = False
+            is_deleted = False
             for queue in (name, dq_name(name), xq_name(name)):
                 if self._get_queue(queue) is not None:
                     self._open().queue_delete(queue)
-                    deleted = True
-            result.append(dict(name=name, deleted=deleted))
+                    is_deleted = True
+            result.append(dict(name=name, is_deleted=is_deleted))
         return result
 
     def recreate(self, names=None, force=False):
@@ -409,14 +407,11 @@ def _build_dead_letter(message):
     """Describe a dead letter by its message."""
     options = message.options
     traceback = (options.get('traceback') or '').strip().splitlines()
-    args = repr((message.args, message.kwargs))
-    if len(args) > ARGS_PREVIEW_LENGTH:
-        args = args[:ARGS_PREVIEW_LENGTH] + '...'
     return dict(
         message_id=message.message_id,
-        actor=message.actor_name,
+        actor_name=message.actor_name,
         retries=options.get('retries', 0),
         error=traceback[-1] if traceback else None,
-        args=args,
-        timestamp=message.message_timestamp,
+        args=_cut(repr((message.args, message.kwargs))),
+        enqueued_at=message.message_timestamp,
     )

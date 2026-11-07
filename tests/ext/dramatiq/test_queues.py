@@ -173,7 +173,7 @@ def test_state(app, server):
     server.add('mail.XQ', b'4', b'5', b'6')
     states = {s['name']: s for s in app.dramatiq.queues.state()}
     assert states['mail'] == dict(
-        name='mail', exists=True, ready=2, delayed=1, dead=3, consumers=2, unparalleled=False, actors=['send_mail', 'send_report']
+        name='mail', exists=True, ready=2, delayed=1, dead=3, consumers=2, is_unparalleled=False, actors=['send_mail', 'send_report']
     )
     # a missing queue is reported, but not created
     assert states['orders_unparalleled'] == dict(
@@ -183,7 +183,7 @@ def test_state(app, server):
         delayed=None,
         dead=None,
         consumers=None,
-        unparalleled=True,
+        is_unparalleled=True,
         actors=['build_order'],
     )
     assert 'orders_unparalleled' not in server.queues
@@ -204,7 +204,7 @@ def test_peek_dead_leaves_letters(app, server):
     long_args = ('x' * 600,)
     server.add('mail.XQ', _make_dead_letter(retries=3, traceback='Traceback\n  ...\nValueError: bad'), _make_dead_letter(args=long_args))
     letters = app.dramatiq.queues.peek_dead('mail')
-    assert (letters[0]['actor'], letters[0]['retries'], letters[0]['error']) == ('send_mail', 3, 'ValueError: bad')
+    assert (letters[0]['actor_name'], letters[0]['retries'], letters[0]['error']) == ('send_mail', 3, 'ValueError: bad')
     assert letters[0]['args'] == "(('a@b.c',), {})"
     # the arguments are cut, the letters stay in place and in order
     assert letters[1]['args'].endswith('...') and len(letters[1]['args']) == 503
@@ -237,7 +237,7 @@ def test_requeue_dead_refuses_missing_queue(app, server):
     server.add('mail.XQ', _make_dead_letter())
     with pytest.raises(TokeoDramatiqQueueError, match='Queue mail is missing') as err_info:
         app.dramatiq.queues.requeue_dead('mail')
-    assert err_info.value.queue == 'mail'
+    assert err_info.value.queue_name == 'mail'
     assert len(server.queues['mail.XQ']['messages']) == 1
 
 
@@ -285,7 +285,8 @@ def test_delete(app, server):
     """delete with force removes a queue with its .DQ and .XQ."""
     for name in ('mail', 'mail.DQ', 'mail.XQ'):
         server.add(name, b'1', consumers=1)
-    assert app.dramatiq.queues.delete(['mail', 'old'], force=True) == [dict(name='mail', deleted=True), dict(name='old', deleted=False)]
+    result = app.dramatiq.queues.delete(['mail', 'old'], force=True)
+    assert result == [dict(name='mail', is_deleted=True), dict(name='old', is_deleted=False)]
     assert server.queues == {}
 
 
@@ -415,39 +416,39 @@ def test_command_refuses(command, options, error):
 
 
 def test_state_without_cache_asks_each_time(app, server):
-    """Without cache_ttl every state call asks rabbitmq."""
+    """Without cache_ttl_seconds every state call asks rabbitmq."""
     app.dramatiq.queues.state('mail')
     app.dramatiq.queues.state('mail')
     assert server.declares == 6
 
 
 def test_state_cache(app, server, monkeypatch):
-    """Within cache_ttl state comes from the cache, as a copy."""
+    """Within cache_ttl_seconds state comes from the cache, as a copy."""
     now = [100.0]
     monkeypatch.setattr('tokeo.ext.dramatiq.queues.time.monotonic', lambda: now[0])
     server.add('mail', b'1')
     queues = app.dramatiq.queues
-    first = queues.state('mail', cache_ttl=5)
+    first = queues.state('mail', cache_ttl_seconds=5)
     server.add('mail', b'1', b'2')
     now[0] += 4
     # within the ttl the kept state comes back, rabbitmq is not asked
-    assert queues.state('mail', cache_ttl=5) == first and server.declares == 3
+    assert queues.state('mail', cache_ttl_seconds=5) == first and server.declares == 3
     # a caller may change its copy without changing the cache
     first[0]['ready'] = 99
-    assert queues.state('mail', cache_ttl=5)[0]['ready'] == 1
+    assert queues.state('mail', cache_ttl_seconds=5)[0]['ready'] == 1
     now[0] += 1
-    assert queues.state('mail', cache_ttl=5)[0]['ready'] == 2
+    assert queues.state('mail', cache_ttl_seconds=5)[0]['ready'] == 2
 
 
 def test_state_cache_per_names_and_cleared_by_changes(app, server):
     """The cache keeps the names apart and a purge clears it."""
     server.add('mail', b'1')
     queues = app.dramatiq.queues
-    queues.state('mail', cache_ttl=60)
-    queues.state(cache_ttl=60)
+    queues.state('mail', cache_ttl_seconds=60)
+    queues.state(cache_ttl_seconds=60)
     assert server.declares == 9
     queues.purge('mail')
-    assert queues.state('mail', cache_ttl=60)[0]['ready'] == 0
+    assert queues.state('mail', cache_ttl_seconds=60)[0]['ready'] == 0
 
 
 def test_refused_request(app, server):

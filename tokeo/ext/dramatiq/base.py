@@ -130,7 +130,7 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
         a string pins the expected name, False skips the hostname check
     - **tls_verify_cert** (bool): Verify the certificate chain; False
         disables verification (CERT_NONE)
-    - **tls_ca** (str, optional): Path to a CA bundle to trust instead of
+    - **tls_ca_path** (str, optional): Path to a CA bundle to trust instead of
         the system store
 
     ### Keyword Args
@@ -147,14 +147,22 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
         connection url, since RabbitmqBroker cannot take a url and separate
         pika credentials at the same time
 
-    : For amqps urls it accepts tls_verify_hostname/tls_verify_cert/tls_ca to
+    : For amqps urls it accepts tls_verify_hostname/tls_verify_cert/tls_ca_path to
         customize the ssl context; a custom context forces the pika
         parameters path, since RabbitmqBroker cannot mix url and parameters
 
     """
 
     def __init__(
-        self, *, url=None, auth_identity=None, auth_password=None, tls_verify_hostname=True, tls_verify_cert=True, tls_ca=None, **kwargs
+        self,
+        *,
+        url=None,
+        auth_identity=None,
+        auth_password=None,
+        tls_verify_hostname=True,
+        tls_verify_cert=True,
+        tls_ca_path=None,
+        **kwargs,
     ):
         url = format_auth_url(url, auth_identity, auth_password)
         # tls is driven by the amqps scheme; the tls_* options only customize
@@ -164,7 +172,7 @@ class ExtendedRabbitmqBroker(RabbitmqBroker):
             context, server_hostname = tls_create_ssl_context(
                 tls_verify_hostname,
                 tls_verify_cert,
-                tls_ca,
+                tls_ca_path,
             )
         if context is None:
             # plain amqp, or amqps with secure defaults where pika builds its
@@ -274,9 +282,9 @@ class TokeoDramatiq(MetaMixin):
             # Worker shutdown timeout in milliseconds
             worker_shutdown_timeout=600_000,
             # Delay between worker restarts in milliseconds
-            restart_delay=3_000,
+            restart_delay_ms=3_000,
             # Worker poll interval in milliseconds (None: dramatiq default)
-            worker_poll_interval=None,
+            worker_poll_interval_ms=None,
             # Number of messages to prefetch from queues (auto: dramatiq default)
             queue_prefetch='auto',
             # Number of delay queue messages to prefetch (auto: dramatiq default)
@@ -298,7 +306,7 @@ class TokeoDramatiq(MetaMixin):
             # Send a heartbeat of each worker process for the monitor
             monitoring=False,
             # Seconds between two heartbeats
-            monitoring_interval=5,
+            monitoring_interval_seconds=5,
             # Send task arguments and error texts: off, on or debug (with --debug)
             monitoring_with_details='debug',
             # Broker type (currently only rabbitmq supported)
@@ -318,7 +326,7 @@ class TokeoDramatiq(MetaMixin):
                 # verify the certificate chain (amqps only); False disables it
                 tls_verify_cert=True,
                 # path to a CA bundle to trust instead of the system store
-                tls_ca=None,
+                tls_ca_path=None,
                 # wait for rabbitmq to confirm each sent message
                 confirm_delivery=True,
                 # highest message priority of the queues (None: no priorities)
@@ -331,7 +339,7 @@ class TokeoDramatiq(MetaMixin):
             # Prefix for dramatiq lock keys
             locks_key_prefix='dq_',
             # Seconds between two checks of a waiting lock or temper call
-            locks_sleep_time=0.1,
+            locks_sleep_seconds=0.1,
         )
 
     #: (Application) The Cement application instance, set on setup
@@ -370,7 +378,7 @@ class TokeoDramatiq(MetaMixin):
                 self._locks = self.app.cache.create_locks_handler(
                     self._config('locks_tag'),
                     self._config('locks_key_prefix'),
-                    self._config('locks_sleep_time'),
+                    self._config('locks_sleep_seconds'),
                 )
             except AttributeError as e:
                 self.app.log.debug(f'dramatiq locks unavailable on cache_handler: {e}')
@@ -460,7 +468,7 @@ class TokeoDramatiq(MetaMixin):
             middleware.CurrentMessage(),
             TokeoAsyncIO(),
         ]
-        heartbeat = self._build_heartbeat()
+        heartbeat = self._create_heartbeat_middleware()
         if heartbeat is not None:
             use_middleware.append(heartbeat)
         # create the broker to RabbitMQ based on config; configured
@@ -484,7 +492,7 @@ class TokeoDramatiq(MetaMixin):
             auth_password=rabbitmq_config['auth_password'],
             tls_verify_hostname=rabbitmq_config['tls_verify_hostname'],
             tls_verify_cert=rabbitmq_config['tls_verify_cert'],
-            tls_ca=rabbitmq_config['tls_ca'],
+            tls_ca_path=rabbitmq_config['tls_ca_path'],
             confirm_delivery=rabbitmq_config['confirm_delivery'],
             max_priority=max_priority,
             middleware=use_middleware,
@@ -494,20 +502,20 @@ class TokeoDramatiq(MetaMixin):
         dramatiq.set_broker(rabbitmq_broker)
         self.app.log.debug('ExtendedRabbitmqBroker is registered as dramatiq broker')
 
-    def _build_heartbeat(self):
-        """Build the heartbeat middleware, None without monitoring."""
+    def _create_heartbeat_middleware(self):
+        """Create the heartbeat middleware, None without monitoring."""
         monitoring = self._config('monitoring')
         if not is_bool(monitoring):
             raise TokeoDramatiqConfigError('config', 'monitoring', monitoring, 'true or false')
-        interval = _check_number('config', 'monitoring_interval', self._config('monitoring_interval'))
+        interval_seconds = _check_number('config', 'monitoring_interval_seconds', self._config('monitoring_interval_seconds'))
         with_details = _get_with_details(self._config('monitoring_with_details'), self.app.debug)
         if not monitoring:
             return None
         # imported here, the monitoring module builds on this one
-        from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat, exchange_name, _get_app_version
+        from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat, get_exchange_name, _get_app_version
 
-        app = dict(label=self.app._meta.label, version=_get_app_version(self.app))
-        return TokeoDramatiqHeartbeat(exchange_name(self.app), interval, with_details, app)
+        app_dict = dict(label=self.app._meta.label, version=_get_app_version(self.app))
+        return TokeoDramatiqHeartbeat(get_exchange_name(self.app), interval_seconds, app_dict, with_details)
 
     def close(self):
         """
@@ -545,7 +553,7 @@ class TokeoDramatiq(MetaMixin):
         This property provides access to the distributed locks handler from the
         diskcache extension, which can be used to apply rate limiting and
         concurrency control to Dramatiq actors. A waiting ```lock``` or
-        ```temper``` call checks every ```locks_sleep_time``` seconds of the
+        ```temper``` call checks every ```locks_sleep_seconds``` seconds of the
         dramatiq config, not of the diskcache config.
 
         ### Returns
