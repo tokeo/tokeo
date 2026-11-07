@@ -49,7 +49,7 @@ if __name__ == '__main__':
         if log_file:
             app.log.backend.addHandler(logging.FileHandler(log_file))
         threading.Thread(target=run_other_thread, args=(app,), daemon=True).start()
-        app.tui.input.shell(run_command, prompt='Probe> ')
+        app.tui.input.run_shell(run_command, prompt='Probe> ')
         if log_file:
             with open(log_file, 'a') as f:
                 f.write('SHELL-ENDED\n')

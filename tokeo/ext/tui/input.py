@@ -26,7 +26,7 @@ def run_command(line):
     return True
 
 completer = {'exit': None, 'quit': None}
-app.tui.input.shell(run_command, prompt='MyApp> ', completer=completer)
+app.tui.input.run_shell(run_command, prompt='MyApp> ', completer=completer)
 ```
 
 """
@@ -56,7 +56,7 @@ class TokeoTuiInput:
         #: The Cement application instance
         self.app = app
 
-    def shell(self, command, prompt='> ', completer=None, history=None, **session):
+    def run_shell(self, command, prompt='> ', completer=None, history=None, **session_options):
         """
         Run a shell until Ctrl-D, a shutdown signal or an EOFError of a command.
 
@@ -70,7 +70,8 @@ class TokeoTuiInput:
             like ```{'tasks': {'pause': None}}```, or a prompt_toolkit completer
         - **history** (list|History, optional): The history, a list of lines to
             start with, or a prompt_toolkit history; a new one without
-        - **session**: More options for the prompt_toolkit ```PromptSession```
+        - **session_options**: More options for the prompt_toolkit
+            ```PromptSession```
 
         ### Notes
 
@@ -101,11 +102,11 @@ class TokeoTuiInput:
         # a descriptor of its own on the terminal: code that closes or moves
         # fd 0, e.g. a job of the scheduler, does not reach the shell
         own_stdin = None
-        if 'input' not in session:
+        if 'input' not in session_options:
             try:
                 if os.isatty(sys.stdin.fileno()):
                     own_stdin = os.fdopen(os.dup(sys.stdin.fileno()), 'r')
-                    session['input'] = create_input(own_stdin)
+                    session_options['input'] = create_input(own_stdin)
             except (OSError, ValueError):
                 pass
         # complete while typing excludes history search, so it is not set
@@ -114,7 +115,7 @@ class TokeoTuiInput:
             completer=completer,
             auto_suggest=AutoSuggestFromHistory(),
             complete_while_typing=True,
-            **session,
+            **session_options,
         )
         consoles = (sys.stdout, sys.stderr, sys.__stdout__, sys.__stderr__)
         # an input that starts on a terminal has to stay on it

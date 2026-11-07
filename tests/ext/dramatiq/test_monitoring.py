@@ -484,7 +484,7 @@ def test_command_follow(command):
     app, calls, follows = command('--follow', '--interval', '2')
     ((view, options),) = follows
     # listening for the interval fills the time between two displays
-    assert calls == [2] and options == dict(interval=0)
+    assert calls == [2] and options == dict(interval_seconds=0)
     assert 'every 2 s' in TokeoTuiOutput(None).render(*view)
 
 
@@ -493,7 +493,7 @@ def test_command_follow_json(command):
     app, calls, follows = command('--follow', '--json')
     ((line, options),) = follows
     assert json.loads(line)['interval'] == 5 and '\n' not in line
-    assert calls == [5] and options == dict(interval=0, repaint=False)
+    assert calls == [5] and options == dict(interval_seconds=0, with_repaint=False)
 
 
 def test_command_interval_checked(command):

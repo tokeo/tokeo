@@ -220,11 +220,11 @@ class TokeoDramatiqController(Controller):
         if not pargs.follow:
             output.print(*_format_monitor_view(output, monitor.snapshot(), self.app._meta.label))
         elif pargs.json:
-            output.follow(lambda: json.dumps(monitor.snapshot(wait=interval)), interval=0, repaint=False)
+            output.follow(lambda: json.dumps(monitor.snapshot(wait=interval)), interval_seconds=0, with_repaint=False)
         else:
             # listening fills the time between two displays
             output.follow(
-                lambda: _format_monitor_view(output, monitor.snapshot(wait=interval), self.app._meta.label, interval), interval=0
+                lambda: _format_monitor_view(output, monitor.snapshot(wait=interval), self.app._meta.label, interval), interval_seconds=0
             )
 
     # ---- serve --------------------------------------------------------------
@@ -510,9 +510,9 @@ def _format_queue_table(output, states):
         # the cell takes the style of its most severe hint
         style = next((style for _, style in flags if style), None)
         counts = ['-' if state.get(key) is None else state[key] for key in keys]
-        rows.append([state['name'], *counts, output.text(', '.join(flag for flag, _ in flags), style)])
+        rows.append([state['name'], *counts, output.create_text(', '.join(flag for flag, _ in flags), style)])
     rows.append(['total', *(sum(state.get(key) or 0 for state in states) for key in keys), ''])
-    return output.table([('queue', 'left', 'full'), *((key, 'right') for key in keys), 'flags'], rows, title='queues')
+    return output.build_table([('queue', 'left', 'full'), *((key, 'right') for key in keys), 'flags'], rows, title='queues')
 
 
 def _format_dead_letter_tables(output, states):
@@ -520,7 +520,7 @@ def _format_dead_letter_tables(output, states):
     # a cut message id is of no use, json shows errors and args in full
     columns = [('message_id', 'left', 'full'), 'actor', ('retries', 'right'), 'error', 'args']
     return [
-        output.table(
+        output.build_table(
             columns,
             [[d['message_id'], d['actor'], d['retries'], d['error'], d['args']] for d in s['dead_letters']],
             title=f'dead letters of {s["name"]}',
@@ -601,14 +601,14 @@ def _format_monitor_view(output, snapshot, label, follow=None):
             ('dead', 'right'),
             'last',
         ]
-        view.append(output.table(columns, rows, title='workers'))
+        view.append(output.build_table(columns, rows, title='workers'))
         if tasks:
             columns = [('worker', 'left', 'full'), 'actor', 'queue', ('runtime', 'right'), ('retries', 'right'), 'args']
-            view.append(output.table(columns, tasks, title='running'))
+            view.append(output.build_table(columns, tasks, title='running'))
     if snapshot['actors']:
         actors = snapshot['actors'].items()
         rows = [[name, a['done'], a['failed'], _format_duration(a['max_runtime_ms']), a.get('last_error', '')] for name, a in actors]
         columns = ['actor', ('done', 'right'), ('failed', 'right'), ('longest', 'right'), 'last error']
-        view.append(output.table(columns, rows, title='actors (last heartbeat of each worker)'))
+        view.append(output.build_table(columns, rows, title='actors (last heartbeat of each worker)'))
     view.append(_format_queue_table(output, snapshot['queues']))
     return view

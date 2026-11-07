@@ -16,11 +16,15 @@ when the extension is enabled.
 
 ```python
 output = app.tui.output
-table = output.table(['queue', ('ready', 'right')], [['mail', 3], ['orders', 0]])
+columns = ['queue', ('ready', 'right')]
+table = output.build_table(columns, [['mail', 3], ['orders', 0]])
 output.print(table)
 
 # repaint every 5 seconds until Ctrl-C
-output.follow(lambda: output.table(['time'], [[time.strftime('%X')]]), interval=5)
+output.follow(
+    lambda: output.build_table(['time'], [[time.strftime('%X')]]),
+    interval_seconds=5,
+)
 ```
 
 """
@@ -32,7 +36,7 @@ from cement.core.foundation import SIGNALS
 from tokeo.ext.tui import register, import_library
 
 #: Width a column with long values may shrink to in a narrow terminal
-SHRINK_WIDTH = 12
+_COLUMN_MIN_WIDTH = 12
 
 
 class TokeoTuiOutput:
@@ -67,7 +71,7 @@ class TokeoTuiOutput:
         """Whether the output goes to a terminal."""
         return self._console.is_terminal
 
-    def table(self, columns, rows, title=None):
+    def build_table(self, columns, rows, title=None):
         """
         Build a table.
 
@@ -88,14 +92,14 @@ class TokeoTuiOutput:
         from rich import box
         from rich.table import Table
 
-        rows = [[_build_text(value) for value in row] for row in rows]
+        rows = [[_create_text(value) for value in row] for row in rows]
         specs = [(column, 'left') if isinstance(column, str) else column for column in columns]
         widths, minimums, lasts = [], [], []
         for index, (name, justify, *full) in enumerate(specs):
             longest = max([len(name), *(row[index].cell_len for row in rows)])
             widths.append(longest)
             # short values stay whole, a full column never shrinks
-            minimums.append(longest if full == ['full'] else min(longest, max(len(name), SHRINK_WIDTH)))
+            minimums.append(longest if full == ['full'] else min(longest, max(len(name), _COLUMN_MIN_WIDTH)))
             lasts.append(longest if full == ['full'] else min(longest, 3))
         # the box takes a space at both edges and three between two columns
         available = self._console.width - 3 * len(specs) - 1
@@ -108,9 +112,9 @@ class TokeoTuiOutput:
             table.add_row(*row)
         return table
 
-    def text(self, value, style=None):
+    def create_text(self, value, style=None):
         """
-        Build a text shown as it is, optionally styled.
+        Create a text shown as it is, optionally styled.
 
         ### Args
 
@@ -122,7 +126,7 @@ class TokeoTuiOutput:
         - **rich.text.Text**: The text, for tables or print
 
         """
-        text = _build_text(value)
+        text = _create_text(value)
         if style:
             text.stylize(style)
         return text
@@ -138,7 +142,7 @@ class TokeoTuiOutput:
         """
         self._console.print(_build_group(renderables))
 
-    def json(self, data):
+    def print_json(self, data):
         """
         Print data as indented json, colored in a terminal.
 
@@ -171,17 +175,17 @@ class TokeoTuiOutput:
         Console(file=buffer, width=width or self._console.width, color_system=None, highlight=False).print(_build_group(renderables))
         return buffer.getvalue()
 
-    def follow(self, render, interval, repaint=None, count=None):
+    def follow(self, render, interval_seconds, with_repaint=None, max_repaints=None):
         """
         Show what ```render``` returns again and again until Ctrl-C.
 
         ### Args
 
         - **render** (callable): Returns a renderable or a list of them
-        - **interval** (float): Seconds between two repaints
-        - **repaint** (bool, optional): Repaint in place, or append each
+        - **interval_seconds** (float): Seconds between two repaints
+        - **with_repaint** (bool, optional): Repaint in place, or append each
             block; without it repaints in a terminal only
-        - **count** (int, optional): Stop after so many repaints
+        - **max_repaints** (int, optional): Stop after so many repaints
 
         ### Notes
 
@@ -194,22 +198,22 @@ class TokeoTuiOutput:
         """
         from rich.live import Live
 
-        repaint = self.is_terminal if repaint is None else repaint
+        with_repaint = self.is_terminal if with_repaint is None else with_repaint
         shown = 0
         try:
-            if repaint:
+            if with_repaint:
                 with Live(console=self._console, screen=True, auto_refresh=False) as live:
-                    while count is None or shown < count:
+                    while max_repaints is None or shown < max_repaints:
                         live.update(_build_group(_build_items(render())), refresh=True)
                         shown += 1
-                        time.sleep(interval)
+                        time.sleep(interval_seconds)
             else:
-                while count is None or shown < count:
+                while max_repaints is None or shown < max_repaints:
                     if shown:
                         self._console.print()
                     self._console.print(_build_group(_build_items(render())))
                     shown += 1
-                    time.sleep(interval)
+                    time.sleep(interval_seconds)
         except KeyboardInterrupt:
             pass
         except CaughtSignal as e:
@@ -217,7 +221,7 @@ class TokeoTuiOutput:
                 raise
 
 
-def _build_text(value):
+def _create_text(value):
     """Turn a value into a renderable that shows it as it is."""
     from rich.protocol import is_renderable
     from rich.text import Text
@@ -243,7 +247,7 @@ def _build_group(renderables):
     """Group renderables to show each on its own line."""
     from rich.console import Group
 
-    return Group(*(_build_text(item) for item in renderables))
+    return Group(*(_create_text(item) for item in renderables))
 
 
 def _build_items(renderables):

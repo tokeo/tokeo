@@ -21,11 +21,11 @@ class MyApp(App):
         ]
 
 # a table of the current state
-table = app.tui.output.table(['worker', ('done', 'right')], [['w-01', 102]])
+table = app.tui.output.build_table(['worker', ('done', 'right')], [['w-01', 102]])
 app.tui.output.print(table)
 
 # a shell that runs each entered line
-app.tui.input.shell(lambda line: run(line), prompt='MyApp> ')
+app.tui.input.run_shell(lambda line: run(line), prompt='MyApp> ')
 ```
 
 """

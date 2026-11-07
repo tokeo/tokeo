@@ -2081,7 +2081,7 @@ class TokeoAutomateShell:
             for task in self.app.automate.tasks.values()
         ]
         header = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %z (%Z)')
-        output.print(header, output.table([('id', 'left', 'full'), 'name', 'function', ('hosts', 'right')], rows, title='tasks'))
+        output.print(header, output.build_table([('id', 'left', 'full'), 'name', 'function', ('hosts', 'right')], rows, title='tasks'))
 
     def handle_command_show(self, args):
         """
@@ -2097,7 +2097,7 @@ class TokeoAutomateShell:
                 self.app.log.error(f'Task {task_id} not found!')
                 continue
             # the credentials from the vault show masked, never their values
-            self.app.tui.output.json(redact_vault(self.app.automate.tasks[task_id]))
+            self.app.tui.output.print_json(redact_vault(self.app.automate.tasks[task_id]))
 
     def handle_command_run(self, args):
         """
@@ -2160,10 +2160,11 @@ class TokeoAutomateShell:
         automate = self.app.automate
         if args.cmd == 'hosts.list':
             rows = [[h['id'], h['name'], h['host'], h.get('port'), h.get('user'), _join_auth_keys(h)] for h in automate.hosts.values()]
-            output.print(output.table([('id', 'left', 'full'), 'name', 'host', ('port', 'right'), 'user', 'auth'], rows, title='hosts'))
+            columns = [('id', 'left', 'full'), 'name', 'host', ('port', 'right'), 'user', 'auth']
+            output.print(output.build_table(columns, rows, title='hosts'))
         elif args.cmd == 'groups.list':
             rows = [[group, _join_host_ids(hosts)] for group, hosts in automate.hostgroups.items()]
-            output.print(output.table([('group', 'left', 'full'), 'hosts'], rows, title='hostgroups'))
+            output.print(output.build_table([('group', 'left', 'full'), 'hosts'], rows, title='hostgroups'))
         elif args.cmd == 'conns.list':
             # the defaults first
             names = ['_defaults', *(name for name in automate.connections if name != '_defaults')]
@@ -2172,7 +2173,7 @@ class TokeoAutomateShell:
                 for name, c in ((name, automate.connections[name]) for name in names)
             ]
             columns = [('id', 'left', 'full'), 'name', 'user', ('port', 'right'), 'hosts', 'auth']
-            output.print(output.table(columns, rows, title='connections'))
+            output.print(output.build_table(columns, rows, title='connections'))
 
     def handle_subcommand_help(self, args):
         """
@@ -2312,7 +2313,7 @@ class TokeoAutomateShell:
                 print('')
 
         self.app.log.info('Welcome to automate interactive shell.')
-        self.app.tui.input.shell(
+        self.app.tui.input.run_shell(
             run_command, prompt='Automate> ', completer=self.shell_completion(), history=self.shell_history(), **session
         )
         self.app.log.info('bye bye using automate shell...')

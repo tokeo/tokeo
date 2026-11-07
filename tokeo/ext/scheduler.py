@@ -658,7 +658,7 @@ class TokeoScheduler(MetaMixin):
             for job in self._scheduler.get_jobs()
         ]
         columns = [('id', 'left', 'full'), 'name', 'trigger', 'next run', 'state']
-        output.print(header, output.table(columns, rows, title='tasks'))
+        output.print(header, output.build_table(columns, rows, title='tasks'))
 
     def handle_command_pause(self, args):
         """
@@ -1030,7 +1030,7 @@ class TokeoScheduler(MetaMixin):
                 print('')
 
         self.app.log.info('Welcome to scheduler interactive shell.')
-        self.app.tui.input.shell(
+        self.app.tui.input.run_shell(
             run_command, prompt=get_prompt, completer=self.shell_completion(), history=self.shell_history(), **session
         )
         self.app.log.info('bye bye using scheduler...')

@@ -42,7 +42,7 @@ def shell():
 
         with TuiInputTest() as app, create_pipe_input() as keyboard:
             keyboard.send_text(keys)
-            app.tui.input.shell(record, input=keyboard, output=DummyOutput(), **options)
+            app.tui.input.run_shell(record, input=keyboard, output=DummyOutput(), **options)
         return lines
 
     return run
@@ -134,7 +134,7 @@ def test_signal_handlers_of_the_app_return_after_the_shell(shell):
     with TuiInputTest() as app, create_pipe_input() as keyboard:
         before = (signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGHUP))
         keyboard.send_text(f'x\r{CTRL_D}')
-        app.tui.input.shell(command, input=keyboard, output=DummyOutput())
+        app.tui.input.run_shell(command, input=keyboard, output=DummyOutput())
         after = (signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGHUP))
     assert callable(before[0]) and callable(before[1])
     assert handlers[0][0] is not before[0] and handlers[0][1] is not before[1]
@@ -148,7 +148,9 @@ def test_default_signal_stays_as_it_is(shell):
         previous = signal.signal(signal.SIGHUP, signal.SIG_DFL)
         try:
             keyboard.send_text(f'x\r{CTRL_D}')
-            app.tui.input.shell(lambda line: seen.append(signal.getsignal(signal.SIGHUP)) or True, input=keyboard, output=DummyOutput())
+            app.tui.input.run_shell(
+                lambda line: seen.append(signal.getsignal(signal.SIGHUP)) or True, input=keyboard, output=DummyOutput()
+            )
         finally:
             signal.signal(signal.SIGHUP, previous)
     assert seen == [signal.SIG_DFL]
@@ -174,7 +176,7 @@ def test_closed_input_ends_the_shell_with_one_error():
             keyboard.send_text('x\r' + (end or ''))
             if end is None:
                 keyboard.close()
-            app.tui.input.shell(lambda line: True, input=keyboard, output=DummyOutput())
+            app.tui.input.run_shell(lambda line: True, input=keyboard, output=DummyOutput())
     assert errors == {'closed': ['Shell input closed or left the terminal, the shell ends'], 'ctrl_d': []}
 
 
