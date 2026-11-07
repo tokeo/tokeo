@@ -30,7 +30,7 @@ def make_automate_hosts(validate=False):
             user='user1',
             password='password1',
             sudo='sudo1',
-            identity='identity1',
+            key_path='identity1',
             host_key='host_key1',
         ),
         host2=dict(
@@ -56,7 +56,7 @@ def make_automate_hosts(validate=False):
             password='sudo1',
             mode='eq',
             match='password:',
-            tail=100,
+            tail_chars=100,
         )
     return d
 
@@ -140,7 +140,7 @@ def make_automate_connections(validate=False):
         user='user_connect_base',
         password='password_connect_base',
         sudo='sudo_connect_base',
-        identity=None,
+        key_path=None,
         connect_timeout=30,
         lookup_keys=None,
         allow_agent=False,
@@ -163,7 +163,7 @@ def make_automate_connections(validate=False):
             user='user_con1',
             password='password_con1',
             sudo='sudo_con1',
-            identity='identity',
+            key_path='identity',
             known_hosts='known_hosts_con1',
             connect_timeout=30,
             forward_agent=False,
@@ -172,7 +172,7 @@ def make_automate_connections(validate=False):
             name='A short connection',
             hosts='192.168.101.1',
             user='user_con2',
-            identity='identity',
+            key_path='identity',
         ),
     )
     if not validate:
@@ -189,7 +189,7 @@ def make_automate_connections(validate=False):
             password='sudo_connect_base',
             mode='eq',
             match='password:',
-            tail=100,
+            tail_chars=100,
         )
         c['_defaults'] = b
         c['con1']['id'] = 'con1'
@@ -198,7 +198,7 @@ def make_automate_connections(validate=False):
             password='sudo_con1',
             mode='eq',
             match='password:',
-            tail=100,
+            tail_chars=100,
         )
         # the connections property returns the composed mapping itself
         d = c
@@ -227,7 +227,7 @@ def make_automate_tasks(validate=False):
                     user='user_task1',
                     password='password_task1',
                     sudo='sudo_task1',
-                    identity='identity_task1',
+                    key_path='identity_task1',
                     connect_timeout=30,
                     forward_agent=False,
                     known_hosts='known_hosts_task1',
@@ -269,9 +269,9 @@ def make_automate_tasks(validate=False):
                         password='sudo_connect_base',
                         mode='eq',
                         match='password:',
-                        tail=100,
+                        tail_chars=100,
                     ),
-                    identity=None,
+                    key_path=None,
                     connect_timeout=30,
                     lookup_keys=None,
                     allow_agent=False,
@@ -312,9 +312,9 @@ def make_automate_tasks(validate=False):
                                     password='sudo1',
                                     mode='eq',
                                     match='password:',
-                                    tail=100,
+                                    tail_chars=100,
                                 ),
-                                identity='identity1',
+                                key_path='identity1',
                                 host_key='host_key1',
                             ),
                             dict(
@@ -344,9 +344,9 @@ def make_automate_tasks(validate=False):
                         password='sudo_task1',
                         mode='eq',
                         match='password:',
-                        tail=100,
+                        tail_chars=100,
                     ),
-                    identity='identity_task1',
+                    key_path='identity_task1',
                     connect_timeout=30,
                     lookup_keys=None,
                     allow_agent=False,
@@ -383,9 +383,9 @@ def make_automate_tasks(validate=False):
                         password='sudo_connect_base',
                         mode='eq',
                         match='password:',
-                        tail=100,
+                        tail_chars=100,
                     ),
-                    identity=None,
+                    key_path=None,
                     connect_timeout=30,
                     lookup_keys=None,
                     allow_agent=False,

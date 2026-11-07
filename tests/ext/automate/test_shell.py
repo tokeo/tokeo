@@ -60,7 +60,7 @@ def test_shell_switch_no_colors_removed():
 def test_list_tasks(shell, capsys):
     """list shows a table of the tasks with function and number of hosts."""
     capsys.readouterr()
-    assert shell.command('list')
+    assert shell.run_command('list')
     lines = _get_lines(capsys)
     assert lines[1] == 'tasks' and lines[2].split() == ['id', 'name', 'function', 'hosts']
     task2 = next(line for line in lines if line.startswith('task2'))
@@ -69,19 +69,19 @@ def test_list_tasks(shell, capsys):
 
 
 def test_list_hosts_without_passwords(shell, capsys):
-    """hosts list shows the hosts without passwords, sudo or identity."""
+    """hosts list shows the hosts without passwords, sudo or key path."""
     capsys.readouterr()
-    shell.command('hosts list')
+    shell.run_command('hosts list')
     text = capsys.readouterr().out
     assert 'password1' not in text and 'sudo1' not in text and 'identity1' not in text
     host1 = next(line for line in text.splitlines() if line.strip().startswith('host1'))
-    assert host1.split() == ['host1', 'host1', 'ip_address1', '22', 'user1', 'identity,', 'password,', 'sudo']
+    assert host1.split() == ['host1', 'host1', 'ip_address1', '22', 'user1', 'key_path,', 'password,', 'sudo']
 
 
 def test_list_hostgroups(shell, capsys):
     """hostgroups list shows each group with its hosts."""
     capsys.readouterr()
-    shell.command('hostgroups list')
+    shell.run_command('hostgroups list')
     group1 = next(line for line in _get_lines(capsys) if line.startswith('group1'))
     assert group1.split() == ['group1', 'host1,', 'host2']
 
@@ -89,7 +89,7 @@ def test_list_hostgroups(shell, capsys):
 def test_list_connections_defaults_first(shell, capsys):
     """connections list shows _defaults first, without passwords."""
     capsys.readouterr()
-    shell.command('connections list')
+    shell.run_command('connections list')
     lines = _get_lines(capsys)
     assert lines[3].startswith('_defaults') and 'password_connect_base' not in '\n'.join(lines)
     assert any(line.startswith('con1') for line in lines[4:])
@@ -98,7 +98,7 @@ def test_list_connections_defaults_first(shell, capsys):
 def test_show_as_json(shell, capsys):
     """show task2 prints the task as json."""
     capsys.readouterr()
-    shell.command('show task2')
+    shell.run_command('show task2')
     text = capsys.readouterr().out
     start = text.index('{')
     task = json.loads(text[start:])
@@ -110,7 +110,7 @@ def test_show_masks_the_vault_values(shell, capsys):
     host = shell.app.automate.tasks['task2']['connection']['hosts'][1]
     host['password'] = VaultSecret(host['password'])
     capsys.readouterr()
-    shell.command('show task2')
+    shell.run_command('show task2')
     text = capsys.readouterr().out
     start = text.index('{')
     shown = json.loads(text[start:])
@@ -123,7 +123,7 @@ def test_show_unknown_task(shell, monkeypatch):
 
     errors = []
     monkeypatch.setattr(LoggingLogHandler, 'error', lambda self, msg, **kw: errors.append(msg))
-    shell.command('show nope')
+    shell.run_command('show nope')
     assert errors == ['Task nope not found!']
 
 
@@ -139,7 +139,7 @@ def test_shell_shows_a_failing_command(shell, monkeypatch):
     monkeypatch.setattr(shell.app.automate, 'run_sequential', run)
     with create_pipe_input() as keyboard:
         keyboard.send_text(f'run task1\r{CTRL_C}{CTRL_D}')
-        shell.shell(input=keyboard, output=DummyOutput())
+        shell.run_shell(input=keyboard, output=DummyOutput())
     assert errors == ['Shell command failed: cannot run']
 
 

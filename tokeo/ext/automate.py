@@ -24,7 +24,7 @@ automate:
     webserver1:
       host: "192.168.1.10"
       user: "admin"
-      identity: "/path/to/ssh_key"
+      key_path: "/path/to/ssh_key"
 
 # Execute via CLI
 # tokeo automate run check_uptime
@@ -153,7 +153,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         #: How the protected kwargs of a run are handled
         self.protect = self.task_kwprotected['protect']
         #: Whether the env of a run is sanitized
-        self.sanitize = self.task_kwprotected['sanitize']
+        self.is_env_sanitized = self.task_kwprotected['sanitize']
 
     @staticmethod
     def generate_sudo_env_match_token(self):
@@ -190,7 +190,7 @@ class TokeoInvokeLocalContext(invoke.Context):
         # sanitize keeps the env names that are keywords; the values are
         # quoted only for the export line of a remote shell, a local process
         # gets them without a shell and so as they are
-        if env and self.sanitize:
+        if env and self.is_env_sanitized:
             env = sanitize.filter_keyword_keys(env)
         # if strict protected, remove all kwargs, except safe ones
         if self.protect == 'strict':
@@ -232,7 +232,7 @@ class TokeoInvokeLocalContext(invoke.Context):
             keywords pass, by sanitize.filter_keyword_keys().
 
         : A sudo password (sudo.password) is injected reactively when the
-            configured prompt is seen in the last tail chars of stdout or
+            configured prompt is seen in the last sudo.tail_chars of stdout or
             stderr: sudo.mode 'eq' matches the literal sudo.match, 'regex'
             matches it as a pattern, 'env' sets a unique SUDO_PROMPT and matches
             that. Injection happens at most once. If sudo is None the support
@@ -338,7 +338,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         #: How the protected kwargs of a run are handled
         self.protect = self.task_kwprotected['protect']
         #: Whether the env of a run is sanitized
-        self.sanitize = self.task_kwprotected['sanitize']
+        self.is_env_sanitized = self.task_kwprotected['sanitize']
         #: The paramiko client, None until the first run connects
         self.client = None
 
@@ -414,7 +414,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
             sanitize.quote_keyword_dict(), otherwise they are exported as-is.
 
         : A sudo password (sudo.password) is injected reactively when the
-            configured prompt is seen in the last tail chars of stdout or
+            configured prompt is seen in the last sudo.tail_chars of stdout or
             stderr: sudo.mode 'eq' matches the literal sudo.match, 'regex'
             matches it as a pattern, 'env' sets a unique SUDO_PROMPT and matches
             that. Injection happens at most once. If sudo is None the support
@@ -444,7 +444,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
             kwargs['pty'] = True
             # local values of the sudo config
             sudo_mode = sudo_config.get('mode')
-            sudo_tail = sudo_config.get('tail')
+            sudo_tail_chars = sudo_config.get('tail_chars')
             if sudo_mode == 'env':
                 sudo_match = TokeoInvokeLocalContext.generate_sudo_env_match_token(self)
                 sudo_prompt = sudo_match
@@ -452,9 +452,9 @@ class TokeoInvokeRemoteContext(invoke.Context):
                 sudo_match = sudo_config.get('match')
             # check for regex or escape
             if sudo_mode != 'regex':
-                # validate tail only for equal tests
-                if len(sudo_match) + 25 >= sudo_tail:
-                    sudo_tail = len(sudo_match) + 25
+                # validate tail_chars only for equal tests
+                if len(sudo_match) + 25 >= sudo_tail_chars:
+                    sudo_tail_chars = len(sudo_match) + 25
                 # escape the match to search for equality
                 sudo_match = re.escape(sudo_match)
 
@@ -471,7 +471,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         # create the export string to survive env while on ssh
         env = kwargs.get('env', {})
         # the export line is read by the remote shell, so its values are quoted
-        if env and self.sanitize:
+        if env and self.is_env_sanitized:
             env = sanitize.quote_keyword_dict(env)
         if env:
             env_exports = 'export ' + ' '.join(f'{k}={str(v)}' for k, v in env.items()) + ' ; '
@@ -518,8 +518,8 @@ class TokeoInvokeRemoteContext(invoke.Context):
 
             # detect the configured sudo match in either stream (one-shot)
             if sudo_pass and (
-                (re.search(sudo_match, stdout_buffer[-sudo_tail:].decode(encoding, errors='replace')) is not None)
-                or (re.search(sudo_match, stderr_buffer[-sudo_tail:].decode(encoding, errors='replace')) is not None)
+                (re.search(sudo_match, stdout_buffer[-sudo_tail_chars:].decode(encoding, errors='replace')) is not None)
+                or (re.search(sudo_match, stderr_buffer[-sudo_tail_chars:].decode(encoding, errors='replace')) is not None)
             ):
                 channel.sendall(sudo_pass.encode(encoding) + b'\n')
                 sudo_pass = None
@@ -703,7 +703,7 @@ class TokeoAutomate(MetaMixin):
                     # sudo of the commands, e.g. its password and mode
                     sudo=None,
                     # path of the private key file
-                    identity=None,
+                    key_path=None,
                     # look for private keys in ~/.ssh
                     lookup_keys=False,
                     # use the ssh agent for keys
@@ -805,11 +805,11 @@ class TokeoAutomate(MetaMixin):
         if not isinstance(sudo, str) and not isinstance(sudo, dict):
             raise TokeoAutomateError('To define a sudo there must be at least a str or dict')
         # setup the dict
-        _sudo = dict(password=None, mode='eq', match='password:', tail=100)
+        _sudo = dict(password=None, mode='eq', match='password:', tail_chars=100)
         if isinstance(sudo, str):
             _sudo['password'] = sudo
             return _sudo
-        for field in ('password', 'mode', 'match', 'tail'):
+        for field in ('password', 'mode', 'match', 'tail_chars'):
             if field in sudo:
                 _sudo[field] = sudo[field]
         # return the record
@@ -855,7 +855,7 @@ class TokeoAutomate(MetaMixin):
             raise TokeoAutomateError('To define a host entry there must be at least a "host" field')
         # setup the dict
         _host = dict(id=key, name=entry['name'] if 'name' in entry else key, host=entry['host'])
-        for field in ('port', 'user', 'password', 'sudo', 'identity', 'host_key', 'shell', 'encoding'):
+        for field in ('port', 'user', 'password', 'sudo', 'key_path', 'host_key', 'shell', 'encoding'):
             if field in entry:
                 _host[field] = entry[field]
         # return the validated record
@@ -933,7 +933,7 @@ class TokeoAutomate(MetaMixin):
         ### Notes
 
         : Only specific fields can be overruled: id, name, host, port, user,
-            password, sudo, identity, host_key, shell and encoding.
+            password, sudo, key_path, host_key, shell and encoding.
 
         """
         # use the counter also as running id
@@ -948,7 +948,7 @@ class TokeoAutomate(MetaMixin):
         # drop 'use' attribute if was defined
         overrule.pop('use', None)
         # overrulable fields from host dict
-        for field in ('id', 'name', 'host', 'port', 'user', 'password', 'sudo', 'identity', 'host_key', 'shell', 'encoding'):
+        for field in ('id', 'name', 'host', 'port', 'user', 'password', 'sudo', 'key_path', 'host_key', 'shell', 'encoding'):
             if field in overrule:
                 _host[field] = overrule[field]
         # return the validated record
@@ -992,7 +992,7 @@ class TokeoAutomate(MetaMixin):
             'user',
             'password',
             'sudo',
-            'identity',
+            'key_path',
             'connect_timeout',
             'lookup_keys',
             'allow_agent',
@@ -1508,8 +1508,8 @@ class TokeoAutomate(MetaMixin):
                     if not is_number_gt(timeout, 0):
                         raise TokeoAutomateError(f'connect_timeout must be a number of seconds greater than 0, not {timeout!r}')
                     connect_kwargs['timeout'] = timeout
-                if 'identity' in connection and connection['identity'] is not None:
-                    connect_kwargs['key_filename'] = connection['identity']
+                if 'key_path' in connection and connection['key_path'] is not None:
+                    connect_kwargs['key_filename'] = connection['key_path']
                 # check for key information
                 if 'host_key' in _host and _host['host_key'] or 'known_hosts' in connection and connection['known_hosts']:
                     # get the list of host keys from known_hosts like strings
@@ -1634,12 +1634,12 @@ class TokeoAutomate(MetaMixin):
     def run_sequential(
         self,
         task_ids,
-        with_hosts=None,
-        with_connection=None,
-        continue_on_error=False,
-        verbose=False,
+        override_hosts=None,
+        override_connection=None,
         return_results=False,
         return_outputs=True,
+        continue_on_error=False,
+        verbose=False,
     ):
         """
         Execute multiple tasks sequentially.
@@ -1652,18 +1652,18 @@ class TokeoAutomate(MetaMixin):
 
         - **task_ids** (str|list|tuple): String or sequence of task IDs to
             execute
-        - **with_hosts** (str|list|tuple|dict, optional): Host or hosts to
+        - **override_hosts** (str|list|tuple|dict, optional): Host or hosts to
             override task configuration
-        - **with_connection** (str|dict, optional): Connection to override
+        - **override_connection** (str|dict, optional): Connection to override
             task configuration
-        - **continue_on_error** (bool, optional): Whether to continue executing
-            tasks after errors. Defaults to False.
-        - **verbose** (bool, optional): Whether to enable verbose execution
-            output. Defaults to False.
         - **return_results** (bool, optional): Whether to include full result
             details in results. Defaults to False.
         - **return_outputs** (bool, optional): Whether to include stdout/stderr
             in results. Defaults to True.
+        - **continue_on_error** (bool, optional): Whether to continue executing
+            tasks after errors. Defaults to False.
+        - **verbose** (bool, optional): Whether to enable verbose execution
+            output. Defaults to False.
 
         ### Returns
 
@@ -1689,25 +1689,25 @@ class TokeoAutomate(MetaMixin):
             raise TokeoAutomateError('run_sequential must be called with one or many task ids')
 
         # check overrulers for hosts
-        if isinstance(with_hosts, str):
-            if with_hosts in self.hosts:
-                _with_hosts = tuple((self.hosts[with_hosts],))
+        if isinstance(override_hosts, str):
+            if override_hosts in self.hosts:
+                _override_hosts = tuple((self.hosts[override_hosts],))
             else:
-                _with_hosts = tuple((self._get_host_dict_from_str(None, with_hosts),))
-        elif isinstance(with_hosts, (list, tuple, dict)):
-            _with_hosts = with_hosts
+                _override_hosts = tuple((self._get_host_dict_from_str(None, override_hosts),))
+        elif isinstance(override_hosts, (list, tuple, dict)):
+            _override_hosts = override_hosts
         else:
-            _with_hosts = None
+            _override_hosts = None
 
         # check overrulers for connection
-        if isinstance(with_connection, str):
-            _with_connection = self.connections[with_connection]
-        elif isinstance(with_connection, dict):
-            _with_connection = self._get_connection_dict(None, with_connection)
-            if 'use' in with_connection:
-                _with_connection['use'] = with_connection['use']
+        if isinstance(override_connection, str):
+            _override_connection = self.connections[override_connection]
+        elif isinstance(override_connection, dict):
+            _override_connection = self._get_connection_dict(None, override_connection)
+            if 'use' in override_connection:
+                _override_connection['use'] = override_connection['use']
         else:
-            _with_connection = None
+            _override_connection = None
 
         # flag for getting all exit codes from run commands
         all_exited_code = 0
@@ -1728,10 +1728,10 @@ class TokeoAutomate(MetaMixin):
                     # overrides below never mutate the shared task cache
                     task = copy.deepcopy(self.tasks[task_id])
                     # test overules
-                    if _with_connection:
-                        task['connection'] = self._setup_connection(_with_connection)
-                    if _with_hosts:
-                        task['connection']['hosts'] = _with_hosts
+                    if _override_connection:
+                        task['connection'] = self._setup_connection(_override_connection)
+                    if _override_hosts:
+                        task['connection']['hosts'] = _override_hosts
                         task['connection'] = self._setup_connection(task['connection'])
                     # use and run one by one
                     run_results = self.app.automate.run(task, filter_host_ids=host_id, verbose=verbose)
@@ -1782,13 +1782,13 @@ class TokeoAutomate(MetaMixin):
 
     def run_threaded(
         self,
-        max_workers,
         task_ids,
-        with_hosts=None,
-        with_connection=None,
-        verbose=False,
+        max_workers,
+        override_hosts=None,
+        override_connection=None,
         return_results=False,
         return_outputs=True,
+        verbose=False,
     ):
         """
         Execute multiple tasks in parallel using a thread pool.
@@ -1799,19 +1799,19 @@ class TokeoAutomate(MetaMixin):
 
         ### Args
 
-        - **max_workers** (int): Maximum number of concurrent worker threads
         - **task_ids** (str|list|tuple): String or sequence of task IDs to
             execute
-        - **with_hosts** (str|list|tuple|dict, optional): Host or hosts to
+        - **max_workers** (int): Maximum number of concurrent worker threads
+        - **override_hosts** (str|list|tuple|dict, optional): Host or hosts to
             override task configuration
-        - **with_connection** (str|dict, optional): Connection to override
+        - **override_connection** (str|dict, optional): Connection to override
             task configuration
-        - **verbose** (bool, optional): Whether to enable verbose execution
-            output. Defaults to False.
         - **return_results** (bool, optional): Whether to include full result
             details in results. Defaults to False.
         - **return_outputs** (bool, optional): Whether to include stdout/stderr in
             results. Defaults to True.
+        - **verbose** (bool, optional): Whether to enable verbose execution
+            output. Defaults to False.
 
         ### Returns
 
@@ -1838,25 +1838,25 @@ class TokeoAutomate(MetaMixin):
             raise TokeoAutomateError('run_threaded must be called with one or many task ids')
 
         # check overrulers for hosts
-        if isinstance(with_hosts, str):
-            if with_hosts in self.hosts:
-                _with_hosts = tuple((self.hosts[with_hosts],))
+        if isinstance(override_hosts, str):
+            if override_hosts in self.hosts:
+                _override_hosts = tuple((self.hosts[override_hosts],))
             else:
-                _with_hosts = tuple((self._get_host_dict_from_str(None, with_hosts),))
-        elif isinstance(with_hosts, (list, tuple, dict)):
-            _with_hosts = with_hosts
+                _override_hosts = tuple((self._get_host_dict_from_str(None, override_hosts),))
+        elif isinstance(override_hosts, (list, tuple, dict)):
+            _override_hosts = override_hosts
         else:
-            _with_hosts = None
+            _override_hosts = None
 
         # check overrulers for connection
-        if isinstance(with_connection, str):
-            _with_connection = self.connections[with_connection]
-        elif isinstance(with_connection, dict):
-            _with_connection = self._get_connection_dict(None, with_connection)
-            if 'use' in with_connection:
-                _with_connection['use'] = with_connection['use']
+        if isinstance(override_connection, str):
+            _override_connection = self.connections[override_connection]
+        elif isinstance(override_connection, dict):
+            _override_connection = self._get_connection_dict(None, override_connection)
+            if 'use' in override_connection:
+                _override_connection['use'] = override_connection['use']
         else:
-            _with_connection = None
+            _override_connection = None
 
         # flag for getting all exit codes from run commands
         all_exited_code = 0
@@ -1881,10 +1881,10 @@ class TokeoAutomate(MetaMixin):
                     # own task instead of sharing one
                     task = copy.deepcopy(self.tasks[task_id])
                     # test overules
-                    if _with_connection:
-                        task['connection'] = self._setup_connection(_with_connection)
-                    if _with_hosts:
-                        task['connection']['hosts'] = _with_hosts
+                    if _override_connection:
+                        task['connection'] = self._setup_connection(_override_connection)
+                    if _override_hosts:
+                        task['connection']['hosts'] = _override_hosts
                         task['connection'] = self._setup_connection(task['connection'])
                     # put task on pool
                     futures.append(executor.submit(self.run, task, host_id, verbose))
@@ -2009,7 +2009,7 @@ class TokeoAutomateShell:
 
         """
         self.startup()
-        self.shell()
+        self.run_shell()
 
     def shell_completion(self):
         """
@@ -2036,7 +2036,7 @@ class TokeoAutomateShell:
             wordlist_show = WordCompleter(sorted(set(tasks_completion)))
             wordlist_run = WordCompleter(
                 sorted(set(tasks_completion + tasks_host_completion))
-                + ['--with-hosts', '--with-connection', '--continue', '--verbose', '--as-json', '--without-output', '--threads']
+                + ['--override-hosts', '--override-connection', '--continue', '--verbose', '--as-json', '--without-output', '--threads']
             )
             self._shell_completion = {
                 'list': None,
@@ -2118,15 +2118,15 @@ class TokeoAutomateShell:
         run_args['return_outputs'] = not args.without_output
         # only set host/connection overrides if explicitly provided so the task's
         # configured connection is used by default
-        if args.with_hosts:
-            run_args['with_hosts'] = args.with_hosts
-        if args.with_connection:
-            run_args['with_connection'] = args.with_connection
+        if args.override_hosts:
+            run_args['override_hosts'] = args.override_hosts
+        if args.override_connection:
+            run_args['override_connection'] = args.override_connection
         # run command line with args
         if args.threads > 1:
             res = self.app.automate.run_threaded(
-                args.threads,
                 args.task,
+                args.threads,
                 **run_args,
             )
         else:
@@ -2144,7 +2144,7 @@ class TokeoAutomateShell:
                 )
             )
 
-    def handle_subcommand_commands(self, args):
+    def handle_subcommands(self, args):
         """
         Handle the hosts, hostgroups and connections list subcommands.
 
@@ -2221,8 +2221,8 @@ class TokeoAutomateShell:
             # tasks run command
             cmd = sub.add_parser('run', help='run task(s)')
             cmd.add_argument('task', nargs='+', help='task_id(s)[:host] to run')
-            cmd.add_argument('--with-hosts', type=str, default=None, help='override hosts by id or user[:password]@host[:port] string')
-            cmd.add_argument('--with-connection', type=str, default=None, help='override connection by id')
+            cmd.add_argument('--override-hosts', type=str, default=None, help='override hosts by id or user[:password]@host[:port] string')
+            cmd.add_argument('--override-connection', type=str, default=None, help='override connection by id')
             cmd.add_argument('--continue', dest='continue_run', action='store_true', help='continue with next task(s) also having errors')
             cmd.add_argument('--verbose', action='store_true', help='show output from command execution')
             cmd.add_argument('--as-json', action='store_true', help='show results as json')
@@ -2236,30 +2236,31 @@ class TokeoAutomateShell:
             nested = nested.add_subparsers(metavar='')
             # tasks remove command
             cmd = nested.add_parser('list', help='show the configured hosts')
-            cmd.set_defaults(func=self.handle_subcommand_commands, cmd='hosts.list')
+            cmd.set_defaults(func=self.handle_subcommands, cmd='hosts.list')
             # nested tasks sub-commands
             nested = sub.add_parser('hostgroups', help='about hostgroups')
             nested.set_defaults(func=self.handle_subcommand_help, print_help=nested.print_help)
             nested = nested.add_subparsers(metavar='')
             # tasks remove command
             cmd = nested.add_parser('list', help='show the configured hostgroups')
-            cmd.set_defaults(func=self.handle_subcommand_commands, cmd='groups.list')
+            cmd.set_defaults(func=self.handle_subcommands, cmd='groups.list')
             # nested tasks sub-commands
             nested = sub.add_parser('connections', help='about connections')
             nested.set_defaults(func=self.handle_subcommand_help, print_help=nested.print_help)
             nested = nested.add_subparsers(metavar='')
             # tasks remove command
             cmd = nested.add_parser('list', help='show the configured connections')
-            cmd.set_defaults(func=self.handle_subcommand_commands, cmd='conns.list')
+            cmd.set_defaults(func=self.handle_subcommands, cmd='conns.list')
 
         # return initialized parser
         return self._command_parser
 
-    def command(self, cmd=''):
+    def run_command(self, cmd=''):
         """
         Process a command in the interactive shell.
 
-        Parses and executes a command entered in the interactive shell.
+        Parses and executes a command entered in the interactive shell, an
+        empty line follows each command.
 
         ### Args
 
@@ -2274,47 +2275,47 @@ class TokeoAutomateShell:
         - **EOFError**: If the command is 'exit' or 'quit'
 
         """
-        # signal bye bye to interactive shell
-        if cmd in ['exit', 'quit']:
-            raise EOFError('Command exit entered.')
-
-        # check command
-        cmd_args = shlex.split(cmd)
+        # an empty line between two commands
         try:
-            args = self.command_parser.parse_args(args=cmd_args)
-        except SystemExit as err:
-            # if parse was ok but only help, err == 0, else err != 0
-            return err.code == 0
+            # signal bye bye to interactive shell
+            if cmd in ['exit', 'quit']:
+                raise EOFError('Command exit entered.')
 
-        # a failing command raises, the shell shows the error and keeps the line
-        if 'func' in args:
-            print('')
-            args.func(args)
+            # check command
+            cmd_args = shlex.split(cmd)
+            try:
+                args = self.command_parser.parse_args(args=cmd_args)
+            except SystemExit as err:
+                # if parse was ok but only help, err == 0, else err != 0
+                return err.code == 0
+
+            # a failing command raises, the shell shows the error and keeps the line
+            if 'func' in args:
+                print('')
+                args.func(args)
+                return True
+
+            # unusual empty but valid command, can be added to history
             return True
+        finally:
+            print('')
 
-        # unusual empty but valid command, can be added to history
-        return True
-
-    def shell(self, **session):
+    def run_shell(self, **session_options):
         """
         Run the interactive shell until ```exit```, ```quit``` or Ctrl-D.
 
         ### Args
 
-        - **session**: More options for the shell of ```app.tui.input```
+        - **session_options**: More options for the shell of ```app.tui.input```
 
         """
-
-        def run_command(line):
-            # an empty line between two commands
-            try:
-                return self.command(line)
-            finally:
-                print('')
-
         self.app.log.info('Welcome to automate interactive shell.')
         self.app.tui.input.run_shell(
-            run_command, prompt='Automate> ', completer=self.shell_completion(), history=self.shell_history(), **session
+            self.run_command,
+            prompt='Automate> ',
+            completer=self.shell_completion(),
+            history=self.shell_history(),
+            **session_options,
         )
         self.app.log.info('bye bye using automate shell...')
 
@@ -2357,7 +2358,7 @@ class TokeoAutomateController(Controller):
                 ),
             ),
             (
-                ['--with-hosts'],
+                ['--override-hosts'],
                 dict(
                     type=str,
                     default=None,
@@ -2365,7 +2366,7 @@ class TokeoAutomateController(Controller):
                 ),
             ),
             (
-                ['--with-connection'],
+                ['--override-connection'],
                 dict(
                     type=str,
                     default=None,
@@ -2438,22 +2439,22 @@ class TokeoAutomateController(Controller):
         kwargs = dict(
             verbose=self.app.pargs.verbose, return_results=self.app.pargs.as_json, return_outputs=not self.app.pargs.without_output
         )
-        # get hosts by --with-hosts
-        if self.app.pargs.with_hosts:
+        # get hosts by --override-hosts
+        if self.app.pargs.override_hosts:
             try:
-                kwargs['with_hosts'] = yaml.safe_load(self.app.pargs.with_hosts)
+                kwargs['override_hosts'] = yaml.safe_load(self.app.pargs.override_hosts)
             except (yaml.error.MarkedYAMLError, yaml.error.YAMLError):
-                kwargs['with_hosts'] = self.app.pargs.with_hosts
-        # get connection by --with-connection
-        if self.app.pargs.with_connection:
+                kwargs['override_hosts'] = self.app.pargs.override_hosts
+        # get connection by --override-connection
+        if self.app.pargs.override_connection:
             try:
-                kwargs['with_connection'] = yaml.safe_load(self.app.pargs.with_connection)
+                kwargs['override_connection'] = yaml.safe_load(self.app.pargs.override_connection)
             except (yaml.error.MarkedYAMLError, yaml.error.YAMLError):
-                kwargs['with_connection'] = self.app.pargs.with_connection
+                kwargs['override_connection'] = self.app.pargs.override_connection
 
         # use the internal processings
         if self.app.pargs.threads > 1:
-            res = self.app.automate.run_threaded(self.app.pargs.threads, self.app.pargs.task, **kwargs)
+            res = self.app.automate.run_threaded(self.app.pargs.task, self.app.pargs.threads, **kwargs)
         else:
             res = self.app.automate.run_sequential(self.app.pargs.task, continue_on_error=self.app.pargs.continue_run, **kwargs)
 
@@ -2494,7 +2495,7 @@ def _join_host_ids(hosts):
 
 def _join_auth_keys(entry):
     """Name the credentials set for a host or connection, never their values."""
-    return ', '.join(key for key in ('identity', 'password', 'sudo') if entry.get(key))
+    return ', '.join(key for key in ('key_path', 'password', 'sudo') if entry.get(key))
 
 
 def tokeo_automate_extend_app(app):
