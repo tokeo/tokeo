@@ -15,6 +15,6 @@ def test_encrypt_and_decrypt_keep_the_value():
     assert vault.decrypt(PROFILE, 'my-dev-password') == 'my-dev-password'
 
 
-def test_create_scaffolds_a_profile_without_secrets():
+def test_build_scaffold_gives_a_profile_without_secrets():
     """create gives the type only and no environment variable."""
-    assert PlainVault().create('dev') == {'profile': {'type': 'plain'}, 'secrets': []}
+    assert PlainVault().build_scaffold('dev') == {'profile': {'type': 'plain'}, 'secrets': []}

@@ -252,13 +252,13 @@ class Vault:
         """
         raise NotImplementedError
 
-    def _build_env_name(self, name, suffix):
+    def _format_env_name(self, name, suffix):
         # build a conventional env variable name for a profile scaffold, for
         # example VAULT_EXAMPLE_KEY, sanitising the profile name to upper case
         base = re.sub('[^0-9A-Za-z]+', '_', name).upper()
         return f'VAULT_{base}_{suffix}'
 
-    def create(self, name):
+    def build_scaffold(self, name):
         """
         Build a ready-to-use profile scaffold for this handler type.
 
@@ -275,7 +275,8 @@ class Vault:
         ### Returns
 
         - **dict**: ```profile``` (the yaml fields for the profile) and
-            ```secrets``` (a list of ```name```/```value```/```quote``` env entries)
+            ```secrets``` (a list of ```name```/```value```/```is_quoted```
+            env entries)
 
         ### Raises
 

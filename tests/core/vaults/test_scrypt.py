@@ -190,26 +190,26 @@ def test_invalid_profile_value_fails(passphrase, field, value):
 # create
 
 
-def test_create_scaffolds_a_scrypt_profile_with_a_fresh_salt():
+def test_build_scaffold_gives_a_scrypt_profile_with_a_fresh_salt():
     """create gives a 16 byte salt and a quoted passphrase placeholder."""
-    scaffold = ScryptVault().create('my-app')
+    scaffold = ScryptVault().build_scaffold('my-app')
     profile = scaffold['profile']
     assert (profile['type'], profile['env']) == ('scrypt', 'VAULT_MY_APP_PASSPHRASE')
     assert len(base64.b64decode(profile['salt'])) == 16
     [secret] = scaffold['secrets']
-    assert (secret['name'], secret['quote']) == ('VAULT_MY_APP_PASSPHRASE', True)
+    assert (secret['name'], secret['is_quoted']) == ('VAULT_MY_APP_PASSPHRASE', True)
     assert secret['value'].startswith('change me')
 
 
-def test_create_draws_a_new_salt_each_time():
+def test_build_scaffold_draws_a_new_salt_each_time():
     """Two scaffolds of the same name get different salts."""
     vault = ScryptVault()
-    assert vault.create('a')['profile']['salt'] != vault.create('a')['profile']['salt']
+    assert vault.build_scaffold('a')['profile']['salt'] != vault.build_scaffold('a')['profile']['salt']
 
 
-def test_create_profile_works_once_the_passphrase_is_set(monkeypatch):
+def test_build_scaffold_profile_works_once_the_passphrase_is_set(monkeypatch):
     """The scaffolded profile works once its passphrase variable is set."""
-    scaffold = ScryptVault().create('example')
+    scaffold = ScryptVault().build_scaffold('example')
     monkeypatch.setenv('VAULT_EXAMPLE_PASSPHRASE', 'my passphrase')
     # a low cost keeps the derivation of the test fast
     profile = dict(scaffold['profile'], cost=16)

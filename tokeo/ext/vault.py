@@ -331,7 +331,7 @@ class TokeoVaultController(Controller):
 
         """
         name = self.app.pargs.name
-        scaffold = self.app.config.get_handler(self.app.pargs.type).create(name)
+        scaffold = self.app.config.get_handler(self.app.pargs.type).build_scaffold(name)
         self.app.print('vault:')
         self.app.print('  profiles:')
         self.app.print(f'    {name}:')
@@ -339,7 +339,7 @@ class TokeoVaultController(Controller):
             self.app.print(f'      {field}: {value}')
         self.app.print('')
         for secret in scaffold['secrets']:
-            value = f'"{secret["value"]}"' if secret.get('quote') else secret['value']
+            value = f'"{secret["value"]}"' if secret.get('is_quoted') else secret['value']
             self.app.print(f'{secret["name"]}={value}')
 
     @ex(
@@ -458,7 +458,7 @@ class TokeoVaultController(Controller):
         self.app.print(self.app.config.get_handler(profile['type']).decrypt(profile, value))
 
 
-def tokeo_vault_extend_app(app):
+def tokeo_vault_extend_by_others(app):
     """
     Cement post-setup hook to register externally provided vault handlers.
 
@@ -504,7 +504,7 @@ def load(app):
     # handler from the outside by hooking 'tokeo_vault_register_handlers'; it
     # runs at post_setup, once every extension has been loaded
     app.hook.define('tokeo_vault_register_handlers')
-    app.hook.register('post_setup', tokeo_vault_extend_app)
+    app.hook.register('post_setup', tokeo_vault_extend_by_others)
     app.handler.register(TokeoVaultConfigHandler)
     app.handler.register(TokeoVaultController)
     app._meta.config_handler = TokeoVaultConfigHandler.Meta.label

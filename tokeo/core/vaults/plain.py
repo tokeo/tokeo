@@ -74,7 +74,7 @@ class PlainVault(Vault):
         """
         return ciphertext
 
-    def create(self, name):
+    def build_scaffold(self, name):
         """
         Build a profile scaffold of type plain, it needs no secret.
 

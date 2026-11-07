@@ -89,7 +89,7 @@ class ScryptVault(EncVault):
         # Fernet expects a url-safe base64 key
         return base64.urlsafe_b64encode(key)
 
-    def create(self, name):
+    def build_scaffold(self, name):
         """
         Build a ```scrypt``` profile scaffold with a fresh salt.
 
@@ -108,9 +108,9 @@ class ScryptVault(EncVault):
             must hold the chosen passphrase
 
         """
-        env = self._build_env_name(name, 'PASSPHRASE')
+        env = self._format_env_name(name, 'PASSPHRASE')
         salt = base64.b64encode(os.urandom(16)).decode()
         return {
             'profile': {'type': 'scrypt', 'env': env, 'salt': salt},
-            'secrets': [{'name': env, 'value': 'change me to a memorable passphrase', 'quote': True}],
+            'secrets': [{'name': env, 'value': 'change me to a memorable passphrase', 'is_quoted': True}],
         }

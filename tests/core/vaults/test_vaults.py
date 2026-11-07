@@ -89,10 +89,10 @@ def test_vault_base_methods_are_abstract(method):
         getattr(Vault(), method)({'type': 'x'}, 'value')
 
 
-def test_vault_create_is_not_supported_by_the_base():
+def test_vault_build_scaffold_is_not_supported_by_the_base():
     """create of the base Vault raises TokeoVaultError."""
     with pytest.raises(TokeoVaultError, match='cannot create a profile scaffold'):
-        Vault().create('example')
+        Vault().build_scaffold('example')
 
 
 @pytest.mark.parametrize(
@@ -104,9 +104,9 @@ def test_vault_create_is_not_supported_by_the_base():
         ('Prod2', 'VAULT_PROD2_KEY'),
     ],
 )
-def test_vault_build_env_name_is_sanitised_and_upper_case(name, env):
+def test_vault_format_env_name_is_sanitised_and_upper_case(name, env):
     """Each run of other characters becomes one _, letters go upper case."""
-    assert Vault()._build_env_name(name, 'KEY') == env
+    assert Vault()._format_env_name(name, 'KEY') == env
 
 
 # VaultLoader

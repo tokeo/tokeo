@@ -129,18 +129,18 @@ def test_generate_fernet_key_gives_fresh_valid_keys():
 # create
 
 
-def test_create_scaffolds_an_enc_profile_with_a_fresh_key(monkeypatch):
+def test_build_scaffold_gives_an_enc_profile_with_a_fresh_key(monkeypatch):
     """create gives an enc profile on VAULT_<NAME>_KEY and a key that encrypts."""
-    scaffold = EncVault().create('my-app')
+    scaffold = EncVault().build_scaffold('my-app')
     assert scaffold['profile'] == {'type': 'enc', 'env': 'VAULT_MY_APP_KEY'}
     [secret] = scaffold['secrets']
-    assert (secret['name'], secret['quote']) == ('VAULT_MY_APP_KEY', False)
+    assert (secret['name'], secret['is_quoted']) == ('VAULT_MY_APP_KEY', False)
     monkeypatch.setenv('VAULT_MY_APP_KEY', secret['value'])
     vault = EncVault()
     assert vault.decrypt(scaffold['profile'], vault.encrypt(scaffold['profile'], 's3cret')) == 's3cret'
 
 
-def test_create_draws_a_new_key_each_time():
+def test_build_scaffold_draws_a_new_key_each_time():
     """Two scaffolds of the same name get different keys."""
     vault = EncVault()
-    assert vault.create('a')['secrets'][0]['value'] != vault.create('a')['secrets'][0]['value']
+    assert vault.build_scaffold('a')['secrets'][0]['value'] != vault.build_scaffold('a')['secrets'][0]['value']
