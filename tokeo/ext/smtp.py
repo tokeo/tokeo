@@ -10,6 +10,38 @@ configuration options.
 
 """
 
+# The handler stems from cement/ext/ext_smtp.py and follows the names of
+# tokeo. Each name that differs from cement, compared with cement 3.0.16, as
+# cement -> tokeo (kind):
+#
+# - SMTPMailHandler -> TokeoSMTPMailHandler (class)
+# - Meta.label = 'smtp' -> Meta.label = 'tokeo.smtp' and
+#   config_section = 'smtp' (meta)
+# - username -> auth_identity (config)
+# - password -> auth_password (config)
+# - port: '25' as str -> port: 25 as int (config value)
+# - msgid_domain: None -> msgid_domain: 'localhost' (default)
+# - none -> local_hostname, source_address of smtplib (config, new)
+# - none -> tls_verify_cert, tls_verify_hostname (config, new)
+# - none -> tls_ca_path, tls_ca (config, new)
+# - _header(value, _charset, **params) -> _create_header(value, _charset,
+#   **params) (method)
+# - none -> _create_tls_context(**params) (method, new)
+# - cs_header, cs_body -> header_charset, body_charset (variables and
+#   parameters)
+# - _attach_files(msg, **params) -> _attach_files(msg, rel, **params)
+#   (signature)
+# - send(body, **kw) returns a bool -> returns the dict of the refused
+#   recipients, as cement 3.2 will (return)
+# - none -> _config(key, **kwargs), send_by_template(template, data, **kw)
+#   (methods, new)
+#
+# The same names in both: _get_params, _build_charsets, _build_body_parts,
+# _build_mime_structure, _set_headers, _attach_body, _make_message, send and
+# the other config keys (to, from_addr, cc, bcc, subject, subject_prefix,
+# host, timeout, ssl, tls, auth, files, charset, header_encoding,
+# body_encoding, date_enforce, msgid_enforce, msgid_str).
+
 import os
 from datetime import datetime, timezone
 import smtplib
@@ -87,7 +119,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             # SMTP server hostname
             'host': 'localhost',
             # SMTP server port
-            'port': '25',
+            'port': 25,
             # Connection timeout in seconds
             'timeout': 30,
             # Name announced in EHLO/HELO (None = FQDN of local host)
@@ -98,10 +130,15 @@ class TokeoSMTPMailHandler(mail.MailHandler):
             'ssl': False,
             # Use STARTTLS command
             'tls': False,
-            # Verify certificate chain and hostname for ssl and tls
-            'host_cert_verify': False,
-            # CA for verify: single line = file path, multi line = PEM text
-            'host_cert_ca': None,
+            # Verify the certificate chain for ssl and tls
+            'tls_verify_cert': False,
+            # Verify the hostname of the certificate for ssl and tls, needs
+            # tls_verify_cert
+            'tls_verify_hostname': False,
+            # Path of a CA file to verify against instead of the system CAs
+            'tls_ca_path': None,
+            # PEM text of a CA to verify against, not together with tls_ca_path
+            'tls_ca': None,
             # Use SMTP authentication
             'auth': False,
             # SMTP username or identity
@@ -158,7 +195,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         host = handler._config('host')
 
         # Get a value with a fallback default
-        port = handler._config('port', fallback='587')
+        port = handler._config('port', fallback=587)
         ```
 
         """
@@ -221,7 +258,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         for item in [
             # fmt: off
             'ssl', 'tls', 'host', 'port', 'auth', 'auth_identity', 'auth_password',
-            'timeout', 'local_hostname', 'source_address', 'host_cert_verify', 'host_cert_ca',
+            'timeout', 'local_hostname', 'source_address',
+            'tls_verify_cert', 'tls_verify_hostname', 'tls_ca_path', 'tls_ca',
             'msgid_domain'
             # fmt: on
         ]:
@@ -324,8 +362,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         """
         params = self._get_params(**kw)
 
-        # build before connecting, so a bad CA option fails without network
-        context = self._build_host_cert_context(**params)
+        # create before connecting, so a bad CA option fails without network
+        context = self._create_tls_context(**params)
         # an empty value means "not set", smtplib would announce an empty EHLO
         local_hostname = params['local_hostname'] or None
         # port 0 lets the system choose the local port
@@ -375,13 +413,14 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # enforce compatibility for cement v3.2+
         return res
 
-    def _build_host_cert_context(self, **params):
+    def _create_tls_context(self, **params):
         """
         Create the TLS context that verifies the certificate of the host.
 
         The context is used for both encrypted connections, ```ssl``` and
-        ```tls``` (STARTTLS). It checks the certificate chain and that the
-        configured ```host``` is contained in the certificate.
+        ```tls``` (STARTTLS). It checks the certificate chain and, with
+        ```tls_verify_hostname```, that the configured ```host``` is contained
+        in the certificate.
 
         ### Args
 
@@ -389,29 +428,40 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         ### Returns
 
-        - **ssl.SSLContext|None**: Verifying context if ```host_cert_verify```
+        - **ssl.SSLContext|None**: Verifying context if ```tls_verify_cert```
             is set, otherwise ```None``` to keep the smtplib default
+
+        ### Raises
+
+        - **ValueError**: If ```tls_ca``` and ```tls_ca_path``` are both set
 
         ### Notes
 
-        - Without ```host_cert_ca``` the CAs of the system are trusted
-        - A single line ```host_cert_ca``` is the path of a CA file
-        - A multi line ```host_cert_ca``` is the PEM text of one or more
-            certificates, e.g. a self-signed certificate of the host
-        - The value is used as is, a path must not end with a line break
+        - Without ```tls_ca``` and ```tls_ca_path``` the CAs of the system are
+            trusted
+        - ```tls_ca``` is the PEM text of one or more certificates, e.g. a
+            self-signed certificate of the host; ```tls_ca_path``` is the path
+            of a CA file, used as is
+        - ```tls_verify_hostname``` needs ```tls_verify_cert```, without the
+            chain nothing is verified, as in ```create_ssl_context``` of
+            tokeo-base
 
         """
-        if not is_true(params['host_cert_verify']):
+        ca, ca_path = params['tls_ca'], params['tls_ca_path']
+        if ca and ca_path:
+            raise ValueError('tls_ca and tls_ca_path are both set, set the PEM text by tls_ca or the file by tls_ca_path')
+        if not is_true(params['tls_verify_cert']):
             return None
 
-        ca = params['host_cert_ca']
-        if not ca:
-            return ssl.create_default_context()
-        if '\n' in ca:
-            return ssl.create_default_context(cadata=ca)
-        return ssl.create_default_context(cafile=ca)
+        if ca:
+            context = ssl.create_default_context(cadata=ca)
+        else:
+            context = ssl.create_default_context(cafile=ca_path or None)
+        if not is_true(params['tls_verify_hostname']):
+            context.check_hostname = False
+        return context
 
-    def _build_header(self, value=None, _charset=None, **params):
+    def _create_header(self, value=None, _charset=None, **params):
         """
         Create an email header value with proper encoding if needed.
 
@@ -508,9 +558,9 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         if params['bcc']:
             msg['Bcc'] = ', '.join(params['bcc'])
         if params['subject_prefix'] not in [None, '']:
-            msg['Subject'] = self._build_header(f"{params['subject_prefix']} {params['subject']}", _charset=header_charset, **params)
+            msg['Subject'] = self._create_header(f"{params['subject_prefix']} {params['subject']}", _charset=header_charset, **params)
         else:
-            msg['Subject'] = self._build_header(params['subject'], _charset=header_charset, **params)
+            msg['Subject'] = self._create_header(params['subject'], _charset=header_charset, **params)
 
         # auto-generate date and message-id if enforced and not provided
         if is_true(params['date_enforce']) and not params.get('date', None):
@@ -530,7 +580,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         # X-headers
         for item in params.keys():
             if item.startswith('X-'):
-                msg[item] = self._build_header(f'{params[item]}', _charset=header_charset, **params)
+                msg[item] = self._create_header(f'{params[item]}', _charset=header_charset, **params)
 
     def _attach_body(self, msg, part_text, part_html, body_charset, **params):
         """Attach body parts to the message with correct MIME structure."""

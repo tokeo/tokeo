@@ -73,16 +73,16 @@ def test_connection_params(use_ssl):
     expected = dict(local_hostname='mx.local', timeout=7, source_address=('127.0.0.1', 0))
     empty = dict(local_hostname=None, timeout=30, source_address=None)
     if use_ssl:
-        # without host_cert_verify the smtplib default context is kept
+        # without tls_verify_cert the smtplib default context is kept
         expected['context'] = empty['context'] = None
-    assert used.call_args_list[0] == mock.call('localhost', '25', **expected)
-    assert used.call_args_list[1] == mock.call('localhost', '25', **empty)
+    assert used.call_args_list[0] == mock.call('localhost', 25, **expected)
+    assert used.call_args_list[1] == mock.call('localhost', 25, **empty)
 
 
 def test_starttls_and_login():
-    """tls with host_cert_verify uses a verifying context, then logs in."""
+    """tls with tls_verify_cert uses a verifying context, then logs in."""
     with mock.patch('smtplib.SMTP') as smtp:
-        with SmtpTest(tls=True, auth=True, auth_identity='user', auth_password='secret', host_cert_verify=True) as app:
+        with SmtpTest(tls=True, auth=True, auth_identity='user', auth_password='secret', tls_verify_cert=True) as app:
             app.mail.send('body')
 
     server = smtp.return_value
@@ -105,32 +105,55 @@ def test_debug_prints_the_dialog_and_warns_with_auth(auth):
     assert any('AUTH credentials included' in msg for msg in warnings) is auth
 
 
-# ---- host certificate context -----------------------------------------------
+# ---- tls context ------------------------------------------------------------
 
 
-def test_host_cert_context(tmp):
-    """host_cert_ca takes PEM text or a file path, used strictly as given."""
+def _create_tls_context(app, tls_verify_cert=True, tls_verify_hostname=True, tls_ca_path=None, tls_ca=None):
+    # the tls context of the handler for the given options
+    return app.mail._create_tls_context(
+        tls_verify_cert=tls_verify_cert, tls_verify_hostname=tls_verify_hostname, tls_ca_path=tls_ca_path, tls_ca=tls_ca
+    )
+
+
+def test_create_tls_context(tmp):
+    """tls_ca takes PEM text, tls_ca_path a file path, used strictly as given."""
     cert_pem, _ = make_cert('localhost')
     ca_file = os.path.join(tmp.dir, 'ca.pem')
     with open(ca_file, 'w') as f:
         f.write(cert_pem)
 
     with SmtpTest() as app:
-        context = app.mail._build_host_cert_context
-        # verify off keeps the smtplib default
-        assert context(host_cert_verify=False, host_cert_ca=cert_pem) is None
+        # verify off keeps the smtplib default, also with the hostname check
+        assert _create_tls_context(app, tls_verify_cert=False, tls_ca=cert_pem) is None
+        assert _create_tls_context(app, tls_verify_cert=False, tls_verify_hostname=True) is None
         # verify on without CA trusts the system CAs
-        system = context(host_cert_verify=True, host_cert_ca=None)
+        system = _create_tls_context(app)
         assert system.verify_mode == ssl.CERT_REQUIRED and system.check_hostname is True
-        # multi line is PEM text, single line is a file path
-        for ca in (cert_pem, ca_file):
-            trusted = context(host_cert_verify=True, host_cert_ca=ca)
+        # the chain only, without the hostname
+        chain = _create_tls_context(app, tls_verify_hostname=False)
+        assert chain.verify_mode == ssl.CERT_REQUIRED and chain.check_hostname is False
+        # tls_ca is PEM text, tls_ca_path a file path
+        for options in (dict(tls_ca=cert_pem), dict(tls_ca_path=ca_file)):
+            trusted = _create_tls_context(app, **options)
             assert [c['subject'] for c in trusted.get_ca_certs()] == [((('commonName', 'localhost'),),)]
         # the value is used strictly as given
         with pytest.raises(ssl.SSLError):
-            context(host_cert_verify=True, host_cert_ca=ca_file + '\n')
+            _create_tls_context(app, tls_ca=ca_file)
         with pytest.raises(FileNotFoundError):
-            context(host_cert_verify=True, host_cert_ca=os.path.join(tmp.dir, 'missing.pem'))
+            _create_tls_context(app, tls_ca_path=os.path.join(tmp.dir, 'missing.pem'))
+
+
+def test_create_tls_context_refuses_tls_ca_and_tls_ca_path(tmp):
+    """tls_ca and tls_ca_path together raise a ValueError, also on send."""
+    cert_pem, _ = make_cert('localhost')
+    with SmtpTest(tls_ca=cert_pem, tls_ca_path=os.path.join(tmp.dir, 'ca.pem')) as app:
+        with pytest.raises(ValueError, match='tls_ca and tls_ca_path are both set'):
+            _create_tls_context(app, tls_ca=cert_pem, tls_ca_path=os.path.join(tmp.dir, 'ca.pem'))
+        with mock.patch('smtplib.SMTP') as smtp:
+            with pytest.raises(ValueError, match='tls_ca and tls_ca_path are both set'):
+                app.mail.send('body')
+        # refused before connecting
+        assert smtp.call_count == 0
 
 
 # ---- x-headers --------------------------------------------------------------

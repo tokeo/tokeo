@@ -108,11 +108,12 @@ _MODES = [
 ]
 
 _CASES = [
-    pytest.param(HOST_CERT, dict(host_cert_verify=False), True, id='verify_off'),
-    pytest.param(HOST_CERT, dict(host_cert_verify=True), False, id='verify_system_ca'),
-    pytest.param(HOST_CERT, dict(host_cert_verify=True, host_cert_ca='file'), True, id='verify_ca_file'),
-    pytest.param(HOST_CERT, dict(host_cert_verify=True, host_cert_ca=HOST_CERT[0]), True, id='verify_ca_text'),
-    pytest.param(OTHER_CERT, dict(host_cert_verify=True, host_cert_ca=OTHER_CERT[0]), False, id='verify_wrong_host'),
+    pytest.param(HOST_CERT, dict(tls_verify_cert=False), True, id='verify_off'),
+    pytest.param(HOST_CERT, dict(tls_verify_cert=True, tls_verify_hostname=True), False, id='verify_system_ca'),
+    pytest.param(HOST_CERT, dict(tls_verify_cert=True, tls_verify_hostname=True, tls_ca_path='file'), True, id='verify_ca_file'),
+    pytest.param(HOST_CERT, dict(tls_verify_cert=True, tls_verify_hostname=True, tls_ca=HOST_CERT[0]), True, id='verify_ca_text'),
+    pytest.param(OTHER_CERT, dict(tls_verify_cert=True, tls_verify_hostname=True, tls_ca=OTHER_CERT[0]), False, id='verify_wrong_host'),
+    pytest.param(OTHER_CERT, dict(tls_verify_cert=True, tls_ca=OTHER_CERT[0]), True, id='verify_chain_only'),
 ]
 
 
@@ -121,9 +122,9 @@ _CASES = [
 def test_tls_to_smtpd(tmp, mode, client, cert, verify, delivered):
     """STARTTLS and SMTPS deliver to the smtpd, unless the certificate fails."""
     verify = dict(verify)
-    if verify.get('host_cert_ca') == 'file':
-        verify['host_cert_ca'] = os.path.join(tmp.dir, 'ca.pem')
-        with open(verify['host_cert_ca'], 'w') as f:
+    if verify.get('tls_ca_path') == 'file':
+        verify['tls_ca_path'] = os.path.join(tmp.dir, 'ca.pem')
+        with open(verify['tls_ca_path'], 'w') as f:
             f.write(cert[0])
 
     with BackgroundSmtpd(_make_tls_options(mode, cert)) as smtpd:
