@@ -7,7 +7,7 @@ default values for every field), for both connection_initialize True and False.
 
 import pytest
 
-from tokeo.core.smtpd.server import SmtpdServer, CMD_PROXY, CMD_HELO, CMD_RSET, CMD_STARTTLS, SmtpdSession
+from tokeo.core.smtpd.server import SmtpdServer, _CMD_PROXY, _CMD_HELO, _CMD_RSET, _CMD_STARTTLS, _SmtpdSession
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 
 
@@ -17,23 +17,23 @@ def _make_smtpd():
 
 def test_reset_helo():
     """A new connection expects HELO first."""
-    session = SmtpdSession()
+    session = _SmtpdSession()
     _make_smtpd().process_reset_session(session, connection_initialize=True)
-    assert session.cmd_sequence is CMD_HELO
+    assert session.cmd_sequence is _CMD_HELO
 
 
 @pytest.mark.parametrize(
     'options, expected',
     [
-        ({'proxy_extension': True}, CMD_PROXY),
-        ({'encrypt_mode': 'TLS_IMMEDIATE'}, CMD_STARTTLS),
-        ({'proxy_extension': True, 'encrypt_mode': 'TLS_IMMEDIATE'}, CMD_PROXY),
+        ({'proxy_extension': True}, _CMD_PROXY),
+        ({'encrypt_mode': 'TLS_IMMEDIATE'}, _CMD_STARTTLS),
+        ({'proxy_extension': True, 'encrypt_mode': 'TLS_IMMEDIATE'}, _CMD_PROXY),
     ],
 )
 def test_reset_initial_sequence(monkeypatch, options, expected):
     """With PROXY or TLS_IMMEDIATE the first step is PROXY or STARTTLS."""
     monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', (3, 14, 4, 'final', 0))
-    session = SmtpdSession()
+    session = _SmtpdSession()
     SmtpdServer(CaptureSmtpdEvents(), options=dict(options, tls_cert_cn='localhost')).process_reset_session(
         session, connection_initialize=True
     )
@@ -42,14 +42,14 @@ def test_reset_initial_sequence(monkeypatch, options, expected):
 
 def test_reset_rset():
     """A reset within a connection leaves the session in the RSET state."""
-    session = SmtpdSession()
+    session = _SmtpdSession()
     _make_smtpd().process_reset_session(session, connection_initialize=False)
-    assert session.cmd_sequence is CMD_RSET
+    assert session.cmd_sequence is _CMD_RSET
 
 
 def test_session_status():
     """A new session has the empty defaults of server, envelope and message."""
-    session = SmtpdSession()
+    session = _SmtpdSession()
     _make_smtpd().process_reset_session(session, connection_initialize=True)
     assert isinstance(session.auth_challenge, dict)
     server = session.ctx.server

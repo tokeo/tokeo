@@ -5,7 +5,7 @@ Checks HELO/EHLO case-insensitivity and argument stripping, and the EHLO
 extension advertisement with pipelining on and TLS forbidden.
 """
 
-from tokeo.core.smtpd.server import SmtpdServer, SmtpdSession
+from tokeo.core.smtpd.server import SmtpdServer, _SmtpdSession
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_tests_helper import run_line
 
@@ -22,7 +22,7 @@ _SMTPD = SmtpdServer(
 
 
 def _make_session():
-    session = SmtpdSession()
+    session = _SmtpdSession()
     _SMTPD.process_reset_session(session, connection_initialize=True)
     session.ctx.server.helo_response = 'Process line test - Greeting'
     return session

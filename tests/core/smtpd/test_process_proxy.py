@@ -11,7 +11,7 @@ mandatory as the first line, so that case aborts with 421 instead of 503.
 
 import pytest
 
-from tokeo.core.smtpd.server import SmtpdServer, SmtpdSession
+from tokeo.core.smtpd.server import SmtpdServer, _SmtpdSession
 from tokeo.core.smtpd.exc import Smtpd421CloseException
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_tests_helper import run_line
@@ -31,7 +31,7 @@ _SMTPD = SmtpdServer(
 
 
 def _make_session():
-    session = SmtpdSession()
+    session = _SmtpdSession()
     _SMTPD.process_reset_session(session, connection_initialize=True)
     server = session.ctx.server
     server.local_host = 'localhost.local'

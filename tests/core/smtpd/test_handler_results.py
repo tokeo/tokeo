@@ -11,7 +11,7 @@ returned dict (also ```{}```), keeps them on None and aborts by 421 otherwise.
 
 import pytest
 
-from tokeo.core.smtpd.server import SmtpdServer, SmtpdSession
+from tokeo.core.smtpd.server import SmtpdServer, _SmtpdSession
 from tokeo.core.smtpd.events import SmtpdEvents
 from tokeo.core.smtpd.exc import Smtpd421CloseException
 from tests.core.smtpd.lib.smtpd_tests_helper import run_dialog, run_line
@@ -85,7 +85,7 @@ class ProxyEvents(SmtpdEvents):
 
 def _run_proxy(result):
     smtpd = SmtpdServer(ProxyEvents(result), {'proxy_extension': True})
-    session = SmtpdSession()
+    session = _SmtpdSession()
     smtpd.process_reset_session(session, connection_initialize=True)
     session.ctx.server.local_response = 'welcome'
     reply = run_line(smtpd, session, 'PROXY TCP4 1.1.1.1 2.2.2.2 1111 2222')

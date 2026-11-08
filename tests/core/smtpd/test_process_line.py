@@ -15,7 +15,7 @@ import base64
 
 import pytest
 
-from tokeo.core.smtpd.server import SmtpdServer, CMD_RSET, CMD_QUIT, SmtpdSession
+from tokeo.core.smtpd.server import SmtpdServer, _CMD_RSET, _CMD_QUIT, _SmtpdSession
 from tokeo.core.smtpd.exc import Smtpd535Exception
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_tests_helper import run_line
@@ -46,7 +46,7 @@ class ProcessLineSession:
                 'internationalization_extensions': True,
             },
         )
-        self.session = SmtpdSession()
+        self.session = _SmtpdSession()
         self.smtpd.process_reset_session(self.session, connection_initialize=True)
         server = self.session.ctx.server
         server.local_host = 'localhost.local'
@@ -144,7 +144,7 @@ def test_50_data(shared):
     shared.send_line('..')
     result = shared.send_line('.')
     assert result.startswith('250 ')
-    assert shared.session.cmd_sequence is CMD_RSET
+    assert shared.session.cmd_sequence is _CMD_RSET
     assert shared.session.ctx.message.bytesize == -1
     assert bytes(shared.session.ctx.message.data) == b''
     events = shared.smtpd.events_handler
@@ -166,10 +166,10 @@ def test_90_noop(shared):
 def test_91_rset(shared):
     """RSET answers "250 OK" and sets the RSET state."""
     assert shared.send_line('RSET') == '250 OK'
-    assert shared.session.cmd_sequence is CMD_RSET
+    assert shared.session.cmd_sequence is _CMD_RSET
 
 
 def test_99_quit(shared):
     """QUIT answers empty and sets the QUIT state."""
     assert shared.send_line('QUIT') == ''
-    assert shared.session.cmd_sequence is CMD_QUIT
+    assert shared.session.cmd_sequence is _CMD_QUIT

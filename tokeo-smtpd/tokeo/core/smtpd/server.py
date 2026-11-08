@@ -84,7 +84,7 @@ DEFAULT_IO_SESSION_TIMEOUT = 3600
 DEFAULT_IO_BUFFER_MAX_SIZE = 1 * 1024 * 1024
 
 
-class CmdSequence(Enum):
+class _CmdSequence(Enum):
     """
     Command sequence states (the ```session[:cmd_sequence]``` symbols).
 
@@ -195,34 +195,34 @@ def is_tls_immediate_supported():
 
 
 # short module-level aliases for the :CMD_* symbol names
-#: Alias of ```CmdSequence.PROXY```
-CMD_PROXY = CmdSequence.PROXY
-#: Alias of ```CmdSequence.HELO```
-CMD_HELO = CmdSequence.HELO
-#: Alias of ```CmdSequence.RSET```
-CMD_RSET = CmdSequence.RSET
-#: Alias of ```CmdSequence.MAIL```
-CMD_MAIL = CmdSequence.MAIL
-#: Alias of ```CmdSequence.RCPT```
-CMD_RCPT = CmdSequence.RCPT
-#: Alias of ```CmdSequence.DATA```
-CMD_DATA = CmdSequence.DATA
-#: Alias of ```CmdSequence.QUIT```
-CMD_QUIT = CmdSequence.QUIT
-#: Alias of ```CmdSequence.STARTTLS```
-CMD_STARTTLS = CmdSequence.STARTTLS
-#: Alias of ```CmdSequence.AUTH_PLAIN_VALUES```
-CMD_AUTH_PLAIN_VALUES = CmdSequence.AUTH_PLAIN_VALUES
-#: Alias of ```CmdSequence.AUTH_LOGIN_USER```
-CMD_AUTH_LOGIN_USER = CmdSequence.AUTH_LOGIN_USER
-#: Alias of ```CmdSequence.AUTH_LOGIN_PASS```
-CMD_AUTH_LOGIN_PASS = CmdSequence.AUTH_LOGIN_PASS
+#: Alias of ```_CmdSequence.PROXY```
+_CMD_PROXY = _CmdSequence.PROXY
+#: Alias of ```_CmdSequence.HELO```
+_CMD_HELO = _CmdSequence.HELO
+#: Alias of ```_CmdSequence.RSET```
+_CMD_RSET = _CmdSequence.RSET
+#: Alias of ```_CmdSequence.MAIL```
+_CMD_MAIL = _CmdSequence.MAIL
+#: Alias of ```_CmdSequence.RCPT```
+_CMD_RCPT = _CmdSequence.RCPT
+#: Alias of ```_CmdSequence.DATA```
+_CMD_DATA = _CmdSequence.DATA
+#: Alias of ```_CmdSequence.QUIT```
+_CMD_QUIT = _CmdSequence.QUIT
+#: Alias of ```_CmdSequence.STARTTLS```
+_CMD_STARTTLS = _CmdSequence.STARTTLS
+#: Alias of ```_CmdSequence.AUTH_PLAIN_VALUES```
+_CMD_AUTH_PLAIN_VALUES = _CmdSequence.AUTH_PLAIN_VALUES
+#: Alias of ```_CmdSequence.AUTH_LOGIN_USER```
+_CMD_AUTH_LOGIN_USER = _CmdSequence.AUTH_LOGIN_USER
+#: Alias of ```_CmdSequence.AUTH_LOGIN_PASS```
+_CMD_AUTH_LOGIN_PASS = _CmdSequence.AUTH_LOGIN_PASS
 
 #: Reply that ends a dialog on a shutdown of the service (RFC 5321 3.8)
 REPLY_421_FOR_SHUTDOWN = '421 Service shutting down and closing transmission channel'
 
 
-class SmtpdSession:
+class _SmtpdSession:
     """
     Per-connection dialog state.
 
@@ -239,8 +239,8 @@ class SmtpdSession:
 
     def __init__(self):
         #: @private Current position in the SMTP command sequence
-        #: (```CmdSequence```)
-        self.cmd_sequence = CMD_HELO
+        #: (```_CmdSequence```)
+        self.cmd_sequence = _CMD_HELO
         #: @private The per-connection ```SmtpdContext``` (built on connection
         #: start)
         self.ctx = None
@@ -890,7 +890,7 @@ class SmtpdServer:
         # track the running task so a graceful stop can drain or cancel it
         task = asyncio.current_task()
         self._sessions.add(task)
-        session = SmtpdSession()
+        session = _SmtpdSession()
         try:
             await self.serve_client(session, reader, writer)
         except asyncio.CancelledError:
@@ -991,17 +991,17 @@ class SmtpdServer:
 
         ### Args
 
-        - **session** (SmtpdSession): The session of the connection
+        - **session** (_SmtpdSession): The session of the connection
 
         ### Returns
 
-        - **str**: The greet message while the session is in ```CMD_HELO```,
+        - **str**: The greet message while the session is in ```_CMD_HELO```,
             else an empty text
 
         """
-        # return greet response when in CMD_HELO sequence
+        # return greet response when in _CMD_HELO sequence
         # like Ruby to_s, None is an empty text
-        return f'220 {str(session.ctx.server.local_response or "").strip()}' if session.cmd_sequence is CMD_HELO else ''
+        return f'220 {str(session.ctx.server.local_response or "").strip()}' if session.cmd_sequence is _CMD_HELO else ''
 
     # ---- per-connection dialog ----------------------------------------------
 
@@ -1011,7 +1011,7 @@ class SmtpdServer:
 
         ### Args
 
-        - **session** (SmtpdSession): The dialog state (cmd_sequence,
+        - **session** (_SmtpdSession): The dialog state (cmd_sequence,
             auth_challenge, ctx)
         - **reader** (StreamReader): The connection input stream
         - **writer** (StreamWriter): The connection output stream
@@ -1068,7 +1068,7 @@ class SmtpdServer:
                 # the line before ended by CRLF, needed by the end of DATA
                 line_break_before_has_crlf = True
 
-                # greet on connect only when CMD_HELO and empty ctx.server.helo
+                # greet on connect only when _CMD_HELO and empty ctx.server.helo
                 output = self._format_greet_message(session)
 
                 while True:
@@ -1078,14 +1078,14 @@ class SmtpdServer:
 
                         await self._write_line(writer, output.encode('utf-8', 'surrogateescape') + b'\r\n')
 
-                    if session.cmd_sequence is CMD_QUIT:
+                    if session.cmd_sequence is _CMD_QUIT:
                         break
 
                     # a graceful shutdown ends the dialog
                     if self._is_shutdown:
                         break
 
-                    if session.cmd_sequence is CMD_STARTTLS:
+                    if session.cmd_sequence is _CMD_STARTTLS:
                         # STARTTLS discards plaintext buffered before the handshake
                         # so commands injected right after STARTTLS cannot run over
                         # the encrypted channel (CVE-2011-0411 class); immediate TLS
@@ -1097,7 +1097,7 @@ class SmtpdServer:
                         ctx.server.encrypted_at = get_utc_now()
                         # client must re-HELO; HELO, AUTH and the transaction are
                         # dropped (RFC 3207 4.2)
-                        session.cmd_sequence = CMD_HELO
+                        session.cmd_sequence = _CMD_HELO
                         ctx.reset_on_starttls()
                         # immediate TLS greets only now, on the encrypted channel
                         if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
@@ -1108,7 +1108,7 @@ class SmtpdServer:
 
                     raw = await self._read_line(
                         reader,
-                        self.io_proxy_cmd_timeout if session.cmd_sequence is CMD_PROXY else self.io_cmd_timeout,
+                        self.io_proxy_cmd_timeout if session.cmd_sequence is _CMD_PROXY else self.io_cmd_timeout,
                         session.end_time,
                     )
 
@@ -1124,9 +1124,9 @@ class SmtpdServer:
                     try:
                         # pipelining extension or violation
                         if not (
-                            (session.cmd_sequence is CMD_DATA)
+                            (session.cmd_sequence is _CMD_DATA)
                             or self.pipelining_extension
-                            or (session.cmd_sequence is CMD_PROXY)
+                            or (session.cmd_sequence is _CMD_PROXY)
                             or not self._has_buffered_line_lf(reader)
                         ):
                             raise Smtpd500PipeliningException
@@ -1136,12 +1136,12 @@ class SmtpdServer:
                         # the last line ended by CRLF and this raw is b'.\r\n'
                         is_data_dialog_end_rfc_conform = line_break_before_has_crlf and raw == b'.\r\n'
                         # renew the last line flag by this line (raw) or sequence
-                        line_break_before_has_crlf = raw.endswith(b'\r\n') or session.cmd_sequence is not CMD_DATA
+                        line_break_before_has_crlf = raw.endswith(b'\r\n') or session.cmd_sequence is not _CMD_DATA
                         # in DATA the strict modes allow no other CR in the raw;
                         # raw comes from _read_line, so its last char is always LF
                         if (
                             # inside the data dialog
-                            session.cmd_sequence is CMD_DATA
+                            session.cmd_sequence is _CMD_DATA
                             # strict modes are enforced
                             and self.crlf_data_mode in (CrlfDataMode.CRLF_DATA_STRICT, CrlfDataMode.CRLF_DATA_STRICT_CLOSE)
                             # not ending by CRLF, or another CR before the CRLF
@@ -1155,7 +1155,7 @@ class SmtpdServer:
                         elif self.crlf_mode is CrlfMode.CRLF_LEAVE:
                             # use the input line break, a line always ends by LF
                             line_break = b'\r\n' if raw.endswith(b'\r\n') else b'\n'
-                            if session.cmd_sequence is CMD_DATA:
+                            if session.cmd_sequence is _CMD_DATA:
                                 ctx.message.crlf = line_break
                             line = raw.removesuffix(line_break)
                         else:  # is CrlfMode.CRLF_STRICT
@@ -1170,7 +1170,7 @@ class SmtpdServer:
                         if (
                             line == b'.'
                             and not is_data_dialog_end_rfc_conform
-                            and session.cmd_sequence is CMD_DATA
+                            and session.cmd_sequence is _CMD_DATA
                             and self.crlf_data_mode is not CrlfDataMode.CRLF_DATA_UNSAFE
                         ):
                             line = b'..'
@@ -1178,7 +1178,7 @@ class SmtpdServer:
                         # log the received command line (never the DATA payload);
                         # the DATA check first: it skips the membership test and
                         # the decoding for every body line
-                        if session.cmd_sequence is not CMD_DATA and SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
+                        if session.cmd_sequence is not _CMD_DATA and SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
                             await self._emit(
                                 SmtpdEvent.ON_LOGGING_EVENT,
                                 ctx,
@@ -1197,7 +1197,7 @@ class SmtpdServer:
                         # within DATA keep the first error, the end of DATA raises
                         # it again: read DATA to its end, answer then (RFC 1870);
                         # a SmtpdCloseException too closes only after the end
-                        if session.cmd_sequence is CMD_DATA:
+                        if session.cmd_sequence is _CMD_DATA:
                             if session.data_error is None:
                                 session.data_error = e
                                 if SmtpdEvent.ON_LOGGING_EVENT in self._event_dispatch_dict:
@@ -1221,12 +1221,12 @@ class SmtpdServer:
                         # respond the smtp error of the exception to the client
                         output = e.smtp_response if isinstance(e, SmtpdException) else Smtpd500Exception().smtp_response
 
-                    # still in CMD_PROXY: the header failed, end without a dialog
-                    if session.cmd_sequence is CMD_PROXY:
+                    # still in _CMD_PROXY: the header failed, end without a dialog
+                    if session.cmd_sequence is _CMD_PROXY:
                         raise Smtpd421CloseException(f'Abort connection while PROXY failed! ({output})')
 
                 # QUIT closes with 221, a shutdown with 421 (RFC 5321 3.8)
-                output = '221 Service closing transmission channel' if session.cmd_sequence is CMD_QUIT else REPLY_421_FOR_SHUTDOWN
+                output = '221 Service closing transmission channel' if session.cmd_sequence is _CMD_QUIT else REPLY_421_FOR_SHUTDOWN
                 await self._write_line(writer, output.encode() + b'\r\n')
 
             # the peer closed the connection, also within a line
@@ -1459,13 +1459,13 @@ class SmtpdServer:
         """
         ctx = session.ctx
 
-        if session.cmd_sequence is not CMD_DATA:
+        if session.cmd_sequence is not _CMD_DATA:
             # commands are text; decode byte-exact
             line = line.decode('utf-8', 'surrogateescape')
             # whitespace_mode, not for the PROXY header: MODERATE strips unusual
             # whitespace and control chars at the edges as noise and refuses
             # control chars inside, STRICT and UNSAFE strip only SP and HTAB
-            if session.cmd_sequence is not CMD_PROXY:
+            if session.cmd_sequence is not _CMD_PROXY:
                 if self.whitespace_mode is WhitespaceMode.WHITESPACE_MODERATE:
                     line = self._RE_NOISE_AT_EDGES.sub('', line)
                 else:
@@ -1473,7 +1473,7 @@ class SmtpdServer:
                 # one SP separates the verb (ASCII) of a command from its
                 # argument; MODERATE separates by any whitespace, STRICT and
                 # UNSAFE by SP and HTAB, without one the command is unknown
-                if session.cmd_sequence not in (CMD_AUTH_PLAIN_VALUES, CMD_AUTH_LOGIN_USER, CMD_AUTH_LOGIN_PASS):
+                if session.cmd_sequence not in (_CMD_AUTH_PLAIN_VALUES, _CMD_AUTH_LOGIN_USER, _CMD_AUTH_LOGIN_PASS):
                     if self.whitespace_mode is WhitespaceMode.WHITESPACE_MODERATE:
                         match = self._RE_VERB_ANY_SEPARATOR.match(line)
                     else:
@@ -1488,29 +1488,29 @@ class SmtpdServer:
                     raise Smtpd501Exception
 
         # the client cancels a running AUTH exchange (RFC 4954 section 4)
-        if line == '*' and session.cmd_sequence in (CMD_AUTH_PLAIN_VALUES, CMD_AUTH_LOGIN_USER, CMD_AUTH_LOGIN_PASS):
-            session.cmd_sequence = CMD_RSET
+        if line == '*' and session.cmd_sequence in (_CMD_AUTH_PLAIN_VALUES, _CMD_AUTH_LOGIN_USER, _CMD_AUTH_LOGIN_PASS):
+            session.cmd_sequence = _CMD_RSET
             session.auth_challenge = {}
             raise Smtpd501Exception
 
-        if session.cmd_sequence is CMD_AUTH_PLAIN_VALUES:
+        if session.cmd_sequence is _CMD_AUTH_PLAIN_VALUES:
             # handle authentication
             return await self.process_auth_plain(session, line)
 
-        elif session.cmd_sequence is CMD_AUTH_LOGIN_USER:
+        elif session.cmd_sequence is _CMD_AUTH_LOGIN_USER:
             # handle authentication
             return self.process_auth_login_user(session, line)
 
-        elif session.cmd_sequence is CMD_AUTH_LOGIN_PASS:
+        elif session.cmd_sequence is _CMD_AUTH_LOGIN_PASS:
             # handle authentication
             return await self.process_auth_login_pass(session, line)
 
-        elif session.cmd_sequence is not CMD_DATA:
+        elif session.cmd_sequence is not _CMD_DATA:
             # PROXY
             # Docs: haproxy/doc/proxy-protocol.txt (github.com/haproxy)
             # syntax
             # PROXY PROTO source-ip dest-ip source-port dest-port
-            if session.cmd_sequence is CMD_PROXY:
+            if session.cmd_sequence is _CMD_PROXY:
                 # with proxy_extension the PROXY header has to be the first line
                 if not re.match(r'^PROXY(\s+)', line, self._RE_CMD_FLAGS):
                     raise Smtpd421CloseException('Abort connection while PROXY is not the first command!')
@@ -1569,12 +1569,12 @@ class SmtpdServer:
                 # the server greeting must follow the PROXY header, not the connect
                 if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
                     # on TLS_IMMEDIATE the connection must be encrypted next
-                    session.cmd_sequence = CMD_STARTTLS
+                    session.cmd_sequence = _CMD_STARTTLS
                     # do not send the server greeting yet
                     return ''
                 else:
                     # continue with the HELO sequence
-                    session.cmd_sequence = CMD_HELO
+                    session.cmd_sequence = _CMD_HELO
                     # send the server greeting next
                     return self._format_greet_message(session)
 
@@ -1593,7 +1593,7 @@ class SmtpdServer:
                     raise Tls530Exception
                 # a later HELO/EHLO resets the transaction like RSET
                 # an AUTH stays (RFC 5321 4.1.4)
-                if session.cmd_sequence is not CMD_HELO:
+                if session.cmd_sequence is not _CMD_HELO:
                     self.process_reset_session(session)
                 cmd_data = re.sub(r'^(HELO|EHLO)\ ?', '', line, flags=self._RE_CMD_FLAGS)
                 if SmtpdEvent.ON_HELO_EVENT in self._event_dispatch_dict:
@@ -1602,7 +1602,7 @@ class SmtpdServer:
                     # without a handler an empty domain is a syntax error
                     raise Smtpd501Exception
                 ctx.server.helo = cmd_data
-                session.cmd_sequence = CMD_RSET
+                session.cmd_sequence = _CMD_RSET
                 # like Ruby to_s, None is an empty text
                 helo_response = str(ctx.server.helo_response or '').strip()
                 if re.match(r'^EHLO', line, self._RE_CMD_FLAGS):
@@ -1628,13 +1628,13 @@ class SmtpdServer:
                 # STARTTLS takes no argument
                 if ' ' in line:
                     raise Smtpd501Exception
-                if session.cmd_sequence is CMD_HELO:
+                if session.cmd_sequence is _CMD_HELO:
                     raise Smtpd503Exception
                 # no test for self.tls, it is built whenever encrypt_mode is not
                 # TLS_FORBIDDEN
                 if ctx.server.encrypted_at:
                     raise Smtpd503Exception
-                session.cmd_sequence = CMD_STARTTLS
+                session.cmd_sequence = _CMD_STARTTLS
                 # return with new service ready message
                 return '220 Ready to start TLS'
 
@@ -1642,7 +1642,7 @@ class SmtpdServer:
                 # AUTH
                 if self.auth_mode is AuthMode.AUTH_FORBIDDEN:
                     raise Smtpd500Exception
-                if session.cmd_sequence is not CMD_RSET:
+                if session.cmd_sequence is not _CMD_RSET:
                     raise Smtpd503Exception
                 if not self._is_auth_available(ctx):
                     # TLS_WHEN_AUTH asks for encryption by AUTH (RFC 4954 6),
@@ -1662,7 +1662,7 @@ class SmtpdServer:
                 # handle auth command
                 if auth_data[0].upper() == 'PLAIN':
                     if len(auth_data) == 1:
-                        session.cmd_sequence = CMD_AUTH_PLAIN_VALUES
+                        session.cmd_sequence = _CMD_AUTH_PLAIN_VALUES
                         # response code include post ending with a space
                         return '334 '
                     else:
@@ -1673,7 +1673,7 @@ class SmtpdServer:
                     if len(auth_data) == 1:
                         # reset auth_challenge
                         session.auth_challenge = {}
-                        session.cmd_sequence = CMD_AUTH_LOGIN_USER
+                        session.cmd_sequence = _CMD_AUTH_LOGIN_USER
                         # response code with request for Username
                         return '334 ' + base64.b64encode(b'Username:').decode()
 
@@ -1700,25 +1700,25 @@ class SmtpdServer:
                     raise Smtpd501Exception
                 if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted_at:
                     raise Tls530Exception
-                # continue with CMD_HELO when in it
+                # continue with _CMD_HELO when in it
                 previous_cmd_sequence = session.cmd_sequence
                 # always clean session on RSET
                 self.process_reset_session(session)
-                # need to restore CMD_HELO state
-                if previous_cmd_sequence is CMD_HELO:
-                    session.cmd_sequence = CMD_HELO
+                # need to restore _CMD_HELO state
+                if previous_cmd_sequence is _CMD_HELO:
+                    session.cmd_sequence = _CMD_HELO
                 return '250 OK'
 
             elif re.match(r'^QUIT(\ .*)?$', line, self._RE_CMD_FLAGS):
                 # QUIT takes no argument
                 if ' ' in line:
                     raise Smtpd501Exception
-                session.cmd_sequence = CMD_QUIT
+                session.cmd_sequence = _CMD_QUIT
                 return ''
 
             elif re.match(r'^MAIL FROM:', line, self._RE_CMD_FLAGS):
                 # MAIL
-                if session.cmd_sequence is not CMD_RSET:
+                if session.cmd_sequence is not _CMD_RSET:
                     raise Smtpd503Exception
                 if self.encrypt_mode is EncryptMode.TLS_REQUIRED and not ctx.server.encrypted_at:
                     raise Tls530Exception
@@ -1781,13 +1781,13 @@ class SmtpdServer:
                     elif return_value is not True:
                         raise Smtpd451Exception(f'on_mail_from_event must not return {return_value!r}')
                 ctx.envelope.mail_from = cmd_data
-                session.cmd_sequence = CMD_MAIL
+                session.cmd_sequence = _CMD_MAIL
                 return '250 OK'
 
             elif re.match(r'^RCPT TO:', line, self._RE_CMD_FLAGS):
                 # RCPT
                 # TLS and AUTH were tested by MAIL and stay for the transaction
-                if session.cmd_sequence not in (CMD_MAIL, CMD_RCPT):
+                if session.cmd_sequence not in (_CMD_MAIL, _CMD_RCPT):
                     raise Smtpd503Exception
                 cmd_data = re.sub(r'^RCPT TO:', '', line, flags=self._RE_CMD_FLAGS)
                 # separate the address as sent, RCPT TO announces no params, split
@@ -1808,7 +1808,7 @@ class SmtpdServer:
                     elif return_value is not True:
                         raise Smtpd451Exception(f'on_rcpt_to_event must not return {return_value!r}')
                 ctx.envelope.rcpt_tos.append(cmd_data)
-                session.cmd_sequence = CMD_RCPT
+                session.cmd_sequence = _CMD_RCPT
                 return '250 OK'
 
             elif re.match(r'^DATA(\ .*)?$', line, self._RE_CMD_FLAGS):
@@ -1816,9 +1816,9 @@ class SmtpdServer:
                 if ' ' in line:
                     raise Smtpd501Exception
                 # TLS and AUTH were tested by MAIL and stay for the transaction
-                if session.cmd_sequence is not CMD_RCPT:
+                if session.cmd_sequence is not _CMD_RCPT:
                     raise Smtpd503Exception
-                session.cmd_sequence = CMD_DATA
+                session.cmd_sequence = _CMD_DATA
                 ctx.message.received_at = get_utc_now()
                 return '354 Enter message, ending with "." on a line by itself'
 
@@ -1956,7 +1956,7 @@ class SmtpdServer:
                 if SmtpdEvent.ON_MESSAGE_DATA_RECEIVING_EVENT in self._event_dispatch_dict:
                     await self._emit(SmtpdEvent.ON_MESSAGE_DATA_RECEIVING_EVENT, ctx)
 
-                # just return and stay on CMD_DATA
+                # just return and stay on _CMD_DATA
                 return ''
 
             # otherwise the entire new message data (line) consists
@@ -2101,7 +2101,7 @@ class SmtpdServer:
 
         finally:
             # whatever happens in this check, reset next sequence
-            session.cmd_sequence = CMD_RSET
+            session.cmd_sequence = _CMD_RSET
 
     def process_auth_login_user(self, session, encoded_auth_response):
         """
@@ -2123,10 +2123,10 @@ class SmtpdServer:
             session.auth_challenge['authentication_id'] = self._decode_base64(encoded_auth_response)
         except SmtpdException:
             # an error of the decoding ends the AUTH exchange
-            session.cmd_sequence = CMD_RSET
+            session.cmd_sequence = _CMD_RSET
             session.auth_challenge = {}
             raise
-        session.cmd_sequence = CMD_AUTH_LOGIN_PASS
+        session.cmd_sequence = _CMD_AUTH_LOGIN_PASS
         # response code with request for Password
         return '334 ' + base64.b64encode(b'Password:').decode()
 
@@ -2174,7 +2174,7 @@ class SmtpdServer:
 
         finally:
             # whatever happens in this check, reset next sequence
-            session.cmd_sequence = CMD_RSET
+            session.cmd_sequence = _CMD_RSET
             # and reset auth_challenge
             session.auth_challenge = {}
 
@@ -2186,21 +2186,21 @@ class SmtpdServer:
 
         ### Args
 
-        - **session** (SmtpdSession): The session state to reset
+        - **session** (_SmtpdSession): The session state to reset
         - **connection_initialize** (bool): True on connection start; builds the
-            ctx and sets the sequence to CMD_PROXY, CMD_STARTTLS (implicit TLS)
-            or CMD_HELO, else CMD_RSET
+            ctx and sets the sequence to _CMD_PROXY, _CMD_STARTTLS (implicit TLS)
+            or _CMD_HELO, else _CMD_RSET
 
         """
         # set active command sequence info
         if not connection_initialize:
-            session.cmd_sequence = CMD_RSET
+            session.cmd_sequence = _CMD_RSET
         elif self.proxy_extension:
-            session.cmd_sequence = CMD_PROXY
+            session.cmd_sequence = _CMD_PROXY
         elif self.encrypt_mode is EncryptMode.TLS_IMMEDIATE:
-            session.cmd_sequence = CMD_STARTTLS
+            session.cmd_sequence = _CMD_STARTTLS
         else:
-            session.cmd_sequence = CMD_HELO
+            session.cmd_sequence = _CMD_HELO
         # drop any auth challenge
         session.auth_challenge = {}
         # reset error signaling for data dialog
