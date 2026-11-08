@@ -178,6 +178,11 @@ class TokeoPocketBase(MetaMixin):
 
         - **app**: The Tokeo application instance
 
+        ### Raises
+
+        - **TokeoPocketBaseError**: If ```realtime_max_pending``` is not an
+            integer of 1 or more
+
         ### Notes
 
         : Merges the default configuration with any user-provided configuration
@@ -229,9 +234,18 @@ class TokeoPocketBase(MetaMixin):
         # the collection a successful login used; reused for refresh and
         # re-login, set on the first successful authentication
         self._auth_collection = None
+        # Realtime refuses a max_pending below 1 as a wrong argument, the config
+        # value is checked here to name its option
+        value = self._config('realtime_max_pending')
+        try:
+            max_pending = int(value)
+        except (TypeError, ValueError):
+            max_pending = 0
+        if max_pending < 1:
+            raise TokeoPocketBaseError(f'{self._meta.config_section}.realtime_max_pending must be an integer of 1 or more, not {value!r}')
         self.realtime_options = dict(
             read_timeout=float(self._config('realtime_read_timeout')),
-            max_pending=int(self._config('realtime_max_pending')),
+            max_pending=max_pending,
             auth_check_seconds=float(self._config('realtime_auth_check_seconds')),
             max_delay_seconds=float(self._config('realtime_max_delay_seconds')),
         )

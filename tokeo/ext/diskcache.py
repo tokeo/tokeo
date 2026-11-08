@@ -835,7 +835,8 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         ### Raises
 
-        - **TokeoDiskCacheError**: If ```directory``` is not set
+        - **TokeoDiskCacheError**: If ```directory``` is not set or
+            ```locks_sleep_seconds``` is not a number greater than 0
 
         """
         super()._setup(*args, **kw)
@@ -899,8 +900,17 @@ class TokeoDiskCacheCacheHandler(cache.CacheHandler):
 
         - **TokeoDiskCacheLocksHandler**: The locks handler instance
 
+        ### Raises
+
+        - **TokeoDiskCacheError**: If the config ```locks_sleep_seconds``` is
+            not a number greater than 0
+        - **ValueError**: If sleep_seconds is not a number greater than 0
+
         """
-        sleep_seconds = self._config('locks_sleep_seconds') if sleep_seconds is None else sleep_seconds
+        if sleep_seconds is None:
+            sleep_seconds = self._config('locks_sleep_seconds')
+            if not is_number_gt(sleep_seconds, 0):
+                raise TokeoDiskCacheError(_ERR_SECONDS_GT_0.format(f'{self._meta.config_section}.locks_sleep_seconds', sleep_seconds))
         return TokeoDiskCacheLocksHandler(self.app, self._cache, tag, key_prefix, sleep_seconds)
 
     def get(self, key, default=None, **kw):

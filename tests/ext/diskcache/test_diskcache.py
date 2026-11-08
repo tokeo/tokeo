@@ -4,6 +4,7 @@ temper (concurrency limit) and throttle (rate limit), alone, across threads
 and across processes.
 """
 
+import re
 import time
 import sqlite3
 import threading
@@ -276,9 +277,18 @@ def test_temper_waits_by_locks_sleep_seconds(tmp):
 @pytest.mark.parametrize('sleep_seconds', [0, -1, True, '0.05'], ids=['zero', 'negative', 'bool', 'str'])
 def test_locks_sleep_seconds_must_be_a_number_greater_than_0(tmp, sleep_seconds):
     """A locks_sleep_seconds not greater than 0 stops the setup of the cache."""
-    with pytest.raises(ValueError, match='sleep_seconds must be a number of seconds greater than 0'):
+    expected = f'diskcache.locks_sleep_seconds must be a number of seconds greater than 0, not {sleep_seconds!r}'
+    with pytest.raises(TokeoDiskCacheError, match=f'^{re.escape(expected)}$'):
         with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_seconds': sleep_seconds}):
             pass
+
+
+def test_create_locks_handler_refuses_a_sleep_seconds_argument_not_greater_than_0(tmp):
+    """sleep_seconds=0 as argument raises a ValueError, an error in the code."""
+    with DiskcacheTest(tmp.dir) as app:
+        with pytest.raises(ValueError, match='^sleep_seconds must be a number of seconds greater than 0, not 0$') as err_info:
+            app.cache.create_locks_handler('tag', 'prefix', sleep_seconds=0)
+    assert type(err_info.value) is ValueError
 
 
 # ---- temper: five essential points ------------------------------------------

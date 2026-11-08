@@ -10,7 +10,8 @@ from tokeo.core.exc import TokeoError
 
 class TokeoPocketBaseError(TokeoError):
     """
-    Raised for an error answer of PocketBase or a failed request.
+    Raised for an error answer of PocketBase or a failed request, by the
+    extension also for a config that cannot be used.
 
     ### Args
 

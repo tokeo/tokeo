@@ -239,6 +239,15 @@ def test_setup_gives_the_realtime_options_of_the_config(server):
         assert app.db.realtime_options == dict(read_timeout=90.0, max_pending=50, auth_check_seconds=60.0, max_delay_seconds=30.0)
 
 
+@pytest.mark.parametrize('max_pending', [0, '0', 'many', None], ids=['zero', 'zero_str', 'text', 'none'])
+def test_setup_refuses_a_realtime_max_pending_below_1(server, max_pending):
+    """A realtime_max_pending that is no integer of 1 or more stops the setup."""
+    expected = f'pocketbase.realtime_max_pending must be an integer of 1 or more, not {max_pending!r}'
+    with pytest.raises(TokeoPocketBaseError, match=f'^{re.escape(expected)}$'):
+        with PocketbaseTest(dict(realtime_max_pending=max_pending)):
+            pass
+
+
 def test_setup_sends_no_request(server):
     """The setup sends no request, not even a login with a service identity."""
     with PocketbaseTest(SERVICE):
