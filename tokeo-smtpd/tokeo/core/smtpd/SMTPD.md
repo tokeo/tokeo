@@ -282,7 +282,7 @@ which carries the whole state of the conversation. It has three parts:
 The points in time (```connected_at```, ```authenticated_at```,
 ```encrypted_at```, ```received_at```, ```delivered_at```) are ```None```
 until they happen, then a UTC ```datetime```; a JSON dump with
-```SmtpdContextEncoder``` writes them as ISO 8601 text in UTC
+```SmtpdContextEncoder``` writes them as RFC 3339 text in UTC
 (```YYYY-MM-DD HH:MM:SS.MMMZ```) and ```None``` as ```null```.
 
 A transaction (envelope + message) resets after each delivered message or a

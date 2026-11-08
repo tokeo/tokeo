@@ -22,7 +22,7 @@ pdoc:
   title: "Spiral Docs"                 # suffix in <title>: "module · Spiral Docs"
   brand: "🍒 Spiral"                   # sidebar label; null => "🚀 <app label>"
   favicon_path: public/spiral-favicon.ico  # project path, copied to the root of the docs
-  html_lang: de                        # lang attribute of <html>
+  lang: de                             # lang attribute of <html>
   config_page: true                    # render the yaml config page
   ancestors_max_depth: 2               # class hierarchy levels in the docs
 ```
@@ -218,7 +218,7 @@ Available in every template, on top of pdoc's own
 | ```app_label``` | str | App label |
 | ```doc_title``` | str | Configured ```title``` |
 | ```brand``` | str | Configured ```brand```, empty when unset |
-| ```html_lang``` | str | Configured ```html_lang``` |
+| ```html_lang``` | str | Configured ```lang``` |
 | ```has_config``` | bool | Whether a config page will be written |
 | ```tokeo_version```, ```pdoc_version``` | str | For the footer credit |
 | ```get_decorators(func)``` | callable | Decorator metadata for a function |

@@ -11,7 +11,7 @@ the Ruby code assigns into the hash.
     ```message.spooler``` are ```None```; ```bytesize``` starts at ```-1```;
     the points in time ```connected_at```, ```authenticated_at```,
     ```encrypted_at```, ```received_at``` and ```delivered_at``` are
-    ```None``` until set, then a UTC ```datetime``` (ISO 8601 text in a
+    ```None``` until set, then a UTC ```datetime``` (RFC 3339 text in a
     JSON dump); ```headers``` flips from ```False``` to ```True```;
     ```data``` is the raw message and is appended to directly
 : Python keyword clash: the Ruby ```ctx[:envelope][:from]``` / ```[:to]``` are
