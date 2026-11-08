@@ -23,10 +23,10 @@ import os
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from tokeo.core.vaults import Vault, TokeoVaultError
+from tokeo.core.vaults import TokeoVault, TokeoVaultError
 
 
-class EncVault(Vault):
+class EncVault(TokeoVault):
     """
     Fernet vault handler that reads a ready Fernet key from the environment.
 

@@ -11,7 +11,13 @@ import invoke
 import pytest
 from cement.utils.misc import init_defaults
 from tokeo.core.utils.props import hasprops, hasanyprop, getprop
-from tokeo.ext.automate import TokeoAutomateError, TokeoAutomateResult, TokeoInvokeLocalContext, TokeoInvokeRemoteContext
+from tokeo.ext.automate import (
+    TokeoAutomateError,
+    TokeoAutomateCommandTimedOutError,
+    TokeoAutomateResult,
+    TokeoAutomateLocalContext,
+    TokeoAutomateRemoteContext,
+)
 from tests.ext.automate.automate_tests_helper import (
     AutomateTest,
     DEFAULTS,
@@ -178,8 +184,8 @@ def test_tasks_build_leaves_the_config_as_it_is():
 def test_run_closes_the_connections_of_every_host(monkeypatch):
     """A run closes each connection it opened, also of a host whose task failed."""
     closed = []
-    monkeypatch.setattr(TokeoInvokeRemoteContext, 'close', lambda self: closed.append(self.host))
-    monkeypatch.setattr(TokeoInvokeLocalContext, 'close', lambda self: closed.append('local'))
+    monkeypatch.setattr(TokeoAutomateRemoteContext, 'close', lambda self: closed.append(self.host))
+    monkeypatch.setattr(TokeoAutomateLocalContext, 'close', lambda self: closed.append('local'))
 
     def func(run, verbose=False, **kwargs):
         if getattr(run.__self__, 'host', None) == '10.0.0.2':
@@ -206,7 +212,7 @@ def _make_task_ref(**kwprotected):
 def test_local_run_gets_the_env_values_as_they_are(monkeypatch):
     """A local run gets the env values unquoted, a bad name is dropped."""
     env = {'GREETING': 'hello world', 'BAD-NAME': 'x'}
-    context = TokeoInvokeLocalContext(config=invoke.Config(overrides={}), task_ref=_make_task_ref(env=env))
+    context = TokeoAutomateLocalContext(config=invoke.Config(overrides={}), task_ref=_make_task_ref(env=env))
     monkeypatch.setattr('sys.stdin', io.StringIO(''))
     result = context.run('printenv GREETING; env | grep -c "^BAD-NAME=" ; true', hide=True)
     assert result.stdout == 'hello world\n0\n'
@@ -214,7 +220,7 @@ def test_local_run_gets_the_env_values_as_they_are(monkeypatch):
 
 def _make_remote(exited, **kwprotected):
     # a remote context on a fake ssh client whose command ends with exited
-    context = TokeoInvokeRemoteContext(
+    context = TokeoAutomateRemoteContext(
         host='h', config=invoke.Config(overrides={}), connect_kwargs={}, task_ref=_make_task_ref(**kwprotected)
     )
     context.client = mock.MagicMock()
@@ -238,3 +244,16 @@ def test_remote_run_failing_raises_unless_warn():
     with pytest.raises(invoke.exceptions.UnexpectedExit):
         context.run('false', hide=True)
     assert context.run('false', hide=True, warn=True).exited == 1
+
+
+def test_remote_run_timing_out_raises_the_automate_timeout_error(monkeypatch):
+    """A remote command over its timeout raises an error of tokeo and of invoke."""
+    context, channel = _make_remote(0, timeout=5)
+    channel.exit_status_ready.return_value = False
+    clock = iter([100.0, 110.0])
+    monkeypatch.setattr('tokeo.ext.automate.time', mock.Mock(time=lambda: next(clock)))
+    with pytest.raises(TokeoAutomateCommandTimedOutError) as err:
+        context.run('sleep 60', hide=True)
+    assert isinstance(err.value, TokeoAutomateError)
+    assert isinstance(err.value, invoke.CommandTimedOut)
+    assert str(err.value) == "Command: 'sleep 60' timed out and did not complete within 5 seconds!"

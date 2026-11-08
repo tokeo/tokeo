@@ -81,13 +81,13 @@ class TokeoAutomateError(TokeoError):
     pass
 
 
-class TokeoAutomateCommandTimedOut(invoke.CommandTimedOut):
+class TokeoAutomateCommandTimedOutError(TokeoAutomateError, invoke.CommandTimedOut):
     """
     invoke.CommandTimedOut with a clearer timeout message.
 
     Subclassed instead of monkey-patching invoke.CommandTimedOut.__str__
     process-wide; 'except invoke.CommandTimedOut' still catches it because
-    this is a subclass.
+    this is a subclass, and 'except TokeoAutomateError' catches it as well.
 
     """
 
@@ -97,7 +97,7 @@ class TokeoAutomateCommandTimedOut(invoke.CommandTimedOut):
         return template.format(command, self.timeout)
 
 
-class TokeoInvokeSudoResponder(invoke.watchers.Responder):
+class _SudoResponder(invoke.watchers.Responder):
     """
     Invoke responder that answers the first prompt match exactly once.
 
@@ -125,7 +125,7 @@ class TokeoInvokeSudoResponder(invoke.watchers.Responder):
             break
 
 
-class TokeoInvokeLocalContext(invoke.Context):
+class TokeoAutomateLocalContext(invoke.Context):
     """
     Internal context that runs commands locally through invoke's default runner.
 
@@ -170,7 +170,7 @@ class TokeoInvokeLocalContext(invoke.Context):
 
         Declared as a static method so the remote context can share the same
         logic without subclassing; both contexts call it as
-        TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs).
+        TokeoAutomateLocalContext.protect_kwargs_inplace(self, kwargs).
 
         """
         # get the protected values
@@ -223,7 +223,7 @@ class TokeoInvokeLocalContext(invoke.Context):
 
         ### Raises
 
-        - **TokeoAutomateCommandTimedOut**: If the command exceeds the timeout
+        - **TokeoAutomateCommandTimedOutError**: If the command exceeds the timeout
 
         ### Notes
 
@@ -240,7 +240,7 @@ class TokeoInvokeLocalContext(invoke.Context):
 
         """
         # take care of kwargs
-        TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs)
+        TokeoAutomateLocalContext.protect_kwargs_inplace(self, kwargs)
 
         # check for the sudo config
         sudo_config = self.config.get('sudo')
@@ -253,7 +253,7 @@ class TokeoInvokeLocalContext(invoke.Context):
             # local values of the sudo config
             sudo_mode = sudo_config.get('mode')
             if sudo_mode == 'env':
-                sudo_match = TokeoInvokeLocalContext.generate_sudo_env_match_token(self)
+                sudo_match = TokeoAutomateLocalContext.generate_sudo_env_match_token(self)
                 kwargs['env']['SUDO_PROMPT'] = sudo_match
             else:
                 sudo_match = sudo_config.get('match')
@@ -262,7 +262,7 @@ class TokeoInvokeLocalContext(invoke.Context):
                 sudo_match = re.escape(sudo_match)
 
             # sudo prints its prompt on the tty
-            _responder = TokeoInvokeSudoResponder(pattern=sudo_match, response=sudo_pass + '\n')
+            _responder = _SudoResponder(pattern=sudo_match, response=sudo_pass + '\n')
             if kwargs.get('watchers'):
                 kwargs['watchers'].insert(0, _responder)
             else:
@@ -273,10 +273,10 @@ class TokeoInvokeLocalContext(invoke.Context):
             return super().run(command, **kwargs)
         except invoke.CommandTimedOut as e:
             # surface the same clearer message for local timeouts
-            raise TokeoAutomateCommandTimedOut(e.result, e.timeout) from e
+            raise TokeoAutomateCommandTimedOutError(e.result, e.timeout) from e
 
 
-class TokeoInvokeRemoteContext(invoke.Context):
+class TokeoAutomateRemoteContext(invoke.Context):
     """
     Internal connection to route invoke-style runs through Paramiko lazily.
 
@@ -405,7 +405,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
 
         ### Raises
 
-        - **TokeoAutomateCommandTimedOut**: If the command exceeds the timeout
+        - **TokeoAutomateCommandTimedOutError**: If the command exceeds the timeout
 
         ### Notes
 
@@ -429,7 +429,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
         hide_err = hide == 'both' or hide is True or hide == 'stderr' or hide == 'err'
 
         # take care of kwargs
-        TokeoInvokeLocalContext.protect_kwargs_inplace(self, kwargs)
+        TokeoAutomateLocalContext.protect_kwargs_inplace(self, kwargs)
 
         # get encoding
         encoding = kwargs.get('encoding', None)
@@ -446,7 +446,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
             sudo_mode = sudo_config.get('mode')
             sudo_tail_chars = sudo_config.get('tail_chars')
             if sudo_mode == 'env':
-                sudo_match = TokeoInvokeLocalContext.generate_sudo_env_match_token(self)
+                sudo_match = TokeoAutomateLocalContext.generate_sudo_env_match_token(self)
                 sudo_prompt = sudo_match
             else:
                 sudo_match = sudo_config.get('match')
@@ -495,7 +495,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
             # 1. Enforce the Timeout
             if timeout and (time.time() - start_time) > timeout:
                 channel.close()
-                raise TokeoAutomateCommandTimedOut(
+                raise TokeoAutomateCommandTimedOutError(
                     invoke.runners.Result(stdout='', stderr='CommandTimeOut', exited=-1, command=command), timeout
                 )
 
@@ -562,7 +562,7 @@ class TokeoInvokeRemoteContext(invoke.Context):
             self.client = None
 
 
-class TokeoJsonAutomateEncoder(TokeoJsonUnknownNoneEncoder):
+class TokeoAutomateJsonEncoder(TokeoJsonUnknownNoneEncoder):
     """
     JSON encoder that renders a TokeoAutomateResult as its fields.
 
@@ -1472,7 +1472,7 @@ class TokeoAutomate(MetaMixin):
                     dict(
                         connection_id=connection['id'],
                         host_id=_host['id'],
-                        context=TokeoInvokeLocalContext(
+                        context=TokeoAutomateLocalContext(
                             config=invoke.Config(overrides={**connect_config}),
                             task_ref=task_ref,
                         ),
@@ -1534,7 +1534,7 @@ class TokeoAutomate(MetaMixin):
                     dict(
                         connection_id=connection['id'],
                         host_id=_host['id'],
-                        context=TokeoInvokeRemoteContext(
+                        context=TokeoAutomateRemoteContext(
                             **connect_args,
                             config=invoke.Config(overrides={**connect_config}),
                             host_keys=host_keys,
@@ -2139,7 +2139,7 @@ class TokeoAutomateShell:
             self.app.print(
                 dump_json(
                     res['results'],
-                    encoder=TokeoJsonAutomateEncoder(),
+                    encoder=TokeoAutomateJsonEncoder(),
                     encoding=None,
                 )
             )
@@ -2463,7 +2463,7 @@ class TokeoAutomateController(Controller):
             self.app.print(
                 dump_json(
                     res['results'],
-                    encoder=TokeoJsonAutomateEncoder(),
+                    encoder=TokeoAutomateJsonEncoder(),
                     encoding='utf-8' if self.app.pargs.encode_utf8 else None,
                 )
             )

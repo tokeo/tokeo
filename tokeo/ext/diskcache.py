@@ -72,23 +72,6 @@ class TokeoDiskCacheError(TokeoError):
     pass
 
 
-class TokeoDiskCacheLockError(TokeoError):
-    """
-    Exception raised for errors during lock operations.
-
-    This exception is raised when lock acquisition, release, or other
-    lock-related operations fail in the distributed locking system.
-
-    ### Notes
-
-    : Inherits from TokeoError to keep error handling consistent across
-        the framework's extensions
-
-    """
-
-    pass
-
-
 # the default of a missing key, a lock of diskcache holds None
 _missing = object()
 

@@ -28,10 +28,10 @@ automate:
 
 """
 
-from tokeo.core.vaults import Vault
+from tokeo.core.vaults import TokeoVault
 
 
-class PlainVault(Vault):
+class PlainVault(TokeoVault):
     """
     Vault handler that keeps the value as plain text, not encrypted.
 

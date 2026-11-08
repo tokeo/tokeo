@@ -11,7 +11,7 @@ from cement.ext.ext_argparse import ArgparseController
 import argparse
 
 
-class TokeoHelpFormatter(argparse.HelpFormatter):
+class TokeoArgparseHelpFormatter(argparse.HelpFormatter):
     """
     Custom help formatter for Tokeo CLI applications.
 
@@ -119,4 +119,4 @@ class Controller(ArgparseController):
     class Meta:
         """Controller meta-data."""
 
-        argument_formatter = TokeoHelpFormatter
+        argument_formatter = TokeoArgparseHelpFormatter

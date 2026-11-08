@@ -14,7 +14,7 @@ from cryptography.fernet import Fernet
 
 from tokeo.ext.yaml import TokeoYamlConfigError
 from tokeo.ext.vault import TokeoVaultConfigHandler
-from tokeo.core.vaults import Vault, VaultRef, VaultLoader, VaultSecret, TokeoVaultError, redact_vault
+from tokeo.core.vaults import TokeoVault, VaultRef, VaultLoader, VaultSecret, TokeoVaultError, redact_vault
 from tokeo.core.vaults.enc import EncVault
 from tokeo.core.vaults.scrypt import ScryptVault
 from tokeo.core.vaults.plain import PlainVault
@@ -34,7 +34,7 @@ def key(monkeypatch):
     return set_secrets(monkeypatch)
 
 
-class _UpperVault(Vault):
+class _UpperVault(TokeoVault):
     # a handler of its own: "encrypts" by upper case, "decrypts" by lower case
     def encrypt(self, profile, plaintext):
         return plaintext.upper()

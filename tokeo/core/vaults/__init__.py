@@ -210,7 +210,7 @@ def redact_vault_yaml(text):
     return text
 
 
-class Vault:
+class TokeoVault:
     """
     Base interface for vault handlers.
 

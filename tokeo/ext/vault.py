@@ -143,7 +143,7 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
 
         - **name** (str): The ```type``` value a vault profile uses to select
             this handler
-        - **handler** (Vault|str): The handler instance, or its class as
+        - **handler** (TokeoVault|str): The handler instance, or its class as
             ```module:Class```, imported and created on first use
 
         """
@@ -159,7 +159,7 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
 
         ### Returns
 
-        - **Vault**: The registered handler instance
+        - **TokeoVault**: The registered handler instance
 
         ### Raises
 

@@ -1,7 +1,7 @@
 """
 Tests for tokeo.core.vaults: the VaultRef built from a ```!vault:<profile>```
 yaml scalar by the VaultLoader, the VaultSecret of a decrypted value and
-redact_vault that masks both, the base Vault interface and the vault error
+redact_vault that masks both, the base TokeoVault interface and the vault error
 class.
 """
 
@@ -9,7 +9,7 @@ import pytest
 import yaml
 
 from tokeo.core.exc import TokeoError
-from tokeo.core.vaults import VAULT_MASK, VaultRef, VaultLoader, VaultSecret, Vault, TokeoVaultError, redact_vault, redact_vault_yaml
+from tokeo.core.vaults import VAULT_MASK, VaultRef, VaultLoader, VaultSecret, TokeoVault, TokeoVaultError, redact_vault, redact_vault_yaml
 
 
 def _load(text):
@@ -79,20 +79,20 @@ def test_vaultref_from_yaml_rejects_a_non_scalar(text):
         _load(text)
 
 
-# Vault
+# TokeoVault
 
 
 @pytest.mark.parametrize('method', ['encrypt', 'decrypt'])
 def test_vault_base_methods_are_abstract(method):
-    """encrypt and decrypt of the base Vault raise NotImplementedError."""
+    """encrypt and decrypt of the base TokeoVault raise NotImplementedError."""
     with pytest.raises(NotImplementedError):
-        getattr(Vault(), method)({'type': 'x'}, 'value')
+        getattr(TokeoVault(), method)({'type': 'x'}, 'value')
 
 
 def test_vault_build_scaffold_is_not_supported_by_the_base():
-    """create of the base Vault raises TokeoVaultError."""
+    """create of the base TokeoVault raises TokeoVaultError."""
     with pytest.raises(TokeoVaultError, match='cannot create a profile scaffold'):
-        Vault().build_scaffold('example')
+        TokeoVault().build_scaffold('example')
 
 
 @pytest.mark.parametrize(
@@ -106,7 +106,7 @@ def test_vault_build_scaffold_is_not_supported_by_the_base():
 )
 def test_vault_format_env_name_is_sanitised_and_upper_case(name, env):
     """Each run of other characters becomes one _, letters go upper case."""
-    assert Vault()._format_env_name(name, 'KEY') == env
+    assert TokeoVault()._format_env_name(name, 'KEY') == env
 
 
 # VaultLoader

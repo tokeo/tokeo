@@ -11,7 +11,7 @@ import pytest
 import yaml
 from cryptography.fernet import Fernet
 
-from tokeo.core.vaults import Vault, TokeoVaultError
+from tokeo.core.vaults import TokeoVault, TokeoVaultError
 from tests.ext.vault.vault_tests_helper import (
     MASTER_ENV,
     VaultTest,
@@ -41,7 +41,7 @@ def vault(tmp_path, capsys):
     return run
 
 
-class _NoScaffoldVault(Vault):
+class _NoScaffoldVault(TokeoVault):
     # a handler of its own without a profile scaffold
     def encrypt(self, profile, plaintext):
         return plaintext
