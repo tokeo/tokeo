@@ -292,29 +292,46 @@ def test_mime_structure(tmp, body, with_file, content_type):
 
 @pytest.mark.parametrize('item', ['to', 'cc', 'bcc'])
 def test_recipients_as_str_raise(item):
-    """to, cc or bcc as a str raises TokeoSmtpError, no mail to each character."""
+    """to, cc or bcc as a str argument raises TypeError, no mail per char."""
     with SmtpTest() as app:
-        with pytest.raises(ValueError, match=f"^{item} must be a list of addresses, not the str 'a@b.de'$") as err_info:
+        with pytest.raises(TypeError, match=f"^{item} must be a list of addresses, not the str 'a@b.de'$"):
             app.mail._get_params(**{item: 'a@b.de'})
-    assert type(err_info.value) is TokeoSmtpError
+        with mock.patch('smtplib.SMTP') as smtp:
+            with pytest.raises(TypeError, match=f"^{item} must be a list of addresses"):
+                app.mail.send('body', **{item: 'a@b.de'})
+        # refused before connecting
+        assert smtp.call_count == 0
 
 
-def test_recipients_as_str_are_reported_by_main(monkeypatch, capsys):
-    """main reports to as a str by its message, exit code 1 and no traceback."""
+@pytest.mark.parametrize('item', ['to', 'cc', 'bcc'])
+def test_recipients_as_str_of_config_become_lists(item):
+    """to, cc or bcc as a str of the config is split by cement into a list."""
+    with SmtpTest(**{item: 'a@b.de, c@d.de'}) as app:
+        assert app.mail._get_params()[item] == ['a@b.de', 'c@d.de']
+
+
+def test_tls_config_error_is_reported_by_main(monkeypatch, capsys):
+    """main reports a wrong tls config by its message, exit 1, no traceback."""
 
     class SendingApp(SmtpTest):
 
+        def __init__(self):
+            # a config case: cement keeps both values as they are
+            super().__init__(tls_ca='PEM', tls_ca_path='/ca.pem')
+
         def run(self):
-            self.mail.send('body', to='a@b.de')
+            self.mail.send('body')
 
     monkeypatch.setattr(tokeo.main, 'Tokeo', SendingApp)
-    with pytest.raises(SystemExit) as err_info:
-        tokeo.main.main()
+    with mock.patch('smtplib.SMTP') as smtp:
+        with pytest.raises(SystemExit) as err_info:
+            tokeo.main.main()
     assert err_info.value.code == 1
+    assert smtp.call_count == 0
     captured = capsys.readouterr()
     output = captured.out + captured.err
     assert 'TokeoSmtpError:' in output
-    assert "to must be a list of addresses, not the str 'a@b.de'" in output
+    assert 'tls_ca and tls_ca_path are both set' in output
     assert 'Traceback' not in output
 
 

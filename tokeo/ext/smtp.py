@@ -237,7 +237,7 @@ class TokeoSmtpMailHandler(mail.MailHandler):
 
         ### Raises
 
-        - **TokeoSmtpError**: If to, cc or bcc is a str instead of a list
+        - **TypeError**: If to, cc or bcc is a str instead of a list
 
         ### Example
 
@@ -271,10 +271,12 @@ class TokeoSmtpMailHandler(mail.MailHandler):
             config_item = self.app.config.get(self._meta.config_section, item)
             params[item] = kw.get(item, config_item)
 
-        # the recipients are lists, a str would be sent to each of its characters
+        # the recipients are lists, a str would be sent to each of its
+        # characters; cement already splits a str of the config into a list,
+        # so a str only comes as an argument of send(...)
         for item in ('to', 'cc', 'bcc'):
             if isinstance(params[item], str):
-                raise TokeoSmtpError(f'{item} must be a list of addresses, not the str {params[item]!r}')
+                raise TypeError(f'{item} must be a list of addresses, not the str {params[item]!r}')
 
         # Connection parameters always come from configuration
         for item in [
@@ -349,9 +351,10 @@ class TokeoSmtpMailHandler(mail.MailHandler):
 
         ### Raises
 
-        - **TypeError**: If the body parameter is not a string, tuple, or dict
-        - **TokeoSmtpError**: If to, cc or bcc is a str instead of a list, on
-            a conflicting tls config or an inline image of no known type
+        - **TypeError**: If the body parameter is not a string, tuple, or
+            dict, or to, cc or bcc is a str instead of a list
+        - **TokeoSmtpError**: On a conflicting tls config or an inline image
+            of no known type
         - **smtplib.SMTPException**: If SMTP server connection or sending fails
 
         ### Example
