@@ -433,7 +433,8 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
         ### Raises
 
-        - **ValueError**: If ```tls_ca``` and ```tls_ca_path``` are both set
+        - **ValueError**: If ```tls_ca``` and ```tls_ca_path``` are both set,
+            or ```tls_verify_hostname``` is set without ```tls_verify_cert```
 
         ### Notes
 
@@ -442,15 +443,17 @@ class TokeoSMTPMailHandler(mail.MailHandler):
         - ```tls_ca``` is the PEM text of one or more certificates, e.g. a
             self-signed certificate of the host; ```tls_ca_path``` is the path
             of a CA file, used as is
-        - ```tls_verify_hostname``` needs ```tls_verify_cert```, without the
-            chain nothing is verified, as in ```create_ssl_context``` of
-            tokeo-base
+        - ```tls_verify_hostname``` needs ```tls_verify_cert```: the hostname
+            is only checked on a verified chain, and smtplib verifies nothing
+            without a context
 
         """
         ca, ca_path = params['tls_ca'], params['tls_ca_path']
         if ca and ca_path:
             raise ValueError('tls_ca and tls_ca_path are both set, set the PEM text by tls_ca or the file by tls_ca_path')
         if not is_true(params['tls_verify_cert']):
+            if is_true(params['tls_verify_hostname']):
+                raise ValueError('tls_verify_hostname needs tls_verify_cert, the hostname is only checked on a verified chain')
             return None
 
         if ca:

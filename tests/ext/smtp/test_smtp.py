@@ -123,9 +123,8 @@ def test_create_tls_context(tmp):
         f.write(cert_pem)
 
     with SmtpTest() as app:
-        # verify off keeps the smtplib default, also with the hostname check
-        assert _create_tls_context(app, tls_verify_cert=False, tls_ca=cert_pem) is None
-        assert _create_tls_context(app, tls_verify_cert=False, tls_verify_hostname=True) is None
+        # verify off keeps the smtplib default
+        assert _create_tls_context(app, tls_verify_cert=False, tls_verify_hostname=False, tls_ca=cert_pem) is None
         # verify on without CA trusts the system CAs
         system = _create_tls_context(app)
         assert system.verify_mode == ssl.CERT_REQUIRED and system.check_hostname is True
@@ -151,6 +150,18 @@ def test_create_tls_context_refuses_tls_ca_and_tls_ca_path(tmp):
             _create_tls_context(app, tls_ca=cert_pem, tls_ca_path=os.path.join(tmp.dir, 'ca.pem'))
         with mock.patch('smtplib.SMTP') as smtp:
             with pytest.raises(ValueError, match='tls_ca and tls_ca_path are both set'):
+                app.mail.send('body')
+        # refused before connecting
+        assert smtp.call_count == 0
+
+
+def test_create_tls_context_refuses_tls_verify_hostname_without_tls_verify_cert():
+    """tls_verify_hostname without tls_verify_cert raises, also on send."""
+    with SmtpTest(tls_verify_hostname=True) as app:
+        with pytest.raises(ValueError, match='tls_verify_hostname needs tls_verify_cert'):
+            _create_tls_context(app, tls_verify_cert=False, tls_verify_hostname=True)
+        with mock.patch('smtplib.SMTP') as smtp:
+            with pytest.raises(ValueError, match='tls_verify_hostname needs tls_verify_cert'):
                 app.mail.send('body')
         # refused before connecting
         assert smtp.call_count == 0
