@@ -11,13 +11,13 @@ import threading
 import httpx
 from tokeo.core.utils.jwt import is_token_valid
 from .exc import TokeoPocketBaseError, TokeoPocketBaseAuthError
-from .record import Record
+from .record import TokeoPocketBaseRecord
 from .filter import format_filter, quote_path_segment
-from .collection import Collection
-from .batch import Batch
+from .collection import TokeoPocketBaseCollection
+from .batch import TokeoPocketBaseBatch
 
 
-class PocketBase:
+class TokeoPocketBaseClient:
     """
     A client of the REST API of one PocketBase server.
 
@@ -158,11 +158,11 @@ class PocketBase:
 
         ### Returns
 
-        - **Collection**: The record methods of the collection
+        - **TokeoPocketBaseCollection**: The record methods of the collection
 
         """
         if name not in self._collections:
-            self._collections[name] = Collection(self, name)
+            self._collections[name] = TokeoPocketBaseCollection(self, name)
         return self._collections[name]
 
     def create_batch(self):
@@ -171,10 +171,10 @@ class PocketBase:
 
         ### Returns
 
-        - **Batch**: The batch to add the changes to
+        - **TokeoPocketBaseBatch**: The batch to add the changes to
 
         """
-        return Batch(self)
+        return TokeoPocketBaseBatch(self)
 
     def check_health(self):
         """
@@ -197,7 +197,7 @@ class PocketBase:
     def _set_auth(self, collection, result):
         # keep the token and the record of a login
         self.token = result['token']
-        self.auth_record = Record(result.get('record'))
+        self.auth_record = TokeoPocketBaseRecord(result.get('record'))
         self.auth_collection = collection
         return self.auth_record
 
@@ -236,7 +236,7 @@ class PocketBase:
 
         ### Returns
 
-        - **Record**: The record of the login, the token is kept
+        - **TokeoPocketBaseRecord**: The record of the login, the token is kept
 
         ### Raises
 
@@ -260,7 +260,7 @@ class PocketBase:
 
         ### Returns
 
-        - **Record**: The record of the login, the new token is kept
+        - **TokeoPocketBaseRecord**: The record of the login, the new token is kept
 
         ### Raises
 
@@ -305,13 +305,13 @@ class PocketBase:
         - **record_id** (str): The id of the record to act as
         - **duration** (int): The seconds the token is valid, 0 takes the
             default of the collection
-        - **client** (PocketBase): The client that takes the login, e.g. to
-            renew it; None makes a new one
+        - **client** (TokeoPocketBaseClient): The client that takes the login,
+            e.g. to renew it; None makes a new one
 
         ### Returns
 
-        - **PocketBase**: The client with the token of the record, a new one
-            with its own connections unless given
+        - **TokeoPocketBaseClient**: The client with the token of the record, a
+            new one with its own connections unless given
 
         ### Raises
 
@@ -334,7 +334,7 @@ class PocketBase:
             if err.status in (401, 403, 404):
                 raise TokeoPocketBaseAuthError(str(err), status=err.status, url=err.url, data=err.data) from err
             raise
-        client = client or PocketBase(self.url, **self._httpx_kwargs)
+        client = client or TokeoPocketBaseClient(self.url, **self._httpx_kwargs)
         client.login_cnt += 1
         client._set_auth(collection, result)
         return client
@@ -346,7 +346,7 @@ class AuthKeeper:
 
     ### Args
 
-    - **client** (PocketBase): The client whose login is kept
+    - **client** (TokeoPocketBaseClient): The client whose login is kept
     - **login** (callable): Called without arguments to log the client in
         anew, e.g. by ```auth_with_password```; raises when it cannot
 
@@ -360,7 +360,7 @@ class AuthKeeper:
     ### Example
 
     ```python
-    pb = PocketBase('http://127.0.0.1:8090')
+    pb = TokeoPocketBaseClient('http://127.0.0.1:8090')
 
     def login():
         pb.auth_with_password('users', 'service@example.com', 'secret')

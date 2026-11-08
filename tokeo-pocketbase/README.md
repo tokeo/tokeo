@@ -38,9 +38,9 @@ pip install tokeo-pocketbase
 Log in as a user, search the open orders of a customer and mark them as paid.
 
 ```python
-from tokeo.core.pocketbase import PocketBase, TokeoPocketBaseError
+from tokeo.core.pocketbase import TokeoPocketBaseClient, TokeoPocketBaseError
 
-with PocketBase('http://127.0.0.1:8090') as pb:
+with TokeoPocketBaseClient('http://127.0.0.1:8090') as pb:
     # log in as a user of the auth collection users
     pb.auth_with_password('users', 'anna@example.com', 'anna-secret-123')
     orders = pb.collection('orders')
@@ -79,13 +79,13 @@ Follow the changes of the orders while the example above runs in a second shell.
 
 ```python
 import time
-from tokeo.core.pocketbase import PocketBase
+from tokeo.core.pocketbase import TokeoPocketBaseClient
 from tokeo.core.pocketbase.realtime import Realtime
 
 def on_order(event):
     print(event.action, event.record.invoice, event.record.status)
 
-with PocketBase('http://127.0.0.1:8090') as pb:
+with TokeoPocketBaseClient('http://127.0.0.1:8090') as pb:
     pb.auth_with_password('users', 'anna@example.com', 'anna-secret-123')
     with Realtime(pb) as realtime:
         realtime.subscribe('orders/*', on_order)
@@ -115,9 +115,9 @@ Start PocketBase from its [releases](https://github.com/pocketbase/pocketbase/re
 Then create the collection orders, the user and three orders once as superuser, and run the example above:
 
 ```python
-from tokeo.core.pocketbase import PocketBase
+from tokeo.core.pocketbase import TokeoPocketBaseClient
 
-with PocketBase('http://127.0.0.1:8090') as pb:
+with TokeoPocketBaseClient('http://127.0.0.1:8090') as pb:
     pb.auth_with_password('_superusers', 'admin@example.com', 'admin-secret-123')
     # signed in users may list, view and update the orders
     rule = '@request.auth.id != ""'

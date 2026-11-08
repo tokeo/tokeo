@@ -23,7 +23,7 @@ import threading
 import subprocess
 
 import pytest
-from tokeo.core.pocketbase import AuthKeeper, PocketBase, TokeoPocketBaseAuthError, TokeoPocketBaseError
+from tokeo.core.pocketbase import AuthKeeper, TokeoPocketBaseClient, TokeoPocketBaseAuthError, TokeoPocketBaseError
 from tokeo.core.pocketbase.realtime import AsyncRealtime, Realtime
 from tests.utils import ROOT_DIR, find_free_port, wait_until, wait_until_async
 from tests.utils.process import SubProcess
@@ -69,7 +69,7 @@ def _make_impersonating_client(su, user, check_seconds):
 def _is_healthy(url):
     # whether the server answers its health check
     try:
-        with PocketBase(url) as pb:
+        with TokeoPocketBaseClient(url) as pb:
             return pb.check_health()['code'] == 200
     except TokeoPocketBaseError:
         return False
@@ -83,7 +83,7 @@ def live(tmp_path_factory):
     url = f'http://127.0.0.1:{find_free_port()}'
     with SubProcess.run(POCKETBASE_BIN, 'serve', '--dir', data, '--http', url.removeprefix('http://'), timeout=15) as process:
         process.wait_for(lambda: _is_healthy(url))
-        with PocketBase(url) as su:
+        with TokeoPocketBaseClient(url) as su:
             su.auth_with_password('_superusers', *SUPERUSER)
             rule = '@request.auth.id != ""'
             su.send(
@@ -110,7 +110,7 @@ def live(tmp_path_factory):
 @pytest.fixture
 def pb(live):
     """A client logged in as the user anna."""
-    with PocketBase(live[0]) as client:
+    with TokeoPocketBaseClient(live[0]) as client:
         client.auth_with_password('users', *USER)
         yield client
 
@@ -118,7 +118,7 @@ def pb(live):
 @pytest.fixture
 def su(live):
     """A client logged in as superuser."""
-    with PocketBase(live[0]) as client:
+    with TokeoPocketBaseClient(live[0]) as client:
         client.auth_with_password('_superusers', *SUPERUSER)
         yield client
 
@@ -205,7 +205,7 @@ def test_live_impersonate_acts_as_the_user(su, pb, live):
 
 def test_live_check_health(live):
     """health of the running server answers code 200."""
-    with PocketBase(live[0]) as client:
+    with TokeoPocketBaseClient(live[0]) as client:
         assert client.check_health()['code'] == 200
 
 
@@ -223,7 +223,7 @@ def test_live_realtime_events_by_topic_options_and_rules(pb, live):
     """
     events, expanded, one, anonymous = [], [], [], []
     posts = pb.collection('posts')
-    with PocketBase(live[0]) as guest, Realtime(pb) as channel, Realtime(guest) as guest_channel:
+    with TokeoPocketBaseClient(live[0]) as guest, Realtime(pb) as channel, Realtime(guest) as guest_channel:
         channel.subscribe('posts/*', lambda e: events.append((e.action, e.record.title)))
         channel.subscribe('posts/*', lambda e: expanded.append(e.record.expand.owner.name), {'query': {'expand': 'owner'}})
         guest_channel.subscribe('posts/*', anonymous.append)
@@ -432,7 +432,7 @@ def short(tmp_path_factory):
     args = [POCKETBASE_BIN, 'serve', '--dir', data, '--hooksDir', str(hooks), '--hooksWatch=false', '--http', url.removeprefix('http://')]
     with SubProcess.run(*args, env=env, timeout=15) as process:
         process.wait_for(lambda: _is_healthy(url))
-        with PocketBase(url) as su:
+        with TokeoPocketBaseClient(url) as su:
             su.auth_with_password('_superusers', *SUPERUSER)
             su.send(
                 'POST',
@@ -446,7 +446,7 @@ def test_live_hook_file_ends_silent_connections_and_the_channel_comes_back(short
     """Without events each connection ends after 1 s, the channel comes back."""
     monkeypatch.setattr('tokeo.core.pocketbase.realtime.MIN_STABLE_SECONDS', 0.5)
     connect_times = []
-    with PocketBase(short) as client, Realtime(client) as channel:
+    with TokeoPocketBaseClient(short) as client, Realtime(client) as channel:
         channel.on_connect = lambda: connect_times.append(time.monotonic())
         channel.subscribe('ticks/*', print)
         assert wait_until(lambda: len(connect_times) >= 4, timeout=10)
@@ -462,7 +462,7 @@ def test_live_hook_file_ends_busy_connections_and_events_go_on_at_once(short, mo
     """
     monkeypatch.setattr('tokeo.core.pocketbase.realtime.MIN_STABLE_SECONDS', 0.5)
     connects, ticks = [], []
-    with PocketBase(short) as su, PocketBase(short) as client:
+    with TokeoPocketBaseClient(short) as su, TokeoPocketBaseClient(short) as client:
         su.auth_with_password('_superusers', *SUPERUSER)
         with Realtime(client) as channel:
             channel.on_connect = lambda: connects.append(1)

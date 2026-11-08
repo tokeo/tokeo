@@ -23,7 +23,7 @@ import httpx
 import pytest
 from cement.utils.misc import init_defaults
 from tokeo.core.exc import TokeoError
-from tokeo.core.pocketbase import Collection, ListResult, PocketBase, Record
+from tokeo.core.pocketbase import TokeoPocketBaseCollection, TokeoPocketBaseListResult, TokeoPocketBaseClient, TokeoPocketBaseRecord
 from tokeo.ext import pocketbase as pocketbase_ext
 from tokeo.ext.pocketbase import TokeoPocketBaseAuthError, TokeoPocketBaseError, TokeoPocketBase
 from tokeo.main import TokeoTest
@@ -186,9 +186,9 @@ def server(monkeypatch):
     def connect_to_fake(url, **kw):
         # keep the httpx kwargs of tokeo and route the client to the fake
         fake.client_kwargs = {key: value for key, value in kw.items() if key != 'before_request'}
-        return PocketBase(url, transport=httpx.MockTransport(lambda request: fake.handle(request)), **kw)
+        return TokeoPocketBaseClient(url, transport=httpx.MockTransport(lambda request: fake.handle(request)), **kw)
 
-    monkeypatch.setattr(pocketbase_ext, 'PocketBase', connect_to_fake)
+    monkeypatch.setattr(pocketbase_ext, 'TokeoPocketBaseClient', connect_to_fake)
     return fake
 
 
@@ -304,10 +304,10 @@ def test_setup_missing_tls_ca_path_fails(server, tmp_path):
 
 
 def test_collection_gives_the_record_service_of_the_driver(server):
-    """collection('posts') is the same Collection of the driver each time."""
+    """collection('posts') is the same TokeoPocketBaseCollection each time."""
     with PocketbaseTest() as app:
         posts = app.db.collection('posts')
-        assert isinstance(posts, Collection)
+        assert isinstance(posts, TokeoPocketBaseCollection)
         assert posts.collection == 'posts'
         assert app.db.collection('posts') is posts
 
@@ -321,7 +321,7 @@ def test_get_one_fetches_the_record_by_id(server):
         record = app.db.get_one('posts', 'abc')
     assert server.calls == [('GET', '/api/collections/posts/records/abc')]
     assert _get_params(server.requests[0]) == {}
-    assert isinstance(record, Record)
+    assert isinstance(record, TokeoPocketBaseRecord)
     assert (record.id, record.collectionName, record.title, record.views) == ('abc', 'posts', 'Hello', 3)
 
 
@@ -391,10 +391,10 @@ def test_get_list_leaves_out_an_empty_sort(server, sort):
 
 
 def test_get_list_returns_the_page_as_list_result(server):
-    """The answer comes back as ListResult with the records and the page counts."""
+    """The answer comes back as TokeoPocketBaseListResult, records and counts."""
     with PocketbaseTest() as app:
         result = app.db.get_list('posts', per_page=1)
-    assert isinstance(result, ListResult)
+    assert isinstance(result, TokeoPocketBaseListResult)
     assert (result.page, result.per_page, result.total_items, result.total_pages) == (1, 1, 2, 2)
     assert [(item.id, item.title) for item in result.items] == [('abc', 'Hello')]
 

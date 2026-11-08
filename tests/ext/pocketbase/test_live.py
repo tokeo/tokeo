@@ -22,7 +22,7 @@ from cement.utils.misc import init_defaults
 from nicegui import ui
 from tokeo.main import TokeoTest
 from tokeo.ext.nicegui import TokeoNiceguiError
-from tokeo.core.pocketbase import PocketBase, TokeoPocketBaseError
+from tokeo.core.pocketbase import TokeoPocketBaseClient, TokeoPocketBaseError
 from tests.utils import find_free_port, wait_until_async
 from tests.utils.process import SubProcess
 from tests.utils.nicegui import NiceguiSimulation
@@ -105,7 +105,7 @@ def _map_pages():
 def _is_healthy(url):
     # whether the server answers its health check
     try:
-        with PocketBase(url) as pb:
+        with TokeoPocketBaseClient(url) as pb:
             return pb.check_health()['code'] == 200
     except TokeoPocketBaseError:
         return False
@@ -119,7 +119,7 @@ def server(tmp_path_factory):
     url = f'http://127.0.0.1:{find_free_port()}'
     with SubProcess.run(POCKETBASE_BIN, 'serve', '--dir', data, '--http', url.removeprefix('http://'), timeout=15) as process:
         process.wait_for(lambda: _is_healthy(url))
-        with PocketBase(url) as su:
+        with TokeoPocketBaseClient(url) as su:
             su.auth_with_password('_superusers', *SUPERUSER)
             su.send(
                 'POST',
@@ -148,7 +148,7 @@ def server(tmp_path_factory):
 @pytest.fixture
 def su(server):
     """A client of the superuser, all orders deleted after the test."""
-    with PocketBase(server['url']) as client:
+    with TokeoPocketBaseClient(server['url']) as client:
         client.auth_with_password('_superusers', *SUPERUSER)
         yield client
         for order in client.collection('orders').get_full_list():

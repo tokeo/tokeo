@@ -6,17 +6,17 @@ create, update and delete, with files along with the fields.
 
 import json
 from .exc import TokeoPocketBaseError
-from .record import Record, ListResult
+from .record import TokeoPocketBaseRecord, TokeoPocketBaseListResult
 from .filter import quote_path_segment
 
 
-class Collection:
+class TokeoPocketBaseCollection:
     """
     The record methods of one collection.
 
     ### Args
 
-    - **client** (PocketBase): The client that sends the requests
+    - **client** (TokeoPocketBaseClient): The client that sends the requests
     - **collection** (str): The name or id of the collection
 
     ### Notes
@@ -54,7 +54,7 @@ class Collection:
 
         ### Returns
 
-        - **ListResult**: The records of the page and the counts
+        - **TokeoPocketBaseListResult**: The records of the page and the counts
 
         """
         params = {
@@ -67,7 +67,7 @@ class Collection:
             'skipTotal': 'true' if skip_total else None,
             **(query or {}),
         }
-        return ListResult(self.client.send('GET', self._path, params=params))
+        return TokeoPocketBaseListResult(self.client.send('GET', self._path, params=params))
 
     def get_full_list(self, per_page=500, filter=None, sort=None, expand=None, fields=None, query=None):
         """
@@ -110,7 +110,7 @@ class Collection:
 
         ### Returns
 
-        - **Record**: The first record
+        - **TokeoPocketBaseRecord**: The first record
 
         ### Raises
 
@@ -135,7 +135,7 @@ class Collection:
 
         ### Returns
 
-        - **Record**: The record
+        - **TokeoPocketBaseRecord**: The record
 
         ### Raises
 
@@ -143,7 +143,7 @@ class Collection:
 
         """
         params = {'expand': expand or None, 'fields': fields or None, **(query or {})}
-        return Record(self.client.send('GET', self._get_record_path(record_id), params=params))
+        return TokeoPocketBaseRecord(self.client.send('GET', self._get_record_path(record_id), params=params))
 
     def _write(self, method, path, data, files, expand, fields, query):
         # json, or multipart with the fields as @jsonPayload when files go along
@@ -152,7 +152,7 @@ class Collection:
             result = self.client.send(method, path, params=params, data={'@jsonPayload': json.dumps(data or {})}, files=files)
         else:
             result = self.client.send(method, path, params=params, json=data or {})
-        return Record(result)
+        return TokeoPocketBaseRecord(result)
 
     def create(self, data=None, files=None, expand=None, fields=None, query=None):
         """
@@ -169,7 +169,7 @@ class Collection:
 
         ### Returns
 
-        - **Record**: The new record
+        - **TokeoPocketBaseRecord**: The new record
 
         """
         return self._write('POST', self._path, data, files, expand, fields, query)
@@ -190,7 +190,7 @@ class Collection:
 
         ### Returns
 
-        - **Record**: The changed record
+        - **TokeoPocketBaseRecord**: The changed record
 
         """
         return self._write('PATCH', self._get_record_path(record_id), data, files, expand, fields, query)

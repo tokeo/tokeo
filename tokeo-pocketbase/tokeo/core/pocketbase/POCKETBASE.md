@@ -18,11 +18,11 @@ binary and its source.
 
 | Part | Module | For |
 |---|---|---|
-| ```PocketBase``` | ```client``` | a client with its own connections and its own login |
+| ```TokeoPocketBaseClient``` | ```client``` | a client with its own connections and its own login |
 | ```AuthKeeper``` | ```client``` | keeps a login valid and confirms it on the server |
-| ```Collection``` | ```collection``` | the records of a collection: list, get, create, update, delete |
-| ```Batch``` | ```batch``` | record changes in one transaction |
-| ```Record```, ```ListResult``` | ```record``` | a record with its fields as attributes, a page of records |
+| ```TokeoPocketBaseCollection``` | ```collection``` | the records of a collection: list, get, create, update, delete |
+| ```TokeoPocketBaseBatch``` | ```batch``` | record changes in one transaction |
+| ```TokeoPocketBaseRecord```, ```TokeoPocketBaseListResult``` | ```record``` | a record with its fields as attributes, a page of records |
 | ```format_filter``` / ```pb.filter()```, ```quote_path_segment``` | ```filter``` | values from outside quoted for a filter and for a path |
 | ```TokeoPocketBaseError```, ```TokeoPocketBaseAuthError``` | ```exc``` | the errors |
 | ```Realtime```, ```AsyncRealtime``` | ```realtime``` | the realtime events, in threads for plain functions or as tasks of asyncio, e.g. of nicegui |
@@ -33,9 +33,9 @@ the channels from ```tokeo.core.pocketbase.realtime```.
 ## 2. Quick start
 
 ```python
-from tokeo.core.pocketbase import PocketBase, TokeoPocketBaseError
+from tokeo.core.pocketbase import TokeoPocketBaseClient, TokeoPocketBaseError
 
-with PocketBase('http://127.0.0.1:8090') as pb:
+with TokeoPocketBaseClient('http://127.0.0.1:8090') as pb:
     pb.auth_with_password('users', 'anna@example.com', 'anna-secret-123')
     orders = pb.collection('orders')
 
@@ -59,15 +59,15 @@ A record is a dict whose fields read and write also as attributes,
 
 ## 3. Clients and logins
 
-One ```PocketBase``` holds **one login**. Never log several identities in
-on one client; take a client of its own for each.
+One ```TokeoPocketBaseClient``` holds **one login**. Never log several
+identities in on one client; take a client of its own for each.
 
 | Way | Use |
 |---|---|
 | ```auth_with_password(collection, identity, password)``` | a service identity or a user with its password |
 | ```auth_refresh()``` | renew the token; it also confirms on the server that the login holds |
 | ```impersonate(collection, id)``` | a superuser gets a client that acts as a record, without its password |
-| ```PocketBase(url, token=...)``` | a token from elsewhere, e.g. of a browser; refreshed on the collection it names |
+| ```TokeoPocketBaseClient(url, token=...)``` | a token from elsewhere, e.g. of a browser; refreshed on the collection it names |
 
 ### The silent guest
 
@@ -84,9 +84,9 @@ whether the login still holds; a refused one is logged in anew, and a failed
 new login raises instead of running on as a guest:
 
 ```python
-from tokeo.core.pocketbase import AuthKeeper, PocketBase
+from tokeo.core.pocketbase import AuthKeeper, TokeoPocketBaseClient
 
-pb = PocketBase('http://127.0.0.1:8090')
+pb = TokeoPocketBaseClient('http://127.0.0.1:8090')
 
 def login():
     pb.auth_with_password('users', 'service@example.com', 'secret')

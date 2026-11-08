@@ -5,7 +5,7 @@ attributes, and a page of records with its counts.
 """
 
 
-class Record(dict):
+class TokeoPocketBaseRecord(dict):
     """
     A record of PocketBase, a dict that also reads and writes its fields as
     attributes.
@@ -25,8 +25,11 @@ class Record(dict):
         # the expanded relations are records too, one or a list of them
         expand = self.get('expand')
         if isinstance(expand, dict):
-            self['expand'] = Record(
-                {key: [Record(item) for item in value] if isinstance(value, list) else Record(value) for key, value in expand.items()}
+            self['expand'] = TokeoPocketBaseRecord(
+                {
+                    key: [TokeoPocketBaseRecord(item) for item in value] if isinstance(value, list) else TokeoPocketBaseRecord(value)
+                    for key, value in expand.items()
+                }
             )
 
     def __getattr__(self, name):
@@ -39,7 +42,7 @@ class Record(dict):
         self[name] = value
 
 
-class ListResult:
+class TokeoPocketBaseListResult:
     """
     A page of records.
 
@@ -64,7 +67,7 @@ class ListResult:
         #: The number of pages, -1 when skipped
         self.total_pages = data.get('totalPages', -1)
         #: The records of this page
-        self.items = [Record(item) for item in data.get('items') or []]
+        self.items = [TokeoPocketBaseRecord(item) for item in data.get('items') or []]
 
 
 # a placeholder of a filter: {:name}

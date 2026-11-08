@@ -4,17 +4,17 @@ PocketBase; it must be switched on in the settings of PocketBase.
 
 """
 
-from .record import Record
+from .record import TokeoPocketBaseRecord
 from .filter import quote_path_segment
 
 
-class Batch:
+class TokeoPocketBaseBatch:
     """
     Record changes sent together in one transaction.
 
     ### Args
 
-    - **client** (PocketBase): The client that sends the batch
+    - **client** (TokeoPocketBaseClient): The client that sends the batch
 
     ### Example
 
@@ -83,4 +83,4 @@ class Batch:
 
         """
         results = self.client.send('POST', '/api/batch', json={'requests': self.requests})
-        return [Record(result['body']) if result.get('body') is not None else None for result in results]
+        return [TokeoPocketBaseRecord(result['body']) if result.get('body') is not None else None for result in results]

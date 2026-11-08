@@ -98,8 +98,8 @@ class LiveFeed:
 
     ### Args
 
-    - **pb** (PocketBase): The client of the login, for the requests of the
-        pages and the realtime channels
+    - **pb** (TokeoPocketBaseClient): The client of the login, for the requests
+        of the pages and the realtime channels
 
     ### Keyword Args
 

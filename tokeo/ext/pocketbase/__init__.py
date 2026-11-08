@@ -57,7 +57,7 @@ anything beyond that surface.
 import httpx
 from cement.core.meta import MetaMixin
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
-from tokeo.core.pocketbase import AuthKeeper, PocketBase, TokeoPocketBaseError, TokeoPocketBaseAuthError  # noqa: F401
+from tokeo.core.pocketbase import AuthKeeper, TokeoPocketBaseClient, TokeoPocketBaseError, TokeoPocketBaseAuthError  # noqa: F401
 
 # collections tried in order on the first login: a regular auth collection
 # first, then the superuser collection as a fallback; the one that succeeds
@@ -154,7 +154,7 @@ class TokeoPocketBase(MetaMixin):
             tls_ca_path=None,
         )
 
-    #: (tokeo.core.pocketbase.PocketBase) The PocketBase client, set on setup
+    #: (tokeo.core.pocketbase.TokeoPocketBaseClient) The client, set on setup
     pb = None
 
     #: (dict) The options of realtime channels from the config, e.g.
@@ -215,7 +215,7 @@ class TokeoPocketBase(MetaMixin):
             client_kwargs['limits'] = httpx.Limits(max_connections=max_connections)
         # anonymous until a service identity is configured; keep_auth runs
         # before each request of the client, also of collection() and batches
-        self.pb = PocketBase(url, before_request=self.keep_auth, **client_kwargs)
+        self.pb = TokeoPocketBaseClient(url, before_request=self.keep_auth, **client_kwargs)
         # cache the auth config once: the per-request guard must not hit
         # self._config on every call
         self._auth_identity = self._config('auth_identity')
@@ -340,8 +340,8 @@ class TokeoPocketBase(MetaMixin):
 
         ### Returns
 
-        - **PocketBase**: A client of its own with the login of the record,
-            kept by an ```AuthKeeper```: confirmed on the server every
+        - **TokeoPocketBaseClient**: A client of its own with the login of the
+            record, kept by an ```AuthKeeper```: confirmed on the server every
             auth_check_seconds and renewed by a new impersonation
 
         ### Raises
@@ -401,7 +401,7 @@ class TokeoPocketBase(MetaMixin):
 
         ### Returns
 
-        - **Collection**: The record methods of the collection
+        - **TokeoPocketBaseCollection**: The record methods of the collection
 
         ### Example
 
@@ -433,7 +433,7 @@ class TokeoPocketBase(MetaMixin):
 
         ### Returns
 
-        - **Record**: The record
+        - **TokeoPocketBaseRecord**: The record
 
         ### Raises
 
@@ -468,7 +468,7 @@ class TokeoPocketBase(MetaMixin):
 
         ### Returns
 
-        - **ListResult**: The records in ```items``` and ```page```,
+        - **TokeoPocketBaseListResult**: The records in ```items``` and ```page```,
             ```per_page```, ```total_items``` and ```total_pages```; the totals
             are -1 with skip_total
 
@@ -532,7 +532,7 @@ class TokeoPocketBase(MetaMixin):
 
         ### Returns
 
-        - **Record**: The first record
+        - **TokeoPocketBaseRecord**: The first record
 
         ### Raises
 
@@ -558,7 +558,7 @@ class TokeoPocketBase(MetaMixin):
 
         ### Returns
 
-        - **Record**: The new record
+        - **TokeoPocketBaseRecord**: The new record
 
         ### Raises
 
@@ -597,7 +597,7 @@ class TokeoPocketBase(MetaMixin):
 
         ### Returns
 
-        - **Record**: The changed record
+        - **TokeoPocketBaseRecord**: The changed record
 
         ### Raises
 

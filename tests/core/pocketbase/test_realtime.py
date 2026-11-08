@@ -24,8 +24,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
 import pytest
-from tokeo.core.pocketbase import PocketBase, TokeoPocketBaseAuthError, TokeoPocketBaseError
-from tokeo.core.pocketbase.realtime import STATUSES, AsyncRealtime, Realtime, RealtimeEvent, SseParser, confirm_login, format_topic_key
+from tokeo.core.pocketbase import TokeoPocketBaseClient, TokeoPocketBaseAuthError, TokeoPocketBaseError
+from tokeo.core.pocketbase.realtime import STATUSES, AsyncRealtime, Realtime, RealtimeEvent, _SseParser, confirm_login, format_topic_key
 from tests.utils import wait_until, wait_until_async
 
 URL = 'http://pocketbase.test:8090'
@@ -167,7 +167,7 @@ def server():
 
 def _make_client(server):
     # a client logged in to users with the token tok, talking to the fake server
-    client = PocketBase(URL, token='tok', transport=httpx.MockTransport(server.handle))
+    client = TokeoPocketBaseClient(URL, token='tok', transport=httpx.MockTransport(server.handle))
     client.auth_collection = 'users'
     return client
 
@@ -215,12 +215,12 @@ def test_format_topic_key_adds_the_options_as_quoted_json():
     assert format_topic_key('posts/*', EXPAND) == 'posts/*?options=%7B%22query%22%3A%20%7B%22expand%22%3A%20%22owner%22%7D%7D'
 
 
-# SseParser
+# _SseParser
 
 
 def test_sse_parser_gives_the_event_on_its_blank_line():
     """id, event and data lines give (PB_CONNECT, data) on the blank line."""
-    parser = SseParser()
+    parser = _SseParser()
     lines = ['id:c1', 'event:PB_CONNECT', 'data:{"clientId":"c1"}']
     assert [parser.feed(line) for line in lines] == [None, None, None]
     assert parser.feed('') == ('PB_CONNECT', {'clientId': 'c1'})
@@ -228,7 +228,7 @@ def test_sse_parser_gives_the_event_on_its_blank_line():
 
 def test_sse_parser_joins_data_lines_and_keeps_text():
     """Two data lines join by a line break, text that is no json stays text."""
-    parser = SseParser()
+    parser = _SseParser()
     for line in ['data: one', 'data:two']:
         parser.feed(line)
     assert parser.feed('') == ('message', 'one\ntwo')
@@ -236,7 +236,7 @@ def test_sse_parser_joins_data_lines_and_keeps_text():
 
 def test_sse_parser_skips_comments_and_events_without_data():
     """A comment gives nothing, an event without data is dropped with its name."""
-    parser = SseParser()
+    parser = _SseParser()
     lines = [': ping', '', 'event:lost', '', 'data:1']
     assert [parser.feed(line) for line in lines] == [None] * 5
     assert parser.feed('') == ('message', 1)
@@ -373,7 +373,7 @@ def test_realtime_silent_connection_counts_as_lost_after_read_timeout(silent_ser
     """A connection silent for 0.2 seconds, like one to a lost server, reopens."""
     url, gets = silent_server
     with caplog.at_level(logging.WARNING, logger='tokeo.core.pocketbase.realtime'):
-        with PocketBase(url) as client, Realtime(client, read_timeout=0.2) as channel:
+        with TokeoPocketBaseClient(url) as client, Realtime(client, read_timeout=0.2) as channel:
             channel.subscribe('posts/*', print)
             assert wait_until(lambda: len(gets) == 2)
     assert any('connection lost' in record.message for record in caplog.records)
@@ -510,7 +510,10 @@ def test_realtime_lost_login_while_connected_hangs_up_and_shows_the_error(silent
             raise TokeoPocketBaseAuthError('login refused')
 
     with caplog.at_level(logging.WARNING, logger='tokeo.core.pocketbase.realtime'):
-        with PocketBase(url, before_request=hook) as client, Realtime(client, auth_check_seconds=0.1, max_delay_seconds=0.05) as channel:
+        with (
+            TokeoPocketBaseClient(url, before_request=hook) as client,
+            Realtime(client, auth_check_seconds=0.1, max_delay_seconds=0.05) as channel,
+        ):
             channel.subscribe('posts/*', print)
             assert wait_until(lambda: len(gets) >= 2 and channel.status == 'connecting')
             assert 'login refused' in channel.error
@@ -694,7 +697,7 @@ def test_async_realtime_silent_connection_counts_as_lost_after_read_timeout(sile
     url, gets = silent_server
 
     async def go():
-        with PocketBase(url) as client:
+        with TokeoPocketBaseClient(url) as client:
             realtime = AsyncRealtime(client, read_timeout=0.2).subscribe('posts/*', print)
             task = asyncio.create_task(realtime.run())
             assert await wait_until_async(lambda: len(gets) == 2)
@@ -853,7 +856,7 @@ def test_confirm_login_takes_the_hook_else_a_refresh_else_nothing(pb, server):
     confirm_login(pb)
     pb.before_request = None
     confirm_login(pb)
-    with PocketBase(URL, transport=httpx.MockTransport(server.handle)) as guest:
+    with TokeoPocketBaseClient(URL, transport=httpx.MockTransport(server.handle)) as guest:
         confirm_login(guest)
     assert (calls, server.refreshes()) == (['hook'], 1)
 

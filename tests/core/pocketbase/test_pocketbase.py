@@ -17,11 +17,11 @@ import pytest
 from tokeo.core.exc import TokeoError
 from tokeo.core.pocketbase import (
     AuthKeeper,
-    Batch,
-    Collection,
-    ListResult,
-    PocketBase,
-    Record,
+    TokeoPocketBaseBatch,
+    TokeoPocketBaseCollection,
+    TokeoPocketBaseListResult,
+    TokeoPocketBaseClient,
+    TokeoPocketBaseRecord,
     TokeoPocketBaseAuthError,
     TokeoPocketBaseError,
     format_filter,
@@ -60,7 +60,7 @@ def server():
 @pytest.fixture
 def pb(server):
     """A client that talks to the fake server."""
-    with PocketBase(URL, transport=httpx.MockTransport(server.handle)) as client:
+    with TokeoPocketBaseClient(URL, transport=httpx.MockTransport(server.handle)) as client:
         yield client
 
 
@@ -154,12 +154,12 @@ def test_filter_of_the_client_is_format_filter(pb):
     assert pb.filter('t = {:t}', {'t': "it's"}) == format_filter('t = {:t}', {'t': "it's"})
 
 
-# Record and ListResult
+# TokeoPocketBaseRecord and TokeoPocketBaseListResult
 
 
 def test_record_reads_and_writes_fields_as_attributes():
     """record.title and record['title'] are the same field, also when set."""
-    record = Record({'id': 'r1', 'title': 'Hello'})
+    record = TokeoPocketBaseRecord({'id': 'r1', 'title': 'Hello'})
     record.views = 4
     assert (record.title, record['views'], dict(record)) == ('Hello', 4, {'id': 'r1', 'title': 'Hello', 'views': 4})
 
@@ -167,21 +167,21 @@ def test_record_reads_and_writes_fields_as_attributes():
 def test_record_missing_field_raises_attribute_error():
     """A missing field read as attribute raises AttributeError."""
     with pytest.raises(AttributeError, match='nope'):
-        Record({}).nope
+        TokeoPocketBaseRecord({}).nope
 
 
 def test_record_expand_holds_records():
     """The expanded relations are records, one or a list of them."""
-    record = Record({'expand': {'owner': {'name': 'Anna'}, 'tags': [{'name': 'a'}, {'name': 'b'}]}})
+    record = TokeoPocketBaseRecord({'expand': {'owner': {'name': 'Anna'}, 'tags': [{'name': 'a'}, {'name': 'b'}]}})
     assert record.expand.owner.name == 'Anna'
     assert [tag.name for tag in record.expand.tags] == ['a', 'b']
 
 
 def test_list_result_maps_the_page_and_its_records():
     """A list answer becomes page, per_page, total counts and records."""
-    result = ListResult({'page': 2, 'perPage': 1, 'totalItems': 3, 'totalPages': 3, 'items': [{'id': 'r2'}]})
+    result = TokeoPocketBaseListResult({'page': 2, 'perPage': 1, 'totalItems': 3, 'totalPages': 3, 'items': [{'id': 'r2'}]})
     assert (result.page, result.per_page, result.total_items, result.total_pages) == (2, 1, 3, 3)
-    assert isinstance(result.items[0], Record) and result.items[0].id == 'r2'
+    assert isinstance(result.items[0], TokeoPocketBaseRecord) and result.items[0].id == 'r2'
 
 
 # send
@@ -249,7 +249,7 @@ def test_before_request_runs_before_each_request_but_auth_and_health(server):
     server.answers[('POST', '/api/collections/users/auth-with-password')] = _make_auth('tok')
     server.answers[('POST', '/api/collections/users/auth-refresh')] = _make_auth('tok2')
     server.answers[('POST', '/api/batch')] = []
-    with PocketBase(URL, before_request=lambda: calls.append(True), transport=httpx.MockTransport(server.handle)) as client:
+    with TokeoPocketBaseClient(URL, before_request=lambda: calls.append(True), transport=httpx.MockTransport(server.handle)) as client:
         client.auth_with_password('users', 'anna@tokeo.test', 'pass')
         client.auth_refresh()
         client.check_health()
@@ -270,7 +270,7 @@ def test_before_request_may_log_in(server):
         if not client.token:
             client.auth_with_password('users', 'anna@tokeo.test', 'pass')
 
-    with PocketBase(URL, before_request=log_in, transport=httpx.MockTransport(server.handle)) as client:
+    with TokeoPocketBaseClient(URL, before_request=log_in, transport=httpx.MockTransport(server.handle)) as client:
         client.collection('posts').get_one('r1')
     assert len(calls) == 1
     assert server.requests[-1].headers['Authorization'] == 'tok'
@@ -286,12 +286,12 @@ def test_impersonate_runs_before_request_and_the_new_client_has_none(pb, server)
     client.close()
 
 
-# Collection
+# TokeoPocketBaseCollection
 
 
 def test_collection_is_the_record_service_of_the_name(pb):
     """collection('posts') gives the record methods of posts, the same each time."""
-    assert isinstance(pb.collection('posts'), Collection)
+    assert isinstance(pb.collection('posts'), TokeoPocketBaseCollection)
     assert pb.collection('posts') is pb.collection('posts')
 
 
@@ -359,7 +359,7 @@ def test_get_one_gets_the_record_by_id(pb, server):
     server.answers[('GET', '/api/collections/posts/records/r1')] = {'id': 'r1', 'title': 'Hello'}
     record = pb.collection('posts').get_one('r1', expand='owner', fields='id,title')
     assert _get_params(server.requests[0]) == dict(expand='owner', fields='id,title')
-    assert isinstance(record, Record) and record.title == 'Hello'
+    assert isinstance(record, TokeoPocketBaseRecord) and record.title == 'Hello'
 
 
 def test_create_posts_the_fields_as_json(pb, server):
@@ -487,7 +487,7 @@ def test_logins_count_each_login_but_no_refresh(pb, server):
     pb.auth_with_password('users', 'anna@tokeo.test', 'pass')
     pb.auth_refresh()
     assert pb.login_cnt == 1
-    with PocketBase(URL, transport=httpx.MockTransport(server.handle)) as other:
+    with TokeoPocketBaseClient(URL, transport=httpx.MockTransport(server.handle)) as other:
         assert pb.impersonate('users', 'u2', client=other) is other
         assert (other.login_cnt, other.token, pb.login_cnt) == (1, 'imp', 1)
 
@@ -511,7 +511,7 @@ def test_auth_refresh_of_a_token_without_collection_raises(pb, server, token):
 
 def test_close_forgets_the_login_and_closes_the_client(server):
     """Leaving the with block clears the login and closes the http client."""
-    with PocketBase(URL, token='tok', transport=httpx.MockTransport(server.handle)) as client:
+    with TokeoPocketBaseClient(URL, token='tok', transport=httpx.MockTransport(server.handle)) as client:
         pass
     assert (client.token, client.auth_record, client.auth_collection) == (None, None, None)
     assert client.http_client.is_closed
@@ -617,7 +617,7 @@ def test_batch_sends_all_changes_in_one_request(pb, server):
         {'status': 204, 'body': None},
     ]
     batch = pb.create_batch()
-    assert isinstance(batch, Batch)
+    assert isinstance(batch, TokeoPocketBaseBatch)
     batch.create('posts', {'title': 'A'}).update('posts', 'b', {'views': 1}).upsert('posts', {'id': 'c'}).delete('posts', 'd')
     results = batch.send()
     assert _get_body(server.requests[0]) == {

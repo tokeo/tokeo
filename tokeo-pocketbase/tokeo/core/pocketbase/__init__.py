@@ -8,9 +8,9 @@ changes of records.
 ### Example
 
 ```python
-from tokeo.core.pocketbase import PocketBase
+from tokeo.core.pocketbase import TokeoPocketBaseClient
 
-with PocketBase('http://127.0.0.1:8090') as pb:
+with TokeoPocketBaseClient('http://127.0.0.1:8090') as pb:
     pb.auth_with_password('users', 'service@example.com', 'secret')
     posts = pb.collection('posts')
     post = posts.create({'title': 'Hello', 'views': 0})
@@ -20,8 +20,8 @@ with PocketBase('http://127.0.0.1:8090') as pb:
 
 ### Notes
 
-: Each PocketBase instance holds its own http client and its own token, an
-    instance logged in as one identity never acts for another one
+: Each TokeoPocketBaseClient instance holds its own http client and its own
+    token, an instance logged in as one identity never acts for another one
 
 : Every error of the server or of the connection raises
     ```TokeoPocketBaseError``` with the status (0 without an answer), the
@@ -39,21 +39,21 @@ with PocketBase('http://127.0.0.1:8090') as pb:
 """
 
 from .exc import TokeoPocketBaseError, TokeoPocketBaseAuthError
-from .record import Record, ListResult
+from .record import TokeoPocketBaseRecord, TokeoPocketBaseListResult
 from .filter import format_filter, quote_path_segment
-from .client import PocketBase, AuthKeeper
-from .collection import Collection
-from .batch import Batch
+from .client import TokeoPocketBaseClient, AuthKeeper
+from .collection import TokeoPocketBaseCollection
+from .batch import TokeoPocketBaseBatch
 
 __all__ = [
     'TokeoPocketBaseError',
     'TokeoPocketBaseAuthError',
-    'Record',
-    'ListResult',
+    'TokeoPocketBaseRecord',
+    'TokeoPocketBaseListResult',
     'format_filter',
     'quote_path_segment',
-    'PocketBase',
+    'TokeoPocketBaseClient',
     'AuthKeeper',
-    'Collection',
-    'Batch',
+    'TokeoPocketBaseCollection',
+    'TokeoPocketBaseBatch',
 ]

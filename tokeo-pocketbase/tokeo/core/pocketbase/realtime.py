@@ -7,13 +7,13 @@ e.g. the one of nicegui, and calls functions or coroutines.
 ### Example
 
 ```python
-from tokeo.core.pocketbase import PocketBase
+from tokeo.core.pocketbase import TokeoPocketBaseClient
 from tokeo.core.pocketbase.realtime import Realtime
 
 def on_order(event):
     print(event.action, event.record.invoice)
 
-pb = PocketBase('http://127.0.0.1:8090')
+pb = TokeoPocketBaseClient('http://127.0.0.1:8090')
 pb.auth_with_password('users', 'anna@example.com', 'anna-secret-123')
 with Realtime(pb) as realtime:
     realtime.subscribe('orders/*', on_order)
@@ -69,7 +69,7 @@ import threading
 from urllib.parse import quote
 import httpx
 from .exc import TokeoPocketBaseError
-from .record import Record
+from .record import TokeoPocketBaseRecord
 
 #: The logger of this module
 LOG = logging.getLogger(__name__)
@@ -124,7 +124,7 @@ def confirm_login(client):
 
     ### Args
 
-    - **client** (PocketBase): The client of a channel
+    - **client** (TokeoPocketBaseClient): The client of a channel
 
     ### Raises
 
@@ -161,13 +161,13 @@ class RealtimeEvent:
         #: What happened: create, update or delete
         self.action = data.get('action')
         #: The record after the change, before it for a delete
-        self.record = Record(data.get('record'))
+        self.record = TokeoPocketBaseRecord(data.get('record'))
 
     def __repr__(self):
         return f'RealtimeEvent({self.topic!r}, {self.action!r}, {self.record.get("id")!r})'
 
 
-class SseParser:
+class _SseParser:
     """
     Read the lines of a stream of server sent events.
 
@@ -259,7 +259,7 @@ class Realtime:
 
     ### Args
 
-    - **client** (PocketBase): The client whose login the channel uses
+    - **client** (TokeoPocketBaseClient): The client whose login the channel uses
 
     ### Keyword Args
 
@@ -489,7 +489,7 @@ class Realtime:
     def _listen(self, stop, http, pending):
         # one connection: subscribe on its connect event, then queue the
         # events without waiting for the callbacks; True when they fell behind
-        parser = SseParser()
+        parser = _SseParser()
         with http.stream('GET', REALTIME_PATH) as response:
             with self._lock:
                 # stop() came first, its shutdown missed this connection
@@ -574,7 +574,7 @@ class AsyncRealtime:
 
     ### Args
 
-    - **client** (PocketBase): The client whose login the channel uses
+    - **client** (TokeoPocketBaseClient): The client whose login the channel uses
 
     ### Keyword Args
 
@@ -789,7 +789,7 @@ class AsyncRealtime:
     async def _listen(self, pending):
         # one connection: subscribe on its connect event, then queue the
         # events without waiting for the callbacks; True when they fell behind
-        parser = SseParser()
+        parser = _SseParser()
         async with self._http.stream('GET', REALTIME_PATH) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
