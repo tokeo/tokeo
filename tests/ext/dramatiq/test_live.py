@@ -86,7 +86,7 @@ def test_state(live):
         actor.send(2)
         actor.send_with_options(args=(3,), delay=600_000)
         (state,) = queues.state()
-        assert (state['exists'], state['ready'], state['delayed'], state['dead'], state['consumers']) == (True, 2, 1, 0, 0)
+        assert (state['exists'], state['ready_cnt'], state['delayed_cnt'], state['dead_cnt'], state['consumer_cnt']) == (True, 2, 1, 0, 0)
 
 
 def test_dead_letters(live):
@@ -99,9 +99,9 @@ def test_dead_letters(live):
             channel.basic_publish(exchange='', routing_key=f'{name}.XQ', body=letter.encode())
         (peeked,) = queues.peek_dead(name)
         assert (peeked['message_id'], peeked['retries'], peeked['error']) == (letter.message_id, 3, 'E: x')
-        assert queues.state(name)[0]['dead'] == 1
-        assert queues.requeue_dead(name) == dict(name=name, requeued=1)
-        assert (queues.state(name)[0]['ready'], queues.state(name)[0]['dead']) == (2, 0)
+        assert queues.state(name)[0]['dead_cnt'] == 1
+        assert queues.requeue_dead(name) == dict(name=name, requeued_cnt=1)
+        assert (queues.state(name)[0]['ready_cnt'], queues.state(name)[0]['dead_cnt']) == (2, 0)
         with _open_raw_channel() as channel:
             bodies = [channel.basic_get(name, auto_ack=True)[2] for _ in range(2)]
         requeued = [Message.decode(b) for b in bodies if Message.decode(b).message_id == letter.message_id][0]
@@ -117,8 +117,8 @@ def test_purge_and_delete(live):
         actor.send_with_options(args=(2,), delay=600_000)
         with pytest.raises(TokeoDramatiqError, match='use force'):
             queues.delete(name)
-        assert queues.purge(name) == [dict(name=name, purged=2)]
-        assert queues.delete(name) == [dict(name=name, is_deleted=True)]
+        assert queues.purge(name) == [dict(name=name, purged_cnt=2)]
+        assert queues.delete(name) == [dict(name=name, deleted=True)]
         assert queues.state(name)[0]['exists'] is False
 
 
@@ -165,16 +165,16 @@ def test_monitor_hears_a_worker(tmp, rando):
             # stopped once on every path, a second stop logs a CRITICAL
             try:
                 actor.send(2)
-                assert wait_until(lambda: find_own_workers(0.5) and find_own_workers(0)[0]['heartbeat']['running'], 15)
+                assert wait_until(lambda: find_own_workers(0.5) and find_own_workers(0)[0]['heartbeat']['running_tasks'], 15)
                 (running,) = find_own_workers(0)
             finally:
                 worker.stop()
             (stopped,) = find_own_workers(1)
         finally:
             app.dramatiq.queues.delete(name, force=True)
-    (task,) = running['heartbeat']['running']
+    (task,) = running['heartbeat']['running_tasks']
     assert running['state'] == 'ok' and task['actor_name'] == f'task_{rando}' and task['args'] == '((2,), {})'
-    assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals']['done'] == 1
+    assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals']['done_cnt'] == 1
 
 
 def test_unparalleled_runs_one_message_at_a_time(tmp, rando):

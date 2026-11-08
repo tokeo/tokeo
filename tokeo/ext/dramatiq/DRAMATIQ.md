@@ -594,12 +594,12 @@ only):
   "worker": {"host": "worker-01", "pid": 4711, "started_at": 1761097200000,
              "threads": 8, "queues": null, "queue_prefetch": 16,
              "delay_queue_prefetch": 8000, "with_details": true},
-  "running": [{"message_id": "3f2a9c1e-...", "actor_name": "send_mail", "queue_name": "mail",
-               "retries": 0, "started_at": 1761100798800, "runtime_ms": 1200,
-               "args": "(('anna@example.com',), {})"}],
-  "totals": {"done": 102, "failed": 3, "dead": 1},
+  "running_tasks": [{"message_id": "3f2a9c1e-...", "actor_name": "send_mail", "queue_name": "mail",
+                     "retries": 0, "started_at": 1761100798800, "runtime_ms": 1200,
+                     "args": "(('anna@example.com',), {})"}],
+  "totals": {"done_cnt": 102, "failed_cnt": 3, "dead_cnt": 1},
   "since_last": {"ms": 5000, "actors": {
-      "send_mail": {"done": 2, "failed": 1, "max_runtime_ms": 1400,
+      "send_mail": {"done_cnt": 2, "failed_cnt": 1, "max_runtime_ms": 1400,
                     "last_error": "SMTPRecipientsRefused: ..."}}}
 }
 ```

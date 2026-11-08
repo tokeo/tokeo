@@ -334,13 +334,13 @@ def test_monitor_hears_a_worker_of_the_app(tmp, start_worker, monkeypatch):
         worker = start_worker(app.dramatiq.broker)
         try:
             actor.send(2)
-            assert wait_until(lambda: monitor.workers() and monitor.workers()[0]['heartbeat']['running'])
+            assert wait_until(lambda: monitor.workers() and monitor.workers()[0]['heartbeat']['running_tasks'])
             (running,) = monitor.workers()
         finally:
             release.set()
         _join(app.dramatiq.broker)
         worker.stop(timeout=5000)
         (stopped,) = monitor.workers()
-    (task,) = running['heartbeat']['running']
+    (task,) = running['heartbeat']['running_tasks']
     assert (running['state'], task['actor_name'], task['args']) == ('ok', 'waits', '((2,), {})')
-    assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals'] == dict(done=1, failed=0, dead=0)
+    assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals'] == dict(done_cnt=1, failed_cnt=0, dead_cnt=0)

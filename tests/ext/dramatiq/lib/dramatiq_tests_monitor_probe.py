@@ -19,8 +19,8 @@ class DramatiqMonitorProbeTest(DramatiqTest):
 
 def snapshot(wait_seconds=0):
     time.sleep(wait_seconds)
-    queues = [dict(name='mail', ready=0, delayed=0, dead=0, consumers=1)]
-    totals = dict(ready=0, delayed=0, dead=0, consumers=1)
+    queues = [dict(name='mail', ready_cnt=0, delayed_cnt=0, dead_cnt=0, consumer_cnt=1)]
+    totals = dict(ready_cnt=0, delayed_cnt=0, dead_cnt=0, consumer_cnt=1)
     return dict(at=int(time.time() * 1000), monitoring=True, interval_seconds=1, workers=[], actors={}, queues=queues, queue_totals=totals)
 
 

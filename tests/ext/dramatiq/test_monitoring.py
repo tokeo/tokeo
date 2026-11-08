@@ -158,11 +158,11 @@ def test_heartbeat_counts_tasks(worker):
     finally:
         w.stop()
     assert sent[0]['state'] == 'running'
-    assert beat['totals'] == dict(done=2, failed=1, dead=1)
-    assert beat['since_last']['actors']['ok']['done'] == 2
+    assert beat['totals'] == dict(done_cnt=2, failed_cnt=1, dead_cnt=1)
+    assert beat['since_last']['actors']['ok']['done_cnt'] == 2
     # without details only the type of the error, it never holds data
     fails = beat['since_last']['actors']['fails']
-    assert (fails['done'], fails['failed'], fails['last_error']) == (0, 1, 'LookupError')
+    assert (fails['done_cnt'], fails['failed_cnt'], fails['last_error']) == (0, 1, 'LookupError')
     # the next heartbeat starts its summary anew
     assert heartbeat.build_heartbeat()['since_last']['actors'] == {}
 
@@ -190,8 +190,8 @@ def test_heartbeat_shows_running_tasks(worker, with_details):
     w.start()
     try:
         actors['waits'].send('anna@example.com')
-        assert wait_until(lambda: heartbeat.build_heartbeat()['running'], 5)
-        (task,) = heartbeat.build_heartbeat()['running']
+        assert wait_until(lambda: heartbeat.build_heartbeat()['running_tasks'], 5)
+        (task,) = heartbeat.build_heartbeat()['running_tasks']
         release.set()
         _join(broker)
         w.join()
@@ -203,7 +203,7 @@ def test_heartbeat_shows_running_tasks(worker, with_details):
     assert ('args' in task) is with_details
     if with_details:
         assert task['args'] == "(('anna@example.com',), {})"
-    assert heartbeat.build_heartbeat()['running'] == []
+    assert heartbeat.build_heartbeat()['running_tasks'] == []
 
 
 def test_heartbeat_details_show_error_texts(worker):
@@ -286,7 +286,7 @@ def test_heartbeat_without_broker_parameters_sends_nothing(monkeypatch):
 # ---- monitor ----------------------------------------------------------------
 
 
-def _make_beat(pid, interval_seconds=5, state='running', running=(), since=None, with_details=False):
+def _make_beat(pid, interval_seconds=5, state='running', running_tasks=(), since=None, with_details=False):
     return dict(
         type='tokeo.dramatiq.heartbeat',
         version=1,
@@ -304,8 +304,8 @@ def _make_beat(pid, interval_seconds=5, state='running', running=(), since=None,
             delay_queue_prefetch=8,
             with_details=with_details,
         ),
-        running=list(running),
-        totals=dict(done=3, failed=1, dead=0),
+        running_tasks=list(running_tasks),
+        totals=dict(done_cnt=3, failed_cnt=1, dead_cnt=0),
         since_last=dict(ms=5000, actors=since or {}),
     )
 
@@ -317,7 +317,9 @@ def monitor(tmp, monkeypatch):
         monitor = app.dramatiq.monitor
         # heartbeats come by receive, not by rabbitmq
         monkeypatch.setattr(monitor, '_collect', lambda wait: None)
-        monkeypatch.setattr(app.dramatiq.queues, 'state', lambda: [dict(name='mail', ready=2, delayed=None, dead=1, consumers=1)])
+        monkeypatch.setattr(
+            app.dramatiq.queues, 'state', lambda: [dict(name='mail', ready_cnt=2, delayed_cnt=None, dead_cnt=1, consumer_cnt=1)]
+        )
         yield monitor
 
 
@@ -325,19 +327,19 @@ def test_monitor_states(monitor):
     """A worker is late after 2 and gone after 3 of its intervals."""
     now = time.monotonic()
     beats = [(1, 1, 5, 'running'), (2, 12, 5, 'running'), (3, 16, 5, 'running'), (4, 3, 1, 'running'), (5, 2, 5, 'stopped')]
-    for pid, seen, interval, state in beats:
-        monitor.receive(json.dumps(_make_beat(pid, interval, state)), received_time=now - seen)
+    for pid, heartbeat_age_seconds, interval, state in beats:
+        monitor.receive(json.dumps(_make_beat(pid, interval, state)), received_time=now - heartbeat_age_seconds)
     states = {w['heartbeat']['worker']['pid']: w['state'] for w in monitor.workers()}
     # late after 2 and gone after 3 intervals, each by the interval of the worker
     assert states == {1: 'ok', 2: 'late', 3: 'gone', 4: 'gone', 5: 'stopped'}
-    assert next(w for w in monitor.workers() if w['heartbeat']['worker']['pid'] == 2)['seen_ms'] >= 12_000
+    assert next(w for w in monitor.workers() if w['heartbeat']['worker']['pid'] == 2)['heartbeat_age_ms'] >= 12_000
 
 
 def test_monitor_drops_gone_and_stopped_workers(monitor):
     """Gone and stopped workers stay for 10 more intervals."""
     now = time.monotonic()
-    for pid, seen, state in [(1, 64, 'running'), (2, 66, 'running'), (3, 49, 'stopped'), (4, 51, 'stopped')]:
-        monitor.receive(json.dumps(_make_beat(pid, state=state)), received_time=now - seen)
+    for pid, heartbeat_age_seconds, state in [(1, 64, 'running'), (2, 66, 'running'), (3, 49, 'stopped'), (4, 51, 'stopped')]:
+        monitor.receive(json.dumps(_make_beat(pid, state=state)), received_time=now - heartbeat_age_seconds)
     # gone and stopped workers stay for 10 more intervals
     assert [w['heartbeat']['worker']['pid'] for w in monitor.workers()] == [1, 3]
 
@@ -352,15 +354,15 @@ def test_monitor_ignores_other_messages(monitor):
 def test_monitor_snapshot_sums_running_workers(monitor):
     """The snapshot sums the actors of live workers and the queues."""
     now = time.monotonic()
-    since = dict(send_mail=dict(done=2, failed=1, max_runtime_ms=1400, last_error='LookupError'))
+    since = dict(send_mail=dict(done_cnt=2, failed_cnt=1, max_runtime_ms=1400, last_error='LookupError'))
     monitor.receive(json.dumps(_make_beat(1, since=since)), received_time=now)
-    monitor.receive(json.dumps(_make_beat(2, since=dict(send_mail=dict(done=1, failed=0, max_runtime_ms=300)))), received_time=now)
+    monitor.receive(json.dumps(_make_beat(2, since=dict(send_mail=dict(done_cnt=1, failed_cnt=0, max_runtime_ms=300)))), received_time=now)
     monitor.receive(json.dumps(_make_beat(3, since=since)), received_time=now - 20)
     snapshot = monitor.snapshot()
     assert snapshot['monitoring'] is False and snapshot['interval_seconds'] == 5
     # the gone worker counts no more
-    assert snapshot['actors'] == dict(send_mail=dict(done=3, failed=1, max_runtime_ms=1400, last_error='LookupError'))
-    assert snapshot['queue_totals'] == dict(ready=2, delayed=0, dead=1, consumers=1)
+    assert snapshot['actors'] == dict(send_mail=dict(done_cnt=3, failed_cnt=1, max_runtime_ms=1400, last_error='LookupError'))
+    assert snapshot['queue_totals'] == dict(ready_cnt=2, delayed_cnt=0, dead_cnt=1, consumer_cnt=1)
 
 
 def test_monitor_without_rabbitmq(tmp, monkeypatch):
@@ -395,20 +397,24 @@ def _make_snapshot(workers, monitoring=True, actors=None):
         interval_seconds=5,
         workers=workers,
         actors=actors or {},
-        queues=[dict(name='mail', ready=2, delayed=0, dead=1, consumers=1)],
-        queue_totals=dict(ready=2, delayed=0, dead=1, consumers=1),
+        queues=[dict(name='mail', ready_cnt=2, delayed_cnt=0, dead_cnt=1, consumer_cnt=1)],
+        queue_totals=dict(ready_cnt=2, delayed_cnt=0, dead_cnt=1, consumer_cnt=1),
     )
 
 
 def test_format_monitor_view(tmp):
     """The view shows workers, running tasks, actors and the queue totals."""
     task = dict(message_id='m1', actor_name='send_mail', queue_name='mail', retries=1, started_at=0, runtime_ms=1200)
-    running = [dict(task, args="(('[red]anna',), {})")]
-    since = dict(send_mail=dict(done=2, failed=1, max_runtime_ms=1400, last_error='LookupError'))
+    running_tasks = [dict(task, args="(('[red]anna',), {})")]
+    since = dict(send_mail=dict(done_cnt=2, failed_cnt=1, max_runtime_ms=1400, last_error='LookupError'))
     workers = [
-        dict(state='ok', seen_ms=300, heartbeat=_make_beat(4711, running=running, since=since, with_details=True)),
+        dict(state='ok', heartbeat_age_ms=300, heartbeat=_make_beat(4711, running_tasks=running_tasks, since=since, with_details=True)),
         # a worker without details sends no args
-        dict(state='gone', seen_ms=20_000, heartbeat=_make_beat(4712, running=[{k: v for k, v in running[0].items() if k != 'args'}])),
+        dict(
+            state='gone',
+            heartbeat_age_ms=20_000,
+            heartbeat=_make_beat(4712, running_tasks=[{k: v for k, v in running_tasks[0].items() if k != 'args'}]),
+        ),
     ]
     with DramatiqMiddlewareTest(tmp) as app:
         text = _render_view(app, _make_snapshot(workers, actors=since), interval_seconds=5)
@@ -448,7 +454,7 @@ def command(tmp, monkeypatch):
 
             def snapshot(wait_seconds=0):
                 calls.append(wait_seconds)
-                return _make_snapshot([dict(state='ok', seen_ms=0, heartbeat=_make_beat(4711))])
+                return _make_snapshot([dict(state='ok', heartbeat_age_ms=0, heartbeat=_make_beat(4711))])
 
             monkeypatch.setattr(app.dramatiq.monitor, 'snapshot', snapshot)
             follows = []

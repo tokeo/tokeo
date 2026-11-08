@@ -165,17 +165,17 @@ class TokeoDramatiqController(Controller):
             raise TokeoDramatiqError('Name the queues for --dead or --requeue-dead!')
         if actions == ['purge']:
             result = queues.purge(names, dead_only=pargs.dead_only)
-            lines = [f'{r["name"]}: purged {r["purged"]} messages' for r in result]
+            lines = [f'{r["name"]}: purged {r["purged_cnt"]} messages' for r in result]
         elif actions == ['delete']:
             result = queues.delete(names, force=pargs.force)
-            lines = [f'{r["name"]}: {"deleted" if r["is_deleted"] else "not found"}' for r in result]
+            lines = [f'{r["name"]}: {"deleted" if r["deleted"] else "not found"}' for r in result]
         elif actions == ['recreate']:
             result = queues.recreate(names, force=pargs.force)
             lines = [f'{r["name"]}: recreated with {r["arguments"]}' for r in result]
         elif actions == ['requeue_dead']:
             max_messages = _check_number('switch', '--max-messages', pargs.max_messages, allow_none=True)
             result = [queues.requeue_dead(name, max_messages) for name in names]
-            lines = [f'{r["name"]}: requeued {r["requeued"]} dead letters' for r in result]
+            lines = [f'{r["name"]}: requeued {r["requeued_cnt"]} dead letters' for r in result]
         else:
             result = queues.state(names)
             if pargs.dead is not None:
@@ -500,24 +500,25 @@ def _format_switch(action):
 # hints on a queue and their style
 _QUEUE_FLAGS = (
     ('missing', lambda q: q.get('exists') is False, 'bold red'),
-    ('unparalleled', lambda q: q.get('is_unparalleled'), None),
-    ('no consumer', lambda q: q.get('exists') is not False and q.get('consumers') == 0, 'yellow'),
+    ('unparalleled', lambda q: q.get('unparalleled'), None),
+    ('no consumer', lambda q: q.get('exists') is not False and q.get('consumer_cnt') == 0, 'yellow'),
     ('no actor', lambda q: q.get('actors') == [], 'yellow'),
 )
 
 
 def _format_queue_table(output, states):
     """Format the state of queues as table with their hints and a total."""
-    keys = ('ready', 'delayed', 'dead', 'consumers')
+    # the counts and their column headings
+    columns = (('ready_cnt', 'ready'), ('delayed_cnt', 'delayed'), ('dead_cnt', 'dead'), ('consumer_cnt', 'consumers'))
     rows = []
     for state in states:
         flags = [(flag, style) for flag, applies, style in _QUEUE_FLAGS if applies(state)]
         # the cell takes the style of its most severe hint
         style = next((style for _, style in flags if style), None)
-        counts = ['-' if state.get(key) is None else state[key] for key in keys]
+        counts = ['-' if state.get(key) is None else state[key] for key, _ in columns]
         rows.append([state['name'], *counts, output.create_text(', '.join(flag for flag, _ in flags), style)])
-    rows.append(['total', *(sum(state.get(key) or 0 for state in states) for key in keys), ''])
-    return output.build_table([('queue', 'left', 'full'), *((key, 'right') for key in keys), 'flags'], rows, title='queues')
+    rows.append(['total', *(sum(state.get(key) or 0 for state in states) for key, _ in columns), ''])
+    return output.build_table([('queue', 'left', 'full'), *((heading, 'right') for _, heading in columns), 'flags'], rows, title='queues')
 
 
 def _format_dead_letter_tables(output, states):
@@ -577,24 +578,24 @@ def _format_monitor_view(output, snapshot, label, interval_seconds=None):
             beat = worker['heartbeat']
             name = f'{beat["worker"]["host"]}:{beat["worker"]["pid"]}'
             last = beat['since_last']['actors'].values()
-            done_cnt, failed_cnt = sum(a.get('done', 0) for a in last), sum(a.get('failed', 0) for a in last)
+            done_cnt, failed_cnt = sum(a.get('done_cnt', 0) for a in last), sum(a.get('failed_cnt', 0) for a in last)
             rows.append(
                 [
                     name,
                     _format_duration(at - beat['worker']['started_at']),
                     worker['state'],
-                    f'{len(beat["running"])}/{beat["worker"]["threads"]}',
-                    beat['totals']['done'],
-                    beat['totals']['failed'],
-                    beat['totals']['dead'],
+                    f'{len(beat["running_tasks"])}/{beat["worker"]["threads"]}',
+                    beat['totals']['done_cnt'],
+                    beat['totals']['failed_cnt'],
+                    beat['totals']['dead_cnt'],
                     f'{done_cnt} done, {failed_cnt} failed' if done_cnt or failed_cnt else '',
                 ]
             )
             # a running task went on since its heartbeat
-            since_heartbeat_ms = worker['seen_ms'] if worker['state'] in ('ok', 'late') else 0
-            for task in beat['running']:
+            heartbeat_age_ms = worker['heartbeat_age_ms'] if worker['state'] in ('ok', 'late') else 0
+            for task in beat['running_tasks']:
                 args = task.get('args', '' if beat['worker']['with_details'] else 'details off')
-                runtime = _format_duration(task['runtime_ms'] + since_heartbeat_ms)
+                runtime = _format_duration(task['runtime_ms'] + heartbeat_age_ms)
                 tasks.append([name, task['actor_name'], task['queue_name'], runtime, task['retries'], args])
         columns = [
             ('worker', 'left', 'full'),
@@ -612,7 +613,9 @@ def _format_monitor_view(output, snapshot, label, interval_seconds=None):
             view.append(output.build_table(columns, tasks, title='running'))
     if snapshot['actors']:
         actors = snapshot['actors'].items()
-        rows = [[name, a['done'], a['failed'], _format_duration(a['max_runtime_ms']), a.get('last_error', '')] for name, a in actors]
+        rows = [
+            [name, a['done_cnt'], a['failed_cnt'], _format_duration(a['max_runtime_ms']), a.get('last_error', '')] for name, a in actors
+        ]
         columns = ['actor', ('done', 'right'), ('failed', 'right'), ('longest', 'right'), 'last error']
         view.append(output.build_table(columns, rows, title='actors (last heartbeat of each worker)'))
     view.append(_format_queue_table(output, snapshot['queues']))

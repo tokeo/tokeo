@@ -22,6 +22,9 @@ from tokeo.ext.dramatiq.exc import (
 )
 from tokeo.ext.dramatiq.monitoring import format_details
 
+# the counts of a queue state and their words in messages
+_QUEUE_COUNTS = (('ready_cnt', 'ready'), ('delayed_cnt', 'delayed'), ('dead_cnt', 'dead'), ('consumer_cnt', 'consumers'))
+
 
 class TokeoDramatiqQueues:
     """
@@ -156,12 +159,12 @@ class TokeoDramatiqQueues:
         ### Returns
 
         - **list**: One dict per queue with ```name```, ```exists```,
-            ```ready```, ```delayed```, ```dead```, ```consumers```,
-            ```is_unparalleled``` and ```actors```
+            ```ready_cnt```, ```delayed_cnt```, ```dead_cnt```,
+            ```consumer_cnt```, ```unparalleled``` and ```actors```
 
         ### Notes
 
-        : ```delayed``` misses the messages workers have prefetched already
+        : ```delayed_cnt``` misses the messages workers have prefetched already
 
         """
         actors = self._get_actors_by_queue()
@@ -184,11 +187,11 @@ class TokeoDramatiqQueues:
                 dict(
                     name=name,
                     exists=queue is not None,
-                    ready=queue.message_count if queue else None,
-                    delayed=delay.message_count if delay else None,
-                    dead=dead.message_count if dead else None,
-                    consumers=queue.consumer_count if queue else None,
-                    is_unparalleled='_unparalleled' in name.lower(),
+                    ready_cnt=queue.message_count if queue else None,
+                    delayed_cnt=delay.message_count if delay else None,
+                    dead_cnt=dead.message_count if dead else None,
+                    consumer_cnt=queue.consumer_count if queue else None,
+                    unparalleled='_unparalleled' in name.lower(),
                     actors=sorted(actors.get(name, [])),
                 )
             )
@@ -241,7 +244,7 @@ class TokeoDramatiqQueues:
 
         ### Returns
 
-        - **dict**: ```name``` and the number ```requeued```
+        - **dict**: ```name``` and the number ```requeued_cnt```
 
         ### Raises
 
@@ -264,7 +267,7 @@ class TokeoDramatiqQueues:
         count = dead.message_count if dead else 0
         count = count if max_messages is None else min(count, max_messages)
         channel = self._open()
-        requeued = 0
+        requeued_cnt = 0
         for _ in range(count):
             method, _, body = channel.basic_get(xq_name(name), auto_ack=False)
             if method is None:
@@ -286,8 +289,8 @@ class TokeoDramatiqQueues:
                 channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
                 raise
             channel.basic_ack(delivery_tag=method.delivery_tag)
-            requeued += 1
-        return dict(name=name, requeued=requeued)
+            requeued_cnt += 1
+        return dict(name=name, requeued_cnt=requeued_cnt)
 
     # ---- maintenance --------------------------------------------------------
 
@@ -304,7 +307,7 @@ class TokeoDramatiqQueues:
         ### Returns
 
         - **list**: One dict per queue with ```name``` and the number
-            ```purged```
+            ```purged_cnt```
 
         """
         return self._call(self._purge, self._get_queue_names(names), dead_only)
@@ -313,11 +316,11 @@ class TokeoDramatiqQueues:
         self._cache.clear()
         result = []
         for name in names:
-            purged = 0
+            purged_cnt = 0
             for queue in (xq_name(name),) if dead_only else (name, dq_name(name), xq_name(name)):
                 if self._get_queue(queue) is not None:
-                    purged += self._open().queue_purge(queue).method.message_count
-            result.append(dict(name=name, purged=purged))
+                    purged_cnt += self._open().queue_purge(queue).method.message_count
+            result.append(dict(name=name, purged_cnt=purged_cnt))
         return result
 
     def delete(self, names=None, force=False):
@@ -333,7 +336,7 @@ class TokeoDramatiqQueues:
 
         ### Returns
 
-        - **list**: One dict per queue with ```name``` and ```is_deleted```
+        - **list**: One dict per queue with ```name``` and ```deleted```
 
         ### Raises
 
@@ -347,17 +350,17 @@ class TokeoDramatiqQueues:
         self._cache.clear()
         if not force:
             for state in self._read_state(names, {}):
-                busy = [key for key in ('ready', 'delayed', 'dead', 'consumers') if state[key]]
+                busy = [word for key, word in _QUEUE_COUNTS if state[key]]
                 if busy:
                     raise TokeoDramatiqQueueError(state['name'], f'has {", ".join(busy)}, use force to delete it anyway')
         result = []
         for name in names:
-            is_deleted = False
+            deleted = False
             for queue in (name, dq_name(name), xq_name(name)):
                 if self._get_queue(queue) is not None:
                     self._open().queue_delete(queue)
-                    is_deleted = True
-            result.append(dict(name=name, is_deleted=is_deleted))
+                    deleted = True
+            result.append(dict(name=name, deleted=deleted))
         return result
 
     def recreate(self, names=None, force=False):
@@ -382,9 +385,9 @@ class TokeoDramatiqQueues:
 
         """
         names = self._get_queue_names(names)
-        known = self.names()
+        known_names = self.names()
         for name in names:
-            if name not in known:
+            if name not in known_names:
                 raise TokeoDramatiqQueueError(name, 'has no actor, its arguments are unknown')
         return self._call(self._recreate, names, force)
 

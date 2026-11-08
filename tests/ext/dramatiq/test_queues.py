@@ -173,17 +173,24 @@ def test_state(app, server):
     server.add('mail.XQ', b'4', b'5', b'6')
     states = {s['name']: s for s in app.dramatiq.queues.state()}
     assert states['mail'] == dict(
-        name='mail', exists=True, ready=2, delayed=1, dead=3, consumers=2, is_unparalleled=False, actors=['send_mail', 'send_report']
+        name='mail',
+        exists=True,
+        ready_cnt=2,
+        delayed_cnt=1,
+        dead_cnt=3,
+        consumer_cnt=2,
+        unparalleled=False,
+        actors=['send_mail', 'send_report'],
     )
     # a missing queue is reported, but not created
     assert states['orders_unparalleled'] == dict(
         name='orders_unparalleled',
         exists=False,
-        ready=None,
-        delayed=None,
-        dead=None,
-        consumers=None,
-        is_unparalleled=True,
+        ready_cnt=None,
+        delayed_cnt=None,
+        dead_cnt=None,
+        consumer_cnt=None,
+        unparalleled=True,
         actors=['build_order'],
     )
     assert 'orders_unparalleled' not in server.queues
@@ -223,13 +230,13 @@ def test_requeue_dead_resets_retries(app, server):
     """requeue_dead moves letters back without retries, traceback and eta."""
     server.add('mail')
     server.add('mail.XQ', _make_dead_letter(queue='mail.DQ', retries=20, traceback='tb', eta=1, broker_priority=3), _make_dead_letter())
-    assert app.dramatiq.queues.requeue_dead('mail', max_messages=1) == dict(name='mail', requeued=1)
+    assert app.dramatiq.queues.requeue_dead('mail', max_messages=1) == dict(name='mail', requeued_cnt=1)
     (body,) = server.queues['mail']['messages']
     message = Message.decode(body)
     # retries, traceback and eta are gone, other options and the id stay
     assert (message.queue_name, message.options) == ('mail', {'broker_priority': 3})
     assert len(server.queues['mail.XQ']['messages']) == 1
-    assert app.dramatiq.queues.requeue_dead('mail') == dict(name='mail', requeued=1)
+    assert app.dramatiq.queues.requeue_dead('mail') == dict(name='mail', requeued_cnt=1)
 
 
 def test_requeue_dead_refuses_missing_queue(app, server):
@@ -258,10 +265,10 @@ def test_purge(app, server):
     """purge empties a queue with its .DQ and .XQ, dead_only only the .XQ."""
     for name in ('mail', 'mail.DQ', 'mail.XQ'):
         server.add(name, b'1', b'2')
-    assert app.dramatiq.queues.purge('mail', dead_only=True) == [dict(name='mail', purged=2)]
+    assert app.dramatiq.queues.purge('mail', dead_only=True) == [dict(name='mail', purged_cnt=2)]
     assert len(server.queues['mail']['messages']) == 2
     # all queues of the app; missing ones count nothing
-    assert app.dramatiq.queues.purge() == [dict(name='mail', purged=4), dict(name='orders_unparalleled', purged=0)]
+    assert app.dramatiq.queues.purge() == [dict(name='mail', purged_cnt=4), dict(name='orders_unparalleled', purged_cnt=0)]
     assert all(not server.queues[name]['messages'] for name in ('mail', 'mail.DQ', 'mail.XQ'))
 
 
@@ -286,7 +293,7 @@ def test_delete(app, server):
     for name in ('mail', 'mail.DQ', 'mail.XQ'):
         server.add(name, b'1', consumers=1)
     result = app.dramatiq.queues.delete(['mail', 'old'], force=True)
-    assert result == [dict(name='mail', is_deleted=True), dict(name='old', is_deleted=False)]
+    assert result == [dict(name='mail', deleted=True), dict(name='old', deleted=False)]
     assert server.queues == {}
 
 
@@ -387,7 +394,7 @@ def test_command_json(command, server):
     """dramatiq queues --json prints the state as json."""
     server.add('mail', b'1')
     (state,) = json.loads(command('--json'))
-    assert (state['name'], state['ready']) == ('mail', 1)
+    assert (state['name'], state['ready_cnt']) == ('mail', 1)
 
 
 def test_command_purge(command, server):
@@ -434,10 +441,10 @@ def test_state_cache(app, server, monkeypatch):
     # within the ttl the kept state comes back, rabbitmq is not asked
     assert queues.state('mail', cache_ttl_seconds=5) == first and server.declares == 3
     # a caller may change its copy without changing the cache
-    first[0]['ready'] = 99
-    assert queues.state('mail', cache_ttl_seconds=5)[0]['ready'] == 1
+    first[0]['ready_cnt'] = 99
+    assert queues.state('mail', cache_ttl_seconds=5)[0]['ready_cnt'] == 1
     now[0] += 1
-    assert queues.state('mail', cache_ttl_seconds=5)[0]['ready'] == 2
+    assert queues.state('mail', cache_ttl_seconds=5)[0]['ready_cnt'] == 2
 
 
 def test_state_cache_per_names_and_cleared_by_changes(app, server):
@@ -448,7 +455,7 @@ def test_state_cache_per_names_and_cleared_by_changes(app, server):
     queues.state(cache_ttl_seconds=60)
     assert server.declares == 9
     queues.purge('mail')
-    assert queues.state('mail', cache_ttl_seconds=60)[0]['ready'] == 0
+    assert queues.state('mail', cache_ttl_seconds=60)[0]['ready_cnt'] == 0
 
 
 def test_refused_request(app, server):
@@ -461,7 +468,7 @@ def test_refused_request(app, server):
     assert err_info.value.address == 'localhost:5672' and err_info.value.__cause__.reply_code == 403
     # the next call works on a new channel of the same connection
     server.refuse = None
-    assert app.dramatiq.queues.purge('mail') == [dict(name='mail', purged=1)]
+    assert app.dramatiq.queues.purge('mail') == [dict(name='mail', purged_cnt=1)]
     assert server.connections == 1
 
 

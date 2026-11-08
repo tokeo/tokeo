@@ -93,8 +93,8 @@ class TokeoDramatiqHeartbeat(Middleware):
         #: Whether to send arguments and error texts
         self.with_details = with_details
         self._lock = threading.Lock()
-        self._running = {}
-        self._totals = dict(done=0, failed=0, dead=0)
+        self._running_tasks = {}
+        self._totals = dict(done_cnt=0, failed_cnt=0, dead_cnt=0)
         self._since = {}
         self._since_start_time = time.monotonic()
         self._worker = None
@@ -140,20 +140,20 @@ class TokeoDramatiqHeartbeat(Middleware):
         if self.with_details:
             task['args'] = format_details(repr((message.args, message.kwargs)))
         with self._lock:
-            self._running[message.message_id] = task
+            self._running_tasks[message.message_id] = task
 
     def after_process_message(self, broker, message, *, result=None, exception=None):
         with self._lock:
-            task = self._running.pop(message.message_id, None)
+            task = self._running_tasks.pop(message.message_id, None)
             runtime_ms = int((time.monotonic() - task['start_time']) * 1000) if task else 0
-            actor = self._since.setdefault(message.actor_name, dict(done=0, failed=0, max_runtime_ms=0))
+            actor = self._since.setdefault(message.actor_name, dict(done_cnt=0, failed_cnt=0, max_runtime_ms=0))
             actor['max_runtime_ms'] = max(actor['max_runtime_ms'], runtime_ms)
             if exception is None:
-                self._totals['done'] += 1
-                actor['done'] += 1
+                self._totals['done_cnt'] += 1
+                actor['done_cnt'] += 1
             else:
-                self._totals['failed'] += 1
-                actor['failed'] += 1
+                self._totals['failed_cnt'] += 1
+                actor['failed_cnt'] += 1
                 # the type never holds data, the text only with details
                 error = type(exception).__name__
                 if self.with_details and str(exception):
@@ -162,12 +162,12 @@ class TokeoDramatiqHeartbeat(Middleware):
 
     def after_skip_message(self, broker, message):
         with self._lock:
-            self._running.pop(message.message_id, None)
+            self._running_tasks.pop(message.message_id, None)
 
     def after_nack(self, broker, message):
         # a rejected message goes to the dead letters
         with self._lock:
-            self._totals['dead'] += 1
+            self._totals['dead_cnt'] += 1
 
     # ---- heartbeat ----------------------------------------------------------
 
@@ -187,10 +187,10 @@ class TokeoDramatiqHeartbeat(Middleware):
         worker = self._worker
         now = time.monotonic()
         with self._lock:
-            running = [
+            running_tasks = [
                 {key: value for key, value in task.items() if key != 'start_time'}
                 | dict(runtime_ms=int((now - task['start_time']) * 1000))
-                for task in self._running.values()
+                for task in self._running_tasks.values()
             ]
             totals = dict(self._totals)
             since_last = dict(ms=int((now - self._since_start_time) * 1000), actors=self._since)
@@ -212,7 +212,7 @@ class TokeoDramatiqHeartbeat(Middleware):
                 delay_queue_prefetch=getattr(worker, 'delay_prefetch', None),
                 with_details=self.with_details,
             ),
-            running=running,
+            running_tasks=running_tasks,
             totals=totals,
             since_last=since_last,
         )
@@ -357,8 +357,8 @@ class TokeoDramatiqMonitor:
         ### Returns
 
         - **list**: One dict per worker process with ```state``` (```ok```,
-            ```late```, ```gone``` or ```stopped```), ```seen_ms``` since its
-            last heartbeat and the ```heartbeat``` itself
+            ```late```, ```gone``` or ```stopped```), ```heartbeat_age_ms```
+            since its last heartbeat and the ```heartbeat``` itself
 
         """
         with self._lock:
@@ -368,19 +368,19 @@ class TokeoDramatiqMonitor:
             for key, entry in list(self._workers.items()):
                 heartbeat = entry['heartbeat']
                 interval = heartbeat.get('interval_seconds') or self.interval_seconds
-                seen_seconds = now - entry['received_time']
+                heartbeat_age_seconds = now - entry['received_time']
                 if heartbeat.get('state') == 'stopped':
                     state, keep_intervals = 'stopped', _KEEP_INTERVALS
-                elif seen_seconds <= _LATE_INTERVALS * interval:
+                elif heartbeat_age_seconds <= _LATE_INTERVALS * interval:
                     state, keep_intervals = 'ok', None
-                elif seen_seconds <= _GONE_INTERVALS * interval:
+                elif heartbeat_age_seconds <= _GONE_INTERVALS * interval:
                     state, keep_intervals = 'late', None
                 else:
                     state, keep_intervals = 'gone', _GONE_INTERVALS + _KEEP_INTERVALS
-                if keep_intervals is not None and seen_seconds > keep_intervals * interval:
+                if keep_intervals is not None and heartbeat_age_seconds > keep_intervals * interval:
                     del self._workers[key]
                     continue
-                result.append(dict(state=state, seen_ms=int(seen_seconds * 1000), heartbeat=heartbeat))
+                result.append(dict(state=state, heartbeat_age_ms=int(heartbeat_age_seconds * 1000), heartbeat=heartbeat))
         return sorted(result, key=lambda w: (w['heartbeat']['worker']['host'], w['heartbeat']['worker']['pid']))
 
     def snapshot(self, wait_seconds=0):
@@ -406,14 +406,14 @@ class TokeoDramatiqMonitor:
             if worker['state'] not in ('ok', 'late'):
                 continue
             for name, counts in worker['heartbeat']['since_last']['actors'].items():
-                actor = actors.setdefault(name, dict(done=0, failed=0, max_runtime_ms=0))
-                actor['done'] += counts.get('done', 0)
-                actor['failed'] += counts.get('failed', 0)
+                actor = actors.setdefault(name, dict(done_cnt=0, failed_cnt=0, max_runtime_ms=0))
+                actor['done_cnt'] += counts.get('done_cnt', 0)
+                actor['failed_cnt'] += counts.get('failed_cnt', 0)
                 actor['max_runtime_ms'] = max(actor['max_runtime_ms'], counts.get('max_runtime_ms', 0))
                 if counts.get('last_error'):
                     actor['last_error'] = counts['last_error']
         queues = self._dramatiq.queues.state()
-        totals = {key: sum(q[key] or 0 for q in queues) for key in ('ready', 'delayed', 'dead', 'consumers')}
+        totals = {key: sum(q[key] or 0 for q in queues) for key in ('ready_cnt', 'delayed_cnt', 'dead_cnt', 'consumer_cnt')}
         return dict(
             at=_get_now_ms(),
             monitoring=self._dramatiq.config('monitoring'),
