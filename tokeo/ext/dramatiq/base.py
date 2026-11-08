@@ -18,7 +18,7 @@ from dramatiq.common import q_name
 import pika
 from tokeo.core.utils.url import format_auth_url
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
-from tokeo.core.utils.validate import is_bool, as_int_or_auto
+from tokeo.core.utils.validate import is_bool, is_number_gt, as_int_or_auto
 from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError, TokeoDramatiqConnectionError
 
 
@@ -363,6 +363,12 @@ class TokeoDramatiq(MetaMixin):
         Cement post-setup hook: bind to app, merge config defaults, attach
         the locks handler if diskcache is loaded, register the broker.
 
+        ### Raises
+
+        - **TokeoDramatiqConfigError**: If ```locks_sleep_seconds``` is not
+            a number greater than 0, with a cache handler, or a value of the
+            config checked by register is not allowed
+
         """
         # save pointer to app
         self.app = app
@@ -374,11 +380,16 @@ class TokeoDramatiq(MetaMixin):
         # cache backends (memcached, etc.) don't expose that method, so
         # we skip silently and rely on the locks property to raise on use
         if getattr(self.app._meta, 'cache_handler', None):
+            # checked as config here, the locks handler would refuse it as
+            # its argument by a ValueError
+            sleep_seconds = self._config('locks_sleep_seconds')
+            if not is_number_gt(sleep_seconds, 0):
+                raise TokeoDramatiqConfigError('config', 'locks_sleep_seconds', sleep_seconds, 'a number of seconds greater than 0')
             try:
                 self._locks = self.app.cache.create_locks_handler(
                     self._config('locks_tag'),
                     self._config('locks_key_prefix'),
-                    self._config('locks_sleep_seconds'),
+                    sleep_seconds,
                 )
             except AttributeError as e:
                 self.app.log.debug(f'dramatiq locks unavailable on cache_handler: {e}')

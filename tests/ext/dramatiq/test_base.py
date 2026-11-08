@@ -4,6 +4,7 @@ middleware and the config values that register hands over to dramatiq.
 """
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -295,6 +296,16 @@ def test_locks_sleep_seconds_is_an_own_option_of_dramatiq(tmp):
         assert app.dramatiq.locks._sleep_seconds == 0.3
         assert app.cache.locks._sleep_seconds == 0.1
 
+
+@pytest.mark.parametrize('value', [0, -0.1, '0.1', None, True], ids=['zero', 'negative', 'str', 'none', 'bool'])
+def test_locks_sleep_seconds_invalid(tmp, value):
+    """locks_sleep_seconds no number greater than 0 raises the config error."""
+    expected = f'Invalid dramatiq config locks_sleep_seconds: Value {value!r} must be a number of seconds greater than 0!'
+    with pytest.raises(TokeoDramatiqConfigError, match='^' + re.escape(expected) + '$') as err_info:
+        with DramatiqTest(tmp, locks_sleep_seconds=value):
+            pass
+    assert err_info.value.name == 'locks_sleep_seconds'
+    assert err_info.value.value == value
 
 # ---- actor send wrapper -----------------------------------------------------
 
