@@ -123,18 +123,18 @@ def test_except_base_exception_in_the_call_swallows_it():
 @needs_python_313
 def test_finally_of_the_call_runs():
     """The finally block of an aborted call runs."""
-    cleaned = []
+    cleaned_calls = []
 
     @timelimit(0.2)
     def job():
         try:
             _run_busy(10)
         finally:
-            cleaned.append(True)
+            cleaned_calls.append(True)
 
     with pytest.raises(TokeoTimelimitExceeded):
         job()
-    assert cleaned == [True]
+    assert cleaned_calls == [True]
 
 
 @needs_python_313
@@ -305,7 +305,7 @@ def test_nested_limits_running_off_together_do_not_lose_the_outer_one():
 @needs_python_313
 def test_many_threads_running_off_at_once_are_all_aborted():
     """50 busy threads with the same limit are all aborted, no timer stays."""
-    aborted = []
+    aborted_calls = []
     lock = threading.Lock()
 
     @timelimit(0.2)
@@ -317,7 +317,7 @@ def test_many_threads_running_off_at_once_are_all_aborted():
             job()
         except TokeoTimelimitExceeded:
             with lock:
-                aborted.append(True)
+                aborted_calls.append(True)
 
     threads = [threading.Thread(target=run) for _ in range(50)]
     start_time = time.monotonic()
@@ -325,6 +325,6 @@ def test_many_threads_running_off_at_once_are_all_aborted():
         thread.start()
     for thread in threads:
         thread.join(10)
-    assert len(aborted) == 50
+    assert len(aborted_calls) == 50
     assert time.monotonic() - start_time < 10
     assert threading.active_count() == 1

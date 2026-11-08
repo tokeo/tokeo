@@ -151,13 +151,13 @@ def test_register_queue_arguments_default(tmp, keep_dead_message_ttl, rabbitmq):
 )
 def test_unparalleled_queues_consume_one_message_at_a_time(tmp, monkeypatch, queue, prefetch, expected):
     """An unparalleled queue prefetches 1, its delay queue as given."""
-    consumed = []
+    consumed_prefetches = []
     monkeypatch.setattr(
-        dramatiq_rabbitmq.RabbitmqBroker, 'consume', lambda self, name, prefetch=1, timeout=5000: consumed.append(prefetch)
+        dramatiq_rabbitmq.RabbitmqBroker, 'consume', lambda self, name, prefetch=1, timeout=5000: consumed_prefetches.append(prefetch)
     )
     with DramatiqBrokerTest(tmp, None) as app:
         app.dramatiq.broker.consume(queue, prefetch=prefetch)
-    assert consumed == [expected]
+    assert consumed_prefetches == [expected]
 
 
 @pytest.mark.usefixtures('keep_dead_message_ttl')
@@ -318,12 +318,12 @@ def test_actor_send_and_run_unchanged(tmp, monkeypatch):
     """send, send_with_options and the call of an actor work as before."""
     with DramatiqBrokerTest(tmp, None) as app:
         actor = app.dramatiq.actor(lambda value: value * 2, actor_name='double')
-        sent = []
-        monkeypatch.setattr(app.dramatiq.broker, 'enqueue', lambda message, delay=None: sent.append((message, delay)) or message)
+        sent_messages = []
+        monkeypatch.setattr(app.dramatiq.broker, 'enqueue', lambda message, delay=None: sent_messages.append((message, delay)) or message)
         message = actor.send_with_options(args=(21,), delay=500, max_retries=1)
         actor.send(2)
-    assert (message.args, message.options['max_retries'], sent[0][1]) == ((21,), 1, 500)
-    assert len(sent) == 2
+    assert (message.args, message.options['max_retries'], sent_messages[0][1]) == ((21,), 1, 500)
+    assert len(sent_messages) == 2
     # the worker calls the actor itself, that path is untouched
     assert actor(21) == 42
 

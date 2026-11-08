@@ -11,7 +11,7 @@ from tokeo.core.smtpd.context import MessageCtx, MessageSpooler
 
 
 @pytest.mark.parametrize(
-    'data, chomped',
+    'data, expected_chomped',
     [
         (b'body\r\n', b'body'),
         (b'body\n', b'body'),
@@ -20,12 +20,12 @@ from tokeo.core.smtpd.context import MessageCtx, MessageSpooler
         (b'body', b'body'),
     ],
 )
-def test_chomp_removes_exactly_one_line_break(data, chomped):
+def test_chomp_removes_exactly_one_line_break(data, expected_chomped):
     """The chomp of a message in memory removes one CRLF, LF or CR, never more."""
     message = MessageCtx(data=bytearray(data))
     message.chomp()
-    assert bytes(message.data) == chomped
-    assert message.bytesize == len(chomped)
+    assert bytes(message.data) == expected_chomped
+    assert message.bytesize == len(expected_chomped)
 
 
 def test_chomp_of_a_closed_spool_file_keeps_the_size(tmp_path):

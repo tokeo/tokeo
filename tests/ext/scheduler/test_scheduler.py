@@ -33,7 +33,7 @@ class SchedulerWithoutTuiTest(SchedulerTest):
 
 
 @pytest.fixture
-def started():
+def started_app():
     """An app with its scheduler running in the background, no shell."""
     with SchedulerTest() as app:
         app.scheduler.startup(with_shell=True)
@@ -56,11 +56,11 @@ def test_trigger_puts_the_delay_on_a_next_fire_time_only(crontab, delay_seconds,
     assert trigger.get_next_fire_time(None, datetime(2026, 11, 1, tzinfo=timezone.utc)) == expected
 
 
-def test_reload_keeps_the_ids_of_the_tasks(started):
+def test_reload_keeps_the_ids_of_the_tasks(started_app):
     """After a reload the tasks have the same ids, pause 1 still means the first."""
-    before = sorted(job.id for job in started.scheduler.scheduler.get_jobs())
-    started.scheduler.handle_command_reload(types.SimpleNamespace(restart=False))
-    assert sorted(job.id for job in started.scheduler.scheduler.get_jobs()) == before
+    before = sorted(job.id for job in started_app.scheduler.scheduler.get_jobs())
+    started_app.scheduler.handle_command_reload(types.SimpleNamespace(restart=False))
+    assert sorted(job.id for job in started_app.scheduler.scheduler.get_jobs()) == before
 
 
 def test_needs_the_tui_extensions():
@@ -99,11 +99,11 @@ def test_launch_switches_removed(switch):
             app.run()
 
 
-def test_list_table(started, capsys, monkeypatch):
+def test_list_table(started_app, capsys, monkeypatch):
     """list shows the state of the scheduler and a table of the tasks."""
     monkeypatch.setenv('COLUMNS', '160')
     capsys.readouterr()
-    assert started.scheduler.run_command('list')
+    assert started_app.scheduler.run_command('list')
     lines = [line.strip() for line in capsys.readouterr().out.splitlines() if line.strip()]
     # the time and the state of the scheduler head the table
     assert lines[0].endswith('scheduler running')
@@ -113,41 +113,41 @@ def test_list_table(started, capsys, monkeypatch):
     assert row[:4] == ['1', '1:the', 'time', "cron[month='1',"] and row[-1] == 'active'
 
 
-def test_list_shows_paused_tasks_and_scheduler(started, capsys):
+def test_list_shows_paused_tasks_and_scheduler(started_app, capsys):
     """list shows a paused task and a paused scheduler."""
-    started.scheduler.run_command('tasks pause 1')
-    started.scheduler.run_command('pause')
+    started_app.scheduler.run_command('tasks pause 1')
+    started_app.scheduler.run_command('pause')
     capsys.readouterr()
-    started.scheduler.run_command('list')
+    started_app.scheduler.run_command('list')
     lines = [line.strip() for line in capsys.readouterr().out.splitlines() if line.strip()]
     assert lines[0].endswith('scheduler not running') and lines[4].split()[-1] == 'paused'
 
 
-def test_shell_runs_commands(started):
+def test_shell_runs_commands(started_app):
     """The shell runs "tasks pause 1", the task has no next run time."""
     with create_pipe_input() as keyboard:
         keyboard.send_text('tasks pause 1\rexit\r')
-        started.scheduler.run_shell(input=keyboard, output=DummyOutput())
-    assert started.scheduler.scheduler.get_job('1').next_run_time is None
+        started_app.scheduler.run_shell(input=keyboard, output=DummyOutput())
+    assert started_app.scheduler.scheduler.get_job('1').next_run_time is None
 
 
-def test_shell_keeps_a_wrong_command(started):
+def test_shell_keeps_a_wrong_command(started_app):
     """An unknown command is tried once, Ctrl-C clears it."""
     calls = []
-    original = started.scheduler.run_command
+    original = started_app.scheduler.run_command
 
     def run_command(line):
         calls.append(line)
         return original(line)
 
-    started.scheduler.run_command = run_command
+    started_app.scheduler.run_command = run_command
     with create_pipe_input() as keyboard:
         keyboard.send_text(f'nonsense\r\x03{CTRL_D}')
-        started.scheduler.run_shell(input=keyboard, output=DummyOutput())
+        started_app.scheduler.run_shell(input=keyboard, output=DummyOutput())
     assert calls == ['nonsense']
 
 
-def test_shell_shows_a_failing_command(started, monkeypatch):
+def test_shell_shows_a_failing_command(started_app, monkeypatch):
     """A failing command is logged as "Shell command failed: ..."."""
     from cement.ext.ext_logging import LoggingLogHandler
 
@@ -156,10 +156,10 @@ def test_shell_shows_a_failing_command(started, monkeypatch):
 
     errors = []
     monkeypatch.setattr(LoggingLogHandler, 'error', lambda self, msg, **kw: errors.append(msg))
-    monkeypatch.setattr(started.scheduler.scheduler, 'pause', pause)
+    monkeypatch.setattr(started_app.scheduler.scheduler, 'pause', pause)
     with create_pipe_input() as keyboard:
         keyboard.send_text(f'pause\r\x03{CTRL_D}')
-        started.scheduler.run_shell(input=keyboard, output=DummyOutput())
+        started_app.scheduler.run_shell(input=keyboard, output=DummyOutput())
     assert errors == ['Shell command failed: cannot pause']
 
 

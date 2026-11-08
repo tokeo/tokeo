@@ -44,7 +44,7 @@ class FakeChannel:
     def __init__(self, server):
         self.server = server
         self.is_closed = False
-        self.unacked = {}
+        self.unacked_messages = {}
         self.tag = 0
 
     def confirm_delivery(self):
@@ -65,17 +65,17 @@ class FakeChannel:
         if not messages:
             return None, None, None
         self.tag += 1
-        self.unacked[self.tag] = (queue, messages.pop(0))
-        return SimpleNamespace(delivery_tag=self.tag), None, self.unacked[self.tag][1]
+        self.unacked_messages[self.tag] = (queue, messages.pop(0))
+        return SimpleNamespace(delivery_tag=self.tag), None, self.unacked_messages[self.tag][1]
 
     def basic_nack(self, delivery_tag, multiple=False, requeue=True):
-        tags = sorted(t for t in self.unacked if t <= delivery_tag) if multiple else [delivery_tag]
+        tags = sorted(t for t in self.unacked_messages if t <= delivery_tag) if multiple else [delivery_tag]
         for tag in reversed(tags):
-            queue, body = self.unacked.pop(tag)
+            queue, body = self.unacked_messages.pop(tag)
             self.server.queues[queue]['messages'].insert(0, body)
 
     def basic_ack(self, delivery_tag):
-        self.unacked.pop(delivery_tag)
+        self.unacked_messages.pop(delivery_tag)
 
     def basic_publish(self, exchange, routing_key, body, properties=None, mandatory=False):
         if routing_key not in self.server.queues or self.server.refuse_publish:
@@ -462,8 +462,8 @@ def test_refused_request(app, server):
     """A refused request raises, the next call works on a new channel."""
     server.add('mail', b'1')
     server.refuse = (403, "ACCESS_REFUSED - access to queue 'mail' refused")
-    refused = r'Rabbitmq at localhost:5672 refused the request \(ChannelClosedByBroker: .*ACCESS_REFUSED'
-    with pytest.raises(TokeoDramatiqRefusedError, match=refused) as err_info:
+    refused_pattern = r'Rabbitmq at localhost:5672 refused the request \(ChannelClosedByBroker: .*ACCESS_REFUSED'
+    with pytest.raises(TokeoDramatiqRefusedError, match=refused_pattern) as err_info:
         app.dramatiq.queues.purge('mail')
     assert err_info.value.address == 'localhost:5672' and err_info.value.__cause__.reply_code == 403
     # the next call works on a new channel of the same connection

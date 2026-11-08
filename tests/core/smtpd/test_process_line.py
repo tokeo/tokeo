@@ -63,91 +63,91 @@ class ProcessLineSession:
 
 
 @pytest.fixture(scope='module')
-def shared():
+def shared_session():
     """One session for the module, each test continues the dialog before."""
     return ProcessLineSession()
 
 
-def test_10_ehlo(shared):
+def test_10_ehlo(shared_session):
     """EHLO lists the extensions with AUTH and STARTTLS and stores the name."""
-    result = shared.send_line('EHLO Process line unit test')
+    result = shared_session.send_line('EHLO Process line unit test')
     assert result == ('250-Process line test - Greeting\r\n' '250-8BITMIME\r\n250-SMTPUTF8\r\n' '250-AUTH LOGIN PLAIN\r\n250 STARTTLS')
-    assert shared.session.ctx.server.helo == 'Process line unit test'
+    assert shared_session.session.ctx.server.helo == 'Process line unit test'
 
 
-def test_11_ehlo_again_resets_like_rset(shared):
+def test_11_ehlo_again_resets_like_rset(shared_session):
     """A second EHLO answers again, resets like RSET and keeps the name."""
-    result = shared.send_line('EHLO Process line unit test')
+    result = shared_session.send_line('EHLO Process line unit test')
     assert result.endswith('250 STARTTLS')
-    assert shared.session.ctx.server.helo == 'Process line unit test'
+    assert shared_session.session.ctx.server.helo == 'Process line unit test'
 
 
-def test_20_auth_login_simulate_fail(shared):
+def test_20_auth_login_simulate_fail(shared_session):
     """AUTH LOGIN with a wrong password raises 535 and stays unauthenticated."""
-    result = shared.send_line('AUTH LOGIN')
+    result = shared_session.send_line('AUTH LOGIN')
     assert result == '334 ' + base64.b64encode(b'Username:').decode()
-    result = shared.send_line(base64.b64encode(b'administrator').decode())
+    result = shared_session.send_line(base64.b64encode(b'administrator').decode())
     assert result == '334 ' + base64.b64encode(b'Password:').decode()
     with pytest.raises(Smtpd535Exception):
-        shared.send_line(base64.b64encode(b'error_password').decode())
-    events = shared.smtpd.events_handler
+        shared_session.send_line(base64.b64encode(b'error_password').decode())
+    events = shared_session.smtpd.events_handler
     assert events.ev_auth_authentication_id == 'administrator'
     assert events.ev_auth_authentication == 'error_password'
-    server = shared.session.ctx.server
+    server = shared_session.session.ctx.server
     assert server.authorization_id == ''
     assert server.authentication_id == ''
     assert server.authenticated_at is None
 
 
-def test_21_auth_plain_authenticate_supervisor(shared):
+def test_21_auth_plain_authenticate_supervisor(shared_session):
     """AUTH PLAIN as administrator answers 235, authorized as supervisor."""
-    result = shared.send_line('AUTH PLAIN')
+    result = shared_session.send_line('AUTH PLAIN')
     assert result == '334 '
-    result = shared.send_line('AGFkbWluaXN0cmF0b3IAcGFzc3dvcmQ')
+    result = shared_session.send_line('AGFkbWluaXN0cmF0b3IAcGFzc3dvcmQ')
     assert result == '235 OK'
-    events = shared.smtpd.events_handler
+    events = shared_session.smtpd.events_handler
     assert events.ev_auth_authentication_id == 'administrator'
     assert events.ev_auth_authentication == 'password'
-    server = shared.session.ctx.server
+    server = shared_session.session.ctx.server
     assert server.authorization_id == 'supervisor'
     assert server.authentication_id == 'administrator'
     assert server.authenticated_at is not None
 
 
-def test_30_mail_from(shared):
+def test_30_mail_from(shared_session):
     """MAIL FROM answers 250 and stores the sender."""
-    result = shared.send_line('MAIL FROM: demo@local.local')
+    result = shared_session.send_line('MAIL FROM: demo@local.local')
     assert result == '250 OK'
-    assert shared.session.ctx.envelope.mail_from == 'demo@local.local'
+    assert shared_session.session.ctx.envelope.mail_from == 'demo@local.local'
 
 
-def test_40_rcpt_to(shared):
+def test_40_rcpt_to(shared_session):
     """Two RCPT TO answer 250 and store both recipients in order."""
-    assert shared.send_line('RCPT TO: demo1@local.local') == '250 OK'
-    assert shared.send_line('RCPT TO: demo2@local.local') == '250 OK'
-    rcpts = shared.session.ctx.envelope.rcpt_tos
+    assert shared_session.send_line('RCPT TO: demo1@local.local') == '250 OK'
+    assert shared_session.send_line('RCPT TO: demo2@local.local') == '250 OK'
+    rcpts = shared_session.session.ctx.envelope.rcpt_tos
     assert len(rcpts) == 2
     assert rcpts[0] == 'demo1@local.local'
     assert rcpts[1] == 'demo2@local.local'
 
 
-def test_50_data(shared):
+def test_50_data(shared_session):
     """DATA delivers 174 bytes with the injected headers, then resets."""
-    assert shared.send_line('DATA').startswith('354 ')
-    shared.send_line('From: <demo@local.local>')
-    shared.send_line('To: <demo1@local.local>, <demo2@local.local>')
-    shared.send_line('Subject: Unit Test')
-    shared.send_line('X-test: 1')
-    shared.send_line('')
-    shared.send_line('Welcome to message!')
-    shared.send_line('Have fun.')
-    shared.send_line('..')
-    result = shared.send_line('.')
+    assert shared_session.send_line('DATA').startswith('354 ')
+    shared_session.send_line('From: <demo@local.local>')
+    shared_session.send_line('To: <demo1@local.local>, <demo2@local.local>')
+    shared_session.send_line('Subject: Unit Test')
+    shared_session.send_line('X-test: 1')
+    shared_session.send_line('')
+    shared_session.send_line('Welcome to message!')
+    shared_session.send_line('Have fun.')
+    shared_session.send_line('..')
+    result = shared_session.send_line('.')
     assert result.startswith('250 ')
-    assert shared.session.cmd_sequence is _CMD_RSET
-    assert shared.session.ctx.message.bytesize == -1
-    assert bytes(shared.session.ctx.message.data) == b''
-    events = shared.smtpd.events_handler
+    assert shared_session.session.cmd_sequence is _CMD_RSET
+    assert shared_session.session.ctx.message.bytesize == -1
+    assert bytes(shared_session.session.ctx.message.data) == b''
+    events = shared_session.smtpd.events_handler
     assert events.ev_message_bytesize == 174
     assert events.ev_message_data.startswith(b'Received: test header\r\n')
     message = email.message_from_bytes(events.ev_message_data)
@@ -158,18 +158,18 @@ def test_50_data(shared):
     assert message['X-inject'] == 'Y'
 
 
-def test_90_noop(shared):
+def test_90_noop(shared_session):
     """NOOP answers "250 OK"."""
-    assert shared.send_line('NOOP') == '250 OK'
+    assert shared_session.send_line('NOOP') == '250 OK'
 
 
-def test_91_rset(shared):
+def test_91_rset(shared_session):
     """RSET answers "250 OK" and sets the RSET state."""
-    assert shared.send_line('RSET') == '250 OK'
-    assert shared.session.cmd_sequence is _CMD_RSET
+    assert shared_session.send_line('RSET') == '250 OK'
+    assert shared_session.session.cmd_sequence is _CMD_RSET
 
 
-def test_99_quit(shared):
+def test_99_quit(shared_session):
     """QUIT answers empty and sets the QUIT state."""
-    assert shared.send_line('QUIT') == ''
-    assert shared.session.cmd_sequence is _CMD_QUIT
+    assert shared_session.send_line('QUIT') == ''
+    assert shared_session.session.cmd_sequence is _CMD_QUIT

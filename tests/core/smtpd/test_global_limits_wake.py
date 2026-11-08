@@ -23,11 +23,11 @@ class GatedEvents(SmtpdEvents):
     def __init__(self, options=None):
         super().__init__(options)
         self.gate = asyncio.Event()
-        self.delivered = []
+        self.delivered_messages = []
 
     async def on_message_data_event(self, ctx):
         await self.gate.wait()
-        self.delivered.append(bytes(ctx.message.data))
+        self.delivered_messages.append(bytes(ctx.message.data))
 
 
 def test_servers_share_the_global_wake_event():
@@ -62,14 +62,14 @@ def test_release_on_service_a_wakes_waiter_on_service_b():
             mail_b = loop.run_in_executor(None, lambda: send_mail(port_b, 'b@x.org', 'to@x.org', 'Subject: b\r\n\r\nB'))
             # B is connected and waits for the slot ...
             assert await wait_until_async(lambda: srv_b.connections == 1)
-            assert srv_b.processings == 0 and events_b.delivered == []  # ... and did not get through yet
+            assert srv_b.processings == 0 and events_b.delivered_messages == []  # ... and did not get through yet
 
             events_a.gate.set()  # A finishes -> releases the slot
             events_b.gate.set()  # let B pass once admitted
             code_a, _ = await asyncio.wait_for(mail_a, 5.0)
             code_b, _ = await asyncio.wait_for(mail_b, 5.0)
             assert code_a == 250 and code_b == 250
-            assert len(events_b.delivered) == 1
+            assert len(events_b.delivered_messages) == 1
         finally:
             await srv_a.stop(wait_seconds_before_close=0.3)
             await srv_b.stop(wait_seconds_before_close=0.3)
@@ -107,11 +107,11 @@ def test_external_counter_release_is_seen_via_wait_for_slot_override():
             gl.processing_cnt = 1  # as if another process holds the slot
             mail = loop.run_in_executor(None, lambda: send_mail(port, 'a@x.org', 'to@x.org', 'Subject: x\r\n\r\nhi'))
             assert await wait_until_async(lambda: srv.connections == 1)
-            assert srv.processings == 0 and events.delivered == []  # throttled by the "foreign" slot
+            assert srv.processings == 0 and events.delivered_messages == []  # throttled by the "foreign" slot
 
             gl.processing_cnt = 0  # foreign process releases: NO event
             code, _ = await asyncio.wait_for(mail, 5.0)
-            assert code == 250 and len(events.delivered) == 1
+            assert code == 250 and len(events.delivered_messages) == 1
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 

@@ -183,9 +183,9 @@ def test_tasks_build_leaves_the_config_as_it_is():
 
 def test_run_closes_the_connections_of_every_host(monkeypatch):
     """A run closes each connection it opened, also of a host whose task failed."""
-    closed = []
-    monkeypatch.setattr(TokeoAutomateRemoteContext, 'close', lambda self: closed.append(self.host))
-    monkeypatch.setattr(TokeoAutomateLocalContext, 'close', lambda self: closed.append('local'))
+    closed_hosts = []
+    monkeypatch.setattr(TokeoAutomateRemoteContext, 'close', lambda self: closed_hosts.append(self.host))
+    monkeypatch.setattr(TokeoAutomateLocalContext, 'close', lambda self: closed_hosts.append('local'))
 
     def func(run, verbose=False, **kwargs):
         if getattr(run.__self__, 'host', None) == '10.0.0.2':
@@ -200,7 +200,7 @@ def test_run_closes_the_connections_of_every_host(monkeypatch):
         task = app.automate.tasks['task1']
         task['func'] = func
         results = app.automate.run(task)
-    assert sorted(closed) == ['10.0.0.1', '10.0.0.2', 'local']
+    assert sorted(closed_hosts) == ['10.0.0.1', '10.0.0.2', 'local']
     assert [result.exited for result in results] == [0, 0, -1]
 
 

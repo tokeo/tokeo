@@ -68,20 +68,20 @@ def no_process_replacement(monkeypatch):
     """The calls of os.execv, recorded instead of replacing the test process."""
     # a test that leaves _watchdog_restart_requested set would have the
     # post_close hook run os.execv() during the teardown of the app
-    replaced = []
+    replaced_calls = []
     monkeypatch.setattr(
         'tokeo.ext.pdoc.os.execv',
-        lambda path, argv: replaced.append((path, argv)),
+        lambda path, argv: replaced_calls.append((path, argv)),
     )
-    return replaced
+    return replaced_calls
 
 
 @pytest.fixture
 def app(tmp_path):
     """A booted app; ```app.pdoc``` is the handler under test."""
-    with PdocTest(tmp_path) as booted:
-        booted.run()
-        yield booted
+    with PdocTest(tmp_path) as app:
+        app.run()
+        yield app
 
 
 @pytest.fixture
@@ -331,9 +331,9 @@ def test_render_shows_values_by_their_documentation(tmp_path, monkeypatch, name,
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc.doc.Module.from_name.cache_clear()
 
-    with PdocTest(tmp_path, modules=['visibility'], config_page=False) as booted:
-        booted.run()
-        booted.pdoc.render()
+    with PdocTest(tmp_path, modules=['visibility'], config_page=False) as app:
+        app.run()
+        app.pdoc.render()
 
     html = (tmp_path / 'html' / 'visibility' / 'main.html').read_text()
     assert (f'id="{name}"' in html) is shown
@@ -385,9 +385,9 @@ def _render_page(tmp_path, monkeypatch, package_name, files):
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc.doc.Module.from_name.cache_clear()
 
-    with PdocTest(tmp_path, modules=[package_name], config_page=False) as booted:
-        booted.run()
-        booted.pdoc.render()
+    with PdocTest(tmp_path, modules=[package_name], config_page=False) as app:
+        app.run()
+        app.pdoc.render()
 
     return {name: (tmp_path / 'html' / package_name / f'{name}.html').read_text() for name in files}
 
@@ -536,8 +536,8 @@ def _collect_config_sections(app, tmp_path, monkeypatch):
         lambda name: types.SimpleNamespace(render=lambda **kw: '<html></html>'),
     )
     app.pdoc._render_config_page(str(tmp_path / 'out'))
-    seen = pdoc.render.env.globals.get('config_dict', {})
-    return list(seen)
+    config_dict = pdoc.render.env.globals.get('config_dict', {})
+    return list(config_dict)
 
 
 def _get_fake_appenv_files(config_dir, app_env, suffix):
@@ -1147,13 +1147,13 @@ def test_markdown_include_of_code_counts_as_a_level(to_html, tmp_path):
 def test_serve_answers_and_stops_via_the_started_monitor(app, tmp_path, monkeypatch):
     """serve answers a request and stops by the monitor it started."""
     _write(tmp_path / 'html' / 'index.html', '<html>tokeo</html>\n')
-    seen = {}
+    seen_values = {}
 
     def monitor(httpd):
-        seen['httpd'] = httpd
+        seen_values['httpd'] = httpd
         port = httpd.server_address[1]
         with urllib.request.urlopen(f'http://127.0.0.1:{port}/', timeout=5) as r:
-            seen['body'] = r.read().decode().strip()
+            seen_values['body'] = r.read().decode().strip()
         httpd.shutdown()
 
     # `_watch()` returns the monitor; serve() runs it in a daemon thread
@@ -1168,18 +1168,18 @@ def test_serve_answers_and_stops_via_the_started_monitor(app, tmp_path, monkeypa
     thread.join(timeout=15)
 
     assert not thread.is_alive()
-    assert 'httpd' in seen
-    assert seen['body'] == '<html>tokeo</html>'
+    assert 'httpd' in seen_values
+    assert seen_values['body'] == '<html>tokeo</html>'
 
 
 def test_serve_reports_a_missing_output_dir(tmp_path):
     """serve without output directory logs "nothing to serve"."""
-    with PdocTest(tmp_path, output_dir=str(tmp_path / 'gone')) as booted:
-        booted.run()
+    with PdocTest(tmp_path, output_dir=str(tmp_path / 'gone')) as app:
+        app.run()
         lines = []
-        booted.log.error = lambda msg, *a, **kw: lines.append(str(msg))
+        app.log.error = lambda msg, *a, **kw: lines.append(str(msg))
 
-        assert booted.pdoc.serve() is None
+        assert app.pdoc.serve() is None
         assert _has(lines, 'nothing to serve')
 
 
@@ -1192,10 +1192,10 @@ def test_serve_raises_a_clean_error_when_the_port_is_taken(tmp_path):
     blocker.bind(('127.0.0.1', 0))
     blocker.listen(1)
     try:
-        with PdocTest(tmp_path, port=blocker.getsockname()[1]) as booted:
-            booted.run()
+        with PdocTest(tmp_path, port=blocker.getsockname()[1]) as app:
+            app.run()
             with pytest.raises(TokeoPdocError) as err_info:
-                booted.pdoc.serve()
+                app.pdoc.serve()
             assert 'port' in str(err_info.value)
     finally:
         blocker.close()
@@ -1287,19 +1287,19 @@ def test_set_modules_defaults_to_app_tests_and_tokeo(app):
 
 def test_setup_reads_the_configured_modules(tmp_path):
     """setup takes the modules from the config."""
-    with PdocTest(tmp_path, modules=['alpha', 'beta']) as booted:
-        booted.run()
+    with PdocTest(tmp_path, modules=['alpha', 'beta']) as app:
+        app.run()
 
-        assert booted.pdoc._modules == ['alpha', 'beta']
+        assert app.pdoc._modules == ['alpha', 'beta']
 
 
 def test_setup_reads_the_configured_config_page(tmp_path):
     """setup takes config_page from the config, True and False."""
     for configured in (True, False):
-        with PdocTest(tmp_path / str(configured), config_page=configured) as booted:
-            booted.run()
+        with PdocTest(tmp_path / str(configured), config_page=configured) as app:
+            app.run()
 
-            assert booted.pdoc._config_page_shown is configured
+            assert app.pdoc._config_page_shown is configured
 
 
 def test_set_config_page_accepts_truthy_strings(app):
@@ -1379,10 +1379,10 @@ def test_hotload_hands_the_restart_flag_on(app, monkeypatch):
     """The restart drops --clean and adds --restart."""
     # the replayed command line drops --clean (wipe once, not per rebuild)
     # and gains --restart (stay quiet next time)
-    seen = {}
+    seen_arguments = {}
     monkeypatch.setattr(
         'tokeo.ext.pdoc.os.execv',
-        lambda path, argv: seen.update(path=path, argv=argv),
+        lambda path, argv: seen_arguments.update(path=path, argv=argv),
     )
     monkeypatch.setattr(
         'sys.argv',
@@ -1393,15 +1393,15 @@ def test_hotload_hands_the_restart_flag_on(app, monkeypatch):
     app.pdoc.hotload()
 
     # argv[0] is the interpreter, argv[1] the console script
-    assert seen['argv'][2:] == ['pdoc', 'render', '--serve', '--watch', '--restart']
+    assert seen_arguments['argv'][2:] == ['pdoc', 'render', '--serve', '--watch', '--restart']
 
 
 def test_hotload_does_not_repeat_the_restart_flag(app, monkeypatch):
     """--restart is added once only."""
-    seen = {}
+    seen_arguments = {}
     monkeypatch.setattr(
         'tokeo.ext.pdoc.os.execv',
-        lambda path, argv: seen.update(argv=argv),
+        lambda path, argv: seen_arguments.update(argv=argv),
     )
     monkeypatch.setattr(
         'sys.argv',
@@ -1411,16 +1411,16 @@ def test_hotload_does_not_repeat_the_restart_flag(app, monkeypatch):
 
     app.pdoc.hotload()
 
-    assert seen['argv'].count('--restart') == 1
+    assert seen_arguments['argv'].count('--restart') == 1
 
 
 def test_restart_flag_is_hidden_from_the_help(tmp_path, monkeypatch, capsys):
     """--restart is not in the help, --watch is."""
     # it exists for the process replacement, not for users to type
-    with PdocTest(tmp_path) as booted:
-        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--help'])
+    with PdocTest(tmp_path) as app:
+        monkeypatch.setattr(app._meta, 'argv', ['pdoc', 'render', '--help'])
         with pytest.raises(SystemExit):
-            booted.run()
+            app.run()
 
     help_text = capsys.readouterr().out
     assert '--watch' in help_text
@@ -1441,9 +1441,9 @@ def _render_minimal(tmp_path, monkeypatch, package_name, clean):
     monkeypatch.syspath_prepend(str(tmp_path))
     pdoc.doc.Module.from_name.cache_clear()
 
-    with PdocTest(tmp_path, modules=[package_name], config_page=False) as booted:
-        booted.run()
-        booted.pdoc.render(clean=clean)
+    with PdocTest(tmp_path, modules=[package_name], config_page=False) as app:
+        app.run()
+        app.pdoc.render(clean=clean)
 
 
 def test_render_logs_the_skipped_modules_with_their_reason(tmp_path, monkeypatch):
@@ -1461,11 +1461,11 @@ def test_render_logs_the_skipped_modules_with_their_reason(tmp_path, monkeypatch
     pdoc.doc.Module.from_name.cache_clear()
 
     lines = []
-    with PdocTest(tmp_path, modules=['skippkg'], config_page=False) as booted:
-        booted.run()
+    with PdocTest(tmp_path, modules=['skippkg'], config_page=False) as app:
+        app.run()
         for level in ('info', 'warning'):
-            monkeypatch.setattr(booted.log, level, lambda msg, level=level, **kw: lines.append((level, str(msg))))
-        booted.pdoc.render()
+            monkeypatch.setattr(app.log, level, lambda msg, level=level, **kw: lines.append((level, str(msg))))
+        app.pdoc.render()
 
     assert (
         'info',
@@ -1502,10 +1502,10 @@ def test_output_dir_is_resolved_at_setup(tmp_path):
     """The output directory is resolved at setup."""
     # resolved once from the config, so render and serve cannot disagree and
     # a read before the first render already answers
-    with PdocTest(tmp_path) as booted:
-        booted.run()
+    with PdocTest(tmp_path) as app:
+        app.run()
 
-        assert booted.pdoc._output_dir == str(tmp_path / 'html')
+        assert app.pdoc._output_dir == str(tmp_path / 'html')
 
 
 def test_output_dir_is_absolute(tmp_path, monkeypatch):
@@ -1513,11 +1513,11 @@ def test_output_dir_is_absolute(tmp_path, monkeypatch):
     # `output_dir: html` in the config is relative; every consumer needs the
     # absolute path
     monkeypatch.chdir(tmp_path)
-    with PdocTest(tmp_path, output_dir='html') as booted:
-        booted.run()
+    with PdocTest(tmp_path, output_dir='html') as app:
+        app.run()
 
-        assert Path(booted.pdoc._output_dir).is_absolute()
-        assert Path(booted.pdoc._output_dir).name == 'html'
+        assert Path(app.pdoc._output_dir).is_absolute()
+        assert Path(app.pdoc._output_dir).name == 'html'
 
 
 def test_render_reports_the_output_directory(app, monkeypatch):
@@ -1554,15 +1554,15 @@ def test_render_reports_after_a_restart_too(tmp_path, monkeypatch):
     # confirmation that the rebuild finished
     lines = []
 
-    with PdocTest(tmp_path) as booted:
-        monkeypatch.setattr(booted.pdoc, '_render', lambda **kwargs: None)
+    with PdocTest(tmp_path) as app:
+        monkeypatch.setattr(app.pdoc, '_render', lambda **kwargs: None)
         monkeypatch.setattr(
-            booted.log,
+            app.log,
             'info',
             lambda msg, *a, **k: lines.append(str(msg)),
         )
-        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--restart'])
-        booted.run()
+        monkeypatch.setattr(app._meta, 'argv', ['pdoc', 'render', '--restart'])
+        app.run()
 
     assert any('documentation updated in' in line for line in lines)
 
@@ -1619,58 +1619,58 @@ def _run_cli(tmp_path, monkeypatch, argv):
     """
     calls = []
 
-    with PdocTest(tmp_path) as booted:
+    with PdocTest(tmp_path) as app:
         monkeypatch.setattr(
-            booted.pdoc,
+            app.pdoc,
             'render',
             lambda **kwargs: calls.append(('render', kwargs.get('raise_on_error'))),
         )
         monkeypatch.setattr(
-            booted.pdoc,
+            app.pdoc,
             'serve',
             lambda **kwargs: calls.append(('serve', kwargs.get('watch'))),
         )
-        monkeypatch.setattr(booted._meta, 'argv', argv)
-        booted.run()
+        monkeypatch.setattr(app._meta, 'argv', argv)
+        app.run()
 
     return calls
 
 
 def test_config_switch_turns_the_page_on(tmp_path, monkeypatch):
     """--config shows the page for this run, the config stays False."""
-    with PdocTest(tmp_path, config_page=False) as booted:
-        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
-        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--config'])
-        booted.run()
+    with PdocTest(tmp_path, config_page=False) as app:
+        monkeypatch.setattr(app.pdoc, 'render', lambda **kwargs: None)
+        monkeypatch.setattr(app._meta, 'argv', ['pdoc', 'render', '--config'])
+        app.run()
 
-        assert booted.pdoc._config_page_shown is True
+        assert app.pdoc._config_page_shown is True
         # the switch is for one run; the configured value stays as written
-        assert booted.config.get('pdoc', 'config_page') is False
+        assert app.config.get('pdoc', 'config_page') is False
 
 
 def test_no_config_switch_turns_the_page_off(tmp_path, monkeypatch):
     """--no-config hides the page for this run, the config stays True."""
-    with PdocTest(tmp_path, config_page=True) as booted:
-        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
-        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--no-config'])
-        booted.run()
+    with PdocTest(tmp_path, config_page=True) as app:
+        monkeypatch.setattr(app.pdoc, 'render', lambda **kwargs: None)
+        monkeypatch.setattr(app._meta, 'argv', ['pdoc', 'render', '--no-config'])
+        app.run()
 
-        assert booted.pdoc._config_page_shown is False
-        assert booted.config.get('pdoc', 'config_page') is True
+        assert app.pdoc._config_page_shown is False
+        assert app.config.get('pdoc', 'config_page') is True
 
 
 def test_both_config_switches_are_a_contradiction(tmp_path, monkeypatch):
     """--config with --no-config raises "exclude each other"."""
-    with PdocTest(tmp_path) as booted:
-        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
+    with PdocTest(tmp_path) as app:
+        monkeypatch.setattr(app.pdoc, 'render', lambda **kwargs: None)
         monkeypatch.setattr(
-            booted._meta,
+            app._meta,
             'argv',
             ['pdoc', 'render', '--config', '--no-config'],
         )
 
         with pytest.raises(TokeoPdocError) as err_info:
-            booted.run()
+            app.run()
 
         assert 'exclude each other' in str(err_info.value)
 
@@ -1679,30 +1679,30 @@ def test_config_switches_leave_the_option_alone_when_unused(tmp_path, monkeypatc
     """Without a switch config_page stays as configured."""
     # both switches are always offered, so the one matching the current
     # option must simply do nothing
-    with PdocTest(tmp_path, config_page=True) as booted:
-        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
-        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render'])
-        booted.run()
+    with PdocTest(tmp_path, config_page=True) as app:
+        monkeypatch.setattr(app.pdoc, 'render', lambda **kwargs: None)
+        monkeypatch.setattr(app._meta, 'argv', ['pdoc', 'render'])
+        app.run()
 
-        assert booted.pdoc._config_page_shown is True
+        assert app.pdoc._config_page_shown is True
 
 
 def test_no_config_switch_removes_config_from_the_summary(tmp_path, monkeypatch):
     """--no-config drops "config" from the summary."""
     import types
 
-    with PdocTest(tmp_path, config_page=True) as booted:
-        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: None)
+    with PdocTest(tmp_path, config_page=True) as app:
+        monkeypatch.setattr(app.pdoc, 'render', lambda **kwargs: None)
         monkeypatch.setattr(
-            booted,
+            app,
             'env',
             types.SimpleNamespace(APP_CONFIG_DIR=str(tmp_path)),
             raising=False,
         )
-        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--no-config'])
-        booted.run()
+        monkeypatch.setattr(app._meta, 'argv', ['pdoc', 'render', '--no-config'])
+        app.run()
 
-        assert 'config' not in booted.pdoc._get_documented_names()
+        assert 'config' not in app.pdoc._get_documented_names()
 
 
 def test_controller_renders_only_without_flags(tmp_path, monkeypatch):
@@ -1746,33 +1746,33 @@ def test_controller_serve_command_does_not_render(tmp_path, monkeypatch):
 
 def test_controller_passes_positional_modules(tmp_path, monkeypatch):
     """Modules given as arguments replace the configured ones."""
-    seen = {}
+    seen_kwargs = {}
 
-    with PdocTest(tmp_path, modules=['from', 'config']) as booted:
+    with PdocTest(tmp_path, modules=['from', 'config']) as app:
         monkeypatch.setattr(
-            booted.pdoc,
+            app.pdoc,
             'render',
-            lambda **kwargs: seen.update(kwargs),
+            lambda **kwargs: seen_kwargs.update(kwargs),
         )
-        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', 'spiral', 'tests'])
-        booted.run()
+        monkeypatch.setattr(app._meta, 'argv', ['pdoc', 'render', 'spiral', 'tests'])
+        app.run()
 
         # positionals replace the configured modules for this run
-        assert booted.pdoc._modules == ['spiral', 'tests']
+        assert app.pdoc._modules == ['spiral', 'tests']
 
-    assert seen['clean'] is False
+    assert seen_kwargs['clean'] is False
 
 
 def test_controller_passes_clean(tmp_path, monkeypatch):
     """--clean reaches render as clean=True."""
-    seen = {}
+    seen_kwargs = {}
 
-    with PdocTest(tmp_path) as booted:
-        monkeypatch.setattr(booted.pdoc, 'render', lambda **kwargs: seen.update(kwargs))
-        monkeypatch.setattr(booted._meta, 'argv', ['pdoc', 'render', '--clean'])
-        booted.run()
+    with PdocTest(tmp_path) as app:
+        monkeypatch.setattr(app.pdoc, 'render', lambda **kwargs: seen_kwargs.update(kwargs))
+        monkeypatch.setattr(app._meta, 'argv', ['pdoc', 'render', '--clean'])
+        app.run()
 
-    assert seen['clean'] is True
+    assert seen_kwargs['clean'] is True
 
 
 # ---- light and dark mode of the pages ---------------------------------------

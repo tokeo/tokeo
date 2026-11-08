@@ -293,15 +293,15 @@ def test_realtime_failing_callback_is_logged_and_the_channel_goes_on(realtime, s
     server.connections = [
         [_make_connect_event('c1'), _make_change_event('posts/*', 'create', 'r1'), _make_change_event('posts/*', 'create', 'r2')]
     ]
-    seen = []
+    seen_ids = []
 
     def fail(event):
         raise ValueError('broken')
 
-    realtime.subscribe('posts/*', fail).subscribe('posts/*', lambda e: seen.append(e.record.id))
+    realtime.subscribe('posts/*', fail).subscribe('posts/*', lambda e: seen_ids.append(e.record.id))
     with caplog.at_level(logging.ERROR, logger='tokeo.core.pocketbase.realtime'):
         realtime.start()
-        assert wait_until(lambda: seen == ['r1', 'r2'])
+        assert wait_until(lambda: seen_ids == ['r1', 'r2'])
     assert sum('callback' in record.message for record in caplog.records) == 2
 
 
@@ -389,23 +389,23 @@ def test_realtime_stop_leaves_a_hanging_callback_and_a_new_start_runs_alone(real
         [_make_connect_event('c1'), _make_change_event('posts/*', 'create', 'r1'), _make_change_event('posts/*', 'create', 'r2')],
         [_make_connect_event('c2'), _make_change_event('posts/*', 'create', 'r3')],
     ]
-    hang, seen = threading.Event(), []
+    hang, seen_ids = threading.Event(), []
 
     def follow(event):
-        seen.append(event.record.id)
+        seen_ids.append(event.record.id)
         if event.record.id == 'r1':
             hang.wait(5)
 
     realtime.subscribe('posts/*', follow).start()
-    assert wait_until(lambda: seen == ['r1'])
+    assert wait_until(lambda: seen_ids == ['r1'])
     old = realtime._dispatcher
     realtime.stop(timeout=0.1)
     assert old.is_alive()
     realtime.start()
-    assert wait_until(lambda: seen == ['r1', 'r3'])
+    assert wait_until(lambda: seen_ids == ['r1', 'r3'])
     hang.set()
     old.join(5)
-    assert (old.is_alive(), seen, realtime.connected_event.is_set()) == (False, ['r1', 'r3'], True)
+    assert (old.is_alive(), seen_ids, realtime.connected_event.is_set()) == (False, ['r1', 'r3'], True)
     assert [body['clientId'] for body in server.posts()] == ['c1', 'c2']
 
 
@@ -414,10 +414,10 @@ def test_realtime_stop_called_by_a_callback_ends_the_thread(realtime, server):
     server.connections = [
         [_make_connect_event('c1'), _make_change_event('posts/*', 'create', 'r1'), _make_change_event('posts/*', 'create', 'r2')]
     ]
-    seen, threads = [], []
+    seen_ids, threads = [], []
 
     def follow(event):
-        seen.append(event.record.id)
+        seen_ids.append(event.record.id)
         threads.append(threading.current_thread())
         # the fake stream has no socket for stop() to shut down
         server.release.set()
@@ -425,7 +425,7 @@ def test_realtime_stop_called_by_a_callback_ends_the_thread(realtime, server):
 
     realtime.subscribe('posts/*', follow).start()
     assert wait_until(lambda: threads and not threads[0].is_alive())
-    assert (seen, realtime.connected_event.is_set(), realtime._thread) == (['r1'], False, None)
+    assert (seen_ids, realtime.connected_event.is_set(), realtime._thread) == (['r1'], False, None)
 
 
 def test_realtime_refuses_max_pending_below_one(pb):
@@ -527,22 +527,22 @@ def test_realtime_hangs_up_when_the_callbacks_fall_behind_and_connects_once_they
     then it hands on the queued r2 and r3, connects c2 after max_delay_seconds and
     calls on_connect again.
     """
-    hanging = threading.Event()
+    hanging_event = threading.Event()
     server.connections = [
         [
             _make_connect_event('c1'),
             _make_change_event('posts/*', 'create', 'r1'),
-            hanging,
+            hanging_event,
             *[_make_change_event('posts/*', 'create', f'r{n}') for n in range(2, 6)],
         ],
         [_make_connect_event('c2'), _make_change_event('posts/*', 'create', 'r6')],
     ]
-    release, seen, connects = threading.Event(), [], []
+    release, seen_ids, connects = threading.Event(), [], []
 
     def follow(event):
-        seen.append(event.record.id)
+        seen_ids.append(event.record.id)
         if event.record.id == 'r1':
-            hanging.set()
+            hanging_event.set()
             release.wait(5)
 
     channel = Realtime(pb, max_delay_seconds=0.05, max_pending=2).subscribe('posts/*', follow)
@@ -553,7 +553,7 @@ def test_realtime_hangs_up_when_the_callbacks_fall_behind_and_connects_once_they
             assert wait_until(lambda: 'events wait' in (channel.error or ''))
         assert (len(server.posts()), channel.status) == (1, 'connecting')
         release.set()
-        assert wait_until(lambda: seen == ['r1', 'r2', 'r3', 'r6'])
+        assert wait_until(lambda: seen_ids == ['r1', 'r2', 'r3', 'r6'])
         assert (len(connects), [body['clientId'] for body in server.posts()]) == (2, ['c1', 'c2'])
     finally:
         release.set()
@@ -580,31 +580,31 @@ def test_realtime_as_context_manager_runs_one_thread_until_stop(pb, server):
 def test_async_realtime_subscribes_by_the_hook_and_awaits_coroutines(async_pb, async_server):
     """The hook sets the token of the POST, function and coroutine get events."""
     async_server.connections = [[_make_connect_event('c1'), _make_change_event('posts/*', 'delete', 'r1')]]
-    hooks, seen = [], []
+    hooks, seen_calls = [], []
 
     def hook():
         hooks.append(threading.current_thread() is not threading.main_thread())
         async_pb.token = 'fresh'
 
     async def later(event):
-        seen.append(('coroutine', event.action))
+        seen_calls.append(('coroutine', event.action))
 
     async def connected():
-        seen.append('connect')
+        seen_calls.append('connect')
 
     async_pb.before_request = hook
 
     async def go():
         realtime = AsyncRealtime(async_pb)
         realtime.on_connect = connected
-        realtime.subscribe('posts/*', lambda e: seen.append(('function', e.action))).subscribe('posts/*', later)
+        realtime.subscribe('posts/*', lambda e: seen_calls.append(('function', e.action))).subscribe('posts/*', later)
         task = asyncio.create_task(realtime.run())
-        assert await wait_until_async(lambda: len(seen) == 3)
+        assert await wait_until_async(lambda: len(seen_calls) == 3)
         await realtime.stop()
         assert task.done() and not realtime.connected_event.is_set()
 
     asyncio.run(go())
-    assert seen == ['connect', ('function', 'delete'), ('coroutine', 'delete')]
+    assert seen_calls == ['connect', ('function', 'delete'), ('coroutine', 'delete')]
     assert hooks == [True]
     assert async_server.posts() == [{'clientId': 'c1', 'subscriptions': ['posts/*']}]
     assert async_server.requests[-1].headers['Authorization'] == 'fresh'
@@ -636,16 +636,16 @@ def test_async_realtime_failing_callback_is_logged_and_the_channel_goes_on(async
     async_server.connections = [
         [_make_connect_event('c1'), _make_change_event('posts/*', 'create', 'r1'), _make_change_event('posts/*', 'create', 'r2')]
     ]
-    seen = []
+    seen_ids = []
 
     async def fail(event):
-        seen.append(event.record.id)
+        seen_ids.append(event.record.id)
         raise ValueError('broken')
 
     async def go():
         realtime = AsyncRealtime(async_pb).subscribe('posts/*', fail)
         asyncio.create_task(realtime.run())
-        assert await wait_until_async(lambda: seen == ['r1', 'r2'])
+        assert await wait_until_async(lambda: seen_ids == ['r1', 'r2'])
         await realtime.stop()
 
     with caplog.at_level(logging.ERROR, logger='tokeo.core.pocketbase.realtime'):
@@ -815,24 +815,24 @@ def test_async_realtime_hangs_up_when_the_callbacks_fall_behind(async_pb, async_
     channel hangs up at r4, after the release it hands on r2 and r3 and
     connects c2 with r6.
     """
-    seen, connects = [], []
+    seen_ids, connects = [], []
 
     async def go():
-        hanging, release = asyncio.Event(), asyncio.Event()
+        hanging_event, release = asyncio.Event(), asyncio.Event()
         async_server.connections = [
             [
                 _make_connect_event('c1'),
                 _make_change_event('posts/*', 'create', 'r1'),
-                hanging,
+                hanging_event,
                 *[_make_change_event('posts/*', 'create', f'r{n}') for n in range(2, 6)],
             ],
             [_make_connect_event('c2'), _make_change_event('posts/*', 'create', 'r6')],
         ]
 
         async def follow(event):
-            seen.append(event.record.id)
+            seen_ids.append(event.record.id)
             if event.record.id == 'r1':
-                hanging.set()
+                hanging_event.set()
                 await release.wait()
 
         realtime = AsyncRealtime(async_pb, max_delay_seconds=0.05, max_pending=2).subscribe('posts/*', follow)
@@ -841,7 +841,7 @@ def test_async_realtime_hangs_up_when_the_callbacks_fall_behind(async_pb, async_
         assert await wait_until_async(lambda: 'events wait' in (realtime.error or ''))
         assert len(async_server.posts()) == 1
         release.set()
-        assert await wait_until_async(lambda: seen == ['r1', 'r2', 'r3', 'r6'])
+        assert await wait_until_async(lambda: seen_ids == ['r1', 'r2', 'r3', 'r6'])
         await realtime.stop()
 
     with caplog.at_level(logging.WARNING, logger='tokeo.core.pocketbase.realtime'):

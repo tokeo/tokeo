@@ -252,38 +252,38 @@ class RecordingEvents(SmtpdEvents):
 
     def __init__(self, options=None):
         super().__init__(options)
-        self.fired = []
+        self.fired_events = []
         self.messages = []
         self.reject_rcpt = set()
         self.rewrite_from = True
 
     def on_connect_event(self, ctx):
-        self.fired.append('connect')
+        self.fired_events.append('connect')
 
     def on_disconnect_event(self, ctx):
-        self.fired.append('disconnect')
+        self.fired_events.append('disconnect')
 
     def on_helo_event(self, ctx, helo):
-        self.fired.append('helo')
+        self.fired_events.append('helo')
 
     def on_mail_from_event(self, ctx, mail_from):
-        self.fired.append('mail')
+        self.fired_events.append('mail')
         return self.rewrite_from
 
     def on_rcpt_to_event(self, ctx, rcpt_to):
-        self.fired.append('rcpt')
+        self.fired_events.append('rcpt')
         if any(s in rcpt_to for s in self.reject_rcpt):
             raise Smtpd550Exception
         return True
 
     def on_message_data_start_event(self, ctx):
-        self.fired.append('start')
+        self.fired_events.append('start')
 
     def on_message_data_headers_event(self, ctx):
-        self.fired.append('headers')
+        self.fired_events.append('headers')
 
     def on_message_data_receiving_event(self, ctx):
-        self.fired.append('recv')
+        self.fired_events.append('recv')
 
     def on_message_data_event(self, ctx):
         self.messages.append((bytes(ctx.message.data), ctx.envelope.mail_from, list(ctx.envelope.rcpt_tos)))

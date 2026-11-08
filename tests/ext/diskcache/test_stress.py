@@ -277,19 +277,19 @@ def _run_stress_worker(directory, index, seed, seconds, purge, result_queue):
 
 
 def _merge(reports):
-    merged = dict(errors=[], wrong=[], lost=[], ops=Counter(), counter=0, mutex=[], purges=[], workers=0)
-    merged['tempers'] = {name: [] for name in TEMPERS}
-    merged['throttles'] = {name: [] for name in THROTTLES}
+    merged_report = dict(errors=[], wrong=[], lost=[], ops=Counter(), counter=0, mutex=[], purges=[], workers=0)
+    merged_report['tempers'] = {name: [] for name in TEMPERS}
+    merged_report['throttles'] = {name: [] for name in THROTTLES}
     for report in reports:
         for field in ('errors', 'wrong', 'lost', 'mutex', 'purges'):
-            merged[field] += report[field]
-        merged['ops'] += report['ops']
-        merged['counter'] += report['counter']
-        merged['workers'] += report['workers']
+            merged_report[field] += report[field]
+        merged_report['ops'] += report['ops']
+        merged_report['counter'] += report['counter']
+        merged_report['workers'] += report['workers']
         for field in ('tempers', 'throttles'):
             for name, items in report[field].items():
-                merged[field][name] += items
-    return merged
+                merged_report[field][name] += items
+    return merged_report
 
 
 def _get_throttle_excess(times, count, per_seconds):
@@ -350,7 +350,7 @@ def _run_stress(directory, monkeypatch, purge):
     integrity = db.execute('PRAGMA integrity_check').fetchone()[0]
     db.close()
     print(f'workers={report["workers"]} ops={sum(report["ops"].values())} {dict(report["ops"])}')
-    print(f'opened connections in the main process: {len(connections.opened)}')
+    print(f'opened connections in the main process: {len(connections.opened_connections)}')
     print(f'counter={counter} increments={report["counter"]} lost locks={len(report["lost"])}')
     _show(report, 'all')
     if purge:
@@ -372,7 +372,7 @@ def test_stress_runs_without_errors_or_wrong_values(tmp_path, monkeypatch, purge
     assert report['wrong'] == []
     assert warnings == []
     assert integrity == 'ok'
-    assert connections.unclosed == []
+    assert connections.unclosed_connections == []
     if purge:
         # purges reset the locks, running holders then raise the limits for a while
         assert report['ops']['purge.purge'] > 0

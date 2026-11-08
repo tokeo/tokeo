@@ -97,16 +97,16 @@ def test_dead_letters(live):
         letter = Message(queue_name=name, actor_name=actor.actor_name, args=(7,), kwargs={}, options=dict(retries=3, traceback='E: x'))
         with _open_raw_channel() as channel:
             channel.basic_publish(exchange='', routing_key=f'{name}.XQ', body=letter.encode())
-        (peeked,) = queues.peek_dead(name)
-        assert (peeked['message_id'], peeked['retries'], peeked['error']) == (letter.message_id, 3, 'E: x')
+        (peeked_letter,) = queues.peek_dead(name)
+        assert (peeked_letter['message_id'], peeked_letter['retries'], peeked_letter['error']) == (letter.message_id, 3, 'E: x')
         assert queues.state(name)[0]['dead_cnt'] == 1
         assert queues.requeue_dead(name) == dict(name=name, requeued_cnt=1)
         assert (queues.state(name)[0]['ready_cnt'], queues.state(name)[0]['dead_cnt']) == (2, 0)
         with _open_raw_channel() as channel:
             bodies = [channel.basic_get(name, auto_ack=True)[2] for _ in range(2)]
-        requeued = [Message.decode(b) for b in bodies if Message.decode(b).message_id == letter.message_id][0]
+        requeued_message = [Message.decode(b) for b in bodies if Message.decode(b).message_id == letter.message_id][0]
         # the requeued message starts its retries again
-        assert 'retries' not in requeued.options and 'traceback' not in requeued.options
+        assert 'retries' not in requeued_message.options and 'traceback' not in requeued_message.options
 
 
 def test_purge_and_delete(live):
@@ -166,15 +166,15 @@ def test_monitor_hears_a_worker(tmp, rando):
             try:
                 actor.send(2)
                 assert wait_until(lambda: find_own_workers(0.5) and find_own_workers(0)[0]['heartbeat']['running_tasks'], 15)
-                (running,) = find_own_workers(0)
+                (running_worker,) = find_own_workers(0)
             finally:
                 worker.stop()
-            (stopped,) = find_own_workers(1)
+            (stopped_worker,) = find_own_workers(1)
         finally:
             app.dramatiq.queues.delete(name, force=True)
-    (task,) = running['heartbeat']['running_tasks']
-    assert running['state'] == 'ok' and task['actor_name'] == f'task_{rando}' and task['args'] == '((2,), {})'
-    assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals']['done_cnt'] == 1
+    (task,) = running_worker['heartbeat']['running_tasks']
+    assert running_worker['state'] == 'ok' and task['actor_name'] == f'task_{rando}' and task['args'] == '((2,), {})'
+    assert stopped_worker['state'] == 'stopped' and stopped_worker['heartbeat']['totals']['done_cnt'] == 1
 
 
 def test_unparalleled_runs_one_message_at_a_time(tmp, rando):
@@ -201,4 +201,4 @@ def test_unparalleled_runs_one_message_at_a_time(tmp, rando):
             app.dramatiq.queues.delete(name, force=True)
     runs.sort()
     assert len(runs) == 4
-    assert all(previous[1] <= following[0] for previous, following in zip(runs, runs[1:]))
+    assert all(previous[1] <= next_run[0] for previous, next_run in zip(runs, runs[1:]))

@@ -129,10 +129,10 @@ def test_shared_limits_count_across_processes():
     assert isinstance(limits, GlobalLimits)
     assert limits.max_processings == 5 and limits.max_connections == 7
 
-    def run_child(shared):
-        shared.admit()
-        shared.admit()
-        shared.begin_processing()
+    def run_child(limits):
+        limits.admit()
+        limits.admit()
+        limits.begin_processing()
 
     # the extension inherits the counters via os.fork; mirror that in the
     # test (the spawn default on macOS would also have to pickle 'run_child')
@@ -153,20 +153,20 @@ def test_shared_limits_give_the_last_slot_to_one_process_only():
     limits = SharedGlobalLimits(max_processings=1)
     context = multiprocessing.get_context('fork')
     start = context.Barrier(8)
-    taken = context.Value('i', 0)
+    taken_cnt = context.Value('i', 0)
 
     def run_child():
         start.wait()
         if limits.try_begin_processing():
-            with taken.get_lock():
-                taken.value += 1
+            with taken_cnt.get_lock():
+                taken_cnt.value += 1
 
     procs = [context.Process(target=run_child) for _ in range(8)]
     for proc in procs:
         proc.start()
     for proc in procs:
         proc.join(5)
-    assert taken.value == 1 and limits.processing_cnt == 1
+    assert taken_cnt.value == 1 and limits.processing_cnt == 1
 
 
 def test_shared_limits_wait_for_slot_recheck_interval():
@@ -451,9 +451,9 @@ def test_failed_start_terminates_forked_workers():
 def test_broken_config_of_a_worker_stops_before_the_fork():
     """A worker service with a broken config ends the start before any fork."""
     port_a, port_b = find_free_port(), find_free_port()
-    broken = _make_service('mx2', port_b, pre_fork=1)
-    broken['server_options']['encrypt_mode'] = 'TLS_NOPE'
-    with _serve({'services': [_make_service('mx1', port_a), broken]}) as process:
+    broken_service = _make_service('mx2', port_b, pre_fork=1)
+    broken_service['server_options']['encrypt_mode'] = 'TLS_NOPE'
+    with _serve({'services': [_make_service('mx1', port_a), broken_service]}) as process:
         assert process.wait() != 0
         assert wait_process_group_ended(process.pid)
         log = process.output
@@ -550,10 +550,10 @@ def test_prefork_logs_the_started_service_of_every_process():
         process.wait_for(lambda: _has_banner(port))
         pids = [process.pid, *_get_child_pids(process.pid)]
         assert len(pids) == 3
-        started = [f"smtpd: service 'mx1' started (pid {pid})" for pid in pids]
-        assert wait_until(lambda: all(line in process.output for line in started))
-        forked = re.search(r'smtpd: forked workers \[([0-9, ]+)\]', process.output)
-        assert {int(pid) for pid in forked.group(1).split(',')} == set(pids[1:])
+        started_lines = [f"smtpd: service 'mx1' started (pid {pid})" for pid in pids]
+        assert wait_until(lambda: all(line in process.output for line in started_lines))
+        forked_match = re.search(r'smtpd: forked workers \[([0-9, ]+)\]', process.output)
+        assert {int(pid) for pid in forked_match.group(1).split(',')} == set(pids[1:])
 
 
 @pytest.fixture(scope='module')

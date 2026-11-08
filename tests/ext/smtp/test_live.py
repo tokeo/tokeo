@@ -39,7 +39,7 @@ class RecordingEvents(SmtpdEvents):
     def __init__(self, options=None):
         super().__init__(options)
         self.messages = []
-        self.disconnected = threading.Event()
+        self.disconnected_event = threading.Event()
 
     def on_auth_event(self, ctx, authorization_id, authentication_id, authentication):
         if (authentication_id, authentication) != ('user', 'secret'):
@@ -55,7 +55,7 @@ class RecordingEvents(SmtpdEvents):
         self.messages.append((bytes(ctx.message.data), ctx.server.encrypted_at is not None))
 
     def on_disconnect_event(self, ctx):
-        self.disconnected.set()
+        self.disconnected_event.set()
 
 
 class BackgroundSmtpd:
@@ -69,12 +69,12 @@ class BackgroundSmtpd:
         self.port = None
 
     def __enter__(self):
-        started = threading.Event()
+        started_event = threading.Event()
 
         def run():
             asyncio.set_event_loop(self.loop)
             self.loop.run_until_complete(self.server.start([{'host': '127.0.0.1', 'port': 0}]))
-            started.set()
+            started_event.set()
             self.loop.run_forever()
             # let the cancelled serve tasks finish before the loop is closed
             pending = asyncio.all_tasks(self.loop)
@@ -84,7 +84,7 @@ class BackgroundSmtpd:
 
         self.thread = threading.Thread(target=run, daemon=True)
         self.thread.start()
-        assert started.wait(10)
+        assert started_event.wait(10)
         self.port = self.server._servers[0].sockets[0].getsockname()[1]
         return self
 
@@ -164,7 +164,7 @@ def test_closes_connection_on_error(smtp, error):
             with pytest.raises(error):
                 app.mail.send('body')
         # ... and the connection was closed anyway
-        assert smtpd.events.disconnected.wait(2)
+        assert smtpd.events.disconnected_event.wait(2)
         assert wait_until(lambda: smtpd.server.connections == 0, 2)
 
     assert smtpd.events.messages == []
@@ -185,7 +185,7 @@ def test_qp_delivered_to_smtpd(tmp):
     with BackgroundSmtpd({}) as smtpd:
         # quoted-printable is set for the config of this app only
         with SmtpTest(host='127.0.0.1', port=smtpd.port, timeout=5, body_encoding='qp') as app:
-            sent = app.mail.send(
+            result = app.mail.send(
                 (TEXT, HTML_WITH_IMAGE),
                 subject=SUBJECT,
                 files=[
@@ -196,7 +196,7 @@ def test_qp_delivered_to_smtpd(tmp):
                 x_binary=(12, 'hallo', -1),
             )
 
-    assert sent == {}
+    assert result == {}
     assert len(smtpd.events.messages) == 1
     data, _ = smtpd.events.messages[0]
     msg = email.message_from_bytes(data)

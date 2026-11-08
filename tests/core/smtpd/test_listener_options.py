@@ -43,12 +43,12 @@ def test_wildcard_host_binds_all_interfaces():
     async def go():
         server = SmtpdServer(Lines(), hosts='*', ports=0)
         await server.start()
-        bound = [sock.getsockname()[0] for listener in server._servers for sock in listener.sockets]
+        bound_addresses = [sock.getsockname()[0] for listener in server._servers for sock in listener.sockets]
         await server.stop(wait_seconds_before_close=0)
-        return bound
+        return bound_addresses
 
-    bound = asyncio.run(go())
-    assert '0.0.0.0' in bound
+    bound_addresses = asyncio.run(go())
+    assert '0.0.0.0' in bound_addresses
     assert any(line.startswith('Service listening on 0.0.0.0:') for line in lines)
 
 

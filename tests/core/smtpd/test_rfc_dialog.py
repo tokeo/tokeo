@@ -251,7 +251,7 @@ class TraceEvents(RecordingEvents):
 
     def __init__(self, options=None):
         super().__init__(options)
-        self.spooled = []
+        self.spooled_messages = []
 
     def on_message_data_start_event(self, ctx):
         server = ctx.server
@@ -264,7 +264,7 @@ class TraceEvents(RecordingEvents):
     def on_message_data_event(self, ctx):
         super().on_message_data_event(ctx)
         if ctx.message.spooler:
-            self.spooled.append(open(ctx.message.spooler.path, 'rb').read())
+            self.spooled_messages.append(open(ctx.message.spooler.path, 'rb').read())
 
 
 _TRACE_COMMANDS = [b'EHLO me\r\n', b'MAIL FROM:<a@x>\r\n', b'RCPT TO:<b@y>\r\n', b'DATA\r\n', b'Subject: hi\r\n\r\nHello\r\n.\r\n']
@@ -285,5 +285,5 @@ def test_the_trace_header_reaches_the_spool_file(tmp):
     ev = TraceEvents()
     _, r = run_dialog(ev, {'spool_path_prefix': f'{tmp.dir}/trace-'}, _TRACE_COMMANDS)
     assert r[4][0].startswith('250')
-    assert ev.spooled[0].startswith(b'Received: from me (')
-    assert ev.spooled[0].endswith(b'\r\nSubject: hi\r\n\r\nHello')
+    assert ev.spooled_messages[0].startswith(b'Received: from me (')
+    assert ev.spooled_messages[0].endswith(b'\r\nSubject: hi\r\n\r\nHello')

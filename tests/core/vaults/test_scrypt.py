@@ -128,9 +128,9 @@ def test_decrypt_a_tampered_token_fails(passphrase):
     vault = ScryptVault()
     token = vault.encrypt(PROFILE, 's3cret')
     # the 40th character encodes byte 30, which lies in the ciphertext part
-    tampered = token[:40] + ('A' if token[40] != 'A' else 'B') + token[41:]
+    tampered_token = token[:40] + ('A' if token[40] != 'A' else 'B') + token[41:]
     with pytest.raises(TokeoVaultError, match='could not be decrypted'):
-        vault.decrypt(PROFILE, tampered)
+        vault.decrypt(PROFILE, tampered_token)
 
 
 def test_token_is_decrypted_by_enc_with_the_derived_key(passphrase, monkeypatch):

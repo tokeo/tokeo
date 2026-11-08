@@ -170,10 +170,10 @@ def test_encrypt_needs_a_profile(vault, key):
 
 def test_encrypt_without_value_asks_for_it_hidden(vault, key, monkeypatch):
     """Without a value the secret is asked for by getpass, not shown."""
-    asked = []
-    monkeypatch.setattr('getpass.getpass', lambda prompt: asked.append(prompt) or 's3cret')
+    asked_prompts = []
+    monkeypatch.setattr('getpass.getpass', lambda prompt: asked_prompts.append(prompt) or 's3cret')
     token = vault('encrypt', '--profile', 'master').strip().split(' ', 1)[1]
-    assert asked == ['value: '] and Fernet(key.encode()).decrypt(token.encode()) == b's3cret'
+    assert asked_prompts == ['value: '] and Fernet(key.encode()).decrypt(token.encode()) == b's3cret'
 
 
 def test_encrypt_with_a_dash_reads_the_value_from_stdin(vault, key, monkeypatch):

@@ -60,8 +60,8 @@ def test_full_delivery_and_events():
     assert r[3][0].startswith('354')
     assert r[4][0].startswith('250')
     assert r[5][0].startswith('221')
-    assert 'connect' in ev.fired and 'disconnect' in ev.fired
-    assert ev.fired.count('start') == 1 and 'headers' in ev.fired and 'recv' in ev.fired
+    assert 'connect' in ev.fired_events and 'disconnect' in ev.fired_events
+    assert ev.fired_events.count('start') == 1 and 'headers' in ev.fired_events and 'recv' in ev.fired_events
     data, mail_from, rcpts = ev.messages[0]
     assert data == b'Subject: hi\r\n\r\nHello world'
     assert mail_from == '<a@x>' and rcpts == ['<b@y>']
@@ -257,14 +257,14 @@ def test_mail_rcpt_event_results(event, result, reply, address):
 
         def __init__(self, options=None):
             super().__init__(options)
-            self.seen = []
+            self.seen_envelopes = []
 
         def on_mail_from_event(self, ctx, mail_from):
             return result if event == 'mail' else True
 
         def on_rcpt_to_event(self, ctx, rcpt_to):
             # a probe recipient shows what the server stored before
-            self.seen.append((ctx.envelope.mail_from, list(ctx.envelope.rcpt_tos)))
+            self.seen_envelopes.append((ctx.envelope.mail_from, list(ctx.envelope.rcpt_tos)))
             return True if rcpt_to == '<probe@y>' else result
 
     if event == 'mail':
@@ -276,9 +276,9 @@ def test_mail_rcpt_event_results(event, result, reply, address):
     assert r[-2][0].startswith(reply)
     if event == 'mail':
         # a refused MAIL leaves no transaction for the probe
-        assert ev.seen == ([(address, [])] if address is not None else [])
+        assert ev.seen_envelopes == ([(address, [])] if address is not None else [])
     else:
-        assert ev.seen[-1] == ('<m@x>', [address] if address is not None else [])
+        assert ev.seen_envelopes[-1] == ('<m@x>', [address] if address is not None else [])
 
 
 # ---- security we own --------------------------------------------------------
@@ -356,7 +356,7 @@ def test_max_data_bytes_limit_552():
     assert ev.messages == []
     # the session is reset like by RSET, only the next MAIL FROM ran
     assert r[5] == ['250 OK']
-    assert ev.fired.count('mail') == 2
+    assert ev.fired_events.count('mail') == 2
 
 
 class ErrorInData(RecordingEvents):
@@ -370,7 +370,7 @@ class ErrorInData(RecordingEvents):
 
     def on_message_data_receiving_event(self, ctx):
         super().on_message_data_receiving_event(ctx)
-        if self.fired.count('recv') == 1:
+        if self.fired_events.count('recv') == 1:
             raise self.error
 
     def on_logging_event(self, ctx, severity, msg, err=None):
@@ -391,7 +391,7 @@ def test_error_in_data_is_answered_once_after_the_end(error, code, kind):
     _, r = run_dialog(ev, {}, DATA_ENVELOPE + [b'Subject: t\r\n\r\nA\r\nB\r\n.\r\n', b'NOOP\r\n'])
     assert r[4][0].startswith(code)
     # no more receiving events after the error, no delivery
-    assert ev.fired.count('recv') == 1
+    assert ev.fired_events.count('recv') == 1
     assert ev.messages == []
     assert r[5] == ['250 OK']
     # the error is logged when it occurs with the real exception, then at the end
@@ -408,7 +408,7 @@ def test_no_start_event_after_an_error_before_the_first_line():
     ev = RecordingEvents()
     _, r = run_dialog(ev, {'crlf_data_mode': 'CRLF_DATA_STRICT'}, DATA_ENVELOPE + [b'A\nB\r\n.\r\n'])
     assert r[4][0].startswith('554')
-    assert 'start' not in ev.fired
+    assert 'start' not in ev.fired_events
 
 
 def test_a_failing_start_event_runs_once():
@@ -423,7 +423,7 @@ def test_a_failing_start_event_runs_once():
     ev = StartFails()
     _, r = run_dialog(ev, {}, DATA_ENVELOPE + [b'A\r\nB\r\nC\r\n.\r\n'])
     assert r[4][0].startswith('550')
-    assert ev.fired.count('start') == 1
+    assert ev.fired_events.count('start') == 1
 
 
 def test_spool_with_empty_first_line_starts_once_and_keeps_max_data_bytes(tmp_path):
@@ -432,21 +432,21 @@ def test_spool_with_empty_first_line_starts_once_and_keeps_max_data_bytes(tmp_pa
     options = {'spool_path_prefix': str(tmp_path) + '/', 'max_data_bytes': 100}
     _, r = run_dialog(ev, options, DATA_ENVELOPE + [b'\r\n' + b'X' * 60 + b'\r\n' + b'Y' * 60 + b'\r\n.\r\n'])
     assert r[4][0].startswith('552')
-    assert ev.fired.count('start') == 1
+    assert ev.fired_events.count('start') == 1
 
 
 def test_only_the_first_error_in_data_counts():
     """Several bare LF in DATA count as one error of the connection."""
-    seen = []
+    seen_counts = []
 
     class Count(RecordingEvents):
 
         def on_disconnect_event(self, ctx):
-            seen.append(ctx.server.exception_cnt)
+            seen_counts.append(ctx.server.exception_cnt)
 
     _, r = run_dialog(Count(), {'crlf_data_mode': 'CRLF_DATA_STRICT'}, DATA_ENVELOPE + [b'A\nB\nC\nD\r\n.\r\n'])
     assert r[4][0].startswith('554')
-    assert seen == [1]
+    assert seen_counts == [1]
 
 
 def test_buffer_overrun_554():
@@ -613,7 +613,7 @@ def test_mail_rcpt_parameters_are_checked_strictly(options, command, reply):
     _, r = run_dialog(ev, options, commands + [command + b'\r\n'])
     assert r[-1][0].startswith(reply)
     # a refused MAIL does not reach the handler
-    assert ev.fired.count('mail') == (1 if command.startswith(b'RCPT') else 0)
+    assert ev.fired_events.count('mail') == (1 if command.startswith(b'RCPT') else 0)
 
 
 @pytest.mark.parametrize(
@@ -798,7 +798,7 @@ def test_on_connect_fires_even_when_refused():
 
     b2 = asyncio.run(go())
     assert b2[0].startswith('421')
-    assert ev.fired.count('connect') == 2
+    assert ev.fired_events.count('connect') == 2
 
 
 def test_max_processings_waits_for_free_slot():
@@ -1377,11 +1377,11 @@ def test_join_waits_until_the_server_has_stopped():
     async def go():
         srv = SmtpdServer(RecordingEvents(), options={})
         await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        joined = asyncio.create_task(srv.join(poll_seconds=0.01))
+        join_task = asyncio.create_task(srv.join(poll_seconds=0.01))
         await asyncio.sleep(0.05)
-        early = joined.done()
+        early = join_task.done()
         await srv.stop(wait_seconds_before_close=0.1)
-        await asyncio.wait_for(joined, 2)
+        await asyncio.wait_for(join_task, 2)
         return early
 
     assert asyncio.run(go()) is False

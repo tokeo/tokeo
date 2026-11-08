@@ -52,7 +52,7 @@ class Connections:
     """Records the sqlite connections diskcache opens and which got closed."""
 
     def __init__(self, monkeypatch):
-        self.opened = []
+        self.opened_connections = []
         connect = sqlite3.connect
         connections = self
 
@@ -61,7 +61,7 @@ class Connections:
             def __init__(self, *args, **kw):
                 super().__init__(*args, **kw)
                 self.closed = False
-                connections.opened.append(self)
+                connections.opened_connections.append(self)
 
             def close(self):
                 self.closed = True
@@ -70,8 +70,8 @@ class Connections:
         monkeypatch.setattr('tokeo.core.diskcache.core.sqlite3.connect', lambda *args, **kw: connect(*args, factory=Connection, **kw))
 
     @property
-    def unclosed(self):
-        return [con for con in self.opened if not con.closed]
+    def unclosed_connections(self):
+        return [con for con in self.opened_connections if not con.closed]
 
 
 def run_in_threads(func, workers=4):

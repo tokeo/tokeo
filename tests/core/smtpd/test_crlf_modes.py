@@ -97,7 +97,7 @@ def test_moderate_keeps_a_false_end_as_data(crlf_mode, end):
     # one message, the smuggled commands stay part of its data
     assert len(events.messages) == 1
     assert b'MAIL FROM:<evil@x>' in events.messages[0][0]
-    assert events.fired.count('mail') == 1
+    assert events.fired_events.count('mail') == 1
 
 
 @pytest.mark.parametrize('crlf_mode', ['CRLF_ENSURE', 'CRLF_LEAVE', 'CRLF_STRICT'])
@@ -110,7 +110,7 @@ def test_strict_rejects_a_false_end_once(crlf_mode, end):
     assert reply == b'554'
     # nothing delivered, the smuggled commands did not run
     assert events.messages == []
-    assert events.fired.count('mail') == 1
+    assert events.fired_events.count('mail') == 1
 
 
 @pytest.mark.parametrize('end', FALSE_ENDS)
@@ -154,7 +154,7 @@ def test_strict_close_answers_554_and_closes():
     # one 554, no 250 for the NOOP, no 221 or 421 on the close
     assert after == b'554 Transaction failed\r\n'
     assert events.messages == []
-    assert 'disconnect' in events.fired
+    assert 'disconnect' in events.fired_events
 
 
 def test_unsafe_logs_a_warning_on_start():
@@ -214,7 +214,7 @@ def test_dot_without_crlf_at_close_delivers_nothing(crlf_mode):
     after = _close_after(events, {'crlf_mode': crlf_mode}, ENVELOPE, b'Subject: t\r\n\r\nline\r\n.')
     assert after == b''
     assert events.messages == []
-    assert 'disconnect' in events.fired
+    assert 'disconnect' in events.fired_events
 
 
 @pytest.mark.parametrize('crlf_mode', ['CRLF_ENSURE', 'CRLF_LEAVE', 'CRLF_STRICT'])
@@ -223,7 +223,7 @@ def test_command_without_lf_at_close_is_not_run(crlf_mode):
     events = ClosingEvents()
     after = _close_after(events, {'crlf_mode': crlf_mode}, [b'HELO a\r\n'], b'MAIL FROM:<a@')
     assert after == b''
-    assert 'mail' not in events.fired
+    assert 'mail' not in events.fired_events
     after = _close_after(ClosingEvents(), {'crlf_mode': crlf_mode}, [b'HELO a\r\n'], b'QUIT')
     # no 221 for a QUIT without CRLF
     assert after == b''

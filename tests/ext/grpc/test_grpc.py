@@ -288,8 +288,8 @@ def test_interceptors_of_grpc_interceptor_guard_the_calls(start_grpc):
 def test_serve_serves_until_interrupted_then_stops(start_grpc, monkeypatch, interrupt):
     """serve logs the address, serves and stops on Ctrl-C or CaughtSignal."""
     app, port = start_grpc(startup=False)
-    logged = []
-    monkeypatch.setattr(app.log, 'info', lambda msg, **kw: logged.append(msg))
+    logged_lines = []
+    monkeypatch.setattr(app.log, 'info', lambda msg, **kw: logged_lines.append(msg))
     answers = []
 
     def wait_for_termination(timeout=None):
@@ -300,17 +300,17 @@ def test_serve_serves_until_interrupted_then_stops(start_grpc, monkeypatch, inte
     monkeypatch.setattr(app.grpc.server, 'wait_for_termination', wait_for_termination)
     app.grpc.serve()
     assert answers == [b'echo hi']
-    assert logged == [f'Grpc server started, listening on localhost:{port}']
+    assert logged_lines == [f'Grpc server started, listening on localhost:{port}']
     assert _get_refused_code(port) == grpc.StatusCode.UNAVAILABLE
 
 
 def test_controller_grpc_serve_runs_serve(monkeypatch):
     """The command grpc serve calls serve of the extension."""
-    served = []
+    served_calls = []
     with GrpcTest(argv=['grpc', 'serve']) as app:
-        monkeypatch.setattr(app.grpc, 'serve', lambda: served.append(True))
+        monkeypatch.setattr(app.grpc, 'serve', lambda: served_calls.append(True))
         app.run()
-    assert served == [True]
+    assert served_calls == [True]
 
 
 # _generate_self_signed_cert
@@ -433,24 +433,24 @@ def test_generate_self_signed_cert_invalid_config_raise(grpc_config, message):
 
 def _record_auto_cert(app, monkeypatch):
     # keep the (key_pem, cert_pem) pairs the auto cert path of the app makes
-    made = []
+    made_certs = []
     generate = app.grpc._generate_self_signed_cert
 
     def record():
-        made.append(generate())
-        return made[-1]
+        made_certs.append(generate())
+        return made_certs[-1]
 
     monkeypatch.setattr(app.grpc, '_generate_self_signed_cert', record)
-    return made
+    return made_certs
 
 
 def test_tls_auto_cert_serves_clients_trusting_it(start_grpc, monkeypatch):
     """With tls and the default auto cert a client trusting it is served."""
     app, port = start_grpc({'tls': True}, startup=False)
-    made = _record_auto_cert(app, monkeypatch)
+    made_certs = _record_auto_cert(app, monkeypatch)
     app.grpc.startup()
-    assert len(made) == 1
-    credentials = grpc.ssl_channel_credentials(root_certificates=made[0][1])
+    assert len(made_certs) == 1
+    credentials = grpc.ssl_channel_credentials(root_certificates=made_certs[0][1])
     assert _call(port, credentials=credentials) == b'echo hi'
     assert _get_refused_code(port) == grpc.StatusCode.UNAVAILABLE
 
@@ -472,11 +472,11 @@ def test_tls_custom_cert_is_served(start_grpc, certs, monkeypatch):
     assert _call(port, credentials=grpc.ssl_channel_credentials(root_certificates=certs.ca)) == b'echo hi'
 
 
-@pytest.mark.parametrize('given', ['tls_cert_path', 'tls_key_path'])
-def test_tls_custom_cert_needs_cert_and_key(start_grpc, certs, given):
+@pytest.mark.parametrize('given_option', ['tls_cert_path', 'tls_key_path'])
+def test_tls_custom_cert_needs_cert_and_key(start_grpc, certs, given_option):
     """Only one of tls_cert_path and tls_key_path raises TokeoGrpcError."""
     files = {'tls_cert_path': certs.server_cert_file, 'tls_key_path': certs.server_key_file}
-    app, _ = start_grpc({'tls': True, given: files[given]}, startup=False)
+    app, _ = start_grpc({'tls': True, given_option: files[given_option]}, startup=False)
     with pytest.raises(TokeoGrpcError, match='tls_cert_path and tls_key_path must both be set'):
         app.grpc.startup()
 
@@ -526,9 +526,12 @@ def test_tls_client_ca_path_refuses_a_cert_of_another_ca(start_grpc, certs):
 def test_tls_client_ca_path_with_the_auto_cert(start_grpc, certs, monkeypatch):
     """A client ca works with the auto cert as server cert too."""
     app, port = start_grpc({'tls': True, 'tls_key_size': 256, 'tls_client_ca_path': certs.ca_file}, startup=False)
-    made = _record_auto_cert(app, monkeypatch)
+    made_certs = _record_auto_cert(app, monkeypatch)
     app.grpc.startup()
     key, chain = certs.client
-    credentials = grpc.ssl_channel_credentials(root_certificates=made[0][1], private_key=key, certificate_chain=chain)
+    credentials = grpc.ssl_channel_credentials(root_certificates=made_certs[0][1], private_key=key, certificate_chain=chain)
     assert _call(port, method='Peer', credentials=credentials) == b'client.tokeo.test'
-    assert _get_refused_code(port, credentials=grpc.ssl_channel_credentials(root_certificates=made[0][1])) == grpc.StatusCode.UNAVAILABLE
+    assert (
+        _get_refused_code(port, credentials=grpc.ssl_channel_credentials(root_certificates=made_certs[0][1]))
+        == grpc.StatusCode.UNAVAILABLE
+    )

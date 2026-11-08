@@ -76,9 +76,9 @@ def test_load_of_a_config_file_keeps_the_secret_a_vaultref(key, tmp_path):
     """A !vault value of a config file is stored as VaultRef, never as plaintext."""
     path = write_config(tmp_path, f'db:\n  password: !vault:master {make_fernet_token(key, "s3cret")}\n')
     with VaultTest(path) as app:
-        stored = RawConfigParser.get(app.config, 'db', 'password')
-        assert isinstance(stored, VaultRef)
-        assert stored.profile == 'master'
+        stored_value = RawConfigParser.get(app.config, 'db', 'password')
+        assert isinstance(stored_value, VaultRef)
+        assert stored_value.profile == 'master'
 
 
 def test_parse_file_of_a_further_file_loads_its_secret_and_skips_an_empty_one(key, tmp_path):

@@ -84,8 +84,8 @@ def test_connections_of_threads_close_when_they_end(tmp, monkeypatch):
         thread.join()
         assert run_in_threads(lambda: app.cache.get('key')) == ['value'] * 4
         # only the connection of the app is still open
-        assert len(connections.unclosed) == 1
-    assert connections.unclosed == []
+        assert len(connections.unclosed_connections) == 1
+    assert connections.unclosed_connections == []
 
 
 def test_connections_of_threads_close_after_temper_and_throttle(tmp, monkeypatch):
@@ -104,8 +104,8 @@ def test_connections_of_threads_close_after_temper_and_throttle(tmp, monkeypatch
         assert run_in_threads(tempered) == ['ran'] * 4
         assert run_in_threads(throttled) == ['ran'] * 4
         # the app itself never accessed the cache after its setup
-        assert len(connections.opened) > 1
-        assert connections.unclosed == []
+        assert len(connections.opened_connections) > 1
+        assert connections.unclosed_connections == []
 
 
 def test_connections_close_by_hand_and_reopen(tmp, monkeypatch):
@@ -114,14 +114,14 @@ def test_connections_close_by_hand_and_reopen(tmp, monkeypatch):
     with DiskcacheTest(tmp.dir) as app:
         app.cache.set('key', 'value')
         app.cache.close()
-        assert connections.unclosed == []
+        assert connections.unclosed_connections == []
         # a later access opens a new connection
         assert app.cache.get('key') == 'value'
-        assert len(connections.unclosed) == 1
+        assert len(connections.unclosed_connections) == 1
         # also by hand inside a thread as diskcache describes it
         assert run_in_threads(lambda: (app.cache.get('key'), app.cache.close())[0]) == ['value'] * 4
-        assert len(connections.unclosed) == 1
-    assert connections.unclosed == []
+        assert len(connections.unclosed_connections) == 1
+    assert connections.unclosed_connections == []
 
 
 def test_connections_of_threads_close_after_transactions(tmp, monkeypatch):
@@ -136,8 +136,8 @@ def test_connections_of_threads_close_after_transactions(tmp, monkeypatch):
 
         assert run_in_threads(transact) == ['value'] * 4
         assert app.cache.get('key') == 'value'
-        assert len(connections.unclosed) == 1
-    assert connections.unclosed == []
+        assert len(connections.unclosed_connections) == 1
+    assert connections.unclosed_connections == []
 
 
 def test_connections_stay_open_when_released_in_another_thread():
@@ -163,51 +163,51 @@ def test_locks_acquire_returns_true(tmp):
 
 def _collect_warnings(app, monkeypatch):
     # collect the warnings the app logs
-    logged = []
-    monkeypatch.setattr(app.log, 'warning', lambda msg, **kw: logged.append(msg))
-    return logged
+    logged_lines = []
+    monkeypatch.setattr(app.log, 'warning', lambda msg, **kw: logged_lines.append(msg))
+    return logged_lines
 
 
 def test_locks_lock_releases_its_own_lock(tmp, monkeypatch):
     """lock() holds the lock in the block and frees it after, no warning."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _collect_warnings(app, monkeypatch)
+        logged_lines = _collect_warnings(app, monkeypatch)
         with app.cache.locks.lock('own'):
             assert app.cache.locks.locked('own') is True
         assert app.cache.locks.locked('own') is False
-        assert logged == []
+        assert logged_lines == []
 
 
 def test_locks_lock_lost_by_purge_warns(tmp, monkeypatch):
     """A lock purged in the block warns "... lost before release (missing)"."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _collect_warnings(app, monkeypatch)
+        logged_lines = _collect_warnings(app, monkeypatch)
         with app.cache.locks.lock('lost'):
             app.cache.locks.purge()
-        assert logged == ['lock dc_lost was lost before release (missing)']
+        assert logged_lines == ['lock dc_lost was lost before release (missing)']
 
 
 def test_locks_lock_keeps_the_lock_of_another(tmp, monkeypatch):
     """A lock taken by another after a purge stays held, with a warning."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _collect_warnings(app, monkeypatch)
+        logged_lines = _collect_warnings(app, monkeypatch)
         with app.cache.locks.lock('other'):
             app.cache.locks.purge()
             # another holder takes the lock after the purge
             app.cache.locks.acquire('other')
         assert app.cache.locks.locked('other') is True
-        assert logged == ['lock dc_other was lost before release (taken by another)']
+        assert logged_lines == ['lock dc_other was lost before release (taken by another)']
 
 
 def test_locks_lock_keeps_the_lock_of_another_after_expire(tmp, monkeypatch):
     """A lock taken by another after expire stays held, with a warning."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _collect_warnings(app, monkeypatch)
+        logged_lines = _collect_warnings(app, monkeypatch)
         with app.cache.locks.lock('expire', expire=0.05):
             time.sleep(0.1)
             app.cache.locks.acquire('expire')
         assert app.cache.locks.locked('expire') is True
-        assert logged == ['lock dc_expire was lost before release (taken by another)']
+        assert logged_lines == ['lock dc_expire was lost before release (taken by another)']
 
 
 def test_locks_lock_failing_acquire_keeps_the_lock_of_another(tmp, monkeypatch):
@@ -303,7 +303,7 @@ def test_temper_callback_when_no_slot(tmp):
     """Without a free slot the callback runs instead of the function."""
     with DiskcacheTest(tmp.dir) as app:
         runs = []
-        entered = threading.Event()
+        entered_event = threading.Event()
         release = threading.Event()
 
         @app.cache.locks.temper(
@@ -314,14 +314,14 @@ def test_temper_callback_when_no_slot(tmp):
         )
         def job():
             runs.append(1)
-            entered.set()
+            entered_event.set()
             release.wait(3.0)
             return 'ran'
 
         holder = threading.Thread(target=job)
         holder.start()
         # wait until the only slot is held by the background thread
-        assert entered.wait(3.0)
+        assert entered_event.wait(3.0)
         # the second call cannot acquire and gets the callback result
         assert job() == 'locked'
         release.set()
@@ -631,7 +631,7 @@ def test_temper_holds_its_slot_by_an_expire_time(tmp):
 def test_temper_drops_an_expired_holder_while_others_run(tmp, monkeypatch):
     """The expire time of a killed holder frees its slot, a running one stays."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _collect_warnings(app, monkeypatch)
+        logged_lines = _collect_warnings(app, monkeypatch)
         now = time.time()
         # count 2 is full: a killed holder and one still running
         app.cache.set('dc_dead', [now - 1, now + 100], expire=100)
@@ -642,7 +642,7 @@ def test_temper_drops_an_expired_holder_while_others_run(tmp, monkeypatch):
 
         assert job() == 2
         assert app.cache.get('dc_dead') == [now + 100]
-        assert logged == ['@temper dc_dead dropped 1 expired slot(s)']
+        assert logged_lines == ['@temper dc_dead dropped 1 expired slot(s)']
 
 
 def test_temper_key_lives_until_the_latest_expire_time(tmp):
@@ -665,7 +665,7 @@ def test_temper_key_lives_until_the_latest_expire_time(tmp):
 def test_temper_warns_when_its_slot_was_lost(tmp, monkeypatch, loss):
     """A call whose expire time is gone on release warns and recreates no key."""
     with DiskcacheTest(tmp.dir) as app:
-        logged = _collect_warnings(app, monkeypatch)
+        logged_lines = _collect_warnings(app, monkeypatch)
 
         @app.cache.locks.temper(name='lost', verbose=False)
         def job():
@@ -677,7 +677,7 @@ def test_temper_warns_when_its_slot_was_lost(tmp, monkeypatch, loss):
 
         assert job() == 'ran'
         assert app.cache.get('dc_lost') == (None if loss == 'purge' else ['foreign'])
-        assert logged == ['@temper dc_lost slot was lost before release']
+        assert logged_lines == ['@temper dc_lost slot was lost before release']
 
 
 @pytest.mark.parametrize('value', [1, ['x', 'y']], ids=['counter', 'foreign'])

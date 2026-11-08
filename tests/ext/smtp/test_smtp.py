@@ -68,15 +68,15 @@ def test_connection_params(use_ssl):
         with SmtpTest(ssl=use_ssl, local_hostname='', source_address='') as app:
             app.mail.send('body')
 
-    used, unused = (smtp_ssl, smtp) if use_ssl else (smtp, smtp_ssl)
-    assert unused.call_count == 0
+    used_mock, unused_mock = (smtp_ssl, smtp) if use_ssl else (smtp, smtp_ssl)
+    assert unused_mock.call_count == 0
     expected = dict(local_hostname='mx.local', timeout=7, source_address=('127.0.0.1', 0))
     empty = dict(local_hostname=None, timeout=30, source_address=None)
     if use_ssl:
         # without tls_verify_cert the smtplib default context is kept
         expected['context'] = empty['context'] = None
-    assert used.call_args_list[0] == mock.call('localhost', 25, **expected)
-    assert used.call_args_list[1] == mock.call('localhost', 25, **empty)
+    assert used_mock.call_args_list[0] == mock.call('localhost', 25, **expected)
+    assert used_mock.call_args_list[1] == mock.call('localhost', 25, **empty)
 
 
 def test_starttls_and_login():
@@ -133,8 +133,8 @@ def test_create_tls_context(tmp):
         assert chain.verify_mode == ssl.CERT_REQUIRED and chain.check_hostname is False
         # tls_ca is PEM text, tls_ca_path a file path
         for options in (dict(tls_ca=cert_pem), dict(tls_ca_path=ca_file)):
-            trusted = _create_tls_context(app, **options)
-            assert [c['subject'] for c in trusted.get_ca_certs()] == [((('commonName', 'localhost'),),)]
+            trusted_context = _create_tls_context(app, **options)
+            assert [c['subject'] for c in trusted_context.get_ca_certs()] == [((('commonName', 'localhost'),),)]
         # the value is used strictly as given
         with pytest.raises(ssl.SSLError):
             _create_tls_context(app, tls_ca=ca_file)
@@ -171,10 +171,10 @@ def test_create_tls_context_refuses_tls_verify_hostname_without_tls_verify_cert(
 
 
 @pytest.mark.parametrize(
-    'header_encoding, encoded',
+    'header_encoding, expected_encoded',
     [(None, '1'), ('base64', '=?utf-8?b?MQ==?='), ('qp', '=?utf-8?q?1?=')],
 )
-def test_x_headers(header_encoding, encoded):
+def test_x_headers(header_encoding, expected_encoded):
     """x_ arguments become X- headers, encoded like the subject."""
     with SmtpTest(header_encoding=header_encoding) as app:
         params = app.mail._get_params(X_API_Key='1', x_my_header='2')
@@ -183,7 +183,7 @@ def test_x_headers(header_encoding, encoded):
     # the name is kept as given, only the prefix separator becomes a dash;
     # with header_encoding the value is encoded like the subject
     assert 'X-my-header' in msg.keys()
-    assert f'X-API-Key: {encoded}\n' in msg.as_string()
+    assert f'X-API-Key: {expected_encoded}\n' in msg.as_string()
 
 
 # ---- attachments ------------------------------------------------------------
@@ -214,8 +214,8 @@ def test_attachment_name_with_spaces_and_umlauts(tmp):
         raw = app.mail._make_message('body', **app.mail._get_params(files=[(name, pdf) for name in names])).as_string()
     # read by the classic parser of python and by the current one
     for policy in (email.policy.compat32, email.policy.default):
-        parsed = email.message_from_string(raw, policy=policy)
-        assert [part.get_filename() for part in parsed.walk() if part.get_filename()] == names
+        parsed_message = email.message_from_string(raw, policy=policy)
+        assert [part.get_filename() for part in parsed_message.walk() if part.get_filename()] == names
 
 
 def test_inline_image(tmp):
@@ -310,16 +310,16 @@ def test_invalid_body(body):
 def test_date_and_message_id():
     """Date and Message-Id are set, a given value wins, both can be left out."""
     with SmtpTest(msgid_domain='example.com') as app:
-        enforced = app.mail._make_message('body', **app.mail._get_params())
-        given = app.mail._make_message(
+        enforced_message = app.mail._make_message('body', **app.mail._get_params())
+        given_message = app.mail._make_message(
             'body', **app.mail._get_params(date='Mon, 01 Jan 2024 00:00:00 +0000', message_id='<given@example.com>')
         )
         absent = app.mail._make_message('body', **app.mail._get_params(date_enforce=False, msgid_enforce=False))
 
-    assert enforced['Date'] and enforced['Message-Id'].endswith('@example.com>')
+    assert enforced_message['Date'] and enforced_message['Message-Id'].endswith('@example.com>')
     # a given value wins over the generated one
-    assert given['Date'] == 'Mon, 01 Jan 2024 00:00:00 +0000'
-    assert given['Message-Id'] == '<given@example.com>'
+    assert given_message['Date'] == 'Mon, 01 Jan 2024 00:00:00 +0000'
+    assert given_message['Message-Id'] == '<given@example.com>'
     assert absent['Date'] is None and absent['Message-Id'] is None
 
 
@@ -328,12 +328,12 @@ def test_date_and_message_id():
 
 def test_send_by_template_mail_params_wins_over_data():
     """A key mail_params in data is no error, the mail params win."""
-    rendered = []
+    rendered_data = []
     with SmtpTest() as app:
         with mock.patch.object(app.template, 'load'), mock.patch.object(app.mail, 'send') as send:
-            with mock.patch.object(app, 'render', side_effect=lambda data, *a, **kw: rendered.append(data) or 'body'):
+            with mock.patch.object(app, 'render', side_effect=lambda data, *a, **kw: rendered_data.append(data) or 'body'):
                 app.mail.send_by_template('mails/welcome', dict(user='tom', mail_params='x'), subject='Hi')
-    assert rendered[0] == dict(user='tom', mail_params=dict(subject='Hi'))
+    assert rendered_data[0] == dict(user='tom', mail_params=dict(subject='Hi'))
     assert send.call_args.kwargs == dict(body=dict(text='body', html='body'), subject='Hi')
 
 

@@ -95,10 +95,10 @@ def nicegui_globals():
 @pytest.fixture(autouse=True)
 def no_process_replacement(monkeypatch):
     """The calls of os.execv by hotload, recorded instead of replacing pytest."""
-    replaced = []
-    monkeypatch.setattr('tokeo.ext.nicegui.os_execv', lambda path, argv: replaced.append((path, argv)))
-    monkeypatch.setattr('multiprocessing.util._exit_function', lambda: replaced.append('exit_function'))
-    return replaced
+    replaced_calls = []
+    monkeypatch.setattr('tokeo.ext.nicegui.os_execv', lambda path, argv: replaced_calls.append((path, argv)))
+    monkeypatch.setattr('multiprocessing.util._exit_function', lambda: replaced_calls.append('exit_function'))
+    return replaced_calls
 
 
 @pytest.fixture
@@ -206,8 +206,8 @@ def test_startup_runs_nicegui_with_the_config(runs):
         'warning',
     )
     # what tokeo fixes, the auto reload of uvicorn included
-    fixed = ('show', 'native', 'reload', 'fastapi_docs', 'show_welcome_message')
-    assert [run[key] for key in fixed] == [False] * 5 and run['uvicorn_reload_dirs'] is None
+    fixed_keys = ('show', 'native', 'reload', 'fastapi_docs', 'show_welcome_message')
+    assert [run[key] for key in fixed_keys] == [False] * 5 and run['uvicorn_reload_dirs'] is None
 
 
 @pytest.mark.parametrize(
@@ -270,7 +270,7 @@ def test_startup_openapi_without_custom_module_raises(runs, openapi):
 
 
 @pytest.mark.parametrize(
-    'attributes, missing',
+    'attributes, expected_missing',
     [
         (None, 'does not import'),
         (dict(custom_swagger_ui_html=str, custom_redoc_html=str), 'get_openapi_custom'),
@@ -279,11 +279,11 @@ def test_startup_openapi_without_custom_module_raises(runs, openapi):
     ],
     ids=['no_module', 'no_openapi', 'no_swagger', 'no_redoc'],
 )
-def test_startup_openapi_with_an_unfit_custom_module_raises(runs, openapi, monkeypatch, attributes, missing):
+def test_startup_openapi_with_an_unfit_custom_module_raises(runs, openapi, monkeypatch, attributes, expected_missing):
     """A module that does not import or lacks a function raises, nothing set up."""
     name = 'tokeo_tests_openapi_missing' if attributes is None else _make_module(monkeypatch, 'tokeo_tests_openapi_unfit', **attributes)
     with NiceguiTest(openapi_custom_module=name, **openapi) as app:
-        with pytest.raises(TokeoNiceguiError, match=f"openapi_custom_module '{name}' cannot serve the openapi: .*{missing}"):
+        with pytest.raises(TokeoNiceguiError, match=f"openapi_custom_module '{name}' cannot serve the openapi: .*{expected_missing}"):
             app.nicegui.startup()
     assert nicegui_app.openapi.__func__ is FastAPI.openapi and nicegui_app.openapi_url is None
     assert not runs
@@ -507,10 +507,10 @@ def test_pdoc_render_decorator_shows_path_and_docstring(source, decorator, param
     """The pdoc hook shows the path of a page or api decorator and its docstring."""
     (call,) = ast.parse(f'{source}\ndef f(): pass').body[0].decorator_list
     with NiceguiPdocTest() as app:
-        rendered = tokeo_nicegui_pdoc_render_decorator(app, None, decorator, call.args, call.keywords)
+        rendered_decorator = tokeo_nicegui_pdoc_render_decorator(app, None, decorator, call.args, call.keywords)
         key = 'nicegui.page' if 'page' in decorator else 'fastapi.' + decorator.rsplit('.', 1)[1]
-        assert rendered == dict(decorator=decorator, params=params, docstring=app.pdoc.find_docstring('decorator', key))
-    assert rendered['docstring']
+        assert rendered_decorator == dict(decorator=decorator, params=params, docstring=app.pdoc.find_docstring('decorator', key))
+    assert rendered_decorator['docstring']
 
 
 def test_pdoc_render_decorator_leaves_others_alone():

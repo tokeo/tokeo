@@ -46,7 +46,7 @@ class ClosingEvents(RecordingEvents):
         self.exc = exc
         self.errors = None
         self.exception_cnt = None
-        self.logged = []
+        self.logged_messages = []
 
     def on_connect_event(self, ctx):
         super().on_connect_event(ctx)
@@ -64,7 +64,7 @@ class ClosingEvents(RecordingEvents):
             raise self.exc
 
     def on_logging_event(self, ctx, severity, msg, err=None):
-        self.logged.append((severity, msg))
+        self.logged_messages.append((severity, msg))
 
     def on_disconnect_event(self, ctx):
         super().on_disconnect_event(ctx)
@@ -81,7 +81,7 @@ def _run(events, options, run_client):
             reader, writer = await asyncio.open_connection('127.0.0.1', port)
             result = await run_client(reader, writer)
             writer.close()
-            assert await wait_until_async(lambda: 'disconnect' in events.fired)
+            assert await wait_until_async(lambda: 'disconnect' in events.fired_events)
             return result
         finally:
             await stop_server(server, task)
@@ -237,11 +237,11 @@ def test_session_timeout_ends_discarded_data():
                 await writer.drain()
                 await asyncio.sleep(0.05)
 
-        feeding = asyncio.create_task(feed())
+        feed_task = asyncio.create_task(feed())
         try:
             return await asyncio.wait_for(read_reply(reader), 5)
         finally:
-            feeding.cancel()
+            feed_task.cancel()
 
     reply = _run(events, {'io_session_timeout': 1, 'max_data_bytes': 100}, run_client)
     assert reply[0].startswith('421')
@@ -259,13 +259,13 @@ def test_session_timeout_is_not_renewed_by_a_message():
         await asyncio.sleep(0.7)
         for command in ENVELOPE:
             await send_command(reader, writer, command)
-        accepted = await send_command(reader, writer, b'Subject: t\r\n\r\nA\r\n.\r\n')
+        accepted_reply = await send_command(reader, writer, b'Subject: t\r\n\r\nA\r\n.\r\n')
         # the server closes on its own at the end of the session
         reply = await asyncio.wait_for(read_reply(reader), 5)
-        return accepted, reply, time.monotonic() - start_time
+        return accepted_reply, reply, time.monotonic() - start_time
 
-    accepted, reply, elapsed_seconds = _run(events, {'io_session_timeout': 1}, run_client)
-    assert accepted[0].startswith('250')
+    accepted_reply, reply, elapsed_seconds = _run(events, {'io_session_timeout': 1}, run_client)
+    assert accepted_reply[0].startswith('250')
     assert reply[0].startswith('421')
     assert elapsed_seconds < 1.5
     assert len(events.messages) == 1
@@ -305,7 +305,7 @@ def test_client_that_does_not_read_is_dropped_after_io_cmd_timeout():
             # the client sends EHLO and reads nothing
             writer.write(b'EHLO a\r\n')
             await writer.drain()
-            assert await wait_until_async(lambda: 'disconnect' in events.fired)
+            assert await wait_until_async(lambda: 'disconnect' in events.fired_events)
             return time.monotonic() - start_time
         finally:
             writer.transport.abort()
@@ -333,5 +333,5 @@ def test_reset_by_client_is_counted_and_logged_as_error():
     _run(events, {}, run_client)
     assert events.exception_cnt == 1
     assert events.errors == [ConnectionResetError]
-    assert (Severity.ERROR, 'Connection lost due reset by client!') in events.logged
-    assert not any(msg.startswith("Can't send") for _, msg in events.logged)
+    assert (Severity.ERROR, 'Connection lost due reset by client!') in events.logged_messages
+    assert not any(msg.startswith("Can't send") for _, msg in events.logged_messages)

@@ -88,10 +88,10 @@ def test_old_import_path():
 def _make_errors():
     # the cause of a real send to a closed port, pika cannot pickle it
     socket_error = AMQPConnectorSocketConnectError(ConnectionRefusedError(111, 'refused'))
-    refused = ConnectionClosed(pika.exceptions.AMQPConnectionError(socket_error))
+    refused_error = ConnectionClosed(pika.exceptions.AMQPConnectionError(socket_error))
     return [
         TokeoDramatiqConfigError('config', 'max_age', {'a': 1}, 'null'),
-        TokeoDramatiqConnectionError('localhost:5672', refused, actor_name='count_words'),
+        TokeoDramatiqConnectionError('localhost:5672', refused_error, actor_name='count_words'),
         TokeoDramatiqRefusedError('localhost:5672', pika.exceptions.ChannelClosedByBroker(403, 'ACCESS_REFUSED')),
         TokeoDramatiqQueueError('mail', 'is missing'),
     ]
@@ -107,14 +107,14 @@ def test_errors_survive_copy_and_pickle(index, clone):
     """copy, deepcopy and pickle keep type, args, fields and notes."""
     error = _make_errors()[index]
     error.add_note('a note')
-    cloned = clone(error)
-    assert type(cloned) is type(error) and cloned.args == error.args and str(cloned) == str(error)
-    assert vars(cloned) == vars(error) and cloned.__notes__ == ['a note']
+    cloned_error = clone(error)
+    assert type(cloned_error) is type(error) and cloned_error.args == error.args and str(cloned_error) == str(error)
+    assert vars(cloned_error) == vars(error) and cloned_error.__notes__ == ['a note']
 
 
 def test_errors_survive_a_process_pool():
     """The errors pass a process pool in and out with the same text."""
     errors = _make_errors()
     with multiprocessing.get_context('spawn').Pool(1) as pool:
-        returned = pool.apply_async(copy.copy, (errors,)).get(timeout=60)
-    assert [str(e) for e in returned] == [str(e) for e in errors]
+        returned_errors = pool.apply_async(copy.copy, (errors,)).get(timeout=60)
+    assert [str(e) for e in returned_errors] == [str(e) for e in errors]

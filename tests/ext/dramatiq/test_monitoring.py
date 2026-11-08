@@ -117,8 +117,8 @@ def worker():
     def build(with_details=False, interval_seconds=60):
         broker = StubBroker()
         heartbeat = TokeoDramatiqHeartbeat('probe.dramatiq.monitoring', interval_seconds, dict(label='probe', version='1.0'), with_details)
-        sent = []
-        heartbeat._send = sent.append
+        sent_heartbeats = []
+        heartbeat._send = sent_heartbeats.append
         broker.add_middleware(heartbeat)
         release = threading.Event()
 
@@ -135,7 +135,7 @@ def worker():
             release.wait(10)
 
         worker = dramatiq.Worker(broker, worker_threads=2, worker_timeout=50)
-        return broker, worker, heartbeat, sent, release, dict(ok=ok, fails=fails, waits=waits)
+        return broker, worker, heartbeat, sent_heartbeats, release, dict(ok=ok, fails=fails, waits=waits)
 
     return build
 
@@ -146,7 +146,7 @@ def _join(broker):
 
 def test_heartbeat_counts_tasks(worker):
     """The heartbeat counts done, failed and dead tasks, per actor too."""
-    broker, w, heartbeat, sent, release, actors = worker()
+    broker, w, heartbeat, sent_heartbeats, release, actors = worker()
     w.start()
     try:
         actors['ok'].send(1)
@@ -157,7 +157,7 @@ def test_heartbeat_counts_tasks(worker):
         beat = heartbeat.build_heartbeat()
     finally:
         w.stop()
-    assert sent[0]['state'] == 'running'
+    assert sent_heartbeats[0]['state'] == 'running'
     assert beat['totals'] == dict(done_cnt=2, failed_cnt=1, dead_cnt=1)
     assert beat['since_last']['actors']['ok']['done_cnt'] == 2
     # without details only the type of the error, it never holds data
@@ -169,7 +169,7 @@ def test_heartbeat_counts_tasks(worker):
 
 def test_heartbeat_describes_the_worker(worker):
     """The heartbeat describes app and worker and is sent on stop too."""
-    broker, w, heartbeat, sent, release, actors = worker()
+    broker, w, heartbeat, sent_heartbeats, release, actors = worker()
     w.start()
     try:
         beat = heartbeat.build_heartbeat()
@@ -180,13 +180,13 @@ def test_heartbeat_describes_the_worker(worker):
     assert beat['worker']['threads'] == 2 and beat['worker']['queues'] is None and beat['worker']['with_details'] is False
     assert beat['worker']['queue_prefetch'] == w.queue_prefetch and beat['worker']['started_at'] <= beat['sent_at']
     # a last heartbeat on shutdown
-    assert sent[-1]['state'] == 'stopped'
+    assert sent_heartbeats[-1]['state'] == 'stopped'
 
 
 @pytest.mark.parametrize('with_details', [False, True])
 def test_heartbeat_shows_running_tasks(worker, with_details):
     """A running task shows actor, queue and runtime, args with details."""
-    broker, w, heartbeat, sent, release, actors = worker(with_details=with_details)
+    broker, w, heartbeat, sent_heartbeats, release, actors = worker(with_details=with_details)
     w.start()
     try:
         actors['waits'].send('anna@example.com')
@@ -208,7 +208,7 @@ def test_heartbeat_shows_running_tasks(worker, with_details):
 
 def test_heartbeat_details_show_error_texts(worker):
     """With details the last error shows its text."""
-    broker, w, heartbeat, sent, release, actors = worker(with_details=True)
+    broker, w, heartbeat, sent_heartbeats, release, actors = worker(with_details=True)
     w.start()
     try:
         actors['fails'].send('anna@example.com')
@@ -216,7 +216,7 @@ def test_heartbeat_details_show_error_texts(worker):
         w.join()
     finally:
         w.stop()
-    assert sent[-1]['since_last']['actors']['fails']['last_error'] == 'LookupError: user anna@example.com not found'
+    assert sent_heartbeats[-1]['since_last']['actors']['fails']['last_error'] == 'LookupError: user anna@example.com not found'
 
 
 def test_format_details_cuts_long_details():
@@ -227,13 +227,13 @@ def test_format_details_cuts_long_details():
 class FakeChannel:
 
     def __init__(self):
-        self.declared, self.published = [], []
+        self.declared_exchanges, self.published_messages = [], []
 
     def exchange_declare(self, exchange, exchange_type):
-        self.declared.append((exchange, exchange_type))
+        self.declared_exchanges.append((exchange, exchange_type))
 
     def basic_publish(self, **publish):
-        self.published.append(publish)
+        self.published_messages.append(publish)
 
 
 class FakeConnection:
@@ -257,11 +257,11 @@ def test_heartbeat_is_sent_without_mandatory_and_not_persistent(monkeypatch):
     heartbeat._send(dict(a=1))
     heartbeat._send(dict(a=2))
     channel = heartbeat._connection.channel_
-    assert channel.declared == [('probe.dramatiq.monitoring', 'fanout')]
-    first = channel.published[0]
+    assert channel.declared_exchanges == [('probe.dramatiq.monitoring', 'fanout')]
+    first = channel.published_messages[0]
     assert (first['exchange'], first['routing_key'], json.loads(first['body'])) == ('probe.dramatiq.monitoring', '', dict(a=1))
     assert first['properties'].delivery_mode == 1 and 'mandatory' not in first
-    assert len(channel.published) == 2
+    assert len(channel.published_messages) == 2
 
 
 def test_heartbeat_survives_a_lost_rabbitmq(monkeypatch):

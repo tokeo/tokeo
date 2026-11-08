@@ -292,8 +292,8 @@ def test_plain_smtpd_runs_without_cryptography():
         'SmtpdServer(SmtpdEvents())\n'
         "print('OK')\n"
     )
-    done = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, env=dict(os.environ))
-    assert done.returncode == 0 and done.stdout.strip() == 'OK', done.stderr
+    done_process = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, env=dict(os.environ))
+    assert done_process.returncode == 0 and done_process.stdout.strip() == 'OK', done_process.stderr
 
 
 def test_self_signed_without_cryptography_raises(monkeypatch):

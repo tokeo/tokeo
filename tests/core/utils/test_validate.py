@@ -181,7 +181,7 @@ def test_as_list(value, expected):
 
 def test_as_list_hands_back_a_new_list():
     """The list is a copy, a change does not touch the given list."""
-    given = ['a']
-    result = as_list(given)
+    given_list = ['a']
+    result = as_list(given_list)
     result.append('b')
-    assert given == ['a']
+    assert given_list == ['a']

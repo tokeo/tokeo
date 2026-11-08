@@ -174,16 +174,16 @@ def test_override_reaches_the_server_logger_by_super():
 
         def __init__(self):
             super().__init__()
-            self.seen = []
+            self.seen_lines = []
 
         def on_logging_event(self, ctx, severity, msg, err=None):
-            self.seen.append(msg)
+            self.seen_lines.append(msg)
             super().on_logging_event(ctx, severity, msg, err)
 
     target = Recorder()
     events = Own()
     SmtpdServer(events, logger=target).logger.info('both\r\n')
-    assert events.seen == ['both\r\n']
+    assert events.seen_lines == ['both\r\n']
     # the line break is chomped like by Ruby
     assert target.lines == [('info', 'both')]
 
@@ -261,22 +261,22 @@ def test_default_auth_deny_logs_without_the_password():
 
 
 @pytest.mark.parametrize(
-    'crlf_mode, line, logged',
+    'crlf_mode, line, expected_logged',
     [
         ('CRLF_ENSURE', b'NOOP \xc3\xa4\r\n', '<<< NOOP ä'),
         ('CRLF_LEAVE', b'NOOP a\rb\r\n', '<<< NOOP a[\\r]b'),
         ('CRLF_ENSURE', b'NOOP \xff\r\n', '<<< NOOP \\xff'),
     ],
 )
-def test_command_lines_are_logged_as_text(crlf_mode, line, logged):
+def test_command_lines_are_logged_as_text(crlf_mode, line, expected_logged):
     """A command line is logged as text, a CR as [\\r] and bad bytes escaped."""
     events = LinesEvents()
     run_dialog(events, {'crlf_mode': crlf_mode}, [b'EHLO a\r\n', line])
-    assert logged in events.messages()
+    assert expected_logged in events.messages()
 
 
-@pytest.mark.parametrize('host, shown, bound', [('127.0.0.1', '127.0.0.1', '127.0.0.1'), ('::1', '[::1]', '[::1]')])
-def test_start_logs_every_listener_and_its_bound_address(host, shown, bound):
+@pytest.mark.parametrize('host, expected_shown, expected_bound', [('127.0.0.1', '127.0.0.1', '127.0.0.1'), ('::1', '[::1]', '[::1]')])
+def test_start_logs_every_listener_and_its_bound_address(host, expected_shown, expected_bound):
     """start() logs the listener as given and each bound address, both at INFO."""
     events = LinesEvents()
 
@@ -291,8 +291,8 @@ def test_start_logs_every_listener_and_its_bound_address(host, shown, bound):
         port = asyncio.run(go())
     except OSError:
         pytest.skip(f'{host} is not available here')
-    assert (None, Severity.INFO, f'Starting service on {shown}:(auto)', None) in events.lines
-    assert (None, Severity.INFO, f'Service listening on {bound}:{port}', None) in events.lines
+    assert (None, Severity.INFO, f'Starting service on {expected_shown}:(auto)', None) in events.lines
+    assert (None, Severity.INFO, f'Service listening on {expected_bound}:{port}', None) in events.lines
 
 
 @pytest.mark.parametrize('auth_mode, noted', [('AUTH_OPTIONAL', True), ('AUTH_FORBIDDEN', False)], ids=['auth', 'no_auth'])

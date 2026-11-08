@@ -41,9 +41,9 @@ def test_connections_counter_tracks_open_clients():
                 assert await wait_until_async(lambda e=expected: srv.connections == e)
                 assert srv.has_connections() is True
             # closing them one by one lowers it back to zero
-            for closed, writer in enumerate(writers, start=1):
+            for closed_cnt, writer in enumerate(writers, start=1):
                 writer.close()
-                remaining = len(writers) - closed
+                remaining = len(writers) - closed_cnt
                 assert await wait_until_async(lambda r=remaining: srv.connections == r)
             assert srv.has_connections() is False
         finally:

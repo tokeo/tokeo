@@ -113,23 +113,23 @@ def test_async_actor_runs_on_the_daemon_event_loop(tmp, start_worker):
 def test_current_message_is_the_one_sent(tmp, start_worker):
     """The actor sees the message it runs by CurrentMessage."""
     with DramatiqTest(tmp) as app:
-        seen = []
-        actor = app.dramatiq.actor(lambda: seen.append(CurrentMessage.get_current_message().message_id), actor_name='current')
+        seen_ids = []
+        actor = app.dramatiq.actor(lambda: seen_ids.append(CurrentMessage.get_current_message().message_id), actor_name='current')
         start_worker(app.dramatiq.broker)
         message = actor.send()
         _join(app.dramatiq.broker)
-    assert seen == [message.message_id]
+    assert seen_ids == [message.message_id]
 
 
 def test_pipeline_hands_each_result_on(tmp, start_worker):
     """A pipeline of double(2), double and keep ends with 8 in keep."""
     with DramatiqTest(tmp) as app:
-        kept = []
+        kept_values = []
         double = app.dramatiq.actor(lambda value: value * 2, actor_name='double')
-        keep = app.dramatiq.actor(kept.append, actor_name='keep')
+        keep = app.dramatiq.actor(kept_values.append, actor_name='keep')
         start_worker(app.dramatiq.broker)
         pipeline([double.message(2), double.message(), keep.message()]).run()
-        assert wait_until(lambda: kept == [8])
+        assert wait_until(lambda: kept_values == [8])
 
 
 def test_callbacks_get_result_and_error(tmp, start_worker):
@@ -189,14 +189,14 @@ def test_retries_follow_message_actor_and_config(tmp, start_worker, actor_option
 def test_time_limit_from_config_stops_a_long_actor(tmp, start_worker):
     """time_limit 100 ms of the config raises TimeLimitExceeded in the actor."""
     with DramatiqMiddlewareTest(tmp, time_limit=100, max_retries=0) as app:
-        raised = []
+        raised_errors = []
 
         def endless():
             try:
                 while True:
                     time.sleep(0.01)
             except TimeLimitExceeded as e:
-                raised.append(e)
+                raised_errors.append(e)
                 raise
 
         actor = app.dramatiq.actor(endless, actor_name='endless')
@@ -206,7 +206,7 @@ def test_time_limit_from_config_stops_a_long_actor(tmp, start_worker):
         message = actor.send()
         _join(app.dramatiq.broker)
         # the limit is checked once a second
-        assert len(raised) == 1 and _get_dead_ids(app.dramatiq.broker) == [message.message_id]
+        assert len(raised_errors) == 1 and _get_dead_ids(app.dramatiq.broker) == [message.message_id]
 
 
 def test_max_age_from_config_skips_old_messages(tmp, start_worker):
@@ -224,14 +224,14 @@ def test_max_age_from_config_skips_old_messages(tmp, start_worker):
         assert runs == ['new'] and _get_dead_ids(broker) == [old.message_id]
 
 
-@pytest.mark.parametrize('notify_shutdown, ended', [(True, 'Shutdown'), (False, 'finished')])
-def test_notify_shutdown_from_config(tmp, start_worker, notify_shutdown, ended):
+@pytest.mark.parametrize('notify_shutdown, expected_ended', [(True, 'Shutdown'), (False, 'finished')])
+def test_notify_shutdown_from_config(tmp, start_worker, notify_shutdown, expected_ended):
     """notify_shutdown of the config raises Shutdown on stop, else it finishes."""
     with DramatiqMiddlewareTest(tmp, notify_shutdown=notify_shutdown, max_retries=0) as app:
-        started, results = threading.Event(), []
+        started_event, results = threading.Event(), []
 
         def busy():
-            started.set()
+            started_event.set()
             try:
                 # a little longer than the stop takes to raise the notice
                 for _ in range(30):
@@ -244,9 +244,9 @@ def test_notify_shutdown_from_config(tmp, start_worker, notify_shutdown, ended):
         actor = app.dramatiq.actor(busy, actor_name='busy')
         worker = start_worker(app.dramatiq.broker)
         actor.send()
-        assert started.wait(5)
+        assert started_event.wait(5)
         worker.stop(timeout=5000)
-    assert results == [ended]
+    assert results == [expected_ended]
 
 
 # ---- locks ------------------------------------------------------------------
@@ -276,11 +276,11 @@ def test_locks_temper_keeps_worker_threads_apart(tmp, start_worker):
 def test_locks_throttle_hands_surplus_messages_to_the_callback(tmp, start_worker):
     """A throttle of 2 per hour runs 2 of 5 messages, the callback gets 3."""
     with DramatiqMiddlewareTest(tmp) as app:
-        ran, locked = [], []
+        ran, locked_values = [], []
 
         @app.dramatiq.actor(actor_name='call_api')
         @app.dramatiq.locks.throttle(
-            count=2, per_seconds=3600, name='api', cb_on_locked=lambda **kw: locked.append(kw['value']), verbose=False
+            count=2, per_seconds=3600, name='api', cb_on_locked=lambda **kw: locked_values.append(kw['value']), verbose=False
         )
         def call_api(value):
             ran.append(value)
@@ -289,7 +289,7 @@ def test_locks_throttle_hands_surplus_messages_to_the_callback(tmp, start_worker
         for value in range(5):
             call_api.send(value)
         _join(app.dramatiq.broker)
-    assert (len(ran), len(locked), sorted(ran + locked)) == (2, 3, [0, 1, 2, 3, 4])
+    assert (len(ran), len(locked_values), sorted(ran + locked_values)) == (2, 3, [0, 1, 2, 3, 4])
 
 
 def test_locks_purge_command_frees_a_lock_an_actor_waits_for(tmp, start_worker, capsys):
@@ -335,12 +335,12 @@ def test_monitor_hears_a_worker_of_the_app(tmp, start_worker, monkeypatch):
         try:
             actor.send(2)
             assert wait_until(lambda: monitor.workers() and monitor.workers()[0]['heartbeat']['running_tasks'])
-            (running,) = monitor.workers()
+            (running_worker,) = monitor.workers()
         finally:
             release.set()
         _join(app.dramatiq.broker)
         worker.stop(timeout=5000)
-        (stopped,) = monitor.workers()
-    (task,) = running['heartbeat']['running_tasks']
-    assert (running['state'], task['actor_name'], task['args']) == ('ok', 'waits', '((2,), {})')
-    assert stopped['state'] == 'stopped' and stopped['heartbeat']['totals'] == dict(done_cnt=1, failed_cnt=0, dead_cnt=0)
+        (stopped_worker,) = monitor.workers()
+    (task,) = running_worker['heartbeat']['running_tasks']
+    assert (running_worker['state'], task['actor_name'], task['args']) == ('ok', 'waits', '((2,), {})')
+    assert stopped_worker['state'] == 'stopped' and stopped_worker['heartbeat']['totals'] == dict(done_cnt=1, failed_cnt=0, dead_cnt=0)

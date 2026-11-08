@@ -31,7 +31,7 @@ class Capture(SmtpdEvents):
 
     def __init__(self, options=None):
         super().__init__(options)
-        self.seen = []
+        self.seen_messages = []
         self.receiving_sizes = []
 
     def on_message_data_receiving_event(self, ctx):
@@ -44,7 +44,7 @@ class Capture(SmtpdEvents):
             entry['path'] = spooler.path
             with open(spooler.path, 'rb') as f:
                 entry['file'] = f.read()
-        self.seen.append(entry)
+        self.seen_messages.append(entry)
 
 
 class InjectingCapture(Capture):
@@ -59,7 +59,7 @@ class KeepCapture(Capture):
 
     def on_message_data_event(self, ctx):
         super().on_message_data_event(ctx)
-        self.seen[-1]['kept'] = ctx.message.spooler.keep()
+        self.seen_messages[-1]['kept'] = ctx.message.spooler.keep()
 
 
 class MoveCapture(Capture):
@@ -69,7 +69,7 @@ class MoveCapture(Capture):
         super().on_message_data_event(ctx)
         target = ctx.message.spooler.path + '.taken'
         assert ctx.message.spooler.keep(target) == target
-        self.seen[-1]['target'] = target
+        self.seen_messages[-1]['target'] = target
 
 
 class EarlyMoveCapture(Capture):
@@ -93,7 +93,7 @@ class RenameCapture(Capture):
         super().on_message_data_event(ctx)
         target = ctx.message.spooler.path + '.renamed'
         os.rename(ctx.message.spooler.path, target)
-        self.seen[-1]['target'] = target
+        self.seen_messages[-1]['target'] = target
 
 
 def _run(events, options, messages=(MESSAGE,), debug=False):
@@ -119,18 +119,18 @@ def test_file_is_byte_identical_to_ram_mode(tmp_path):
     _run(ram, {})
     spool = Capture()
     _run(spool, {'spool_path_prefix': str(tmp_path) + '/'})
-    assert spool.seen[0]['file'] == ram.seen[0]['data']
-    assert spool.seen[0]['bytesize'] == ram.seen[0]['bytesize'] == len(ram.seen[0]['data'])
+    assert spool.seen_messages[0]['file'] == ram.seen_messages[0]['data']
+    assert spool.seen_messages[0]['bytesize'] == ram.seen_messages[0]['bytesize'] == len(ram.seen_messages[0]['data'])
 
 
 def test_data_holds_only_headers_without_separator_line(tmp_path):
     """In spool mode data holds the headers only, without the empty line."""
     events = Capture()
     _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
-    assert events.seen[0]['data'] == b'Subject: spool test\r\nFrom: a@x.org\r\n'
+    assert events.seen_messages[0]['data'] == b'Subject: spool test\r\nFrom: a@x.org\r\n'
     import email
 
-    assert email.message_from_bytes(events.seen[0]['data'])['Subject'] == 'spool test'
+    assert email.message_from_bytes(events.seen_messages[0]['data'])['Subject'] == 'spool test'
 
 
 def test_injected_headers_reach_file_and_bytesize(tmp_path):
@@ -140,9 +140,9 @@ def test_injected_headers_reach_file_and_bytesize(tmp_path):
     spool = InjectingCapture()
     _run(spool, {'spool_path_prefix': str(tmp_path) + '/'})
     # injected header sits before the separator, file identical to RAM mode
-    assert b'X-inject: Y\r\n\r\n' in spool.seen[0]['file']
-    assert spool.seen[0]['file'] == ram.seen[0]['data']
-    assert spool.seen[0]['bytesize'] == len(spool.seen[0]['file']) == ram.seen[0]['bytesize']
+    assert b'X-inject: Y\r\n\r\n' in spool.seen_messages[0]['file']
+    assert spool.seen_messages[0]['file'] == ram.seen_messages[0]['data']
+    assert spool.seen_messages[0]['bytesize'] == len(spool.seen_messages[0]['file']) == ram.seen_messages[0]['bytesize']
 
 
 def test_bytesize_runs_live_in_both_modes(tmp_path):
@@ -153,7 +153,7 @@ def test_bytesize_runs_live_in_both_modes(tmp_path):
         sizes = events.receiving_sizes
         assert sizes == sorted(sizes) and sizes[0] > 0
         # final bytesize = last running value minus the chomped line break
-        assert events.seen[0]['bytesize'] == sizes[-1] - 2
+        assert events.seen_messages[0]['bytesize'] == sizes[-1] - 2
 
 
 def test_message_without_separator_gets_no_spooler(tmp_path):
@@ -162,9 +162,9 @@ def test_message_without_separator_gets_no_spooler(tmp_path):
     _run(ram, {}, messages=('Subject: only headers\r\nX-test: 1',))
     spool = Capture()
     _run(spool, {'spool_path_prefix': str(tmp_path) + '/'}, messages=('Subject: only headers\r\nX-test: 1',))
-    assert spool.seen[0]['path'] is None
-    assert spool.seen[0]['data'] == ram.seen[0]['data']
-    assert spool.seen[0]['bytesize'] == ram.seen[0]['bytesize']
+    assert spool.seen_messages[0]['path'] is None
+    assert spool.seen_messages[0]['data'] == ram.seen_messages[0]['data']
+    assert spool.seen_messages[0]['bytesize'] == ram.seen_messages[0]['bytesize']
     assert os.listdir(tmp_path) == []
 
 
@@ -175,19 +175,19 @@ def test_file_name_pattern_and_prefix(tmp_path):
     """Files are named [prefix]YYYYMMDD-HHMMSS-<id>.eml."""
     events = Capture()
     _run(events, {'spool_path_prefix': str(tmp_path) + '/mx1-'}, debug=True)
-    name = os.path.basename(events.seen[0]['path'])
+    name = os.path.basename(events.seen_messages[0]['path'])
     assert re.fullmatch(r'mx1-\d{8}-\d{6}-.+\.eml', name)
     # trailing slash = plain directory, no name prefix
     events = Capture()
     _run(events, {'spool_path_prefix': str(tmp_path) + '/'}, debug=True)
-    assert re.fullmatch(r'\d{8}-\d{6}-.+\.eml', os.path.basename(events.seen[0]['path']))
+    assert re.fullmatch(r'\d{8}-\d{6}-.+\.eml', os.path.basename(events.seen_messages[0]['path']))
 
 
 def test_file_deleted_after_event(tmp_path):
     """The file exists during the data event and is deleted after it."""
     events = Capture()
     _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
-    assert events.seen[0]['file'] is not None  # existed during the event
+    assert events.seen_messages[0]['file'] is not None  # existed during the event
     assert os.listdir(tmp_path) == []  # gone afterwards
 
 
@@ -198,7 +198,7 @@ def test_debug_keeps_delivered_files(tmp_path):
     files = os.listdir(tmp_path)
     assert len(files) == 1
     with open(tmp_path / files[0], 'rb') as f:
-        assert f.read() == events.seen[0]['file']
+        assert f.read() == events.seen_messages[0]['file']
 
 
 def test_two_messages_one_connection_get_fresh_files(tmp_path):
@@ -226,10 +226,10 @@ def test_two_messages_one_connection_get_fresh_files(tmp_path):
             await srv.stop(wait_seconds_before_close=0.3)
 
     asyncio.run(go())
-    assert len(events.seen) == 2
-    assert events.seen[0]['path'] != events.seen[1]['path']
-    assert events.seen[0]['file'].endswith(b'first')
-    assert events.seen[1]['file'].endswith(b'second')
+    assert len(events.seen_messages) == 2
+    assert events.seen_messages[0]['path'] != events.seen_messages[1]['path']
+    assert events.seen_messages[0]['file'].endswith(b'first')
+    assert events.seen_messages[1]['file'].endswith(b'second')
 
 
 # ---- takeover via keep() ----------------------------------------------------
@@ -239,20 +239,20 @@ def test_keep_returns_path_and_file_survives(tmp_path):
     """keep() returns the path and the file survives the event."""
     events = KeepCapture()
     _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
-    kept = events.seen[0]['kept']
-    assert kept is not None and os.path.exists(kept)
-    with open(kept, 'rb') as f:
-        assert f.read() == events.seen[0]['file']
+    kept_path = events.seen_messages[0]['kept']
+    assert kept_path is not None and os.path.exists(kept_path)
+    with open(kept_path, 'rb') as f:
+        assert f.read() == events.seen_messages[0]['file']
 
 
 def test_keep_moves_to_target(tmp_path):
     """keep(target) moves the file there, the spool directory holds only it."""
     events = MoveCapture()
     _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
-    target = events.seen[0]['target']
+    target = events.seen_messages[0]['target']
     assert os.path.exists(target)
     with open(target, 'rb') as f:
-        assert f.read() == events.seen[0]['file']
+        assert f.read() == events.seen_messages[0]['file']
     assert os.listdir(tmp_path) == [os.path.basename(target)]
 
 
@@ -267,7 +267,7 @@ def test_early_keep_mid_stream_completes_at_target(tmp_path):
     size = os.path.getsize(events.target)
     with open(events.target, 'rb') as f:
         content = f.read()
-    assert size == events.seen[0]['bytesize']
+    assert size == events.seen_messages[0]['bytesize']
     assert content.startswith(b'Subject: t\r\n\r\nXXX') and content.endswith(b'\r\nlast')
 
 
@@ -275,10 +275,10 @@ def test_manual_rename_takeover_still_safe(tmp_path):
     """A file renamed by the handler itself is left alone, nothing raises."""
     events = RenameCapture()
     _run(events, {'spool_path_prefix': str(tmp_path) + '/'})  # unlink must not raise
-    target = events.seen[0]['target']
+    target = events.seen_messages[0]['target']
     assert os.path.exists(target)
     with open(target, 'rb') as f:
-        assert f.read() == events.seen[0]['file']
+        assert f.read() == events.seen_messages[0]['file']
 
 
 # ---- aborts and limits ------------------------------------------------------
@@ -355,15 +355,15 @@ class DoubleKeep(Capture):
 
     def on_message_data_event(self, ctx):
         super().on_message_data_event(ctx)
-        self.seen[-1]['first'] = ctx.message.spooler.keep()
-        self.seen[-1]['second'] = ctx.message.spooler.keep()
+        self.seen_messages[-1]['first'] = ctx.message.spooler.keep()
+        self.seen_messages[-1]['second'] = ctx.message.spooler.keep()
 
 
 def test_keep_called_twice_returns_none(tmp_path):
     """A second keep() returns None, the first path stays."""
     events = DoubleKeep()
     _run(events, {'spool_path_prefix': str(tmp_path) + '/'})
-    first, second = events.seen[0]['first'], events.seen[0]['second']
+    first, second = events.seen_messages[0]['first'], events.seen_messages[0]['second']
     assert first is not None and os.path.exists(first)
     assert second is None
 
@@ -375,8 +375,8 @@ def test_empty_body_message_matches_ram_mode(tmp_path):
     assert run_wire(ram, {}, wire) == b'250'
     spool = Capture()
     assert run_wire(spool, {'spool_path_prefix': str(tmp_path) + '/'}, wire) == b'250'
-    assert spool.seen[0]['file'] == ram.seen[0]['data'] == b'Subject: t\r\n'
-    assert spool.seen[0]['bytesize'] == ram.seen[0]['bytesize']
+    assert spool.seen_messages[0]['file'] == ram.seen_messages[0]['data'] == b'Subject: t\r\n'
+    assert spool.seen_messages[0]['bytesize'] == ram.seen_messages[0]['bytesize']
 
 
 def test_crlf_leave_spool_file_is_byte_true(tmp_path):
@@ -387,17 +387,17 @@ def test_crlf_leave_spool_file_is_byte_true(tmp_path):
     assert run_wire(ram, {'crlf_mode': 'CRLF_LEAVE'}, wire) == b'250'
     spool = Capture()
     assert run_wire(spool, {'crlf_mode': 'CRLF_LEAVE', 'spool_path_prefix': str(tmp_path) + '/'}, wire) == b'250'
-    assert spool.seen[0]['file'] == ram.seen[0]['data']
-    assert not spool.seen[0]['file'].endswith(b'\n')
-    assert spool.seen[0]['bytesize'] == ram.seen[0]['bytesize']
+    assert spool.seen_messages[0]['file'] == ram.seen_messages[0]['data']
+    assert not spool.seen_messages[0]['file'].endswith(b'\n')
+    assert spool.seen_messages[0]['bytesize'] == ram.seen_messages[0]['bytesize']
 
 
 def test_completely_empty_message(tmp_path):
     """A dot right after DATA gives no spooler, no file and bytesize 0."""
     events = Capture()
     assert run_wire(events, {'spool_path_prefix': str(tmp_path) + '/'}, b'') == b'250'
-    assert events.seen[0]['path'] is None
-    assert events.seen[0]['bytesize'] == 0
+    assert events.seen_messages[0]['path'] is None
+    assert events.seen_messages[0]['bytesize'] == 0
     assert os.listdir(tmp_path) == []
 
 

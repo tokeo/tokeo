@@ -143,17 +143,17 @@ def test_signal_handlers_of_the_app_return_after_the_shell(shell):
 
 def test_default_signal_stays_as_it_is(shell):
     """A signal the app does not handle keeps its default during the shell."""
-    seen = []
+    seen_handlers = []
     with TuiInputTest() as app, create_pipe_input() as keyboard:
         previous = signal.signal(signal.SIGHUP, signal.SIG_DFL)
         try:
             keyboard.send_text(f'x\r{CTRL_D}')
             app.tui.input.run_shell(
-                lambda line: seen.append(signal.getsignal(signal.SIGHUP)) or True, input=keyboard, output=DummyOutput()
+                lambda line: seen_handlers.append(signal.getsignal(signal.SIGHUP)) or True, input=keyboard, output=DummyOutput()
             )
         finally:
             signal.signal(signal.SIGHUP, previous)
-    assert seen == [signal.SIG_DFL]
+    assert seen_handlers == [signal.SIG_DFL]
 
 
 def test_other_signal_passes(shell):
@@ -202,15 +202,15 @@ def test_output_of_other_threads_appears_above_the_prompt():
     """
     probe = 'tests.ext.tui.tui_tests_input_probe'
     with Terminal([sys.executable, '-m', probe], rows=12, columns=80) as terminal:
-        shown = terminal.wait_for(lambda lines: 'MARK-APP-PRINT' in ''.join(lines) and lines[-1] == 'Probe>')
-        assert shown is not None, '\n'.join(terminal.screen.display)
+        shown_lines = terminal.wait_for(lambda lines: 'MARK-APP-PRINT' in ''.join(lines) and lines[-1] == 'Probe>')
+        assert shown_lines is not None, '\n'.join(terminal.screen.display)
         terminal.send(b'exit\r')
         terminal.wait()
     # each output on its own line above the prompt, the prompt untouched
-    assert 'MARK-PRINT' in shown
-    assert any(line.endswith('MARK-LOG') and 'Probe>' not in line for line in shown)
-    assert 'MARK-APP-PRINT' in shown
-    assert shown[-1] == 'Probe>'
+    assert 'MARK-PRINT' in shown_lines
+    assert any(line.endswith('MARK-LOG') and 'Probe>' not in line for line in shown_lines)
+    assert 'MARK-APP-PRINT' in shown_lines
+    assert shown_lines[-1] == 'Probe>'
 
 
 PROBE = 'tests.ext.tui.tui_tests_input_probe'

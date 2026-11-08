@@ -27,10 +27,10 @@ class SyncLogging(SmtpdEvents):
 
     def __init__(self, options=None):
         super().__init__(options)
-        self.captured = []
+        self.captured_lines = []
 
     def on_logging_event(self, ctx, severity, msg, err=None):
-        self.captured.append((severity, msg))
+        self.captured_lines.append((severity, msg))
 
 
 class AsyncLogging(SmtpdEvents):
@@ -38,10 +38,10 @@ class AsyncLogging(SmtpdEvents):
 
     def __init__(self, options=None):
         super().__init__(options)
-        self.captured = []
+        self.captured_lines = []
 
     async def on_logging_event(self, ctx, severity, msg, err=None):
-        self.captured.append((severity, msg))
+        self.captured_lines.append((severity, msg))
 
 
 class ThreadedLogging(SmtpdEvents):
@@ -49,11 +49,11 @@ class ThreadedLogging(SmtpdEvents):
 
     def __init__(self, options=None):
         super().__init__(options)
-        self.captured = []
+        self.captured_lines = []
 
     @threaded
     def on_logging_event(self, ctx, severity, msg, err=None):
-        self.captured.append((severity, msg))
+        self.captured_lines.append((severity, msg))
 
 
 @pytest.mark.parametrize('handler_cls', [SyncLogging, AsyncLogging, ThreadedLogging])
@@ -62,7 +62,7 @@ def test_logger_reaches_every_logging_event_form(handler_cls):
     events = handler_cls()
     smtpd = SmtpdServer(events)
     smtpd.logger.warning('bridge me')
-    assert events.captured == [(Severity.WARNING, 'bridge me')]
+    assert events.captured_lines == [(Severity.WARNING, 'bridge me')]
 
 
 def test_handler_log_is_bound_to_the_server_logger():
@@ -72,7 +72,7 @@ def test_handler_log_is_bound_to_the_server_logger():
     # the handler's self.log is the very server logger
     assert events.log is smtpd.logger
     events.log.info('via handler')
-    assert events.captured == [(Severity.INFO, 'via handler')]
+    assert events.captured_lines == [(Severity.INFO, 'via handler')]
 
 
 def test_handler_log_is_none_before_binding():
@@ -106,12 +106,12 @@ def test_self_log_from_sync_and_async_events_with_async_logging():
             )
             assert code == 250
             # the fire-and-forget log tasks run on the loop
-            assert await wait_until_async(lambda: 'rcpt_to (async event)' in [m for _, m in events.captured])
+            assert await wait_until_async(lambda: 'rcpt_to (async event)' in [m for _, m in events.captured_lines])
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
     asyncio.run(go())
-    messages = [m for _, m in events.captured]
+    messages = [m for _, m in events.captured_lines]
     assert 'mail_from (sync event)' in messages
     assert 'rcpt_to (async event)' in messages
 
@@ -137,12 +137,12 @@ def test_self_log_from_threaded_event_reaches_loop_threadsafe():
                 lambda: send_mail(port, 'from@example.org', 'to@example.org', 'Subject: x\r\n\r\nhi'),
             )
             assert code == 250
-            assert await wait_until_async(lambda: 'data (threaded event)' in [m for _, m in events.captured])
+            assert await wait_until_async(lambda: 'data (threaded event)' in [m for _, m in events.captured_lines])
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
     asyncio.run(go())
-    assert 'data (threaded event)' in [m for _, m in events.captured]
+    assert 'data (threaded event)' in [m for _, m in events.captured_lines]
 
 
 def test_base_auth_deny_logs_via_bound_self_log():
@@ -161,7 +161,7 @@ def test_base_auth_deny_logs_via_bound_self_log():
         with pytest.raises(Smtpd535Exception):
             await smtpd._emit(SmtpdEvent.ON_AUTH_EVENT, ctx, '', 'user', 'secret')
         # the scheduled deny log runs on the loop
-        assert await wait_until_async(lambda: any('Deny access' in m for _, m in events.captured))
+        assert await wait_until_async(lambda: any('Deny access' in m for _, m in events.captured_lines))
 
     asyncio.run(go())
-    assert any('Deny access' in m for _, m in events.captured)
+    assert any('Deny access' in m for _, m in events.captured_lines)

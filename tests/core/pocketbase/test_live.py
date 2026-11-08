@@ -129,8 +129,8 @@ def test_live_filter_finds_exactly_the_tricky_title(pb):
     for title in TRICKY:
         posts.create({'title': title})
     for title in TRICKY:
-        found = posts.get_list(filter=pb.filter('title = {:t}', {'t': title}))
-        assert [record.title for record in found.items] == [title]
+        found_list = posts.get_list(filter=pb.filter('title = {:t}', {'t': title}))
+        assert [record.title for record in found_list.items] == [title]
 
 
 def test_live_records_round_trip_with_expand(pb, live):
@@ -175,10 +175,10 @@ def test_live_batch_is_all_or_nothing(pb):
         pb.create_batch().create('posts', {'title': 'batch-lost'}).update('posts', 'nope12345678901', {'title': 'x'}).send()
     assert err_info.value.data['requests']['1']['response']['status'] == 404
     assert posts.get_list(filter="title = 'batch-lost'").total_items == 0
-    created, upserted = (
+    created_record, upserted_record = (
         pb.create_batch().create('posts', {'title': 'batch-a'}).upsert('posts', {'id': 'batchupsert0001', 'title': 'batch-b'}).send()
     )
-    assert (created.title, upserted.id) == ('batch-a', 'batchupsert0001')
+    assert (created_record.title, upserted_record.id) == ('batch-a', 'batchupsert0001')
 
 
 def test_live_refresh_and_wrong_password(pb):
@@ -221,11 +221,11 @@ def test_live_realtime_events_by_topic_options_and_rules(pb, live):
     post reaches only the expanded subscription, the anonymous channel gets
     nothing by the list rule.
     """
-    events, expanded, one, anonymous = [], [], [], []
+    events, expanded_names, one, anonymous = [], [], [], []
     posts = pb.collection('posts')
     with TokeoPocketBaseClient(live[0]) as guest, Realtime(pb) as channel, Realtime(guest) as guest_channel:
         channel.subscribe('posts/*', lambda e: events.append((e.action, e.record.title)))
-        channel.subscribe('posts/*', lambda e: expanded.append(e.record.expand.owner.name), {'query': {'expand': 'owner'}})
+        channel.subscribe('posts/*', lambda e: expanded_names.append(e.record.expand.owner.name), {'query': {'expand': 'owner'}})
         guest_channel.subscribe('posts/*', anonymous.append)
         assert channel.connected_event.wait(5) and guest_channel.connected_event.wait(5)
         post = posts.create({'title': 'rt', 'owner': live[1]})
@@ -236,7 +236,7 @@ def test_live_realtime_events_by_topic_options_and_rules(pb, live):
         assert wait_until(lambda: one == ['update', 'delete'])
         channel.unsubscribe('posts/*')
         posts.create({'title': 'rt3', 'owner': live[1]})
-        assert wait_until(lambda: expanded == ['Anna'] * 4)
+        assert wait_until(lambda: expanded_names == ['Anna'] * 4)
     assert (len(events), anonymous) == (3, [])
 
 
@@ -305,11 +305,11 @@ def test_live_realtime_hanging_callback_hangs_up_and_catches_up_after(pb, su):
     released it hands on what it queued, connects again and gets the next
     post.
     """
-    release, seen, connects = threading.Event(), [], []
+    release, seen_titles, connects = threading.Event(), [], []
 
     def follow(event):
-        seen.append(event.record.title)
-        if len(seen) == 1:
+        seen_titles.append(event.record.title)
+        if len(seen_titles) == 1:
             release.wait(30)
 
     posts = su.collection('posts')
@@ -324,8 +324,8 @@ def test_live_realtime_hanging_callback_hangs_up_and_catches_up_after(pb, su):
         release.set()
         assert wait_until(lambda: channel.status == 'live' and len(connects) == 2)
         posts.create({'title': 'after'})
-        assert wait_until(lambda: seen[-1] == 'after')
-    assert 1 + 50 <= len(seen) - 1 < 300
+        assert wait_until(lambda: seen_titles[-1] == 'after')
+    assert 1 + 50 <= len(seen_titles) - 1 < 300
 
 
 def test_live_realtime_expired_token_without_hook_shows_the_error(su, rando):
@@ -351,15 +351,15 @@ def test_live_realtime_changed_password_renews_the_login_and_the_events_go_on(su
     """
     user = _create_user(su, rando)
     client = _make_impersonating_client(su, user, 0.2)
-    seen = []
+    seen_titles = []
     try:
         with Realtime(client, auth_check_seconds=0.2) as channel:
-            channel.subscribe('posts/*', lambda event: seen.append(event.record.title))
+            channel.subscribe('posts/*', lambda event: seen_titles.append(event.record.title))
             assert channel.connected_event.wait(5)
             su.collection('users').update(user.id, {'password': 'other-pass-456', 'passwordConfirm': 'other-pass-456'})
             assert wait_until(lambda: client.login_cnt == 2)
             su.collection('posts').create({'title': 'after-password'})
-            assert wait_until(lambda: seen == ['after-password'])
+            assert wait_until(lambda: seen_titles == ['after-password'])
             assert channel.status == 'live'
     finally:
         client.close()
@@ -381,15 +381,15 @@ def test_live_realtime_deleted_user_shows_the_error(su, rando):
 
 def test_live_async_realtime_hanging_coroutine_hangs_up_and_catches_up_after(pb, su):
     """A hanging coroutine with max_pending 50 hangs up, then it catches up."""
-    seen = []
+    seen_titles = []
     posts = su.collection('posts')
 
     async def go():
         release = asyncio.Event()
 
         async def follow(event):
-            seen.append(event.record.title)
-            if len(seen) == 1:
+            seen_titles.append(event.record.title)
+            if len(seen_titles) == 1:
                 await release.wait()
 
         realtime = AsyncRealtime(pb, max_pending=50, max_delay_seconds=0.5).subscribe('posts/*', follow)
@@ -401,7 +401,7 @@ def test_live_async_realtime_hanging_coroutine_hangs_up_and_catches_up_after(pb,
         release.set()
         assert await wait_until_async(lambda: realtime.status == 'live')
         await asyncio.to_thread(posts.create, {'title': 'aafter'})
-        assert await wait_until_async(lambda: seen[-1] == 'aafter')
+        assert await wait_until_async(lambda: seen_titles[-1] == 'aafter')
         await realtime.stop()
 
     asyncio.run(go())

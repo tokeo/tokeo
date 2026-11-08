@@ -106,8 +106,8 @@ def test_output_handler_escapes_the_values_for_html(tmp_path):
     """app.render escapes the values, those of an included template too."""
     templates = _write_templates(tmp_path / 'templates', page='{{ v }} {% include "part.jinja2" %}', part='{{ v }}')
     with Jinja2Test({'template_dirs': templates}) as app:
-        escaped = '&lt;a href=&#39;x&#39;&gt;&amp;'
-        assert app.render({'v': "<a href='x'>&"}, 'page.jinja2', out=None) == f'{escaped} {escaped}'
+        escaped_html = '&lt;a href=&#39;x&#39;&gt;&amp;'
+        assert app.render({'v': "<a href='x'>&"}, 'page.jinja2', out=None) == f'{escaped_html} {escaped_html}'
 
 
 def test_output_handler_without_autoescape_keeps_the_values(tmp_path):
