@@ -83,6 +83,23 @@ def test_init_tasks_names_the_task_of_a_wrong_crontab(crontab, error):
     assert type(err_info.value.__cause__) is ValueError
 
 
+def test_close_after_init_tasks_failed_after_the_first_job():
+    """init_tasks fails after the first job, the app closes without error."""
+    tasks = {
+        'time': dict(module='time', crontab='0 0 1 1 *'),
+        'wrong': dict(module='time', crontab='0 0 1 1'),
+    }
+    with SchedulerTest(tasks=tasks) as app:
+        with pytest.raises(TokeoSchedulerError, match='^Task "wrong" with crontab "0 0 1 1"'):
+            app.scheduler.init_tasks()
+        # the first job is added, but the scheduler is not started
+        scheduler = app.scheduler.scheduler
+        assert len(scheduler.get_jobs()) == 1
+        assert scheduler.running is False
+    # closed by the with above, the shutdown skipped the scheduler not running
+    assert scheduler.running is False
+
+
 def test_reload_keeps_the_ids_of_the_tasks(started_app):
     """After a reload the tasks have the same ids, pause 1 still means the first."""
     before = sorted(job.id for job in started_app.scheduler.scheduler.get_jobs())

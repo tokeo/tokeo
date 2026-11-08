@@ -577,7 +577,9 @@ class TokeoScheduler(MetaMixin):
         Shutdown the scheduler.
 
         Stops the scheduler and removes all jobs. This should be called
-        when the application is shutting down to ensure proper cleanup.
+        when the application is shutting down to ensure proper cleanup. A
+        scheduler that is not running, e.g. after ```init_tasks``` failed, is
+        left as it is.
 
         ### Args
 
@@ -586,8 +588,9 @@ class TokeoScheduler(MetaMixin):
             handlers)
 
         """
-        # only shutdown if initialized
-        if self._scheduler is not None:
+        # only shutdown if started, e.g. not after init_tasks failed, the
+        # scheduler of apscheduler raises on a shutdown when not running
+        if self._scheduler is not None and self._scheduler.running:
             self.app.log.info('Shutdown scheduler')
             self._scheduler.shutdown()
             self._scheduler.remove_all_jobs()
