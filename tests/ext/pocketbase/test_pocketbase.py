@@ -248,6 +248,26 @@ def test_setup_refuses_a_realtime_max_pending_below_1(server, max_pending):
             pass
 
 
+@pytest.mark.parametrize(
+    'key', ['auth_check_seconds', 'realtime_read_timeout', 'realtime_auth_check_seconds', 'realtime_max_delay_seconds']
+)
+@pytest.mark.parametrize('value', [0, '0', -1, 'soon', None, float('inf')], ids=['zero', 'zero_str', 'negative', 'text', 'none', 'inf'])
+def test_setup_refuses_seconds_not_greater_than_0(server, key, value):
+    """A time option no number greater than 0 stops the setup, naming it."""
+    expected = f'pocketbase.{key} must be a number of seconds greater than 0, not {value!r}'
+    with pytest.raises(TokeoPocketBaseError, match=f'^{re.escape(expected)}$'):
+        with PocketbaseTest({key: value}):
+            pass
+
+
+def test_setup_takes_seconds_as_text(server):
+    """A time option as text like '5' is taken as a number."""
+    with PocketbaseTest(dict(auth_check_seconds='5', realtime_auth_check_seconds='2.5', realtime_max_delay_seconds='10')) as app:
+        assert app.db._auth_check == 5.0
+        assert app.db.realtime_options['auth_check_seconds'] == 2.5
+        assert app.db.realtime_options['max_delay_seconds'] == 10.0
+
+
 def test_setup_sends_no_request(server):
     """The setup sends no request, not even a login with a service identity."""
     with PocketbaseTest(SERVICE):
@@ -710,9 +730,14 @@ def test_keep_auth_concurrent_calls_log_in_once(server):
     assert server.calls.count(USERS_LOGIN) == 1
 
 
+# auth_check_seconds must be greater than 0, a nanosecond is always over
+# between two requests, so each request asks the server again
+ASK_EACH_TIME = 1e-9
+
+
 def test_keep_auth_confirms_the_login_on_the_server_after_auth_check_seconds(server):
-    """With auth_check_seconds 0 each request asks the server by a refresh first."""
-    with PocketbaseTest(dict(SERVICE, auth_check_seconds=0)) as app:
+    """With a tiny auth_check_seconds each request asks the server first."""
+    with PocketbaseTest(dict(SERVICE, auth_check_seconds=ASK_EACH_TIME)) as app:
         app.db.get_one('posts', 'abc')
         app.db.get_one('posts', 'abc')
     get = ('GET', '/api/collections/posts/records/abc')
@@ -721,7 +746,7 @@ def test_keep_auth_confirms_the_login_on_the_server_after_auth_check_seconds(ser
 
 def test_keep_auth_login_refused_on_the_server_logs_in_anew(server):
     """A token revoked on the server, e.g. by a new password, logs in anew."""
-    with PocketbaseTest(dict(SERVICE, auth_check_seconds=0)) as app:
+    with PocketbaseTest(dict(SERVICE, auth_check_seconds=ASK_EACH_TIME)) as app:
         app.db.get_one('posts', 'abc')
         server.tokens.clear()
         del server.requests[:]
@@ -733,7 +758,7 @@ def test_keep_auth_login_refused_on_the_server_logs_in_anew(server):
 
 def test_keep_auth_changed_password_raises_instead_of_a_guest_request(server):
     """A revoked token and a changed password raise, nothing goes as guest."""
-    with PocketbaseTest(dict(SERVICE, auth_check_seconds=0)) as app:
+    with PocketbaseTest(dict(SERVICE, auth_check_seconds=ASK_EACH_TIME)) as app:
         app.db.get_one('posts', 'abc')
         server.tokens.clear()
         server.accounts.clear()
@@ -764,7 +789,7 @@ def test_impersonate_gives_a_client_of_its_own_acting_as_the_record(server):
 def test_impersonate_renews_a_login_refused_on_the_server_by_a_new_impersonation(server):
     """A revoked token of the record is impersonated anew for the request."""
     server.accounts = {('_superusers', 'admin@example.com'): 'secret'}
-    with PocketbaseTest(dict(SUPERUSER, auth_check_seconds=0)) as app:
+    with PocketbaseTest(dict(SUPERUSER, auth_check_seconds=ASK_EACH_TIME)) as app:
         client = app.db.impersonate('users', 'u1')
         old = client.token
         del server.tokens[old]

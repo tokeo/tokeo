@@ -54,6 +54,7 @@ anything beyond that surface.
 
 """
 
+import math
 import httpx
 from cement.core.meta import MetaMixin
 from tokeo.core.utils.tls import create_ssl_context as tls_create_ssl_context
@@ -181,7 +182,9 @@ class TokeoPocketBase(MetaMixin):
         ### Raises
 
         - **TokeoPocketBaseError**: If ```realtime_max_pending``` is not an
-            integer of 1 or more
+            integer of 1 or more, or ```auth_check_seconds```,
+            ```realtime_read_timeout```, ```realtime_auth_check_seconds``` or
+            ```realtime_max_delay_seconds``` is not a number greater than 0
 
         ### Notes
 
@@ -225,7 +228,7 @@ class TokeoPocketBase(MetaMixin):
         # self._config on every call
         self._auth_identity = self._config('auth_identity')
         self._auth_token_min_valid_seconds = self._config('auth_token_min_valid_seconds')
-        self._auth_check = float(self._config('auth_check_seconds'))
+        self._auth_check = self._get_seconds('auth_check_seconds')
         # keeps the login of the service identity under its lock, since the
         # login of the shared client has no locking of its own
         self._auth_keeper = AuthKeeper(
@@ -244,10 +247,10 @@ class TokeoPocketBase(MetaMixin):
         if max_pending < 1:
             raise TokeoPocketBaseError(f'{self._meta.config_section}.realtime_max_pending must be an integer of 1 or more, not {value!r}')
         self.realtime_options = dict(
-            read_timeout=float(self._config('realtime_read_timeout')),
+            read_timeout=self._get_seconds('realtime_read_timeout'),
             max_pending=max_pending,
-            auth_check_seconds=float(self._config('realtime_auth_check_seconds')),
-            max_delay_seconds=float(self._config('realtime_max_delay_seconds')),
+            auth_check_seconds=self._get_seconds('realtime_auth_check_seconds'),
+            max_delay_seconds=self._get_seconds('realtime_max_delay_seconds'),
         )
 
     def _config(self, key, **kwargs):
@@ -272,6 +275,34 @@ class TokeoPocketBase(MetaMixin):
 
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
+
+    def _get_seconds(self, key):
+        """
+        Get a number of seconds greater than 0 from the config section.
+
+        ### Args
+
+        - **key** (str): Configuration key to retrieve
+
+        ### Returns
+
+        - **float**: The seconds, a text like ```'5'``` is taken as a number
+
+        ### Raises
+
+        - **TokeoPocketBaseError**: If the value is not a finite number
+            greater than 0, naming the option
+
+        """
+        value = self._config(key)
+        try:
+            seconds = float(value)
+        except (TypeError, ValueError):
+            seconds = 0.0
+        # also refuses nan and inf
+        if not 0 < seconds < math.inf:
+            raise TokeoPocketBaseError(f'{self._meta.config_section}.{key} must be a number of seconds greater than 0, not {value!r}')
+        return seconds
 
     def _login(self):
         """
