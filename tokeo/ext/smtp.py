@@ -35,6 +35,7 @@ configuration options.
 #   recipients, as cement 3.2 will (return)
 # - none -> _config(key, **kwargs), send_by_template(template, data, **kw)
 #   (methods, new)
+# - none -> TokeoSmtpError (class, new)
 #
 # The same names in both: _get_params, _build_charsets, _build_body_parts,
 # _build_mime_structure, _set_headers, _attach_body, _make_message, send and
@@ -57,6 +58,23 @@ from email.utils import format_datetime, make_msgid
 from cement.core import mail
 from cement.utils import fs
 from cement.utils.misc import is_true
+from tokeo.core.exc import TokeoError
+
+
+class TokeoSmtpError(TokeoError, ValueError):
+    """
+    Exception raised for a smtp config or a message that cannot be sent.
+
+    ### Notes
+
+    : Inherits from TokeoError, so main reports it as a clean message
+
+    : Is also a ```ValueError```, so an ```except ValueError``` still catches
+        it
+
+    """
+
+    pass
 
 
 class TokeoSmtpMailHandler(mail.MailHandler):
@@ -217,6 +235,10 @@ class TokeoSmtpMailHandler(mail.MailHandler):
 
         - **dict**: Merged parameters for email creation
 
+        ### Raises
+
+        - **TokeoSmtpError**: If to, cc or bcc is a str instead of a list
+
         ### Example
 
         ```python
@@ -252,7 +274,7 @@ class TokeoSmtpMailHandler(mail.MailHandler):
         # the recipients are lists, a str would be sent to each of its characters
         for item in ('to', 'cc', 'bcc'):
             if isinstance(params[item], str):
-                raise TypeError(f'{item} must be a list of addresses, not the str {params[item]!r}')
+                raise TokeoSmtpError(f'{item} must be a list of addresses, not the str {params[item]!r}')
 
         # Connection parameters always come from configuration
         for item in [
@@ -327,8 +349,9 @@ class TokeoSmtpMailHandler(mail.MailHandler):
 
         ### Raises
 
-        - **TypeError**: If the body parameter is not a string, tuple, or dict,
-            or to, cc or bcc is a str instead of a list
+        - **TypeError**: If the body parameter is not a string, tuple, or dict
+        - **TokeoSmtpError**: If to, cc or bcc is a str instead of a list, on
+            a conflicting tls config or an inline image of no known type
         - **smtplib.SMTPException**: If SMTP server connection or sending fails
 
         ### Example
@@ -433,8 +456,9 @@ class TokeoSmtpMailHandler(mail.MailHandler):
 
         ### Raises
 
-        - **ValueError**: If ```tls_ca``` and ```tls_ca_path``` are both set,
-            or ```tls_verify_hostname``` is set without ```tls_verify_cert```
+        - **TokeoSmtpError**: If ```tls_ca``` and ```tls_ca_path``` are both
+            set, or ```tls_verify_hostname``` is set without
+            ```tls_verify_cert```
 
         ### Notes
 
@@ -450,10 +474,10 @@ class TokeoSmtpMailHandler(mail.MailHandler):
         """
         ca, ca_path = params['tls_ca'], params['tls_ca_path']
         if ca and ca_path:
-            raise ValueError('tls_ca and tls_ca_path are both set, set the PEM text by tls_ca or the file by tls_ca_path')
+            raise TokeoSmtpError('tls_ca and tls_ca_path are both set, set the PEM text by tls_ca or the file by tls_ca_path')
         if not is_true(params['tls_verify_cert']):
             if is_true(params['tls_verify_hostname']):
-                raise ValueError('tls_verify_hostname needs tls_verify_cert, the hostname is only checked on a verified chain')
+                raise TokeoSmtpError('tls_verify_hostname needs tls_verify_cert, the hostname is only checked on a verified chain')
             return None
 
         if ca:
@@ -662,7 +686,7 @@ class TokeoSmtpMailHandler(mail.MailHandler):
                         part = MIMEImage(file.read())
                     except TypeError as e:
                         # the image type is guessed from the content, not the name
-                        raise TypeError(f'Not a supported image: {path} at inline attachment with cid {cid!r}') from e
+                        raise TokeoSmtpError(f'Not a supported image: {path} at inline attachment with cid {cid!r}') from e
                 else:
                     part = MIMEBase('application', 'octet-stream')
                     part.set_payload(file.read())
@@ -700,6 +724,7 @@ class TokeoSmtpMailHandler(mail.MailHandler):
         ### Raises
 
         - **TypeError**: If body has an unsupported type
+        - **TokeoSmtpError**: If an inline image has no known image type
 
         ### Notes
 

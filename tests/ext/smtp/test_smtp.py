@@ -11,6 +11,8 @@ import email.policy
 from unittest import mock
 
 import pytest
+import tokeo.main
+from tokeo.ext.smtp import TokeoSmtpError
 from tests.ext.smtp.smtp_tests_helper import SmtpTest, SmtpTemplateTest, make_cert, SUBJECT, TEXT, HTML_WITH_IMAGE
 
 
@@ -143,13 +145,13 @@ def test_create_tls_context(tmp):
 
 
 def test_create_tls_context_refuses_tls_ca_and_tls_ca_path(tmp):
-    """tls_ca and tls_ca_path together raise a ValueError, also on send."""
+    """tls_ca and tls_ca_path together raise a TokeoSmtpError, also on send."""
     cert_pem, _ = make_cert('localhost')
     with SmtpTest(tls_ca=cert_pem, tls_ca_path=os.path.join(tmp.dir, 'ca.pem')) as app:
-        with pytest.raises(ValueError, match='tls_ca and tls_ca_path are both set'):
+        with pytest.raises(TokeoSmtpError, match='tls_ca and tls_ca_path are both set'):
             _create_tls_context(app, tls_ca=cert_pem, tls_ca_path=os.path.join(tmp.dir, 'ca.pem'))
         with mock.patch('smtplib.SMTP') as smtp:
-            with pytest.raises(ValueError, match='tls_ca and tls_ca_path are both set'):
+            with pytest.raises(TokeoSmtpError, match='tls_ca and tls_ca_path are both set'):
                 app.mail.send('body')
         # refused before connecting
         assert smtp.call_count == 0
@@ -158,10 +160,10 @@ def test_create_tls_context_refuses_tls_ca_and_tls_ca_path(tmp):
 def test_create_tls_context_refuses_tls_verify_hostname_without_tls_verify_cert():
     """tls_verify_hostname without tls_verify_cert raises, also on send."""
     with SmtpTest(tls_verify_hostname=True) as app:
-        with pytest.raises(ValueError, match='tls_verify_hostname needs tls_verify_cert'):
+        with pytest.raises(TokeoSmtpError, match='tls_verify_hostname needs tls_verify_cert'):
             _create_tls_context(app, tls_verify_cert=False, tls_verify_hostname=True)
         with mock.patch('smtplib.SMTP') as smtp:
-            with pytest.raises(ValueError, match='tls_verify_hostname needs tls_verify_cert'):
+            with pytest.raises(TokeoSmtpError, match='tls_verify_hostname needs tls_verify_cert'):
                 app.mail.send('body')
         # refused before connecting
         assert smtp.call_count == 0
@@ -245,14 +247,14 @@ def test_inline_image(tmp):
 
 
 def test_inline_image_unsupported(tmp):
-    """An svg as inline image raises TypeError."""
+    """An svg as inline image raises TokeoSmtpError."""
     svg = os.path.join(tmp.dir, 'logo.svg')
     with open(svg, 'w') as f:
         f.write('<svg xmlns="http://www.w3.org/2000/svg"/>')
 
     with SmtpTest() as app:
         params = app.mail._get_params(files=[{'path': svg, 'cid': 'logo'}])
-        with pytest.raises(TypeError, match='Not a supported image: .*logo.svg at inline attachment'):
+        with pytest.raises(TokeoSmtpError, match='Not a supported image: .*logo.svg at inline attachment'):
             app.mail._make_message(('text', '<img src="cid:logo">'), **params)
 
 
@@ -290,10 +292,30 @@ def test_mime_structure(tmp, body, with_file, content_type):
 
 @pytest.mark.parametrize('item', ['to', 'cc', 'bcc'])
 def test_recipients_as_str_raise(item):
-    """to, cc or bcc as a str raises TypeError, not a mail to each character."""
+    """to, cc or bcc as a str raises TokeoSmtpError, no mail to each character."""
     with SmtpTest() as app:
-        with pytest.raises(TypeError, match=f'{item} must be a list of addresses'):
+        with pytest.raises(ValueError, match=f"^{item} must be a list of addresses, not the str 'a@b.de'$") as err_info:
             app.mail._get_params(**{item: 'a@b.de'})
+    assert type(err_info.value) is TokeoSmtpError
+
+
+def test_recipients_as_str_are_reported_by_main(monkeypatch, capsys):
+    """main reports to as a str by its message, exit code 1 and no traceback."""
+
+    class SendingApp(SmtpTest):
+
+        def run(self):
+            self.mail.send('body', to='a@b.de')
+
+    monkeypatch.setattr(tokeo.main, 'Tokeo', SendingApp)
+    with pytest.raises(SystemExit) as err_info:
+        tokeo.main.main()
+    assert err_info.value.code == 1
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert 'TokeoSmtpError:' in output
+    assert "to must be a list of addresses, not the str 'a@b.de'" in output
+    assert 'Traceback' not in output
 
 
 @pytest.mark.parametrize('body', [5, {'text': None}, (5, '')], ids=['int', 'dict_none', 'tuple_int'])
