@@ -307,6 +307,7 @@ def test_locks_sleep_seconds_invalid(tmp, value):
     assert err_info.value.name == 'locks_sleep_seconds'
     assert err_info.value.value == value
 
+
 # ---- actor send wrapper -----------------------------------------------------
 
 

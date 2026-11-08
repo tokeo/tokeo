@@ -297,7 +297,7 @@ def test_recipients_as_str_raise(item):
         with pytest.raises(TypeError, match=f"^{item} must be a list of addresses, not the str 'a@b.de'$"):
             app.mail._get_params(**{item: 'a@b.de'})
         with mock.patch('smtplib.SMTP') as smtp:
-            with pytest.raises(TypeError, match=f"^{item} must be a list of addresses"):
+            with pytest.raises(TypeError, match=f'^{item} must be a list of addresses'):
                 app.mail.send('body', **{item: 'a@b.de'})
         # refused before connecting
         assert smtp.call_count == 0
