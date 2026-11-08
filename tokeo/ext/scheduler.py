@@ -789,7 +789,8 @@ class TokeoScheduler(MetaMixin):
 
         ### Args
 
-        - **args**: Command arguments from the parser with cmd and task attributes
+        - **args**: Command arguments from the parser with subcommand and task
+            attributes
 
         ### Raises
 
@@ -808,20 +809,22 @@ class TokeoScheduler(MetaMixin):
         : Each command operates on one or more tasks specified by their IDs.
 
         """
+        # the action of the subcommand, e.g. pause for tasks.pause
+        action = args.subcommand.removeprefix('tasks.')
         for task in args.task:
             try:
                 job = self._scheduler.get_job(task)
                 if job:
-                    if args.cmd == 'remove':
+                    if args.subcommand == 'tasks.remove':
                         self._scheduler.remove_job(task)
-                    elif args.cmd == 'pause':
+                    elif args.subcommand == 'tasks.pause':
                         self._scheduler.pause_job(task)
-                    elif args.cmd == 'resume':
+                    elif args.subcommand == 'tasks.resume':
                         self._scheduler.resume_job(task)
-                    elif args.cmd == 'fire':
+                    elif args.subcommand == 'tasks.fire':
                         self.process_job(job)
                     # a short note
-                    self.app.log.info(f'{args.cmd}d job {job.id} [{job.name}]')
+                    self.app.log.info(f'{action}d job {job.id} [{job.name}]')
                 else:
                     raise ValueError(f'job {task} not found!')
             except Exception as err:
@@ -888,46 +891,34 @@ class TokeoScheduler(MetaMixin):
 
             # prepare for sub-commands
             sub = self._command_parser.add_subparsers(metavar='')
-            # tasks list command
-            cmd = sub.add_parser('list', help='show active scheduler tasks')
-            cmd.set_defaults(func=self.handle_command_list)
+            # scheduler list command
+            command = sub.add_parser('list', help='show active scheduler tasks')
+            command.set_defaults(func=self.handle_command_list)
             # scheduler pause command
-            cmd = sub.add_parser('pause', help='pause the scheduler')
-            cmd.set_defaults(func=self.handle_command_pause)
+            command = sub.add_parser('pause', help='pause the scheduler')
+            command.set_defaults(func=self.handle_command_pause)
             # scheduler resume command
-            cmd = sub.add_parser('resume', help='resume the scheduler')
-            cmd.set_defaults(func=self.handle_command_resume)
+            command = sub.add_parser('resume', help='resume the scheduler')
+            command.set_defaults(func=self.handle_command_resume)
             # scheduler reload command
-            cmd = sub.add_parser('reload', help='reload the scheduling tasks from config')
-            cmd.add_argument('--restart', action='store_true', help='start the scheduler after reload if paused')
-            cmd.set_defaults(func=self.handle_command_reload)
+            command = sub.add_parser('reload', help='reload the scheduling tasks from config')
+            command.add_argument('--restart', action='store_true', help='start the scheduler after reload if paused')
+            command.set_defaults(func=self.handle_command_reload)
             # scheduler restart command
-            cmd = sub.add_parser('restart', help='reload and restart the scheduler from config')
-            cmd.set_defaults(func=self.handle_command_restart)
+            command = sub.add_parser('restart', help='reload and restart the scheduler from config')
+            command.set_defaults(func=self.handle_command_restart)
             # scheduler wakeup command
-            cmd = sub.add_parser('wakeup', help='notify scheduler to trigger _process_jobs')
-            cmd.set_defaults(func=self.handle_command_wakeup)
+            command = sub.add_parser('wakeup', help='notify scheduler to trigger _process_jobs')
+            command.set_defaults(func=self.handle_command_wakeup)
 
-            # nested tasks sub-commands
-            nested = sub.add_parser('tasks', help='tasks manipulation')
-            nested.set_defaults(func=self.handle_subcommand_help, print_help=nested.print_help)
-            nested = nested.add_subparsers(metavar='')
-            # tasks remove command
-            cmd = nested.add_parser('remove', help='remove the task')
-            cmd.add_argument('task', nargs='+', help='id of tasks to drop')
-            cmd.set_defaults(func=self.handle_task_subcommands, cmd='remove')
-            # tasks pause command
-            cmd = nested.add_parser('pause', help='pause the task')
-            cmd.add_argument('task', nargs='+', help='id of tasks to pause')
-            cmd.set_defaults(func=self.handle_task_subcommands, cmd='pause')
-            # tasks resume command
-            cmd = nested.add_parser('resume', help='resume the task')
-            cmd.add_argument('task', nargs='+', help='id of tasks to resume')
-            cmd.set_defaults(func=self.handle_task_subcommands, cmd='resume')
-            # tasks fire command
-            cmd = nested.add_parser('fire', help='fire the task')
-            cmd.add_argument('task', nargs='+', help='id of tasks to fire')
-            cmd.set_defaults(func=self.handle_task_subcommands, cmd='fire')
+            # tasks with its remove, pause, resume and fire commands
+            group_parser = sub.add_parser('tasks', help='tasks manipulation')
+            group_parser.set_defaults(func=self.handle_subcommand_help, print_help=group_parser.print_help)
+            group_sub = group_parser.add_subparsers(metavar='')
+            for name, verb in (('remove', 'drop'), ('pause', 'pause'), ('resume', 'resume'), ('fire', 'fire')):
+                command = group_sub.add_parser(name, help=f'{name} the task')
+                command.add_argument('task', nargs='+', help=f'id of tasks to {verb}')
+                command.set_defaults(func=self.handle_task_subcommands, subcommand=f'tasks.{name}')
 
         # return initialized parser
         return self._command_parser
