@@ -821,7 +821,7 @@ only after ```on_message_data_event```.
 <tr><td>await join()</td><td>wait until the server is stopped</td></tr>
 <tr><td>await stop(wait_seconds_before_close=2.0, gracefully=True)</td><td>stop accepting, drain in-flight connections, then close</td></tr>
 <tr><td>shutdown()</td><td>request a shutdown</td></tr>
-<tr><td>shutdown_requested / stopped</td><td>current state flags</td></tr>
+<tr><td>is_shutdown_requested() / is_stopped()</td><td>whether a shutdown was requested / serving has fully stopped</td></tr>
 <tr><td>connections / processings</td><td>active connection / processing counts</td></tr>
 <tr><td>has_connections() / has_processings()</td><td>whether any is currently active</td></tr>
 </tbody>

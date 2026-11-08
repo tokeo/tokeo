@@ -578,9 +578,9 @@ class SmtpdServer:
             self._spool_dir, self._spool_prefix = os.path.split(value)
             if not os.path.isdir(self._spool_dir):
                 raise ValueError(f'spool_path_prefix: directory does not exist: {self._spool_dir!r}')
-            self._is_spooling = True
+            self._spooling = True
         else:
-            self._is_spooling = False
+            self._spooling = False
         #: Whether SMTPUTF8 is announced
         self.internationalization_extensions = bool(options.get('internationalization_extensions', False))
         #: Whether the hostname of a client is looked up by reverse DNS
@@ -658,8 +658,8 @@ class SmtpdServer:
         self._slot_free = global_limits.slot_free if global_limits is not None else asyncio.Event()
         self._slot_free.set()
         # graceful shutdown state
-        self._is_shutdown = False
-        self._is_stopped = True
+        self._shutdown_requested = False
+        self._stopped = True
         self._sessions = set()
         self._asyncio_shutdown_signal = None
         self._serve_task = None
@@ -712,8 +712,8 @@ class SmtpdServer:
 
     async def _bind(self, listeners):
         """Bind every listener and record it."""
-        self._is_shutdown = False
-        self._is_stopped = False
+        self._shutdown_requested = False
+        self._stopped = False
         self._asyncio_running_loop = asyncio.get_running_loop()
         self._asyncio_shutdown_signal = self._asyncio_running_loop.create_future()
         if listeners is None:
@@ -752,7 +752,7 @@ class SmtpdServer:
             # cancelled by stop(); the listeners are already closed
             pass
         finally:
-            self._is_stopped = True
+            self._stopped = True
 
     async def serve(self, listeners=None):
         """
@@ -786,7 +786,7 @@ class SmtpdServer:
 
     def shutdown(self):
         """Schedule a graceful shutdown."""
-        self._is_shutdown = True
+        self._shutdown_requested = True
         # signal to the dialogs that wait for input, from any thread
         if self._asyncio_running_loop is not None and not self._asyncio_running_loop.is_closed():
             self._asyncio_running_loop.call_soon_threadsafe(self._send_shutdown_signal)
@@ -796,13 +796,13 @@ class SmtpdServer:
         if self._asyncio_shutdown_signal is not None and not self._asyncio_shutdown_signal.done():
             self._asyncio_shutdown_signal.set_result(b'')
 
-    def shutdown_requested(self):
+    def is_shutdown_requested(self):
         """True once a shutdown was scheduled."""
-        return self._is_shutdown
+        return self._shutdown_requested
 
-    def stopped(self):
+    def is_stopped(self):
         """True once serving has fully stopped."""
-        return self._is_stopped and not self._sessions
+        return self._stopped and not self._sessions
 
     @property
     def connections(self):
@@ -861,11 +861,11 @@ class SmtpdServer:
             if not self._sessions:
                 break
             await asyncio.sleep(0.01)
-        self._is_stopped = True
+        self._stopped = True
 
     async def join(self, poll_seconds=0.1):
         """Block until the server has fully stopped."""
-        while not self.stopped():
+        while not self.is_stopped():
             await asyncio.sleep(poll_seconds)
 
     def close(self):
@@ -1057,7 +1057,7 @@ class SmtpdServer:
                 await self._acquire_processing_slot(session)
 
                 # a graceful shutdown refuses a connection that was not greeted yet
-                if self._is_shutdown:
+                if self._shutdown_requested:
                     raise Smtpd421CloseException('Abort connection while service is shutting down!')
 
                 # io_session_timeout limits the time a connection holds its slot
@@ -1082,7 +1082,7 @@ class SmtpdServer:
                         break
 
                     # a graceful shutdown ends the dialog
-                    if self._is_shutdown:
+                    if self._shutdown_requested:
                         break
 
                     if session.cmd_sequence is _CMD_STARTTLS:
@@ -1116,7 +1116,7 @@ class SmtpdServer:
                     # a line) or from a shutdown that ended the wait in _wait_line
                     if raw == b'':
                         # a shutdown ends by 421, a closed peer gets no reply
-                        if self._is_shutdown:
+                        if self._shutdown_requested:
                             break
                         # not by a shutdown: the client has closed the input
                         raise EOFError
@@ -1248,7 +1248,7 @@ class SmtpdServer:
             except asyncio.CancelledError:
                 # a stop drops the connection, after a last attempt to send 421
                 # (RFC 5321 3.8)
-                if self._is_shutdown:
+                if self._shutdown_requested:
                     try:
                         # no drain: a client that does not read must not block
                         writer.write(REPLY_421_FOR_SHUTDOWN.encode() + b'\r\n')
@@ -1375,7 +1375,7 @@ class SmtpdServer:
 
     async def _wait_line(self, reader, io_timeout):
         """Wait for the next line, b'' once a shutdown ends the wait."""
-        if self._is_shutdown:
+        if self._shutdown_requested:
             return b''
         read = asyncio.ensure_future(reader.readuntil(b'\n'))
         # a server that was never started has no shutdown signal yet
@@ -1389,7 +1389,7 @@ class SmtpdServer:
         if read in done:
             # a line that arrived together with the shutdown is still served
             return read.result()
-        if self._is_shutdown:
+        if self._shutdown_requested:
             return b''
         raise asyncio.TimeoutError
 
@@ -1922,7 +1922,7 @@ class SmtpdServer:
                         ctx.message.bytesize = len(ctx.message.data)
 
                     # create the spool file and handle if activated
-                    if self._is_spooling:
+                    if self._spooling:
                         # timestamp from the connection start
                         stamp = ctx.server.connected_at.strftime('%Y%m%d-%H%M%S')
                         # create the spooler for message spooling
