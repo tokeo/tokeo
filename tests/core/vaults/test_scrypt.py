@@ -197,7 +197,7 @@ def test_build_scaffold_gives_a_scrypt_profile_with_a_fresh_salt():
     assert (profile['type'], profile['env']) == ('scrypt', 'VAULT_MY_APP_PASSPHRASE')
     assert len(base64.b64decode(profile['salt'])) == 16
     [secret] = scaffold['secrets']
-    assert (secret['name'], secret['is_quoted']) == ('VAULT_MY_APP_PASSPHRASE', True)
+    assert (secret['name'], secret['quoted']) == ('VAULT_MY_APP_PASSPHRASE', True)
     assert secret['value'].startswith('change me')
 
 

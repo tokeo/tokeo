@@ -275,7 +275,7 @@ class TokeoVault:
         ### Returns
 
         - **dict**: ```profile``` (the yaml fields for the profile) and
-            ```secrets``` (a list of ```name```/```value```/```is_quoted```
+            ```secrets``` (a list of ```name```/```value```/```quoted```
             env entries)
 
         ### Raises

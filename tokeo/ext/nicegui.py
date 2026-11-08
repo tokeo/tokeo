@@ -205,7 +205,7 @@ def check_user_context():
     client = context.client
 
     # the client passed the check before
-    if getattr(client, '_tokeo_is_user_context_checked', False):
+    if getattr(client, '_tokeo_user_context_checked', False):
         return
 
     # the script client of nicegui is the global scope as well
@@ -218,7 +218,7 @@ def check_user_context():
         # fmt: on
 
     # mark the client as checked
-    client._tokeo_is_user_context_checked = True
+    client._tokeo_user_context_checked = True
 
 
 class NiceguiElementHelper:

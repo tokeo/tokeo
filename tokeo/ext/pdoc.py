@@ -422,7 +422,7 @@ class TokeoPdoc(Handler):
         else:
             self._modules = list(modules)
 
-    def set_config_page(self, is_shown=None):
+    def set_config_page(self, shown=None):
         """Set whether the yaml config page is rendered.
 
         Called once at setup from the config and again from the CLI for
@@ -431,14 +431,14 @@ class TokeoPdoc(Handler):
 
         ### Args
 
-        - **is_shown** (bool|str): Truthy to render the page, or None to take
+        - **shown** (bool|str): Truthy to render the page, or None to take
             the configured value
 
         """
-        if is_shown is None:
-            self._is_config_page_shown = self._config('config_page')
+        if shown is None:
+            self._config_page_shown = self._config('config_page')
         else:
-            self._is_config_page_shown = is_true(is_shown)
+            self._config_page_shown = is_true(shown)
 
     def _get_template_dirs(self):
         """Resolve configured template modules/paths to filesystem dirs.
@@ -568,7 +568,7 @@ class TokeoPdoc(Handler):
         pdoc.render.env.globals['is_instance_attribute'] = self.is_instance_attribute
 
         # is a config page going to be written? (index links to it)
-        pdoc.render.env.globals['has_config'] = bool(self._is_config_page_shown and getattr(self.app, 'env', None) is not None)
+        pdoc.render.env.globals['has_config'] = bool(self._config_page_shown and getattr(self.app, 'env', None) is not None)
 
         pdoc.render.env.globals['html_lang'] = self._config('lang')
         pdoc.render.env.globals['doc_title'] = self._config('title')
@@ -717,13 +717,13 @@ class TokeoPdoc(Handler):
         # drop members inherited from undocumented external classes (e.g. a
         # subclass of a third-party base), so pages document the package's own
         # surface rather than the whole inherited API
-        documented = set(all_modules.keys())
+        documented_modules = set(all_modules.keys())
         # expose the documented module set so templates can hide members
         # inherited from classes that live outside the documentation
-        pdoc.render.env.globals['all_modules'] = documented
+        pdoc.render.env.globals['all_modules'] = documented_modules
         for mod in all_modules.values():
             if mod is not None:
-                self._filter_external_inherited(mod, documented)
+                self._filter_external_inherited(mod, documented_modules)
 
         # render each module
         for spec, mod in all_modules.items():
@@ -841,7 +841,7 @@ class TokeoPdoc(Handler):
         ```config/index.html```.
         Requires the appenv extension (```app.env```); skipped otherwise.
         """
-        if not self._is_config_page_shown:
+        if not self._config_page_shown:
             return
         env = getattr(self.app, 'env', None)
         if env is None:
@@ -1107,7 +1107,7 @@ class TokeoPdoc(Handler):
         return list(ex)
 
     @staticmethod
-    def _is_excluded(spec, excludes):
+    def _excluded(spec, excludes):
         # template placeholders are never valid modules
         if '{{' in spec or '}}' in spec:
             return True
@@ -1135,7 +1135,7 @@ class TokeoPdoc(Handler):
 
         if excludes is None:
             excludes = self._get_excludes()
-        if self._is_excluded(module_name, excludes):
+        if self._excluded(module_name, excludes):
             return set()
 
         found = set()
@@ -1165,10 +1165,10 @@ class TokeoPdoc(Handler):
                     continue
                 full = os.path.join(base, entry)
                 if entry.endswith('.py') and entry != '__init__.py':
-                    if not self._is_excluded(spec, excludes):
+                    if not self._excluded(spec, excludes):
                         found.add(spec)
                 elif os.path.isdir(full):
-                    if self._is_excluded(spec, excludes):
+                    if self._excluded(spec, excludes):
                         continue
                     try:
                         children = os.listdir(full)
@@ -1178,7 +1178,7 @@ class TokeoPdoc(Handler):
                         found |= self._discover(spec, excludes)
         return found
 
-    def _filter_external_inherited(self, mod, documented):
+    def _filter_external_inherited(self, mod, documented_modules):
         """Restrict each class's inherited members to documented origins.
 
         pdoc groups a class's inherited members by the class they come from
@@ -1191,8 +1191,10 @@ class TokeoPdoc(Handler):
         written into the instance ```__dict__``` to take effect.
         """
 
-        def is_documented(origin_module):
-            return any(origin_module == d or origin_module.startswith(d + '.') or d.startswith(origin_module + '.') for d in documented)
+        def documented(origin_module):
+            return any(
+                origin_module == d or origin_module.startswith(d + '.') or d.startswith(origin_module + '.') for d in documented_modules
+            )
 
         def walk(members):
             for member in members.values():
@@ -1202,7 +1204,7 @@ class TokeoPdoc(Handler):
                     inherited = member.inherited_members
                 except Exception:
                     continue
-                filtered = {origin: mems for origin, mems in inherited.items() if is_documented(origin[0])}
+                filtered = {origin: mems for origin, mems in inherited.items() if documented(origin[0])}
                 if len(filtered) != len(inherited):
                     member.__dict__['inherited_members'] = filtered
                 # recurse into nested classes
@@ -1417,13 +1419,13 @@ class TokeoPdoc(Handler):
         """
         # the specs as configured: `modules: [spiral.core, tests]` documents
         # exactly those two, so that is what the line has to say
-        documented = list(dict.fromkeys(self._modules))
+        documented_names = list(dict.fromkeys(self._modules))
         # mirror the condition in `_render_config_page`, so the line never
         # claims a config page that was not written. `app.env` comes from the
         # optional appenv extension, hence getattr rather than attribute access
-        if self._is_config_page_shown and getattr(self.app, 'env', None):
-            documented.append('config')
-        return documented
+        if self._config_page_shown and getattr(self.app, 'env', None):
+            documented_names.append('config')
+        return documented_names
 
     def _get_watch_dirs(self):
         """Every directory whose contents can change and be edited here.
@@ -1527,7 +1529,7 @@ class TokeoPdoc(Handler):
             self._watchdog_last_event_time = monotonic()
             self._watchdog_last_path = path
 
-    def _watch(self, is_restarted=False):
+    def _watch(self, restarted=False):
         """Start the observer and returns the monitor
 
         On a settled change the monitor stops the server, ```serve()``` returns,
@@ -1538,7 +1540,7 @@ class TokeoPdoc(Handler):
 
         ### Args
 
-        - **is_restarted** (bool): Suppress the startup output. Set after a
+        - **restarted** (bool): Suppress the startup output. Set after a
             process replacement, where repeating it would bury the one line
             that says what changed
 
@@ -1566,7 +1568,7 @@ class TokeoPdoc(Handler):
         # observer is touched
         self._setup_watchdog(dirs)
 
-        if not is_restarted:
+        if not restarted:
             self.app.log.info('pdoc watching for changes on project files')
             # the paths are noise on info level, but the only way to tell why
             # an edit does nothing, so they go to debug rather than nowhere
@@ -1684,7 +1686,7 @@ class TokeoPdoc(Handler):
 
     # ---- serving ------------------------------------------------------------
 
-    def serve(self, watch=False, is_restarted=False):
+    def serve(self, watch=False, restarted=False):
         """Serve the rendered documentation directory over HTTP.
 
         The render step already produced static HTML in ```output_dir```. Serving
@@ -1700,7 +1702,7 @@ class TokeoPdoc(Handler):
             server, mirroring nicegui's ```fastapi_app.on_startup(...)```: the
             server keeps the foreground, so Ctrl+C lands where expected and
             the monitor ends the session by stopping the server.
-        - **is_restarted** (bool): Suppress the startup output, because this
+        - **restarted** (bool): Suppress the startup output, because this
             process came out of a ```--watch``` restart and the interesting line
             is the one naming the change.
 
@@ -1738,7 +1740,7 @@ class TokeoPdoc(Handler):
                 f'Another process may already use that port; stop it or set a '
                 f'different "port" in the [pdoc] config section.'
             ) from err
-        if not is_restarted:
+        if not restarted:
             self.app.log.info(f'pdoc serving at http://{host}:{port}')
             self.app.log.info(f'pdoc explaining modules: {", ".join(self._get_documented_names())}')
         # the monitor needs the running server to stop it later, so the
@@ -1748,7 +1750,7 @@ class TokeoPdoc(Handler):
         # is left unclosed because the `try/finally` starts below. Harmless
         # at process exit, but the messages read out of order.
         if watch:
-            watch_daemon = self._watch(is_restarted=is_restarted)
+            watch_daemon = self._watch(restarted=restarted)
             Thread(
                 target=watch_daemon,
                 args=(httpd,),
@@ -1756,7 +1758,7 @@ class TokeoPdoc(Handler):
                 name='tokeo-pdoc-watch-daemon',
             ).start()
 
-        if not is_restarted:
+        if not restarted:
             self.app.log.info('press Ctrl+C to stop')
 
         try:
@@ -1808,9 +1810,9 @@ class TokeoPdocController(Controller):
         if self.app.pargs.config and self.app.pargs.no_config:
             raise TokeoPdocError('pdoc render: --config and --no-config exclude each other')
         if self.app.pargs.config:
-            self.app.pdoc.set_config_page(is_shown=True)
+            self.app.pdoc.set_config_page(shown=True)
         elif self.app.pargs.no_config:
-            self.app.pdoc.set_config_page(is_shown=False)
+            self.app.pdoc.set_config_page(shown=False)
         if self.app.pargs.modules:
             self.app.pdoc.set_modules(self.app.pargs.modules)
         self.app.pdoc.render(
@@ -1821,7 +1823,7 @@ class TokeoPdocController(Controller):
             # the modules were resolved and remembered by the render above
             self.app.pdoc.serve(
                 watch=self.app.pargs.watch,
-                is_restarted=self.app.pargs.restart,
+                restarted=self.app.pargs.restart,
             )
 
     @ex(

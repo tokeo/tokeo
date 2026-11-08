@@ -53,11 +53,11 @@ def _collect_imports(package):
                     yield path, node.module
 
 
-def _is_allowed(module, allowed):
+def _allowed(module, allowed_modules):
     # a module of the standard library or of the allowed ones
     if module.split('.')[0] in sys.stdlib_module_names:
         return True
-    return any(module == entry or module.startswith(entry + '.') for entry in allowed)
+    return any(module == entry or module.startswith(entry + '.') for entry in allowed_modules)
 
 
 def test_all_packages_carry_the_version_of_tokeo():
@@ -91,7 +91,7 @@ def test_a_package_imports_only_its_own_parts(package):
     found = [
         f'{os.path.relpath(path, ROOT_DIR)}: {module}'
         for path, module in _collect_imports(package)
-        if not _is_allowed(module, ALLOWED[package])
+        if not _allowed(module, ALLOWED[package])
     ]
     assert found == []
 

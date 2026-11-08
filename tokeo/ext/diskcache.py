@@ -73,7 +73,7 @@ class TokeoDiskCacheError(TokeoError):
 
 
 # the default of a missing key, a lock of diskcache holds None
-_missing = object()
+_MISSING = object()
 
 # the messages of the checks, formatted with the name and the value
 _ERR_SECONDS_GT_0 = '{} must be a number of seconds greater than 0, not {!r}'
@@ -320,11 +320,11 @@ class TokeoDiskCacheLocksHandler:
             yield
         finally:
             with self._cache.transact(retry=True):
-                value = self._cache.get(key, default=_missing)
+                value = self._cache.get(key, default=_MISSING)
                 if value == token:
                     self._cache.delete(key)
             if value != token:
-                lost = 'missing' if value is _missing else 'taken by another'
+                lost = 'missing' if value is _MISSING else 'taken by another'
                 self.app.log.warning(f'lock {key} was lost before release ({lost})')
 
     # ---- throttle -----------------------------------------------------------

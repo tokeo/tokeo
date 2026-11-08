@@ -466,10 +466,10 @@ class Realtime:
             while not pending.empty():
                 if stop.wait(0.1):
                     return
-            overflow, is_ended, start_time = False, False, time.monotonic()
+            overflow, ended, start_time = False, False, time.monotonic()
             try:
                 overflow = self._listen(stop, http, pending)
-                is_ended = not overflow
+                ended = not overflow
             except Exception as err:
                 # closing the client by stop() ends the stream with an error too
                 if not stop.is_set():
@@ -477,7 +477,7 @@ class Realtime:
                     LOG.warning('pocketbase realtime: %s', self.error)
             if stop.is_set():
                 return
-            served = is_ended and self.connected_event.is_set() and time.monotonic() - start_time >= MIN_STABLE_SECONDS
+            served = ended and self.connected_event.is_set() and time.monotonic() - start_time >= MIN_STABLE_SECONDS
             self.connected_event.clear()
             # the server ended a connection that served: connect at once
             if served:
@@ -633,7 +633,7 @@ class AsyncRealtime:
         #: Called after each connect and reconnect, a function or coroutine
         self.on_connect = None
         self._subscriptions = _Subscriptions()
-        self._is_stopping = False
+        self._stopping = False
         self._http = None
         self._task = None
         self._listen_task = None
@@ -707,7 +707,7 @@ class AsyncRealtime:
         """Connect, read and connect again until ```stop()```."""
         if self._task is not None and not self._task.done():
             raise TokeoPocketBaseError('pocketbase realtime: the channel runs already')
-        self._is_stopping = False
+        self._stopping = False
         self._task = asyncio.current_task()
         timeout = httpx.Timeout(10.0, read=self.read_timeout)
         self._http = httpx.AsyncClient(base_url=self.client.url, **{**self.client._httpx_kwargs, 'timeout': timeout})
@@ -715,14 +715,14 @@ class AsyncRealtime:
         dispatcher = asyncio.create_task(self._dispatch(pending))
         listen = None
         try:
-            while not self._is_stopping:
+            while not self._stopping:
                 # a connection starts once the callbacks caught up
                 while not pending.empty():
                     await asyncio.sleep(0.1)
                 start_time = time.monotonic()
                 listen = self._listen_task = asyncio.create_task(self._listen(pending))
                 await asyncio.wait({listen})
-                overflow, is_ended = False, False
+                overflow, ended = False, False
                 if listen.cancelled():
                     # hung up after the login was not confirmed, already logged
                     pass
@@ -731,8 +731,8 @@ class AsyncRealtime:
                     LOG.warning('pocketbase realtime: %s', self.error)
                 else:
                     overflow = listen.result()
-                    is_ended = not overflow
-                served = is_ended and self.connected_event.is_set() and time.monotonic() - start_time >= MIN_STABLE_SECONDS
+                    ended = not overflow
+                served = ended and self.connected_event.is_set() and time.monotonic() - start_time >= MIN_STABLE_SECONDS
                 self.connected_event.clear()
                 # the server ended a connection that served: connect at once
                 if served:
@@ -740,7 +740,7 @@ class AsyncRealtime:
                 await asyncio.sleep(self.max_delay_seconds if overflow else self._delay)
                 self._delay = min(self._delay * 2, self.max_delay_seconds)
         except asyncio.CancelledError:
-            if not self._is_stopping:
+            if not self._stopping:
                 raise
         finally:
             self.connected_event.clear()
@@ -752,7 +752,7 @@ class AsyncRealtime:
 
     async def stop(self):
         """Close the channel and wait until ```run()``` ended."""
-        self._is_stopping = True
+        self._stopping = True
         tasks = [task for task in (self._task, *self._sends) if task is not None and not task.done()]
         for task in tasks:
             task.cancel()

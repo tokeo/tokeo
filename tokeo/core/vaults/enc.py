@@ -113,7 +113,7 @@ class EncVault(TokeoVault):
         env = self._format_env_name(name, 'KEY')
         return {
             'profile': {'type': 'enc', 'env': env},
-            'secrets': [{'name': env, 'value': generate_fernet_key(), 'is_quoted': False}],
+            'secrets': [{'name': env, 'value': generate_fernet_key(), 'quoted': False}],
         }
 
 

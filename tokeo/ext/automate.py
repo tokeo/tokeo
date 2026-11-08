@@ -153,7 +153,7 @@ class TokeoAutomateLocalContext(invoke.Context):
         #: How the protected kwargs of a run are handled
         self.protect = self.task_kwprotected['protect']
         #: Whether the env of a run is sanitized
-        self.is_env_sanitized = self.task_kwprotected['sanitize']
+        self.env_sanitized = self.task_kwprotected['sanitize']
 
     @staticmethod
     def generate_sudo_env_match_token(self):
@@ -190,7 +190,7 @@ class TokeoAutomateLocalContext(invoke.Context):
         # sanitize keeps the env names that are keywords; the values are
         # quoted only for the export line of a remote shell, a local process
         # gets them without a shell and so as they are
-        if env and self.is_env_sanitized:
+        if env and self.env_sanitized:
             env = sanitize.filter_keyword_keys(env)
         # if strict protected, remove all kwargs, except safe ones
         if self.protect == 'strict':
@@ -338,7 +338,7 @@ class TokeoAutomateRemoteContext(invoke.Context):
         #: How the protected kwargs of a run are handled
         self.protect = self.task_kwprotected['protect']
         #: Whether the env of a run is sanitized
-        self.is_env_sanitized = self.task_kwprotected['sanitize']
+        self.env_sanitized = self.task_kwprotected['sanitize']
         #: The paramiko client, None until the first run connects
         self.client = None
 
@@ -471,7 +471,7 @@ class TokeoAutomateRemoteContext(invoke.Context):
         # create the export string to survive env while on ssh
         env = kwargs.get('env', {})
         # the export line is read by the remote shell, so its values are quoted
-        if env and self.is_env_sanitized:
+        if env and self.env_sanitized:
             env = sanitize.quote_keyword_dict(env)
         if env:
             env_exports = 'export ' + ' '.join(f'{k}={str(v)}' for k, v in env.items()) + ' ; '

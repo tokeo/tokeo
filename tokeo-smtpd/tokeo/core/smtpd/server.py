@@ -176,7 +176,7 @@ def _parse_mode(enum_cls, value, default, label):
         raise ValueError(f'{label} must be one of {allowed}, got {value!r}')
 
 
-def is_tls_immediate_supported():
+def tls_immediate_supported():
     """
     Tell whether this Python supports the encrypt mode TLS_IMMEDIATE.
 
@@ -603,7 +603,7 @@ class SmtpdServer:
             CrlfDataMode.CRLF_DATA_STRICT_CLOSE,
         ):
             raise ValueError('Line breaks in DATA (crlf_data_mode) must be CRLF_DATA_STRICT or CRLF_DATA_STRICT_CLOSE with CRLF_STRICT!')
-        if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not is_tls_immediate_supported():
+        if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not tls_immediate_supported():
             raise ValueError('Immediate TLS (encrypt_mode TLS_IMMEDIATE) requires Python 3.13.13+ or 3.14.4+!')
         if not is_number_ge(self.io_cmd_timeout, 1):
             raise ValueError('Timeout for a command line (io_cmd_timeout) must be at least 1 second!')
@@ -2256,9 +2256,9 @@ class SmtpdServer:
             method = getattr(events_handler, name, None)
             if method is None:
                 continue
-            is_overridden = getattr(type(events_handler), name, None) is not getattr(SmtpdEvents, name, None)
+            overridden = getattr(type(events_handler), name, None) is not getattr(SmtpdEvents, name, None)
             # the defaults of these events carry behaviour and run without override
-            if not is_overridden and ev not in (
+            if not overridden and ev not in (
                 SmtpdEvent.ON_AUTH_EVENT,
                 SmtpdEvent.ON_LOGGING_EVENT,
                 SmtpdEvent.ON_CONNECT_EVENT,

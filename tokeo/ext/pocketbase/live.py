@@ -125,7 +125,7 @@ class LiveFeed:
         #: Called without arguments once the last page left
         self.on_idle = None
         #: True once closed
-        self.is_closed = False
+        self.closed = False
         self._followers = []
         self._pages = set()
 
@@ -199,7 +199,7 @@ class LiveFeed:
 
         """
         check_user_context()
-        if self.is_closed:
+        if self.closed:
             raise TokeoPocketBaseError('tokeo live: the feed is closed')
         page = context.client
         self.hold(page)
@@ -262,7 +262,7 @@ class LiveFeed:
 
     async def close(self):
         """Stop the channels of the feed, close its client when it owns it."""
-        self.is_closed = True
+        self.closed = True
         channels, self.channels = self.channels, []
         self._followers.clear()
         await asyncio.gather(*(channel.stop() for channel in channels))
@@ -315,7 +315,7 @@ class LiveHub:
             by a filter what belongs to their user
 
         """
-        if self._service is None or self._service.is_closed:
+        if self._service is None or self._service.closed:
             self._service = LiveFeed(self.app.db.pb, **self.channel_options)
         return self._service
 

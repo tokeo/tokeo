@@ -12,7 +12,7 @@ import platform
 
 import pytest
 
-from tokeo.core.smtpd.server import SmtpdServer, is_tls_immediate_supported
+from tokeo.core.smtpd.server import SmtpdServer, tls_immediate_supported
 from tests.core.smtpd.lib.smtpd_tests_helper import (
     RecordingEvents,
     start_server,
@@ -23,7 +23,7 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
 )
 
 needs_tls_immediate = pytest.mark.skipif(
-    not is_tls_immediate_supported(),
+    not tls_immediate_supported(),
     reason=f'TLS_IMMEDIATE requires Python 3.13.13+ or 3.14.4+ (gh-142352), running {platform.python_version()}',
 )
 
@@ -147,7 +147,7 @@ def test_required_python_version(monkeypatch, version, supported):
     ],
     ids=lambda value: '.'.join(map(str, value)) if isinstance(value, tuple) else str(value),
 )
-def test_is_tls_immediate_supported(monkeypatch, version, supported):
+def test_tls_immediate_supported(monkeypatch, version, supported):
     """Only 3.13.13+ of the 3.13 line and 3.14.4+ onwards support TLS_IMMEDIATE."""
     monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', version + ('final', 0))
-    assert is_tls_immediate_supported() is supported
+    assert tls_immediate_supported() is supported

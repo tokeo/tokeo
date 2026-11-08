@@ -241,9 +241,9 @@ def test_live_user_feed_is_shared_by_the_pages_of_the_user_and_closed_after_the_
             feed = feeds[0]
             assert await wait_until_async(lambda: feed.state == 'live')
             first.client.delete()
-            assert not feed.is_closed
+            assert not feed.closed
             second.client.delete()
-            assert await wait_until_async(lambda: feed.is_closed and feed.pb.http_client.is_closed)
+            assert await wait_until_async(lambda: feed.closed and feed.pb.http_client.is_closed)
             assert (app.nicegui.pb.live._users, feed.channels) == ({}, [])
 
         NiceguiSimulation(app).run(visit)

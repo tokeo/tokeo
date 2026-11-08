@@ -112,5 +112,5 @@ class ScryptVault(EncVault):
         salt = base64.b64encode(os.urandom(16)).decode()
         return {
             'profile': {'type': 'scrypt', 'env': env, 'salt': salt},
-            'secrets': [{'name': env, 'value': 'change me to a memorable passphrase', 'is_quoted': True}],
+            'secrets': [{'name': env, 'value': 'change me to a memorable passphrase', 'quoted': True}],
         }

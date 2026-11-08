@@ -339,7 +339,7 @@ class TokeoVaultController(Controller):
             self.app.print(f'      {field}: {value}')
         self.app.print('')
         for secret in scaffold['secrets']:
-            value = f'"{secret["value"]}"' if secret.get('is_quoted') else secret['value']
+            value = f'"{secret["value"]}"' if secret.get('quoted') else secret['value']
             self.app.print(f'{secret["name"]}={value}')
 
     @ex(

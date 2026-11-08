@@ -723,9 +723,9 @@ class TokeoScheduler(MetaMixin):
 
         """
         # save running state
-        is_running = self._scheduler.state == STATE_RUNNING
+        running = self._scheduler.state == STATE_RUNNING
         # pause if running to prevent events while updating tasks
-        if is_running:
+        if running:
             self._scheduler.pause()
         # drop the job queue
         self._scheduler.remove_all_jobs()
@@ -735,7 +735,7 @@ class TokeoScheduler(MetaMixin):
         # on disk is not reread - the docstring documents this)
         self.init_tasks()
         # set scheduler to running if was running or forced
-        if is_running or args.restart:
+        if running or args.restart:
             self._scheduler.resume()
 
     def handle_command_restart(self, args):

@@ -134,7 +134,7 @@ def test_build_scaffold_gives_an_enc_profile_with_a_fresh_key(monkeypatch):
     scaffold = EncVault().build_scaffold('my-app')
     assert scaffold['profile'] == {'type': 'enc', 'env': 'VAULT_MY_APP_KEY'}
     [secret] = scaffold['secrets']
-    assert (secret['name'], secret['is_quoted']) == ('VAULT_MY_APP_KEY', False)
+    assert (secret['name'], secret['quoted']) == ('VAULT_MY_APP_KEY', False)
     monkeypatch.setenv('VAULT_MY_APP_KEY', secret['value'])
     vault = EncVault()
     assert vault.decrypt(scaffold['profile'], vault.encrypt(scaffold['profile'], 's3cret')) == 's3cret'
