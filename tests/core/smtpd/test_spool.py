@@ -19,6 +19,7 @@ import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents
+from tokeo.core.smtpd.exc import SmtpdConfigError
 
 from tests.utils import wait_until_async
 from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, run_wire, start_smtpd
@@ -402,6 +403,6 @@ def test_completely_empty_message(tmp_path):
 
 
 def test_missing_spool_directory_fails_at_start(tmp_path):
-    """A spool path in a missing directory raises ValueError at start."""
-    with pytest.raises(ValueError):
+    """A spool path in a missing directory raises SmtpdConfigError at start."""
+    with pytest.raises(SmtpdConfigError, match='spool_path_prefix: directory does not exist'):
         SmtpdServer(Capture(), options={'spool_path_prefix': str(tmp_path / 'nope' / 'mx1-')})

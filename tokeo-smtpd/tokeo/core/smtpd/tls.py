@@ -32,6 +32,7 @@ from datetime import datetime, timedelta, timezone
 
 
 from .logger import Severity
+from .exc import SmtpdConfigError
 from tokeo.core.utils.memfd import open_memory_paths
 
 # Cipher strings and TLS floor presets, roughly Mozilla Modern / Intermediate /
@@ -121,11 +122,16 @@ class TlsTransport:
     - **ciphers** (str, optional): OpenSSL cipher string
     - **methods** (str, optional): TLS floor; ```'TLSv1_2'``` (default) /
         ```'TLSv1_3'``` (TLS 1.3 only) / ```'TLSv1'``` (opt-in, reaches
-        deprecated TLS 1.0/1.1 clients). Unknown values fall back to TLS 1.2
+        deprecated TLS 1.0/1.1 clients)
     - **cert_cn** (str, optional): Common name for the self-signed certificate
     - **cert_sans** (list|str, optional): Subject alt names for the self-signed
         certificate
     - **logger** (callable, optional): ```log(severity, msg)``` sink
+
+    ### Raises
+
+    - **SmtpdConfigError**: On an unknown ```methods``` value
+    - **FileNotFoundError**: On a missing ```cert_path``` or ```key_path``` file
 
     """
 
@@ -145,7 +151,7 @@ class TlsTransport:
         self.context.set_ciphers(ciphers if ciphers else TLS_CIPHERS_ADVANCED_PLUS)
         methods = methods or TLS_METHODS_ADVANCED
         if methods not in _TLS_VERSIONS:
-            raise ValueError(f'Minimum TLS version (tls_methods) must be one of {", ".join(_TLS_VERSIONS)}!')
+            raise SmtpdConfigError(f'Minimum TLS version (tls_methods) must be one of {", ".join(_TLS_VERSIONS)}!')
         self.context.minimum_version = _TLS_VERSIONS[methods]
         if cert is not None:
             # certificate content given in memory (Tokeo-only extension):

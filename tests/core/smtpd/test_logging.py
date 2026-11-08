@@ -19,6 +19,7 @@ from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.tls import TlsTransport
 from tokeo.core.smtpd.events import SmtpdEvents, SmtpdEvent
 from tokeo.core.smtpd.logger import Severity
+from tokeo.core.smtpd.exc import SmtpdConfigError
 from tests.core.smtpd.lib.smtpd_tests_helper import run_dialog, make_auth_plain
 
 
@@ -139,14 +140,14 @@ def test_logger_severity_sets_the_level_of_the_own_logger(capsys):
 
 def test_logger_severity_is_refused_with_an_own_logger():
     """A given logger keeps its level, logger_severity must not be set with it."""
-    with pytest.raises(ValueError, match='must not be set with an own logger'):
+    with pytest.raises(SmtpdConfigError, match='must not be set with an own logger'):
         SmtpdServer(SmtpdEvents(), {'logger_severity': 'DEBUG'}, logger=Recorder())
 
 
 @pytest.mark.parametrize('value', ['debug', 'WARN', 10, ''])
 def test_logger_severity_is_validated(value):
     """logger_severity accepts only the Severity names."""
-    with pytest.raises(ValueError, match='logger_severity'):
+    with pytest.raises(SmtpdConfigError, match='logger_severity'):
         SmtpdServer(SmtpdEvents(), {'logger_severity': value})
 
 

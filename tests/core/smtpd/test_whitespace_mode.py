@@ -17,6 +17,7 @@ import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, WhitespaceMode
 from tokeo.core.smtpd.events import SmtpdEvents
+from tokeo.core.smtpd.exc import SmtpdConfigError
 from tests.core.smtpd.lib.smtpd_tests_helper import AuthEvents, run_dialog, make_auth_plain
 
 
@@ -178,7 +179,7 @@ def test_defaults_whitespace_mode():
 
 def test_unknown_whitespace_mode_is_rejected():
     """An unknown whitespace_mode names the allowed values."""
-    with pytest.raises(ValueError, match='whitespace_mode must be one of'):
+    with pytest.raises(SmtpdConfigError, match='whitespace_mode must be one of'):
         SmtpdServer(SmtpdEvents(), {'whitespace_mode': 'WHITESPACE_LAX'})
 
 

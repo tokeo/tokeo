@@ -15,6 +15,7 @@ import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, _resolve_host, _get_tls_cert_names, DEFAULT_IO_BUFFER_MAX_SIZE
 from tokeo.core.smtpd.events import SmtpdEvents
+from tokeo.core.smtpd.exc import SmtpdConfigError
 
 
 def test_wildcard_host_resolves_to_the_wildcard_addresses():
@@ -72,7 +73,7 @@ def test_hosts_drop_empty_items_at_the_end():
 )
 def test_ports_with_an_empty_item_are_refused(ports, message):
     """An empty item before the end or no port at all stops the setup."""
-    with pytest.raises(ValueError, match=message):
+    with pytest.raises(SmtpdConfigError, match=message):
         SmtpdServer(SmtpdEvents(), ports=ports)
 
 
@@ -82,7 +83,7 @@ def test_ports_with_an_empty_item_are_refused(ports, message):
 )
 def test_hosts_with_an_empty_item_are_refused(hosts, message):
     """An empty host before the end or no host at all stops the setup."""
-    with pytest.raises(ValueError, match=message):
+    with pytest.raises(SmtpdConfigError, match=message):
         SmtpdServer(SmtpdEvents(), hosts=hosts)
 
 
@@ -95,7 +96,7 @@ def test_io_buffer_max_size_none_is_the_default():
 @pytest.mark.parametrize('value', [0, -1, '1024', 1.5, True])
 def test_io_buffer_max_size_must_be_a_positive_integer(value):
     """io_buffer_max_size refuses anything but a positive integer."""
-    with pytest.raises(ValueError, match='io_buffer_max_size'):
+    with pytest.raises(SmtpdConfigError, match='io_buffer_max_size'):
         SmtpdServer(SmtpdEvents(), {'io_buffer_max_size': value})
 
 

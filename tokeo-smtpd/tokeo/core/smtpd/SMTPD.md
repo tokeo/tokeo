@@ -336,7 +336,7 @@ by ```501```.
 
 Both sides of this trust are checked automatically to be stripped: the entries
 of ```trusted_relay_auth_ids``` when the server starts (else a
-```ValueError```) and the ```authorization_id``` returned by
+```SmtpdConfigError```) and the ```authorization_id``` returned by
 ```on_auth_event``` (else ```454```, see above). So an id only matches as
 written, without hidden whitespace.
 
@@ -533,6 +533,22 @@ The 421 reply (service not available, closing the channel) may be returned for
 any command when the server must shut down. Raising the matching ```Smtpd*Exception```
 from a handler produces one of the failure/error codes above; returning normally
 produces the success code.
+
+### Errors of the server
+
+Besides the replies, the library raises its own errors, all derived from
+```SmtpdError``` (a ```TokeoError```) and importable from ```tokeo.core.smtpd```:
+
+- ```SmtpdConfigError``` on a wrong value or a wrong combination of the
+  options (section 10) and of the TLS options (section 8), raised by
+  ```SmtpdServer``` before any listener is bound. It is also a
+  ```ValueError```, so an ```except ValueError``` still catches it
+- ```SmtpdContractError``` when a handler violates the events contract,
+  raised on import (section 4)
+
+A missing certificate or key file raises ```FileNotFoundError```, a
+```logger``` that is the log input of a handler a ```ValueError``` (an error
+in the code).
 
 ## 8. TLS and STARTTLS
 

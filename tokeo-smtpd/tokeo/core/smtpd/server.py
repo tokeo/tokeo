@@ -41,6 +41,7 @@ from .events import SmtpdEvents, SmtpdEvent, EVENT_METHOD_NAMES
 
 
 from .exc import (
+    SmtpdConfigError,
     SmtpdException,
     SmtpdCloseException,
     Smtpd421CloseException,
@@ -173,7 +174,7 @@ def _parse_mode(enum_cls, value, default, label):
         return enum_cls[name]
     except KeyError:
         allowed_names = ', '.join(m.name for m in enum_cls)
-        raise ValueError(f'{label} must be one of {allowed_names}, got {value!r}')
+        raise SmtpdConfigError(f'{label} must be one of {allowed_names}, got {value!r}')
 
 
 def tls_immediate_supported():
@@ -270,16 +271,16 @@ def _parse_ports(ports):
 
     ### Raises
 
-    - **ValueError**: On a missing or an empty ```''``` port item
+    - **SmtpdConfigError**: On a missing or an empty ```''``` port item
 
     """
     # like Ruby split, empty items at the end are dropped ('2525,')
     value = str(ports).replace(' ', '').rstrip(',')
     items = value.split(',') if value else []
     if not items:
-        raise ValueError('Missing port(s) to bind service(s) to!')
+        raise SmtpdConfigError('Missing port(s) to bind service(s) to!')
     if '' in items:
-        raise ValueError('Do not use empty value "" for port(s). Please use specific port(s)!')
+        raise SmtpdConfigError('Do not use empty value "" for port(s). Please use specific port(s)!')
     return items
 
 
@@ -298,7 +299,7 @@ def _parse_hosts(hosts):
 
     ### Raises
 
-    - **ValueError**: On no hosts or an empty ```''``` inner host item
+    - **SmtpdConfigError**: On no hosts or an empty ```''``` inner host item
 
     """
     if isinstance(hosts, (list, tuple)):
@@ -308,9 +309,9 @@ def _parse_hosts(hosts):
         value = str(hosts).replace(' ', '').rstrip(',')
         items = value.split(',') if value else []
     if not items or items == ['']:
-        raise ValueError('No hosts defined! Please use specific hostnames and / or ip_addresses or "*" for wildcard!')
+        raise SmtpdConfigError('No hosts defined! Please use specific hostnames and / or ip_addresses or "*" for wildcard!')
     if '' in items:
-        raise ValueError(
+        raise SmtpdConfigError(
             'Detected an empty identifier in given hosts! Please use specific hostnames and / or ip_addresses or "*" for wildcard!'
         )
     return items
@@ -489,6 +490,13 @@ class SmtpdServer:
     - **debug** (bool, optional): Debug mode, keeps the spool files on disk.
         Defaults to False.
 
+    ### Raises
+
+    - **SmtpdConfigError**: On a wrong value or a wrong combination of the
+        options, also of the TLS options
+    - **FileNotFoundError**: On a missing certificate or private key file
+    - **ValueError**: On a ```logger``` that is the log input of a handler
+
     """
 
     def __init__(self, events_handler, options=None, *, global_limits=None, logger=None, debug=False, **kwargs):
@@ -516,9 +524,9 @@ class SmtpdServer:
         # stderr logger; set on mounting, a value set on the handler is replaced
         logger_severity = options.get('logger_severity')
         if logger_severity is not None and logger_severity not in Severity.__members__:
-            raise ValueError(f'Severity of the server logger (logger_severity) must be one of {", ".join(Severity.__members__)}!')
+            raise SmtpdConfigError(f'Severity of the server logger (logger_severity) must be one of {", ".join(Severity.__members__)}!')
         if logger is not None and logger_severity is not None:
-            raise ValueError('Severity of the server logger (logger_severity) must not be set with an own logger!')
+            raise SmtpdConfigError('Severity of the server logger (logger_severity) must not be set with an own logger!')
         if isinstance(logger, ForwardingLogger):
             raise ValueError('The server logger (logger) must not be the log input of a handler!')
         if logger is None:
@@ -577,7 +585,7 @@ class SmtpdServer:
             value = str(value)
             self._spool_dir, self._spool_prefix = os.path.split(value)
             if not os.path.isdir(self._spool_dir):
-                raise ValueError(f'spool_path_prefix: directory does not exist: {self._spool_dir!r}')
+                raise SmtpdConfigError(f'spool_path_prefix: directory does not exist: {self._spool_dir!r}')
             self._spooling = True
         else:
             self._spooling = False
@@ -602,26 +610,28 @@ class SmtpdServer:
             CrlfDataMode.CRLF_DATA_STRICT,
             CrlfDataMode.CRLF_DATA_STRICT_CLOSE,
         ):
-            raise ValueError('Line breaks in DATA (crlf_data_mode) must be CRLF_DATA_STRICT or CRLF_DATA_STRICT_CLOSE with CRLF_STRICT!')
+            raise SmtpdConfigError(
+                'Line breaks in DATA (crlf_data_mode) must be CRLF_DATA_STRICT or CRLF_DATA_STRICT_CLOSE with CRLF_STRICT!'
+            )
         if self.encrypt_mode is EncryptMode.TLS_IMMEDIATE and not tls_immediate_supported():
-            raise ValueError('Immediate TLS (encrypt_mode TLS_IMMEDIATE) requires Python 3.13.13+ or 3.14.4+!')
+            raise SmtpdConfigError('Immediate TLS (encrypt_mode TLS_IMMEDIATE) requires Python 3.13.13+ or 3.14.4+!')
         if not is_number_ge(self.io_cmd_timeout, 1):
-            raise ValueError('Timeout for a command line (io_cmd_timeout) must be at least 1 second!')
+            raise SmtpdConfigError('Timeout for a command line (io_cmd_timeout) must be at least 1 second!')
         if not is_number_ge(self.io_proxy_cmd_timeout, 1):
-            raise ValueError('Timeout for the PROXY header (io_proxy_cmd_timeout) must be at least 1 second!')
+            raise SmtpdConfigError('Timeout for the PROXY header (io_proxy_cmd_timeout) must be at least 1 second!')
         if not is_number_between(self.io_session_timeout, 1, 86400):
-            raise ValueError('Timeout of a session (io_session_timeout) must be between 1 and 86400 seconds!')
+            raise SmtpdConfigError('Timeout of a session (io_session_timeout) must be between 1 and 86400 seconds!')
         if not is_int_gt(self.io_buffer_max_size, 0):
-            raise ValueError('Maximum size of a line (io_buffer_max_size) must be a positive integer!')
+            raise SmtpdConfigError('Maximum size of a line (io_buffer_max_size) must be a positive integer!')
         if not is_list_of(self.trusted_relay_auth_ids, lambda i: is_filled_str(i) and i == i.strip()):
-            raise ValueError('Trusted relays (trusted_relay_auth_ids) must be a list of stripped non-empty authorization ids!')
+            raise SmtpdConfigError('Trusted relays (trusted_relay_auth_ids) must be a list of stripped non-empty authorization ids!')
         if not is_int_gt(self.max_processings, 0):
-            raise ValueError('Number of simultaneous processings (max_processings) must be a positive integer!')
+            raise SmtpdConfigError('Number of simultaneous processings (max_processings) must be a positive integer!')
         if self.max_connections is not None:
             if not is_int_gt(self.max_connections, 0):
-                raise ValueError('Number of concurrent connections (max_connections) must be nil or a positive integer!')
+                raise SmtpdConfigError('Number of concurrent connections (max_connections) must be nil or a positive integer!')
             if self.max_connections < self.max_processings:
-                raise ValueError(
+                raise SmtpdConfigError(
                     'Number of concurrent connections (max_connections) is lower than '
                     'number of simultaneous processings (max_processings)!'
                 )

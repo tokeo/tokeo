@@ -4,8 +4,12 @@ Ported from the reference suite's test/specs/defaults_test.rb.
 Checks the default properties and the host-validation exceptions of the server.
 """
 
+import pickle
+
 import pytest
 
+from tokeo.core.exc import TokeoError
+from tokeo.core.smtpd.exc import SmtpdError, SmtpdConfigError
 from tokeo.core.smtpd.server import (
     SmtpdServer,
     CrlfMode,
@@ -27,14 +31,25 @@ def _make_smtpd(**kwargs):
 
 
 def test_exception_on_empty_hosts():
-    """Empty hosts raise ValueError "No hosts defined!"."""
-    with pytest.raises(ValueError, match='No hosts defined!'):
+    """Empty hosts raise SmtpdConfigError "No hosts defined!"."""
+    with pytest.raises(SmtpdConfigError, match='No hosts defined!'):
         SmtpdServer(CaptureSmtpdEvents(), ports=2525, hosts='')
 
 
+def test_config_error_is_a_smtpd_error_and_a_value_error():
+    """A wrong option raises SmtpdConfigError, a SmtpdError and a ValueError."""
+    with pytest.raises(ValueError, match='No hosts defined!') as err_info:
+        SmtpdServer(CaptureSmtpdEvents(), ports=2525, hosts='')
+    assert type(err_info.value) is SmtpdConfigError
+    assert isinstance(err_info.value, SmtpdError)
+    assert isinstance(err_info.value, TokeoError)
+    clone = pickle.loads(pickle.dumps(err_info.value))
+    assert type(clone) is SmtpdConfigError and clone.args == err_info.value.args
+
+
 def test_exception_on_empty_host_in_hosts():
-    """An empty entry in the hosts raises ValueError."""
-    with pytest.raises(ValueError, match='Detected an empty identifier in given hosts!'):
+    """An empty entry in the hosts raises SmtpdConfigError."""
+    with pytest.raises(SmtpdConfigError, match='Detected an empty identifier in given hosts!'):
         SmtpdServer(CaptureSmtpdEvents(), ports=2525, hosts='1.2.3.4,,5.6.7.8')
 
 
@@ -88,7 +103,7 @@ def test_defaults_crlf_data_mode():
 @pytest.mark.parametrize('value', ['CRLF_DATA_MODERATE', 'CRLF_DATA_UNSAFE'])
 def test_crlf_strict_allows_only_the_strict_data_modes(value):
     """CRLF_STRICT with a not strict crlf_data_mode is rejected."""
-    with pytest.raises(ValueError, match='crlf_data_mode'):
+    with pytest.raises(SmtpdConfigError, match='crlf_data_mode'):
         _make_smtpd(options={'crlf_mode': 'CRLF_STRICT', 'crlf_data_mode': value})
     smtpd = _make_smtpd(options={'crlf_mode': 'CRLF_STRICT', 'crlf_data_mode': 'CRLF_DATA_STRICT_CLOSE'})
     assert smtpd.crlf_data_mode is CrlfDataMode.CRLF_DATA_STRICT_CLOSE
@@ -96,7 +111,7 @@ def test_crlf_strict_allows_only_the_strict_data_modes(value):
 
 def test_unknown_crlf_data_mode_is_rejected():
     """An unknown crlf_data_mode names the allowed values."""
-    with pytest.raises(ValueError, match='crlf_data_mode must be one of'):
+    with pytest.raises(SmtpdConfigError, match='crlf_data_mode must be one of'):
         _make_smtpd(options={'crlf_data_mode': 'CRLF_DATA_LAX'})
 
 
@@ -114,7 +129,7 @@ def test_defaults_io_proxy_cmd_timeout():
 @pytest.mark.parametrize('value', [0, 0.5, -1, None, True, '30'])
 def test_io_timeouts_below_one_second_are_rejected(name, value):
     """An io timeout below 1 second, null or not a number stops the server setup."""
-    with pytest.raises(ValueError, match=name):
+    with pytest.raises(SmtpdConfigError, match=name):
         _make_smtpd(options={name: value})
 
 
@@ -134,7 +149,7 @@ def test_io_session_timeout_takes_seconds_from_1_to_86400(value):
 @pytest.mark.parametrize('value', [0, 0.5, -1, 86401, True, '10'])
 def test_io_session_timeout_out_of_range_is_rejected(value):
     """io_session_timeout outside 1 to 86400 or not a number stops the setup."""
-    with pytest.raises(ValueError, match='io_session_timeout'):
+    with pytest.raises(SmtpdConfigError, match='io_session_timeout'):
         _make_smtpd(options={'io_session_timeout': value})
 
 
@@ -167,7 +182,7 @@ def test_trusted_relay_auth_ids_takes_a_list_or_a_tuple_of_ids(value):
 @pytest.mark.parametrize('value', [None, 'relay', ['relay', 1], ['relay', ''], [' relay'], ['relay '], ['  ']])
 def test_trusted_relay_auth_ids_not_a_list_of_ids_is_rejected(value):
     """trusted_relay_auth_ids accepts only a list of stripped non-empty ids."""
-    with pytest.raises(ValueError, match='trusted_relay_auth_ids'):
+    with pytest.raises(SmtpdConfigError, match='trusted_relay_auth_ids'):
         _make_smtpd(options={'trusted_relay_auth_ids': value})
 
 
@@ -204,7 +219,7 @@ def test_defaults_internationalization_extensions():
 )
 def test_limits_that_do_not_fit_are_rejected(options, name):
     """A limit that is no positive integer, or too low, stops the setup."""
-    with pytest.raises(ValueError, match=name):
+    with pytest.raises(SmtpdConfigError, match=name):
         _make_smtpd(options=options)
 
 

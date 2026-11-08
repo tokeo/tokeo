@@ -18,6 +18,7 @@ this library (config -> services, lifecycle, CLI).
 from .logger import Severity, ForwardingLogger
 from .exc import (
     SmtpdError,
+    SmtpdConfigError,
     SmtpdContractError,
     SmtpdException,
     SmtpdCloseException,
@@ -84,6 +85,7 @@ __all__ = [
     'Severity',
     'ForwardingLogger',
     'SmtpdError',
+    'SmtpdConfigError',
     'SmtpdContractError',
     'SmtpdException',
     'SmtpdCloseException',

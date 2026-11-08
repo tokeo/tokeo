@@ -7,8 +7,9 @@ SMTP replies; the handler logic never returns raw SMTP codes.
 
 ### Features
 
-- Extension-level errors (```SmtpdError```, ```SmtpdContractError```) for
-    config, wiring, and contract violations, rooted in ```TokeoError```
+- Extension-level errors (```SmtpdError```, ```SmtpdConfigError```,
+    ```SmtpdContractError```) for config, wiring, and contract violations,
+    rooted in ```TokeoError```
 - SMTP dialog exceptions (```SmtpdException``` and the numeric subclasses)
     that carry a fixed code and text; ```smtp_response``` renders the wire form
 - Closing exceptions (```SmtpdCloseException``` and its
@@ -38,6 +39,23 @@ class SmtpdError(TokeoError):
 
     : Raised by the extension, not by handler logic; handler logic raises the
         SMTP dialog exceptions below instead
+
+    """
+
+    pass
+
+
+class SmtpdConfigError(SmtpdError, ValueError):
+    """
+    Raised on a wrong value or a wrong combination of server options.
+
+    ### Notes
+
+    : Fired by ```SmtpdServer``` and ```TlsTransport``` on start, before any
+        listener is bound
+
+    : Is also a ```ValueError```, so an ```except ValueError``` still catches
+        it
 
     """
 

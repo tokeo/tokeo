@@ -13,6 +13,7 @@ import platform
 import pytest
 
 from tokeo.core.smtpd.server import SmtpdServer, tls_immediate_supported
+from tokeo.core.smtpd.exc import SmtpdConfigError
 from tests.core.smtpd.lib.smtpd_tests_helper import (
     RecordingEvents,
     start_server,
@@ -125,12 +126,12 @@ def test_behind_proxy():
     ids=lambda value: '.'.join(map(str, value)) if isinstance(value, tuple) else str(value),
 )
 def test_required_python_version(monkeypatch, version, supported):
-    """Below 3.13.13 or 3.14.4 a TLS_IMMEDIATE server raises ValueError."""
+    """Below 3.13.13 or 3.14.4 a TLS_IMMEDIATE server raises SmtpdConfigError."""
     monkeypatch.setattr('tokeo.core.smtpd.server.sys.version_info', version + ('final', 0))
     if supported:
         assert SmtpdServer(RecordingEvents(), options=_SERVER_OPTIONS).tls is not None
     else:
-        with pytest.raises(ValueError, match='requires Python 3.13.13\\+ or 3.14.4\\+'):
+        with pytest.raises(SmtpdConfigError, match='requires Python 3.13.13\\+ or 3.14.4\\+'):
             SmtpdServer(RecordingEvents(), options=_SERVER_OPTIONS)
 
 

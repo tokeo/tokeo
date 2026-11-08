@@ -223,14 +223,29 @@ def test_extension_loads_into_cement_app():
             'encrypt_mode must be one of',
         ),
         (dict(events_handler='NoDots'), "'NoDots' must be set as module:attr"),
+        (
+            dict(
+                events_handler='tokeo.ext.smtpd:TokeoSmtpdEvents',
+                server_options=dict(encrypt_mode='TLS_OPTIONAL', tls_cert_path='/nonexistent/smtpd-cert.pem'),
+            ),
+            'File "/nonexistent/smtpd-cert.pem" does not exist',
+        ),
     ],
-    ids=['encrypt_mode', 'events_handler'],
+    ids=['encrypt_mode', 'events_handler', 'tls_cert_path'],
 )
 def test_build_server_names_the_service(svc, reason):
     """A service that cannot be built raises TokeoSmtpdError naming it."""
     with SmtpdTest() as app:
         with pytest.raises(TokeoSmtpdError, match=f"^smtpd: service 'mx-x': {reason}"):
             app.smtpd._build_server(dict(svc, name='mx-x', listeners=[]), None)
+
+
+def test_build_server_passes_an_error_in_the_code():
+    """An error in the code of the events handler is not wrapped."""
+    with SmtpdTest() as app:
+        with pytest.raises(TypeError, match='^broken events handler$'):
+            svc = dict(name='mx-x', listeners=[], events_handler='tests.ext.smtpd.smtpd_tests_helper:BrokenSmtpdEvents')
+            app.smtpd._build_server(svc, None)
 
 
 def _build(svc):

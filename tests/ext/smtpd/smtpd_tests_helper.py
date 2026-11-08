@@ -25,3 +25,10 @@ class TaggedSmtpdEvents(TokeoSmtpdEvents):
     def on_connect_event(self, ctx):
         super().on_connect_event(ctx)
         ctx.server.helo_response = f"{self.options.get('tag')} pid {os.getpid()}"
+
+
+class BrokenSmtpdEvents(TokeoSmtpdEvents):
+    """Fails on init by an error in the code."""
+
+    def __init__(self, app, options=None):
+        raise TypeError('broken events handler')

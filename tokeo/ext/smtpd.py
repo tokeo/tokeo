@@ -439,8 +439,8 @@ class TokeoSmtpd(MetaMixin):
 
         ### Raises
 
-        - **TokeoSmtpdError**: On any error of the service config, naming
-            the service
+        - **TokeoSmtpdError**: On an error of the service config or of the
+            system (address, certificate file), naming the service
 
         """
         try:
@@ -459,7 +459,9 @@ class TokeoSmtpd(MetaMixin):
                 hosts=hosts or None,
                 session_id_bytes=self._config('session_id_bytes'),
             )
-        except Exception as err:
+        except (TokeoError, OSError) as err:
+            # config errors (SmtpdError, handler class) and errors of the system
+            # (address, certificate file) name the service, a code error passes
             error = str(err).removeprefix('smtpd: ')
             raise TokeoSmtpdError(f"smtpd: service '{svc.get('name')}': {error}") from err
 
