@@ -9,7 +9,7 @@ path to it, so the data never touches disk.
 
 - Linux: ```os.memfd_create``` + ```/proc/self/fd/N``` (a seekable anon file).
 - macOS/BSD: an anonymous pipe fed by a thread + ```/dev/fd/N```.
-- Elsewhere (e.g. Windows): ```MemfdUnavailable``` is raised.
+- Elsewhere (e.g. Windows): ```TokeoMemfdError``` is raised.
 
 If CPython ever gains in-memory certificate loading, callers can drop this
 module and pass the PEM strings directly.
@@ -18,9 +18,10 @@ module and pass the PEM strings directly.
 import os
 import threading
 from contextlib import contextmanager
+from tokeo.core.exc import TokeoError
 
 
-class MemfdUnavailable(RuntimeError):
+class TokeoMemfdError(TokeoError):
     """Raised when the platform offers no memory-backed path mechanism."""
 
 
@@ -55,7 +56,7 @@ def open_memory_paths(*blobs):
 
     ### Raises
 
-    - **MemfdUnavailable**: If the platform has neither ```os.memfd_create```
+    - **TokeoMemfdError**: If the platform has neither ```os.memfd_create```
         nor ```/dev/fd``` (e.g. Windows)
 
     """
@@ -104,4 +105,4 @@ def open_memory_paths(*blobs):
                 t.join(timeout=1)
         return
 
-    raise MemfdUnavailable('no os.memfd_create and no /dev/fd on this platform')
+    raise TokeoMemfdError('no os.memfd_create and no /dev/fd on this platform')

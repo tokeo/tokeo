@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from tokeo.core.utils.memfd import open_memory_paths, MemfdUnavailable
+from tokeo.core.utils.memfd import open_memory_paths, TokeoMemfdError
 
 needs_devfd = pytest.mark.skipif(not os.path.isdir('/dev/fd'), reason='needs /dev/fd')
 
@@ -107,6 +107,6 @@ def test_raises_when_no_backing(monkeypatch):
     """Without memfd_create and /dev/fd, as on Windows, it raises."""
     monkeypatch.delattr(os, 'memfd_create', raising=False)
     monkeypatch.setattr(os.path, 'isdir', lambda p: False)
-    with pytest.raises(MemfdUnavailable):
+    with pytest.raises(TokeoMemfdError):
         with open_memory_paths(b'x'):
             pass
