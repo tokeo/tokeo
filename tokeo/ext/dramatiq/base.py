@@ -22,7 +22,7 @@ from tokeo.core.utils.validate import is_bool, as_int_or_auto
 from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError, TokeoDramatiqConnectionError
 
 
-class TokeoActor(dramatiq.Actor):
+class TokeoDramatiqActor(dramatiq.Actor):
     """
     Actor whose send raises ```TokeoDramatiqConnectionError``` without rabbitmq.
 
@@ -41,7 +41,7 @@ class TokeoActor(dramatiq.Actor):
 
 def tokeo_actor(fn=None, **options):
     """
-    Declare an actor like ```dramatiq.actor```, as ```TokeoActor``` by default.
+    Declare an actor like ```dramatiq.actor```, as TokeoDramatiqActor by default.
 
     ### Args
 
@@ -50,18 +50,18 @@ def tokeo_actor(fn=None, **options):
     ### Keyword Args
 
     - **options**: The options of ```dramatiq.actor```; an own
-        ```actor_class``` replaces ```TokeoActor```
+        ```actor_class``` replaces ```TokeoDramatiqActor```
 
     ### Returns
 
-    - **TokeoActor|callable**: The actor, or the decorator without fn
+    - **TokeoDramatiqActor|callable**: The actor, or the decorator without fn
 
     """
-    options.setdefault('actor_class', TokeoActor)
+    options.setdefault('actor_class', TokeoDramatiqActor)
     return dramatiq_actor(fn, **options)
 
 
-class TokeoAsyncIO(middleware.AsyncIO):
+class TokeoDramatiqAsyncIO(middleware.AsyncIO):
     """
     AsyncIO middleware whose event loop thread does not block the exit.
 
@@ -104,7 +104,7 @@ _URL_OPTIONS = (
 )
 
 
-class ExtendedRabbitmqBroker(RabbitmqBroker):
+class TokeoDramatiqRabbitmqBroker(RabbitmqBroker):
     """
     Extended RabbitMQ broker with support for single-active-consumer queues.
 
@@ -355,7 +355,7 @@ class TokeoDramatiq(MetaMixin):
     #: (TokeoDramatiqMonitor) Workers and queues of the app, set on setup
     monitor = None
 
-    #: (ExtendedRabbitmqBroker) The registered broker, set on register
+    #: (TokeoDramatiqRabbitmqBroker) The registered broker, set on register
     broker = None
 
     def _setup(self, app):
@@ -436,16 +436,16 @@ class TokeoDramatiq(MetaMixin):
         ### Notes
 
         : Configures the middleware AgeLimit, TimeLimit, ShutdownNotifications,
-            Callbacks, Pipelines, Retries, CurrentMessage and TokeoAsyncIO,
+            Callbacks, Pipelines, Retries, CurrentMessage and TokeoDramatiqAsyncIO,
             with ```monitoring``` also TokeoDramatiqHeartbeat
 
-        : Creates an ExtendedRabbitmqBroker instance with the configured URL
+        : Creates a TokeoDramatiqRabbitmqBroker instance with the configured URL
             and registers it as the global Dramatiq broker
 
         : Missing keys of the ```rabbitmq``` config take their defaults
 
         """
-        self.app.log.debug('Registering dramatiq middlewares and ExtendedRabbitmqBroker ...')
+        self.app.log.debug('Registering dramatiq middlewares and TokeoDramatiqRabbitmqBroker ...')
         # defaults of the middleware for all actors from the config
         time_limit = _check_number('config', 'time_limit', self._config('time_limit'))
         max_age = _check_number('config', 'max_age', self._config('max_age'), allow_none=True)
@@ -466,7 +466,7 @@ class TokeoDramatiq(MetaMixin):
             middleware.Pipelines(),
             middleware.Retries(max_retries=max_retries, min_backoff=min_backoff, max_backoff=max_backoff),
             middleware.CurrentMessage(),
-            TokeoAsyncIO(),
+            TokeoDramatiqAsyncIO(),
         ]
         heartbeat = self._create_heartbeat_middleware()
         if heartbeat is not None:
@@ -486,7 +486,7 @@ class TokeoDramatiq(MetaMixin):
             # dramatiq takes the env then; 0 would drop every dead letter
             if 'dramatiq_dead_message_ttl' in os.environ:
                 _check_number('env', 'dramatiq_dead_message_ttl', os.environ['dramatiq_dead_message_ttl'])
-        rabbitmq_broker = ExtendedRabbitmqBroker(
+        rabbitmq_broker = TokeoDramatiqRabbitmqBroker(
             url=rabbitmq_config['url'],
             auth_identity=rabbitmq_config['auth_identity'],
             auth_password=rabbitmq_config['auth_password'],
@@ -500,7 +500,7 @@ class TokeoDramatiq(MetaMixin):
         # globally set the broker on dramatiq
         self.broker = rabbitmq_broker
         dramatiq.set_broker(rabbitmq_broker)
-        self.app.log.debug('ExtendedRabbitmqBroker is registered as dramatiq broker')
+        self.app.log.debug('TokeoDramatiqRabbitmqBroker is registered as dramatiq broker')
 
     def _create_heartbeat_middleware(self):
         """Create the heartbeat middleware, None without monitoring."""
@@ -526,7 +526,7 @@ class TokeoDramatiq(MetaMixin):
 
         ### Notes
 
-        - Only closes the broker if it's an instance of ExtendedRabbitmqBroker
+        - Only closes the broker if it's an instance of TokeoDramatiqRabbitmqBroker
         - Logs diagnostic messages about the broker closure process
 
         """
@@ -538,12 +538,12 @@ class TokeoDramatiq(MetaMixin):
         # get the current registered broker
         broker = dramatiq.get_broker()
         # check that is equal to the registered one
-        if isinstance(broker, ExtendedRabbitmqBroker):
+        if isinstance(broker, TokeoDramatiqRabbitmqBroker):
             # shutdown the connections
             broker.close()
-            self.app.log.debug('Closed registered ExtendedRabbitmqBroker')
+            self.app.log.debug('Closed registered TokeoDramatiqRabbitmqBroker')
         else:
-            self.app.log.debug('Dramatiq broker instance is not a ExtendedRabbitmqBroker')
+            self.app.log.debug('Dramatiq broker instance is not a TokeoDramatiqRabbitmqBroker')
 
     @property
     def locks(self):

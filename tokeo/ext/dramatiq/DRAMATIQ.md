@@ -132,7 +132,7 @@ myapp dramatiq monitor --follow
 ## 3. Actors
 
 Use ```@app.dramatiq.actor``` (or ```@dramatiq.actor``` with
-```actor_class=TokeoActor```). It is dramatiq's decorator with one addition:
+```actor_class=TokeoDramatiqActor```). It is dramatiq's decorator with one addition:
 ```send``` raises a ```TokeoDramatiqConnectionError``` that names the RabbitMQ
 host when it cannot reach RabbitMQ, instead of a bare pika error.
 
@@ -153,7 +153,7 @@ The decorator takes these arguments:
 <tr><td>queue_name</td><td>'default'</td><td>the queue of its messages; a queue with '_unparalleled' in its name runs one task at a time (section 5)</td></tr>
 <tr><td>priority</td><td>0</td><td>order inside a worker among messages it already fetched; <b>lower runs first</b> (section 4)</td></tr>
 <tr><td>broker</td><td>the app broker</td><td>rarely needed</td></tr>
-<tr><td>actor_class</td><td>TokeoActor</td><td>the actor class</td></tr>
+<tr><td>actor_class</td><td>TokeoDramatiqActor</td><td>the actor class</td></tr>
 </tbody>
 </table>
 

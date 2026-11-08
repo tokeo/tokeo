@@ -329,7 +329,7 @@ class TokeoPrintDictOutputHandler(output.OutputHandler):
         return out
 
 
-class TokeoInspectOutputHandler(output.OutputHandler):
+class TokeoPrintInspectOutputHandler(output.OutputHandler):
     """
     Output handler for object inspection.
 
@@ -553,7 +553,7 @@ def load(app):
     : This function is called automatically by the Cement framework when the
         extension is loaded. It registers three output handlers:
 
-        - TokeoInspectOutputHandler - For detailed object inspection
+        - TokeoPrintInspectOutputHandler - For detailed object inspection
         - TokeoPrintDictOutputHandler - For dictionary formatting
         - TokeoPrintOutputHandler - For standard printing
 
@@ -561,7 +561,7 @@ def load(app):
         via the register_tokeo_print function.
 
     """
-    app.handler.register(TokeoInspectOutputHandler)
+    app.handler.register(TokeoPrintInspectOutputHandler)
     app.handler.register(TokeoPrintDictOutputHandler)
     app.handler.register(TokeoPrintOutputHandler)
     register_tokeo_print(app)

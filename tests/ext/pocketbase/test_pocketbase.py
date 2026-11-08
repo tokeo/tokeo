@@ -25,7 +25,7 @@ from cement.utils.misc import init_defaults
 from tokeo.core.exc import TokeoError
 from tokeo.core.pocketbase import Collection, ListResult, PocketBase, Record
 from tokeo.ext import pocketbase as pocketbase_ext
-from tokeo.ext.pocketbase import TokeoPocketBaseAuthError, TokeoPocketBaseError, TokeoPocketBaseHandler
+from tokeo.ext.pocketbase import TokeoPocketBaseAuthError, TokeoPocketBaseError, TokeoPocketBase
 from tokeo.main import TokeoTest
 
 # the url of the test apps; the fake server answers any url
@@ -208,7 +208,7 @@ def _get_body(request):
 def test_load_extends_the_app_with_the_handler_as_db(server):
     """After setup app.db is the handler and the client points at the url."""
     with PocketbaseTest() as app:
-        assert isinstance(app.db, TokeoPocketBaseHandler)
+        assert isinstance(app.db, TokeoPocketBase)
         assert app._meta.db_handler == 'tokeo.pocketbase'
         assert app.db.pb.url == URL
 

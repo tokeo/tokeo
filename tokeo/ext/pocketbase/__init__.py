@@ -65,7 +65,7 @@ from tokeo.core.pocketbase import AuthKeeper, PocketBase, TokeoPocketBaseError, 
 _AUTH_COLLECTIONS = ('users', '_superusers')
 
 
-class TokeoPocketBaseHandler(MetaMixin):
+class TokeoPocketBase(MetaMixin):
     """
     PocketBase integration handler for Tokeo applications.
 
@@ -162,7 +162,7 @@ class TokeoPocketBaseHandler(MetaMixin):
     realtime_options = None
 
     def __init__(self, app, *args, **kw):
-        super(TokeoPocketBaseHandler, self).__init__(*args, **kw)
+        super(TokeoPocketBase, self).__init__(*args, **kw)
         #: The Cement application instance
         self.app = app
 
@@ -655,11 +655,11 @@ def tokeo_pocketbase_extend_app(app):
     ### Notes
 
     : This function is called automatically during the application's post_setup
-        phase. It creates an instance of TokeoPocketBaseHandler, configures it,
+        phase. It creates an instance of TokeoPocketBase, configures it,
         and attaches it to the application as the 'db' attribute.
 
     """
-    app.extend('db', TokeoPocketBaseHandler(app))
+    app.extend('db', TokeoPocketBase(app))
     app.db._setup(app)
     # nicegui defines its hook only when it is loaded, else this is ignored
     app.hook.register('tokeo_nicegui_extend', tokeo_pocketbase_extend_nicegui)
@@ -740,7 +740,7 @@ def load(app):
 
     """
     # Set the default database handler for the application
-    app._meta.db_handler = TokeoPocketBaseHandler.Meta.label
+    app._meta.db_handler = TokeoPocketBase.Meta.label
 
     # Register hooks for initialization and cleanup
     app.hook.register('post_setup', tokeo_pocketbase_extend_app)

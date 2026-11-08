@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from dramatiq import broker as dramatiq_broker
 from dramatiq.asyncio import get_event_loop_thread
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
-from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoAsyncIO
+from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoDramatiqAsyncIO
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqBrokerTest, DramatiqMiddlewareTest
 
 
@@ -56,7 +56,7 @@ def _make_ca_cert(name):
 
 def test_asyncio_event_loop_thread_is_daemon():
     """The event loop thread is a daemon and stops on shutdown."""
-    asyncio_middleware = TokeoAsyncIO()
+    asyncio_middleware = TokeoDramatiqAsyncIO()
     asyncio_middleware.before_worker_boot(None, None)
     try:
         thread = get_event_loop_thread()
@@ -70,11 +70,11 @@ def test_asyncio_event_loop_thread_is_daemon():
     assert not thread.is_alive()
 
 
-def test_register_uses_tokeo_asyncio(tmp):
-    """register adds TokeoAsyncIO to the broker."""
+def test_register_uses_tokeo_dramatiq_asyncio(tmp):
+    """register adds TokeoDramatiqAsyncIO to the broker."""
     with DramatiqTest(tmp, []):
         kinds = [type(m) for m in dramatiq.get_broker().middleware]
-    assert TokeoAsyncIO in kinds
+    assert TokeoDramatiqAsyncIO in kinds
 
 
 # ---- broker -----------------------------------------------------------------
@@ -299,16 +299,16 @@ def test_locks_sleep_seconds_is_an_own_option_of_dramatiq(tmp):
 # ---- actor send wrapper -----------------------------------------------------
 
 
-def test_actor_alias_declares_tokeo_actor(tmp):
-    """app.dramatiq.actor makes a TokeoActor, an own actor_class stays."""
-    from tokeo.ext.dramatiq import TokeoActor
+def test_actor_alias_declares_tokeo_dramatiq_actor(tmp):
+    """app.dramatiq.actor makes a TokeoDramatiqActor, an own actor_class stays."""
+    from tokeo.ext.dramatiq import TokeoDramatiqActor
 
     with DramatiqBrokerTest(tmp, None) as app:
         # both forms of the decorator, the bare one and with options
         bare = app.dramatiq.actor(lambda: None, actor_name='bare_actor')
         with_options = app.dramatiq.actor(queue_name='mail', actor_name='mail_actor')(lambda: None)
         own = app.dramatiq.actor(lambda: None, actor_name='own_actor', actor_class=dramatiq.Actor)
-    assert type(bare) is TokeoActor and type(with_options) is TokeoActor
+    assert type(bare) is TokeoDramatiqActor and type(with_options) is TokeoDramatiqActor
     assert with_options.queue_name == 'mail'
     # an own actor_class stays possible
     assert type(own) is dramatiq.Actor

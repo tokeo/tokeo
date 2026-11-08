@@ -14,7 +14,7 @@ configuration options.
 # tokeo. Each name that differs from cement, compared with cement 3.0.16, as
 # cement -> tokeo (kind):
 #
-# - SMTPMailHandler -> TokeoSMTPMailHandler (class)
+# - SMTPMailHandler -> TokeoSmtpMailHandler (class)
 # - Meta.label = 'smtp' -> Meta.label = 'tokeo.smtp' and
 #   config_section = 'smtp' (meta)
 # - username -> auth_identity (config)
@@ -59,7 +59,7 @@ from cement.utils import fs
 from cement.utils.misc import is_true
 
 
-class TokeoSMTPMailHandler(mail.MailHandler):
+class TokeoSmtpMailHandler(mail.MailHandler):
     """
     SMTP mail handler for sending emails in Tokeo applications.
 
@@ -834,7 +834,7 @@ class TokeoSMTPMailHandler(mail.MailHandler):
 
 def load(app):
     """
-    Load the TokeoSMTPMailHandler and register it with the application.
+    Load the TokeoSmtpMailHandler and register it with the application.
 
     This function is called by the Cement framework when the extension
     is loaded. It registers the mail handler and sets it as the default
@@ -859,5 +859,5 @@ def load(app):
     ```
 
     """
-    app.handler.register(TokeoSMTPMailHandler)
-    app._meta.mail_handler = TokeoSMTPMailHandler.Meta.label
+    app.handler.register(TokeoSmtpMailHandler)
+    app._meta.mail_handler = TokeoSmtpMailHandler.Meta.label

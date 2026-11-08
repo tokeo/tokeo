@@ -24,14 +24,14 @@ from dramatiq import pipeline
 from dramatiq.asyncio import get_event_loop_thread
 from dramatiq.brokers.stub import StubBroker
 from dramatiq.middleware import CurrentMessage, Shutdown, TimeLimitExceeded
-from tokeo.ext.dramatiq import TokeoActor
+from tokeo.ext.dramatiq import TokeoDramatiqActor
 from tokeo.ext.dramatiq.monitoring import TokeoDramatiqHeartbeat
 from tests.utils import isolated, wait_until
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqMiddlewareTest
 
 
 class _RabbitmqStub(StubBroker):
-    # takes the place of ExtendedRabbitmqBroker in register: keeps the
+    # takes the place of TokeoDramatiqRabbitmqBroker in register: keeps the
     # middleware built from the config, drops the rabbitmq options
     def __init__(self, *, middleware=None, **rabbitmq):
         super().__init__(middleware=middleware)
@@ -46,7 +46,7 @@ def keep_global_broker(monkeypatch):
 @pytest.fixture(autouse=True)
 def stub_broker(monkeypatch):
     """register builds the stub broker instead of the rabbitmq broker."""
-    monkeypatch.setattr('tokeo.ext.dramatiq.base.ExtendedRabbitmqBroker', _RabbitmqStub)
+    monkeypatch.setattr('tokeo.ext.dramatiq.base.TokeoDramatiqRabbitmqBroker', _RabbitmqStub)
 
 
 @pytest.fixture
@@ -81,11 +81,11 @@ def _get_dead_ids(broker):
 
 
 def test_actor_sent_runs_in_the_worker(tmp, start_worker):
-    """A TokeoActor sent with 21 runs once in the worker and doubles it."""
+    """A TokeoDramatiqActor sent with 21 runs once in the worker and doubles it."""
     with DramatiqTest(tmp) as app:
         results = []
         actor = app.dramatiq.actor(lambda value: results.append(value * 2), actor_name='double', queue_name='mail')
-        assert isinstance(app.dramatiq.broker, StubBroker) and type(actor) is TokeoActor
+        assert isinstance(app.dramatiq.broker, StubBroker) and type(actor) is TokeoDramatiqActor
         start_worker(app.dramatiq.broker)
         actor.send(21)
         _join(app.dramatiq.broker, 'mail')

@@ -18,10 +18,10 @@ from tokeo.ext.dramatiq.exc import (  # noqa: F401
     TokeoDramatiqQueueError,
 )
 from tokeo.ext.dramatiq.base import (  # noqa: F401
-    TokeoActor,
+    TokeoDramatiqActor,
     tokeo_actor,
-    TokeoAsyncIO,
-    ExtendedRabbitmqBroker,
+    TokeoDramatiqAsyncIO,
+    TokeoDramatiqRabbitmqBroker,
     TokeoDramatiq,
 )
 from tokeo.ext.dramatiq.controller import TokeoDramatiqController
