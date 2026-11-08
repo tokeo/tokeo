@@ -435,23 +435,23 @@ class TokeoPrintInspectOutputHandler(output.OutputHandler):
                     prepend = ' | '
             # inspect methods
             if with_methods:
-                m_inspect = inspect.getmembers(arg, lambda attr: inspect.isroutine(attr))
+                inspect_methods = inspect.getmembers(arg, lambda attr: inspect.isroutine(attr))
                 if with_system:
-                    m_system = [m[0] for m in m_inspect if (m[0].startswith('__') and m[0].endswith('__'))]
-                    line += f'{prepend}System methods: {m_system}'
+                    system_methods = [m[0] for m in inspect_methods if (m[0].startswith('__') and m[0].endswith('__'))]
+                    line += f'{prepend}System methods: {system_methods}'
                     prepend = '\n'
-                m_filtered = [m[0] for m in m_inspect if not (m[0].startswith('__') and m[0].endswith('__'))]
-                line += f'{prepend}Methods: {m_filtered}'
+                method_names = [m[0] for m in inspect_methods if not (m[0].startswith('__') and m[0].endswith('__'))]
+                line += f'{prepend}Methods: {method_names}'
                 prepend = '\n'
             # inspect attributes
             if with_attributes:
-                a_inspect = inspect.getmembers(arg, lambda attr: not (inspect.isroutine(attr)))
+                inspect_attributes = inspect.getmembers(arg, lambda attr: not (inspect.isroutine(attr)))
                 if with_system:
-                    a_system = [a[0] for a in a_inspect if (a[0].startswith('__') and a[0].endswith('__'))]
-                    line += f'{prepend}System attributes: {a_system}'
+                    system_attributes = [a[0] for a in inspect_attributes if (a[0].startswith('__') and a[0].endswith('__'))]
+                    line += f'{prepend}System attributes: {system_attributes}'
                     prepend = '\n'
-                a_filtered = [a[0] for a in a_inspect if not (a[0].startswith('__') and a[0].endswith('__'))]
-                line += f'{prepend}Attributes: {a_filtered}'
+                attribute_names = [a[0] for a in inspect_attributes if not (a[0].startswith('__') and a[0].endswith('__'))]
+                line += f'{prepend}Attributes: {attribute_names}'
                 prepend = '\n'
             # append the line of this object
             out += line

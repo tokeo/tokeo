@@ -324,8 +324,8 @@ class TokeoDiskCacheLocksHandler:
                 if value == token:
                     self._cache.delete(key)
             if value != token:
-                lost = 'missing' if value is _MISSING else 'taken by another'
-                self.app.log.warning(f'lock {key} was lost before release ({lost})')
+                lost_reason = 'missing' if value is _MISSING else 'taken by another'
+                self.app.log.warning(f'lock {key} was lost before release ({lost_reason})')
 
     # ---- throttle -----------------------------------------------------------
 

@@ -164,7 +164,7 @@ def _redirect_logs_to(stream, consoles):
     """Write the log handlers of the consoles to the stream meanwhile."""
     loggers = [logging.getLogger(), *(item for item in logging.Logger.manager.loggerDict.values() if isinstance(item, logging.Logger))]
     # log handlers keep the stream they were set up with, patch_stdout misses them
-    moved = [
+    moved_handlers = [
         (handler, handler.setStream(stream))
         for logger in loggers
         for handler in logger.handlers
@@ -173,7 +173,7 @@ def _redirect_logs_to(stream, consoles):
     try:
         yield
     finally:
-        for handler, previous_stream in moved:
+        for handler, previous_stream in moved_handlers:
             handler.setStream(previous_stream)
 
 

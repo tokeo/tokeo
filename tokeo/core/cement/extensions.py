@@ -20,7 +20,7 @@ def check_required_extensions(app, extension, *needed):
     - **TokeoError**: If one of them is not enabled
 
     """
-    missing = [name for name in needed if name not in app.ext.get_loaded_extensions()]
-    if missing:
-        names, them = ' and '.join(missing), 'it' if len(missing) == 1 else 'them'
+    missing_names = [name for name in needed if name not in app.ext.get_loaded_extensions()]
+    if missing_names:
+        names, them = ' and '.join(missing_names), 'it' if len(missing_names) == 1 else 'them'
         raise TokeoError(f'The extension {extension} needs {names}, add {them} to the extensions of the app!')

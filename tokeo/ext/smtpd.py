@@ -409,15 +409,15 @@ class TokeoSmtpd(MetaMixin):
             do not exist and on names given more than once
 
         """
-        configured = self._config('services') or []
-        if not configured:
+        configured_services = self._config('services') or []
+        if not configured_services:
             raise TokeoSmtpdError('smtpd: no services configured')
         if not names:
-            return list(configured)
-        by_name = {svc.get('name'): svc for svc in configured}
-        missing = [name for name in names if name not in by_name]
-        if missing:
-            raise TokeoSmtpdError(f'smtpd: unknown service(s): {", ".join(missing)}')
+            return list(configured_services)
+        by_name = {svc.get('name'): svc for svc in configured_services}
+        missing_names = [name for name in names if name not in by_name]
+        if missing_names:
+            raise TokeoSmtpdError(f'smtpd: unknown service(s): {", ".join(missing_names)}')
         duplicates = sorted({name for name in names if names.count(name) > 1})
         if duplicates:
             raise TokeoSmtpdError(f'smtpd: service(s) named more than once: {", ".join(duplicates)}')
@@ -606,19 +606,19 @@ class TokeoSmtpd(MetaMixin):
                     pass
             # wait with a max of 5 s: a worker gets time to drain, then
             # SIGKILL ends it
-            pending = list(child_pids)
+            pending_pids = list(child_pids)
             end_time = time.monotonic() + 5.0
-            while pending and time.monotonic() < end_time:
-                for pid in list(pending):
+            while pending_pids and time.monotonic() < end_time:
+                for pid in list(pending_pids):
                     try:
                         worker_pid, _status = os.waitpid(pid, os.WNOHANG)
                     except ChildProcessError:
                         worker_pid = pid
                     if worker_pid:
-                        pending.remove(pid)
-                if pending:
+                        pending_pids.remove(pid)
+                if pending_pids:
                     time.sleep(0.05)
-            for pid in pending:
+            for pid in pending_pids:
                 try:
                     os.kill(pid, signal.SIGKILL)
                 except ProcessLookupError:

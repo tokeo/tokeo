@@ -67,13 +67,13 @@ def to_utc(date, auto_type=False):
     elif isinstance(date, str) and len(date) >= 8:
         # parse the ISO string, then bring it to UTC inline (a recursive to_utc
         # call is avoided by handling the parsed datetime or date here)
-        parsed = fromisoformat(date)
-        if isinstance(parsed, datetime_type):
+        parsed_date = fromisoformat(date)
+        if isinstance(parsed_date, datetime_type):
             # if date string was a datetime then move into utc, if it was
             # only a date then replace it to utc
-            d = parsed.astimezone(tz=timezone.utc) if len(date) > 10 else parsed.replace(tzinfo=timezone.utc)
-        elif isinstance(parsed, date_type):
-            d = datetime_type.combine(parsed, time_type(0, 0), tzinfo=timezone.utc)
+            d = parsed_date.astimezone(tz=timezone.utc) if len(date) > 10 else parsed_date.replace(tzinfo=timezone.utc)
+        elif isinstance(parsed_date, date_type):
+            d = datetime_type.combine(parsed_date, time_type(0, 0), tzinfo=timezone.utc)
         else:
             raise ValueError('Wrong string given as a date.')
         # a datetime, except auto_type with a date-only string yields a date
@@ -178,11 +178,11 @@ def as_utc(date, auto_type=False):
     elif isinstance(date, str) and len(date) >= 8:
         # parse the ISO string, then relabel its wall clock time as UTC, so the
         # source offset is dropped rather than converted
-        parsed = fromisoformat(date)
-        if isinstance(parsed, datetime_type):
-            d = parsed.replace(tzinfo=timezone.utc)
-        elif isinstance(parsed, date_type):
-            d = datetime_type.combine(parsed, time_type(0, 0), tzinfo=timezone.utc)
+        parsed_date = fromisoformat(date)
+        if isinstance(parsed_date, datetime_type):
+            d = parsed_date.replace(tzinfo=timezone.utc)
+        elif isinstance(parsed_date, date_type):
+            d = datetime_type.combine(parsed_date, time_type(0, 0), tzinfo=timezone.utc)
         else:
             raise ValueError('Wrong string given as a date.')
         # a datetime, except auto_type with a date-only string yields a date

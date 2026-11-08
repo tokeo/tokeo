@@ -172,8 +172,8 @@ def _parse_mode(enum_cls, value, default, label):
     try:
         return enum_cls[name]
     except KeyError:
-        allowed = ', '.join(m.name for m in enum_cls)
-        raise ValueError(f'{label} must be one of {allowed}, got {value!r}')
+        allowed_names = ', '.join(m.name for m in enum_cls)
+        raise ValueError(f'{label} must be one of {allowed_names}, got {value!r}')
 
 
 def tls_immediate_supported():
@@ -1090,9 +1090,9 @@ class SmtpdServer:
                         # so commands injected right after STARTTLS cannot run over
                         # the encrypted channel (CVE-2011-0411 class); immediate TLS
                         # keeps it, start_tls hands the buffered ClientHello over
-                        buffered = getattr(reader, '_buffer', None)
-                        if buffered and self.encrypt_mode is not EncryptMode.TLS_IMMEDIATE:
-                            del buffered[:]
+                        buffer = getattr(reader, '_buffer', None)
+                        if buffer and self.encrypt_mode is not EncryptMode.TLS_IMMEDIATE:
+                            del buffer[:]
                         await writer.start_tls(self.tls.context, ssl_handshake_timeout=self.io_cmd_timeout)
                         ctx.server.encrypted_at = get_utc_now()
                         # client must re-HELO; HELO, AUTH and the transaction are
@@ -2029,7 +2029,7 @@ class SmtpdServer:
     # ---- authentication -----------------------------------------------------
 
     @staticmethod
-    def _decode_base64(encoded):
+    def _decode_base64(base64_text):
         """
         Decode a base64 response of the AUTH dialog (RFC 4954 section 4).
 
@@ -2038,7 +2038,7 @@ class SmtpdServer:
 
         ### Args
 
-        - **encoded** (str): The base64 text from the dialog
+        - **base64_text** (str): The base64 text from the dialog
 
         ### Returns
 
@@ -2049,14 +2049,14 @@ class SmtpdServer:
         - **Smtpd501Exception**: The text is not valid base64
 
         """
-        encoded = (encoded or '').strip(' \t')
+        base64_text = (base64_text or '').strip(' \t')
         # a single "=" is an empty initial response (RFC 4954 section 4)
-        if encoded == '=':
+        if base64_text == '=':
             return ''
-        if not re.fullmatch(r'[A-Za-z0-9+/]*={0,2}', encoded):
+        if not re.fullmatch(r'[A-Za-z0-9+/]*={0,2}', base64_text):
             raise Smtpd501Exception
         try:
-            raw = base64.b64decode(encoded + '=' * (-len(encoded) % 4), validate=True)
+            raw = base64.b64decode(base64_text + '=' * (-len(base64_text) % 4), validate=True)
         except ValueError:
             raise Smtpd501Exception
         return raw.decode('utf-8', 'surrogateescape')

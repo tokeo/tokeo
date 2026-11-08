@@ -365,11 +365,11 @@ class TokeoGrpc(MetaMixin):
 
         # build sans from host + tls_cert_sans, dedup, typed as ip or dns name
         sans = []
-        seen = set()
+        seen_names = set()
         for entry in [host, *as_list(self._config('tls_cert_sans'))]:
-            if not entry or entry in seen:
+            if not entry or entry in seen_names:
                 continue
-            seen.add(entry)
+            seen_names.add(entry)
             # using the builtin validation and exception to check whether an entry
             # is an ip address or DNS name
             try:

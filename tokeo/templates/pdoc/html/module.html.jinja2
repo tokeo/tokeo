@@ -90,17 +90,17 @@
       {% for v in c.own_members if v.kind == "variable" and not v.is_classvar and (v.docstring or not is_instance_attribute(c, v)) and is_public(v) | trim %}{% set _ = inst_vars.append(v) %}{% endfor %}{% set inst_vars = inst_vars | sort(attribute='name') %}
       {% if inst_vars %}{{ subhead("Instance variables") }}<div class="space-y-6">{% for v in inst_vars %}{{ show_var(v) }}{% endfor %}</div>{% endif %}
 
-      {% set documented_inherited = [] %}
+      {% set documented_inherited_members = [] %}
       {% for parent, mems in c.inherited_members.items() %}
         {% if parent[0] in all_modules %}
           {% set pub_mems = [] %}{% for m in mems if is_public(m) | trim %}{% set _ = pub_mems.append(m) %}{% endfor %}
-          {% if pub_mems %}{% set _ = documented_inherited.append((parent, pub_mems)) %}{% endif %}
+          {% if pub_mems %}{% set _ = documented_inherited_members.append((parent, pub_mems)) %}{% endif %}
         {% endif %}
       {% endfor %}
-      {% if documented_inherited %}
+      {% if documented_inherited_members %}
         {{ subhead("Inherited members") }}
         <ul class="list-none pl-0 space-y-1 text-sm">
-        {% for parent, mems in documented_inherited %}
+        {% for parent, mems in documented_inherited_members %}
           <li><a class="font-bold text-brand-primary hover:text-brand-accent" href="{{ docs_root_path }}{{ parent[0].replace('.', '/') }}.html#{{ parent[1] }}"><code>{{ parent[1] }}</code></a>: <span class="text-brand-muted">{% for m in mems %}<a class="text-brand-primary hover:text-brand-accent" href="{{ docs_root_path }}{{ parent[0].replace('.', '/') }}.html#{{ parent[1] }}.{{ m.name }}"><code>{{ m.name }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}</span></li>
         {% endfor %}
         </ul>
@@ -116,12 +116,12 @@
   {% set pub_submodules = [] %}{% for name, mod in all_modules.items() %}{% if mod and '.' in name and name.rsplit('.', 1)[0] == module.modulename %}{% set _ = pub_submodules.append(mod) %}{% endif %}{% endfor %}{% set pub_submodules = pub_submodules | sort(attribute='modulename') %}
 
   {# partition members into own vs. re-exported (taken_from points elsewhere) #}
-  {% set own_variables = [] %}{% set own_functions = [] %}{% set own_classes = [] %}{% set reexported = [] %}
-  {% for v in module.variables if is_public(v) | trim and v.docstring %}{% if v.taken_from and v.taken_from[0] != module.modulename %}{% set _ = reexported.append(v) %}{% else %}{% set _ = own_variables.append(v) %}{% endif %}{% endfor %}
-  {% for f in module.functions if is_public(f) | trim %}{% if f.taken_from and f.taken_from[0] != module.modulename %}{% set _ = reexported.append(f) %}{% else %}{% set _ = own_functions.append(f) %}{% endif %}{% endfor %}
-  {% for c in module.classes if is_public(c) | trim %}{% if c.taken_from and c.taken_from[0] != module.modulename %}{% set _ = reexported.append(c) %}{% else %}{% set _ = own_classes.append(c) %}{% endif %}{% endfor %}
-  {% set re_sources = [] %}{% for m in reexported %}{% if m.taken_from[0] not in re_sources %}{% set _ = re_sources.append(m.taken_from[0]) %}{% endif %}{% endfor %}
-  {% set reexported = reexported | sort(attribute='name') %}{% set re_sources = re_sources | sort %}
+  {% set own_variables = [] %}{% set own_functions = [] %}{% set own_classes = [] %}{% set reexported_members = [] %}
+  {% for v in module.variables if is_public(v) | trim and v.docstring %}{% if v.taken_from and v.taken_from[0] != module.modulename %}{% set _ = reexported_members.append(v) %}{% else %}{% set _ = own_variables.append(v) %}{% endif %}{% endfor %}
+  {% for f in module.functions if is_public(f) | trim %}{% if f.taken_from and f.taken_from[0] != module.modulename %}{% set _ = reexported_members.append(f) %}{% else %}{% set _ = own_functions.append(f) %}{% endif %}{% endfor %}
+  {% for c in module.classes if is_public(c) | trim %}{% if c.taken_from and c.taken_from[0] != module.modulename %}{% set _ = reexported_members.append(c) %}{% else %}{% set _ = own_classes.append(c) %}{% endif %}{% endfor %}
+  {% set re_sources = [] %}{% for m in reexported_members %}{% if m.taken_from[0] not in re_sources %}{% set _ = re_sources.append(m.taken_from[0]) %}{% endif %}{% endfor %}
+  {% set reexported_members = reexported_members | sort(attribute='name') %}{% set re_sources = re_sources | sort %}
   {% set own_variables = own_variables | sort(attribute='name') %}{% set own_functions = own_functions | sort(attribute='name') %}{% set own_classes = own_classes | sort(attribute='name') %}
   {# in a test module the test_* functions get their own section, the helpers stay under Functions #}
   {% set own_tests = [] %}{% set own_helpers = [] %}{% set is_test_module = module.modulename.rsplit('.', 1)[-1].startswith('test_') %}
@@ -151,7 +151,7 @@
         {% set ns = namespace(any_expandable=false) %}{% for c in own_classes %}{% for mm in c.own_members if is_public(mm) | trim and mm.name != "__init__" and (mm.kind == "function" or (mm.kind == "variable" and (mm.docstring or not is_instance_attribute(c, mm)))) %}{% set ns.any_expandable = true %}{% endfor %}{% endfor %}<div class="space-y-1">{% for c in own_classes %}{% set cmembers = [] %}{% for mm in c.own_members if is_public(mm) | trim and mm.name != "__init__" and (mm.kind == "function" or (mm.kind == "variable" and (mm.docstring or not is_instance_attribute(c, mm)))) %}{% set _ = cmembers.append(mm) %}{% endfor %}{% set cmembers = cmembers | sort(attribute='name') %}{% if cmembers %}<details><summary class="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden py-0.5"><span class="tk-chev"></span><a class="text-brand-primary hover:text-brand-accent" href="#{{ c.qualname }}">{{ c.name }}</a></summary><div class="mt-0.5 pl-4 mb-4"><ul class="space-y-0.5 text-[0.9rem] !m-0 !p-0">{% for mm in cmembers %}<li class="flex items-center gap-2">{{ tbadge("function" if mm.kind == "function" else "variable") }}<a class="text-brand-primary hover:text-brand-accent" href="#{{ mm.qualname }}">{{ mm.name }}</a></li>{% endfor %}</ul></div></details>{% else %}{% if ns.any_expandable %}<div class="py-0.5 pl-3.5">{% else %}<div class="py-0.5">{% endif %}<a class="text-brand-primary hover:text-brand-accent" href="#{{ c.qualname }}">{{ c.name }}</a></div>{% endif %}{% endfor %}</div></div>{% endif %}
         {% if own_functions %}<div><h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Functions</h3><ul class="space-y-1">{% for f in own_functions %}<li><a class="text-brand-primary hover:text-brand-accent" href="#{{ f.qualname }}">{{ f.name }}</a></li>{% endfor %}</ul></div>{% endif %}
         {% if own_tests %}<div><h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Tests</h3><ul class="space-y-1">{% for f in own_tests %}<li><a class="text-brand-primary hover:text-brand-accent" href="#{{ f.qualname }}">{{ f.name }}</a></li>{% endfor %}</ul></div>{% endif %}
-        {% if reexported %}<div><h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Re-exported</h3><div class="space-y-1">{% for source in re_sources %}<details><summary class="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden py-0.5"><span class="tk-chev"></span><a class="text-brand-primary hover:text-brand-accent whitespace-nowrap" href="{{ docs_root_path }}{{ source.replace(".", "/") }}.html">{{ source }}</a></summary><div class="mt-0.5 pl-4 mb-4"><ul class="space-y-0.5 text-[0.9rem] !m-0 !p-0">{% for m in reexported if m.taken_from[0] == source %}<li class="flex items-center gap-2">{{ tbadge("class") }}<a class="text-brand-primary hover:text-brand-accent whitespace-nowrap" href="{{ docs_root_path }}{{ source.replace(".", "/") }}.html#{{ m.qualname }}">{{ m.name }}</a></li>{% endfor %}</ul></div></details>{% endfor %}</div></div>{% endif %}
+        {% if reexported_members %}<div><h3 class="text-[0.78rem] font-semibold uppercase tracking-wider text-brand-muted mb-2">Re-exported</h3><div class="space-y-1">{% for source in re_sources %}<details><summary class="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden py-0.5"><span class="tk-chev"></span><a class="text-brand-primary hover:text-brand-accent whitespace-nowrap" href="{{ docs_root_path }}{{ source.replace(".", "/") }}.html">{{ source }}</a></summary><div class="mt-0.5 pl-4 mb-4"><ul class="space-y-0.5 text-[0.9rem] !m-0 !p-0">{% for m in reexported_members if m.taken_from[0] == source %}<li class="flex items-center gap-2">{{ tbadge("class") }}<a class="text-brand-primary hover:text-brand-accent whitespace-nowrap" href="{{ docs_root_path }}{{ source.replace(".", "/") }}.html#{{ m.qualname }}">{{ m.name }}</a></li>{% endfor %}</ul></div></details>{% endfor %}</div></div>{% endif %}
       </nav>
     </aside>
 

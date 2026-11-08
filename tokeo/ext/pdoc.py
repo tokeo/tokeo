@@ -391,13 +391,13 @@ class TokeoPdoc(Handler):
         try:
             from tokeo.core.pdoc import DecoratedFunction
 
-            decorated = DecoratedFunction(
+            decorated_function = DecoratedFunction(
                 self.app,
                 func,
                 docstring_prefix='\n\n---\n\n',
                 with_docstring_update=True,
             )
-            return decorated.decorators
+            return decorated_function.decorators
         except Exception as err:
             self.app.log.debug(f'pdoc: decorator parsing failed: {err}')
             return []
@@ -685,15 +685,15 @@ class TokeoPdoc(Handler):
         # walk_specs would miss, then load each, preserving the order the
         # modules were configured in (roots appear as named, not alphabetical)
         ordered_specs = []
-        seen = set()
+        seen_specs = set()
         for name in module_names:
             for spec in sorted(self._discover(name)):
-                if spec not in seen:
-                    seen.add(spec)
+                if spec not in seen_specs:
+                    seen_specs.add(spec)
                     ordered_specs.append(spec)
 
         all_modules = {}
-        skipped, errors = [], []
+        skipped_specs, errors = [], []
         for spec in ordered_specs:
             try:
                 all_modules[spec] = pdoc.doc.Module.from_name(spec)
@@ -701,11 +701,11 @@ class TokeoPdoc(Handler):
                 # pdoc wraps the import error in a RuntimeError of its own
                 cause = err.__cause__ or err
                 if isinstance(cause, ModuleNotFoundError) and cause.name:
-                    skipped.append(f'{spec} (missing module {cause.name})')
+                    skipped_specs.append(f'{spec} (missing module {cause.name})')
                 else:
                     errors.append(f'{spec} ({type(cause).__name__}: {cause})')
-        if skipped:
-            self.app.log.info(f'pdoc: skipped {len(skipped)} module(s) with missing optional modules: {", ".join(skipped)}')
+        if skipped_specs:
+            self.app.log.info(f'pdoc: skipped {len(skipped_specs)} module(s) with missing optional modules: {", ".join(skipped_specs)}')
         for error in errors:
             self.app.log.warning(f'pdoc: skipped a module that failed to import: {error}')
 
@@ -774,7 +774,7 @@ class TokeoPdoc(Handler):
                     dirs_exist_ok=True,
                 )
 
-    def _split_config_sections(self, config_file, lines, parsed):
+    def _split_config_sections(self, config_file, lines, parsed_config):
         """Slice a config file into its top-level sections.
 
         For every top-level yaml key this returns the comment block written
@@ -792,11 +792,11 @@ class TokeoPdoc(Handler):
         import yaml
         from tokeo.core.vaults import redact_vault_yaml
 
-        if not isinstance(parsed, dict):
+        if not isinstance(parsed_config, dict):
             return {}
 
         sections = {}
-        for key in parsed:
+        for key in parsed_config:
             start = None
             for i, line in enumerate(lines):
                 if line == f'{key}:' or line.startswith(f'{key}: '):
@@ -836,7 +836,8 @@ class TokeoPdoc(Handler):
 
         Reproduces the prior pdoc3 ```show_config``` feature: it collects the
         config files cement actually loads (via appenv's resolver), reads
-        each into ```config_dict[config_file] = {content: [lines], yaml: parsed}```,
+        each into
+        ```config_dict[config_file] = {content: [lines], yaml: parsed_config}```,
         masks the ```!vault:``` values, and renders a synthetic
         ```config/index.html```.
         Requires the appenv extension (```app.env```); skipped otherwise.
@@ -873,15 +874,15 @@ class TokeoPdoc(Handler):
                         content = f.read()
                     lines = content.split('\n')
                     # a !vault: value loads as VaultRef, it is never decrypted
-                    parsed = yaml.load(content, Loader=VaultLoader)
+                    parsed_config = yaml.load(content, Loader=VaultLoader)
                     config_dict[config_file] = {
                         'content': lines,
-                        'yaml': parsed,
+                        'yaml': parsed_config,
                         'description': _strip_comment_markers('\n'.join(lines[: _get_yaml_header_end(lines)])),
                         'sections': self._split_config_sections(
                             config_file,
                             lines,
-                            parsed,
+                            parsed_config,
                         ),
                     }
                 except Exception as err:
@@ -962,10 +963,10 @@ class TokeoPdoc(Handler):
             out = []
             i = lineno - 2  # 0-based index of the line above
             while i >= 0:
-                stripped = lines[i].strip()
-                if not stripped.startswith('#:'):
+                stripped_line = lines[i].strip()
+                if not stripped_line.startswith('#:'):
                     break
-                out.append(stripped[2:].strip())
+                out.append(stripped_line[2:].strip())
                 i -= 1
             return '\n'.join(reversed(out))
 
@@ -1201,12 +1202,12 @@ class TokeoPdoc(Handler):
                 if getattr(member, 'kind', None) != 'class':
                     continue
                 try:
-                    inherited = member.inherited_members
+                    inherited_members = member.inherited_members
                 except Exception:
                     continue
-                filtered = {origin: mems for origin, mems in inherited.items() if documented(origin[0])}
-                if len(filtered) != len(inherited):
-                    member.__dict__['inherited_members'] = filtered
+                documented_members = {origin: mems for origin, mems in inherited_members.items() if documented(origin[0])}
+                if len(documented_members) != len(inherited_members):
+                    member.__dict__['inherited_members'] = documented_members
                 # recurse into nested classes
                 if hasattr(member, 'members'):
                     walk(member.members)

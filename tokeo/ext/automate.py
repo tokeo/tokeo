@@ -2158,14 +2158,14 @@ class TokeoAutomateShell:
         """
         output = self.app.tui.output
         automate = self.app.automate
-        if args.cmd == 'hosts.list':
+        if args.subcommand == 'hosts.list':
             rows = [[h['id'], h['name'], h['host'], h.get('port'), h.get('user'), _join_auth_keys(h)] for h in automate.hosts.values()]
             columns = [('id', 'left', 'full'), 'name', 'host', ('port', 'right'), 'user', 'auth']
             output.print(output.build_table(columns, rows, title='hosts'))
-        elif args.cmd == 'groups.list':
+        elif args.subcommand == 'hostgroups.list':
             rows = [[group, _join_host_ids(hosts)] for group, hosts in automate.hostgroups.items()]
             output.print(output.build_table([('group', 'left', 'full'), 'hosts'], rows, title='hostgroups'))
-        elif args.cmd == 'conns.list':
+        elif args.subcommand == 'connections.list':
             # the defaults first
             names = ['_defaults', *(name for name in automate.connections if name != '_defaults')]
             rows = [
@@ -2212,45 +2212,35 @@ class TokeoAutomateShell:
             # prepare for sub-commands
             sub = self._command_parser.add_subparsers(metavar='')
             # tasks list command
-            cmd = sub.add_parser('list', help='show the configured tasks')
-            cmd.set_defaults(func=self.handle_command_list)
+            command = sub.add_parser('list', help='show the configured tasks')
+            command.set_defaults(func=self.handle_command_list)
             # tasks show command
-            cmd = sub.add_parser('show', help='show task details')
-            cmd.add_argument('task', nargs='+', help='task_id(s) to show')
-            cmd.set_defaults(func=self.handle_command_show)
+            command = sub.add_parser('show', help='show task details')
+            command.add_argument('task', nargs='+', help='task_id(s) to show')
+            command.set_defaults(func=self.handle_command_show)
             # tasks run command
-            cmd = sub.add_parser('run', help='run task(s)')
-            cmd.add_argument('task', nargs='+', help='task_id(s)[:host] to run')
-            cmd.add_argument('--override-hosts', type=str, default=None, help='override hosts by id or user[:password]@host[:port] string')
-            cmd.add_argument('--override-connection', type=str, default=None, help='override connection by id')
-            cmd.add_argument('--continue', dest='continue_run', action='store_true', help='continue with next task(s) also having errors')
-            cmd.add_argument('--verbose', action='store_true', help='show output from command execution')
-            cmd.add_argument('--as-json', action='store_true', help='show results as json')
-            cmd.add_argument('--without-output', action='store_true', help='hide outputs from stdout and stderr')
-            cmd.add_argument('--threads', type=int, default=0, help='run by number of threads')
-            cmd.set_defaults(func=self.handle_command_run)
+            command = sub.add_parser('run', help='run task(s)')
+            command.add_argument('task', nargs='+', help='task_id(s)[:host] to run')
+            command.add_argument(
+                '--override-hosts', type=str, default=None, help='override hosts by id or user[:password]@host[:port] string'
+            )
+            command.add_argument('--override-connection', type=str, default=None, help='override connection by id')
+            command.add_argument(
+                '--continue', dest='continue_run', action='store_true', help='continue with next task(s) also having errors'
+            )
+            command.add_argument('--verbose', action='store_true', help='show output from command execution')
+            command.add_argument('--as-json', action='store_true', help='show results as json')
+            command.add_argument('--without-output', action='store_true', help='hide outputs from stdout and stderr')
+            command.add_argument('--threads', type=int, default=0, help='run by number of threads')
+            command.set_defaults(func=self.handle_command_run)
 
-            # nested tasks sub-commands
-            nested = sub.add_parser('hosts', help='about hosts')
-            nested.set_defaults(func=self.handle_subcommand_help, print_help=nested.print_help)
-            nested = nested.add_subparsers(metavar='')
-            # tasks remove command
-            cmd = nested.add_parser('list', help='show the configured hosts')
-            cmd.set_defaults(func=self.handle_subcommands, cmd='hosts.list')
-            # nested tasks sub-commands
-            nested = sub.add_parser('hostgroups', help='about hostgroups')
-            nested.set_defaults(func=self.handle_subcommand_help, print_help=nested.print_help)
-            nested = nested.add_subparsers(metavar='')
-            # tasks remove command
-            cmd = nested.add_parser('list', help='show the configured hostgroups')
-            cmd.set_defaults(func=self.handle_subcommands, cmd='groups.list')
-            # nested tasks sub-commands
-            nested = sub.add_parser('connections', help='about connections')
-            nested.set_defaults(func=self.handle_subcommand_help, print_help=nested.print_help)
-            nested = nested.add_subparsers(metavar='')
-            # tasks remove command
-            cmd = nested.add_parser('list', help='show the configured connections')
-            cmd.set_defaults(func=self.handle_subcommands, cmd='conns.list')
+            # hosts, hostgroups and connections, each with its list command
+            for group in ('hosts', 'hostgroups', 'connections'):
+                group_parser = sub.add_parser(group, help=f'about {group}')
+                group_parser.set_defaults(func=self.handle_subcommand_help, print_help=group_parser.print_help)
+                group_sub = group_parser.add_subparsers(metavar='')
+                command = group_sub.add_parser('list', help=f'show the configured {group}')
+                command.set_defaults(func=self.handle_subcommands, subcommand=f'{group}.list')
 
         # return initialized parser
         return self._command_parser

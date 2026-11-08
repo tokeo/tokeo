@@ -308,7 +308,7 @@ class Realtime:
         # each start gets its own stop event, http client and queue; threads
         # still running after stop() keep the ones they were started with
         self._stop = threading.Event()
-        self._pending = None
+        self._pending_events = None
         self._thread = None
         self._dispatcher = None
         self._http = None
@@ -396,13 +396,13 @@ class Realtime:
         if self._thread is None:
             self._stop = threading.Event()
             self._response = None
-            self._pending = queue.Queue(maxsize=self.max_pending)
+            self._pending_events = queue.Queue(maxsize=self.max_pending)
             timeout = httpx.Timeout(10.0, read=self.read_timeout)
             self._http = httpx.Client(base_url=self.client.url, **{**self.client._httpx_kwargs, 'timeout': timeout})
-            run = (self._stop, self._http, self._pending)
+            run = (self._stop, self._http, self._pending_events)
             self._thread = threading.Thread(target=self._run, args=run, name='tokeo-pocketbase-realtime', daemon=True)
             self._dispatcher = threading.Thread(
-                target=self._dispatch, args=(self._stop, self._pending), name='tokeo-pocketbase-realtime-dispatch', daemon=True
+                target=self._dispatch, args=(self._stop, self._pending_events), name='tokeo-pocketbase-realtime-dispatch', daemon=True
             )
             self._thread.start()
             self._dispatcher.start()
@@ -430,7 +430,7 @@ class Realtime:
         self._http.close()
         # wake the dispatcher waiting for an event
         try:
-            self._pending.put_nowait(None)
+            self._pending_events.put_nowait(None)
         except queue.Full:
             pass
         for thread in (self._thread, self._dispatcher):
@@ -459,16 +459,16 @@ class Realtime:
         self.client._send('POST', REALTIME_PATH, json=self._subscriptions.body())
         self._subscriptions.login_cnt = self.client.login_cnt
 
-    def _run(self, stop, http, pending):
+    def _run(self, stop, http, pending_events):
         # reader: connect, read and connect again until stopped
         while not stop.is_set():
             # a connection starts once the callbacks caught up
-            while not pending.empty():
+            while not pending_events.empty():
                 if stop.wait(0.1):
                     return
             overflow, ended, start_time = False, False, time.monotonic()
             try:
-                overflow = self._listen(stop, http, pending)
+                overflow = self._listen(stop, http, pending_events)
                 ended = not overflow
             except Exception as err:
                 # closing the client by stop() ends the stream with an error too
@@ -486,7 +486,7 @@ class Realtime:
                 return
             self._delay = min(self._delay * 2, self.max_delay_seconds)
 
-    def _listen(self, stop, http, pending):
+    def _listen(self, stop, http, pending_events):
         # one connection: subscribe on its connect event, then queue the
         # events without waiting for the callbacks; True when they fell behind
         parser = _SseParser()
@@ -501,10 +501,10 @@ class Realtime:
                 # a thread past its stop() takes nothing more
                 if stop.is_set():
                     return False
-                parsed = parser.feed(line)
-                if parsed is None:
+                event = parser.feed(line)
+                if event is None:
                     continue
-                name, data = parsed
+                name, data = event
                 if name == 'PB_CONNECT':
                     with self._lock:
                         if stop.is_set():
@@ -516,17 +516,17 @@ class Realtime:
                     # a connection that came up starts the delays anew
                     self._delay = 0.5
                     # the queue is empty at connect, the mark always fits
-                    pending.put_nowait(_CONNECTED)
+                    pending_events.put_nowait(_CONNECTED)
                     continue
                 try:
-                    pending.put_nowait(RealtimeEvent(name, data))
+                    pending_events.put_nowait(RealtimeEvent(name, data))
                 except queue.Full:
                     self.error = f'{self.max_pending} events wait for the callbacks, connection closed'
                     LOG.warning('pocketbase realtime: %s', self.error)
                     return True
         return False
 
-    def _dispatch(self, stop, pending):
+    def _dispatch(self, stop, pending_events):
         # dispatcher: hand each event to its callbacks, check the login
         last_check_time = time.monotonic()
         while not stop.is_set():
@@ -546,7 +546,7 @@ class Realtime:
                     self.connected_event.clear()
                     self._close_connection()
             try:
-                item = pending.get(timeout=min(1.0, self.auth_check_seconds))
+                item = pending_events.get(timeout=min(1.0, self.auth_check_seconds))
             except queue.Empty:
                 continue
             # a thread past its stop() hands on nothing more
@@ -711,16 +711,16 @@ class AsyncRealtime:
         self._task = asyncio.current_task()
         timeout = httpx.Timeout(10.0, read=self.read_timeout)
         self._http = httpx.AsyncClient(base_url=self.client.url, **{**self.client._httpx_kwargs, 'timeout': timeout})
-        pending = asyncio.Queue(maxsize=self.max_pending)
-        dispatcher = asyncio.create_task(self._dispatch(pending))
+        pending_events = asyncio.Queue(maxsize=self.max_pending)
+        dispatcher = asyncio.create_task(self._dispatch(pending_events))
         listen = None
         try:
             while not self._stopping:
                 # a connection starts once the callbacks caught up
-                while not pending.empty():
+                while not pending_events.empty():
                     await asyncio.sleep(0.1)
                 start_time = time.monotonic()
-                listen = self._listen_task = asyncio.create_task(self._listen(pending))
+                listen = self._listen_task = asyncio.create_task(self._listen(pending_events))
                 await asyncio.wait({listen})
                 overflow, ended = False, False
                 if listen.cancelled():
@@ -786,17 +786,17 @@ class AsyncRealtime:
         self._sends.add(task)
         task.add_done_callback(self._sends.discard)
 
-    async def _listen(self, pending):
+    async def _listen(self, pending_events):
         # one connection: subscribe on its connect event, then queue the
         # events without waiting for the callbacks; True when they fell behind
         parser = _SseParser()
         async with self._http.stream('GET', REALTIME_PATH) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
-                parsed = parser.feed(line)
-                if parsed is None:
+                event = parser.feed(line)
+                if event is None:
                     continue
-                name, data = parsed
+                name, data = event
                 if name == 'PB_CONNECT':
                     self._subscriptions.client_id = data['clientId']
                     await self._send_subscriptions()
@@ -805,17 +805,17 @@ class AsyncRealtime:
                     # a connection that came up starts the delays anew
                     self._delay = 0.5
                     # the queue is empty at connect, the mark always fits
-                    pending.put_nowait(_CONNECTED)
+                    pending_events.put_nowait(_CONNECTED)
                     continue
                 try:
-                    pending.put_nowait(RealtimeEvent(name, data))
+                    pending_events.put_nowait(RealtimeEvent(name, data))
                 except asyncio.QueueFull:
                     self.error = f'{self.max_pending} events wait for the callbacks, connection closed'
                     LOG.warning('pocketbase realtime: %s', self.error)
                     return True
         return False
 
-    async def _dispatch(self, pending):
+    async def _dispatch(self, pending_events):
         # dispatcher: hand each event to its callbacks, check the login
         last_check_time = time.monotonic()
         while True:
@@ -833,7 +833,7 @@ class AsyncRealtime:
                     if self._listen_task is not None:
                         self._listen_task.cancel()
             try:
-                item = await asyncio.wait_for(pending.get(), timeout=min(1.0, self.auth_check_seconds))
+                item = await asyncio.wait_for(pending_events.get(), timeout=min(1.0, self.auth_check_seconds))
             except TimeoutError:
                 continue
             if item is _CONNECTED:
