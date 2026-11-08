@@ -18,13 +18,19 @@ from tokeo.core.exc import TokeoError
 from tokeo.core.utils.dict import deep_merge
 
 
-class TokeoYamlConfigError(TokeoError):
+class TokeoYamlConfigError(TokeoError, ValueError):
     """
     Exception raised for invalid yaml configuration input.
 
     This exception is raised when a configuration value cannot be handled by
     the yaml config handler, for example when an environment override carries
-    a yaml tag, which is not allowed because env overrides are plain values.
+    a yaml tag, which is not allowed because env overrides are plain values,
+    a config section is not a dict or two config files do not merge.
+
+    ### Notes
+
+    : Is also a ```ValueError```, so an ```except ValueError``` still catches
+        it
 
     """
 
@@ -252,8 +258,9 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
         ### Raises
 
         - **AssertionError**: If dict_obj is not None and not a dictionary
-        - **ValueError**: If a top-level entry is not a dict (config section)
-        - **ValueError**: If deep_merge encounters incompatible types
+        - **TokeoYamlConfigError**: If a top-level entry is not a dict (config
+            section) or a value does not merge into the stored one, e.g. a str
+            into a dict
 
         ### Example
 
@@ -309,7 +316,7 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
             # non-dict here means malformed config, so fail loud instead
             # of silently dropping it
             if section_content is not None and not isinstance(section_content, dict):
-                raise ValueError(f'config section "{section}" must be a dict, got "{type(dict_obj[section]).__name__}"')
+                raise TokeoYamlConfigError(f'config section "{section}" must be a dict, got "{type(dict_obj[section]).__name__}"')
 
             # Create section if it doesn't exist
             if section not in self.get_sections():
@@ -329,7 +336,10 @@ class TokeoYamlConfigHandler(YamlConfigHandler):
                         # resolves or transforms values on read
                         a = RawConfigParser.get(self, section, key)
                         if isinstance(a, dict):
-                            b = deep_merge(a, b)
+                            try:
+                                b = deep_merge(a, b)
+                            except ValueError as err:
+                                raise TokeoYamlConfigError(f'config "{section}.{key}" does not merge: {err}') from err
                     self.set(section, key, b)
                 else:
                     # When not overriding, only set if key doesn't exist
