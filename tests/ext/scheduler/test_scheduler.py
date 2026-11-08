@@ -5,6 +5,7 @@ keys from a pipe; one test runs a real app in a pseudo terminal and reads its
 screen by pyte, a terminal emulator.
 """
 
+import re
 import sys
 import types
 from datetime import datetime, timezone
@@ -13,7 +14,7 @@ import pytest
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from tokeo.core.exc import TokeoError
-from tokeo.ext.scheduler import TokeoCronAndFireTrigger
+from tokeo.ext.scheduler import TokeoCronAndFireTrigger, TokeoSchedulerError
 from tests.utils.tui import Terminal
 from tests.ext.scheduler.scheduler_tests_helper import SchedulerTest
 
@@ -54,6 +55,32 @@ def test_trigger_puts_the_delay_on_a_next_fire_time_only(crontab, delay_seconds,
     """The delay goes on top of a next fire time, a never firing cron stays None."""
     trigger = TokeoCronAndFireTrigger.from_crontab(crontab, delay_seconds=delay_seconds, timezone='UTC')
     assert trigger.get_next_fire_time(None, datetime(2026, 11, 1, tzinfo=timezone.utc)) == expected
+
+
+def test_init_tasks_refuses_an_unknown_coalesce():
+    """coalesce 'newest' raises TokeoSchedulerError, also a ValueError."""
+    with SchedulerTest(tasks={'time': dict(module='time', crontab='0 0 1 1 *', coalesce='newest')}) as app:
+        with pytest.raises(ValueError, match='^Unsupported value "newest" for coalesce option$') as err_info:
+            app.scheduler.init_tasks()
+    assert type(err_info.value) is TokeoSchedulerError
+
+
+@pytest.mark.parametrize(
+    'crontab, error',
+    [
+        ('0 0 1 1', 'Wrong number of fields; got 4, expected 5'),
+        ('0 25 * * *', 'Error validating expression'),
+    ],
+    ids=['fields', 'hour'],
+)
+def test_init_tasks_names_the_task_of_a_wrong_crontab(crontab, error):
+    """A wrong crontab entry raises TokeoSchedulerError naming task and entry."""
+    # raised out of the app like in main, the app is not closed then
+    with pytest.raises(TokeoSchedulerError, match='^' + re.escape(f'Task "time" with crontab "{crontab}": {error}')) as err_info:
+        with SchedulerTest(tasks={'time': dict(module='time', crontab=['0 0 1 1 *', crontab])}) as app:
+            app.scheduler.init_tasks()
+    assert isinstance(err_info.value, ValueError)
+    assert type(err_info.value.__cause__) is ValueError
 
 
 def test_reload_keeps_the_ids_of_the_tasks(started_app):

@@ -37,7 +37,24 @@ from apscheduler.triggers.cron import CronTrigger
 from argparse import ArgumentParser
 import shlex
 from datetime import datetime, timezone, timedelta
+from tokeo.core.exc import TokeoError
 from tokeo.core.cement.extensions import check_required_extensions
+
+
+class TokeoSchedulerError(TokeoError, ValueError):
+    """
+    Exception raised for a scheduler config that cannot be used.
+
+    ### Notes
+
+    : Inherits from TokeoError, so main reports it as a clean message
+
+    : Is also a ```ValueError```, so an ```except ValueError``` still catches
+        it
+
+    """
+
+    pass
 
 
 class TokeoCronAndFireTrigger(CronTrigger):
@@ -458,7 +475,8 @@ class TokeoScheduler(MetaMixin):
 
         ### Raises
 
-        - **ValueError**: If an unsupported coalesce option is used
+        - **TokeoSchedulerError**: If an unsupported coalesce option is used
+            or a crontab entry of a task is not valid, naming the task
 
         ### Notes
 
@@ -501,21 +519,25 @@ class TokeoScheduler(MetaMixin):
             elif coalesce == 'all':
                 coalesce = False
             else:
-                raise ValueError(f'Unsupported value "{coalesce}" for coalesce option')
+                raise TokeoSchedulerError(f'Unsupported value "{coalesce}" for coalesce option')
             # iterate crontab
             for entry in crontab:
-                self.add_crontab_task(
-                    task['module'],
-                    key,
-                    entry,
-                    kwargs=task['kwargs'] if 'kwargs' in task else {},
-                    name=task['name'] if 'name' in task and task['name'] != '' else key,
-                    coalesce=coalesce,
-                    misfire_grace_time=task['misfire_grace_time'] if 'misfire_grace_time' in task else None,
-                    delay_seconds=task['delay_seconds'] if 'delay_seconds' in task else None,
-                    max_jitter_seconds=task['max_jitter_seconds'] if 'max_jitter_seconds' in task else None,
-                    max_running_jobs=task['max_running_jobs'] if 'max_running_jobs' in task else None,
-                )
+                # a wrong crontab entry raises a ValueError of the trigger
+                try:
+                    self.add_crontab_task(
+                        task['module'],
+                        key,
+                        entry,
+                        kwargs=task['kwargs'] if 'kwargs' in task else {},
+                        name=task['name'] if 'name' in task and task['name'] != '' else key,
+                        coalesce=coalesce,
+                        misfire_grace_time=task['misfire_grace_time'] if 'misfire_grace_time' in task else None,
+                        delay_seconds=task['delay_seconds'] if 'delay_seconds' in task else None,
+                        max_jitter_seconds=task['max_jitter_seconds'] if 'max_jitter_seconds' in task else None,
+                        max_running_jobs=task['max_running_jobs'] if 'max_running_jobs' in task else None,
+                    )
+                except ValueError as err:
+                    raise TokeoSchedulerError(f'Task "{key}" with crontab "{entry}": {err}') from err
 
     def startup(self, with_shell=False, paused=False):
         """
