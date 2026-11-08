@@ -686,32 +686,32 @@ class TokeoDiskCacheLocksHandler:
                             # the past expire times are at the start of the list,
                             # they might be from dead or crashed jobs that
                             # couldn't drop their own expire time
-                            expired = bisect.bisect_right(expire_times, now)
+                            expired_cnt = bisect.bisect_right(expire_times, now)
                         except TypeError:
                             # the existing cache entry is invalid,
                             # it's a list of anything else than valid expire times
-                            expire_times, expired = [], len(expire_times)
+                            expire_times, expired_cnt = [], len(expire_times)
                         # drop the past expire times, they block temper otherwise
-                        del expire_times[:expired]
+                        del expire_times[:expired_cnt]
                         # check for a free slot
-                        acquired = len(expire_times) < max_calls
-                        if acquired:
+                        has_slot = len(expire_times) < max_calls
+                        if has_slot:
                             # add our own expire time to the sorted list
                             expire_time = now + expire
                             bisect.insort(expire_times, expire_time)
                         # if anything needs to change on the cache value, save it
-                        if acquired or expired:
+                        if has_slot or expired_cnt:
                             # the key lives until the latest expire time
                             self._cache.set(key, expire_times, expire=expire_times[-1] - now, tag=self._tag)
 
                     # Attention! This must be run outside the transact block,
                     # otherwise this will HOLD the code with no end (DEADLOCK)
 
-                    if expired:
-                        self.app.log.warning(f'@temper {key} dropped {expired} expired slot(s)')
+                    if expired_cnt:
+                        self.app.log.warning(f'@temper {key} dropped {expired_cnt} expired slot(s)')
 
-                    # acquired a slot, run the function outside the lock
-                    if acquired:
+                    # has a slot, run the function outside the lock
+                    if has_slot:
                         break
 
                     # no slot free: hand over to the callback outside lock
@@ -725,7 +725,7 @@ class TokeoDiskCacheLocksHandler:
                     # wait before the next attempt
                     sleep_func(sleep_seconds)
 
-                if acquired:
+                if has_slot:
                     try:
                         # call the wrapped function
                         result = func(*args, **kwargs)
