@@ -51,8 +51,8 @@ def _get_now_ms():
     return int(time.time() * 1000)
 
 
-def _cut(text):
-    # the one place that shortens the details, for heartbeats and dead letters
+def format_details(text):
+    """The details cut to 500 chars, for heartbeats and dead letters."""
     return text if len(text) <= _DETAILS_MAX_CHARS else text[:_DETAILS_MAX_CHARS] + '...'
 
 
@@ -138,7 +138,7 @@ class TokeoDramatiqHeartbeat(Middleware):
             start_time=time.monotonic(),
         )
         if self.with_details:
-            task['args'] = _cut(repr((message.args, message.kwargs)))
+            task['args'] = format_details(repr((message.args, message.kwargs)))
         with self._lock:
             self._running[message.message_id] = task
 
@@ -157,7 +157,7 @@ class TokeoDramatiqHeartbeat(Middleware):
                 # the type never holds data, the text only with details
                 error = type(exception).__name__
                 if self.with_details and str(exception):
-                    error = _cut(f'{error}: {str(exception).splitlines()[0]}')
+                    error = format_details(f'{error}: {str(exception).splitlines()[0]}')
                 actor['last_error'] = error
 
     def after_skip_message(self, broker, message):

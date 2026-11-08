@@ -204,8 +204,8 @@ def check_user_context():
 
     client = context.client
 
-    # SIMPLE TEST: If valid flag, skip!
-    if getattr(client, '_tokeo_ctx_guard_flag', False):
+    # the client passed the check before
+    if getattr(client, '_tokeo_is_user_context_checked', False):
         return
 
     # the script client of nicegui is the global scope as well
@@ -217,8 +217,8 @@ def check_user_context():
         )
         # fmt: on
 
-    # place the flag for next requests
-    client._tokeo_ctx_guard_flag = True
+    # mark the client as checked
+    client._tokeo_is_user_context_checked = True
 
 
 class NiceguiElementHelper:

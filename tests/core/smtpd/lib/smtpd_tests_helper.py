@@ -168,7 +168,7 @@ def send_mail(
     authentication_id=None,
     password=None,
     auth_type=None,
-    tls_enabled=False,
+    with_starttls=False,
     tls_context=None,
     ehlo_name='Integration Test client',
 ):
@@ -182,7 +182,7 @@ def send_mail(
     - **message_data** (str): The message (CRLF); a trailing CRLF is added
     - **authentication_id** / **password** (str, optional): SASL credentials
     - **auth_type** (str, optional): ```'plain'``` or ```'login'```
-    - **tls_enabled** (bool): STARTTLS before the dialog
+    - **with_starttls** (bool): STARTTLS before the dialog
     - **tls_context** (ssl.SSLContext, optional): Client TLS context
 
     ### Returns
@@ -193,7 +193,7 @@ def send_mail(
     client = smtplib.SMTP('127.0.0.1', port, timeout=20, local_hostname=ehlo_name)
     try:
         client.ehlo(ehlo_name)
-        if tls_enabled:
+        if with_starttls:
             client.starttls(context=tls_context or make_insecure_tls_context())
             client.ehlo(ehlo_name)
         if authentication_id is not None:

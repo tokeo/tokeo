@@ -101,7 +101,7 @@ def _deliver(events, options, tls_context):
             authentication_id='administrator',
             password='password',
             auth_type='login',
-            tls_enabled=True,
+            with_starttls=True,
             tls_context=tls_context,
         ),
     )

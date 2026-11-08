@@ -9,8 +9,8 @@ a default. The ```as_``` functions convert a value into one form.
 ```python
 from tokeo.core.utils.validate import is_number_gt, is_list, get_valid_or_default
 
-if not is_number_gt(sleep_time, 0):
-    raise ValueError(f'sleep_time must be a number above 0, not {sleep_time!r}')
+if not is_number_gt(sleep_seconds, 0):
+    raise ValueError(f'sleep_seconds must be above 0, not {sleep_seconds!r}')
 
 names = get_valid_or_default(app.cache.get('names'), is_list, [])
 ```

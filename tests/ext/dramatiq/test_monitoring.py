@@ -219,9 +219,9 @@ def test_heartbeat_details_show_error_texts(worker):
     assert sent[-1]['since_last']['actors']['fails']['last_error'] == 'LookupError: user anna@example.com not found'
 
 
-def test_heartbeat_details_are_cut():
+def test_format_details_cuts_long_details():
     """Details over 500 chars are cut by "..."."""
-    assert monitoring._cut('x' * 600) == 'x' * 500 + '...'
+    assert monitoring.format_details('x' * 600) == 'x' * 500 + '...'
 
 
 class FakeChannel:
@@ -383,9 +383,9 @@ def test_duration():
     assert [_format_duration(ms) for ms in (850, 1400, 185_000, 3_720_000)] == ['850 ms', '1.4 s', '3m 5s', '1h 2m']
 
 
-def _render_view(app, snapshot, follow=None):
+def _render_view(app, snapshot, interval_seconds=None):
     output = app.tui.output
-    return output.render(*_format_monitor_view(output, snapshot, 'probe', follow), width=140)
+    return output.render(*_format_monitor_view(output, snapshot, 'probe', interval_seconds), width=140)
 
 
 def _make_snapshot(workers, monitoring=True, actors=None):
@@ -411,7 +411,7 @@ def test_format_monitor_view(tmp):
         dict(state='gone', seen_ms=20_000, heartbeat=_make_beat(4712, running=[{k: v for k, v in running[0].items() if k != 'args'}])),
     ]
     with DramatiqMiddlewareTest(tmp) as app:
-        text = _render_view(app, _make_snapshot(workers, actors=since), follow=5)
+        text = _render_view(app, _make_snapshot(workers, actors=since), interval_seconds=5)
     assert text.startswith('probe dramatiq monitor  ') and 'every 5 s  (Ctrl-C to quit)' in text
     worker_line = next(line for line in text.splitlines() if 'w1:4711' in line and 'ok' in line)
     assert worker_line.split() == ['w1:4711', '1m', '5s', 'ok', '1/2', '3', '1', '0', '2', 'done,', '1', 'failed']

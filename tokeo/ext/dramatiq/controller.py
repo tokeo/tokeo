@@ -546,7 +546,7 @@ def _format_duration(ms):
     return f'{hours}h {minutes}m' if hours else f'{minutes}m {seconds}s'
 
 
-def _format_monitor_view(output, snapshot, label, follow=None):
+def _format_monitor_view(output, snapshot, label, interval_seconds=None):
     """
     Format a monitor snapshot as header and tables.
 
@@ -555,7 +555,8 @@ def _format_monitor_view(output, snapshot, label, follow=None):
     - **output** (TokeoTuiOutput): Builds the tables
     - **snapshot** (dict): The snapshot of ```app.dramatiq.monitor```
     - **label** (str): The app label for the header
-    - **follow** (int, optional): The interval of --follow for the header
+    - **interval_seconds** (int, optional): The interval of --follow in
+        seconds, for the header
 
     ### Returns
 
@@ -564,7 +565,7 @@ def _format_monitor_view(output, snapshot, label, follow=None):
     """
     at = snapshot['at']
     header = f'{label} dramatiq monitor  {time.strftime("%H:%M:%S", time.localtime(at / 1000))}'
-    view = [header + (f'  every {follow} s  (Ctrl-C to quit)' if follow else '')]
+    view = [header + (f'  every {interval_seconds} s  (Ctrl-C to quit)' if interval_seconds else '')]
     workers = snapshot['workers']
     if not workers:
         view.append(

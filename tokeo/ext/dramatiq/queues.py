@@ -20,7 +20,7 @@ from tokeo.ext.dramatiq.exc import (
     TokeoDramatiqRefusedError,
     TokeoDramatiqQueueError,
 )
-from tokeo.ext.dramatiq.monitoring import _cut
+from tokeo.ext.dramatiq.monitoring import format_details
 
 
 class TokeoDramatiqQueues:
@@ -412,6 +412,6 @@ def _build_dead_letter(message):
         actor_name=message.actor_name,
         retries=options.get('retries', 0),
         error=traceback[-1] if traceback else None,
-        args=_cut(repr((message.args, message.kwargs))),
+        args=format_details(repr((message.args, message.kwargs))),
         enqueued_at=message.message_timestamp,
     )

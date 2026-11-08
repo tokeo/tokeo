@@ -109,7 +109,7 @@ def test_simple_send_1_mail_starttls():
             authentication_id='administrator',
             password='password',
             auth_type='login',
-            tls_enabled=True,
+            with_starttls=True,
             tls_context=make_insecure_tls_context(),
         ),
     )
