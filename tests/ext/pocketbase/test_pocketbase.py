@@ -270,6 +270,21 @@ def test_setup_takes_seconds_as_text(server):
         assert app.db.realtime_options['max_delay_seconds'] == 10.0
 
 
+def test_setup_takes_a_null_auth_token_min_valid_seconds_as_0(server):
+    """A null auth_token_min_valid_seconds is given on to the AuthKeeper as 0."""
+    with PocketbaseTest(dict(SERVICE, auth_token_min_valid_seconds=None)) as app:
+        assert app.db._auth_keeper.min_valid_seconds == 0
+
+
+@pytest.mark.parametrize('value', [0, -1, 'x'], ids=['zero', 'negative', 'text'])
+def test_setup_refuses_an_auth_token_min_valid_seconds_not_greater_than_0(server, value):
+    """A minimum validity neither greater than 0 nor null stops the setup."""
+    expected = f'pocketbase.auth_token_min_valid_seconds must be a number of seconds greater than 0 or null, not {value!r}'
+    with pytest.raises(TokeoPocketBaseError, match=f'^{re.escape(expected)}$'):
+        with PocketbaseTest(dict(auth_token_min_valid_seconds=value)):
+            pass
+
+
 def test_setup_sends_no_request(server):
     """The setup sends no request, not even a login with a service identity."""
     with PocketbaseTest(SERVICE):

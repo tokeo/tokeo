@@ -126,7 +126,7 @@ class TokeoPocketBase(MetaMixin):
             # password for the service login
             auth_password=None,
             # refresh the token once fewer than this many seconds of validity
-            # remain
+            # remain; null renews it only once it has run out
             auth_token_min_valid_seconds=60,
             # ask the server again after this many seconds whether the login
             # still holds; PocketBase takes a refused token as a guest
@@ -182,7 +182,8 @@ class TokeoPocketBase(MetaMixin):
         ### Raises
 
         - **TokeoPocketBaseError**: If ```realtime_max_pending``` is not an
-            integer of 1 or more, or ```auth_check_seconds```,
+            integer of 1 or more, ```auth_token_min_valid_seconds``` neither
+            a number greater than 0 nor null, or ```auth_check_seconds```,
             ```realtime_read_timeout```, ```realtime_auth_check_seconds``` or
             ```realtime_max_delay_seconds``` is not a number greater than 0
 
@@ -227,7 +228,7 @@ class TokeoPocketBase(MetaMixin):
         # cache the auth config once: the per-request guard must not hit
         # self._config on every call
         self._auth_identity = self._config('auth_identity')
-        self._auth_token_min_valid_seconds = self._config('auth_token_min_valid_seconds')
+        self._auth_token_min_valid_seconds = self._get_seconds('auth_token_min_valid_seconds', with_null=True)
         self._auth_check = self._get_seconds('auth_check_seconds')
         # keeps the login of the service identity under its lock, since the
         # login of the shared client has no locking of its own
@@ -276,13 +277,17 @@ class TokeoPocketBase(MetaMixin):
         """
         return self.app.config.get(self._meta.config_section, key, **kwargs)
 
-    def _get_seconds(self, key):
+    def _get_seconds(self, key, with_null=False):
         """
         Get a number of seconds greater than 0 from the config section.
 
         ### Args
 
         - **key** (str): Configuration key to retrieve
+
+        ### Keyword Args
+
+        - **with_null** (bool): Take null (None) as well, given on as 0
 
         ### Returns
 
@@ -291,17 +296,20 @@ class TokeoPocketBase(MetaMixin):
         ### Raises
 
         - **TokeoPocketBaseError**: If the value is not a finite number
-            greater than 0, naming the option
+            greater than 0, nor null with ```with_null```, naming the option
 
         """
         value = self._config(key)
+        if with_null and value is None:
+            return 0.0
         try:
             seconds = float(value)
         except (TypeError, ValueError):
             seconds = 0.0
         # also refuses nan and inf
         if not 0 < seconds < math.inf:
-            raise TokeoPocketBaseError(f'{self._meta.config_section}.{key} must be a number of seconds greater than 0, not {value!r}')
+            allowed = 'greater than 0 or null' if with_null else 'greater than 0'
+            raise TokeoPocketBaseError(f'{self._meta.config_section}.{key} must be a number of seconds {allowed}, not {value!r}')
         return seconds
 
     def _login(self):

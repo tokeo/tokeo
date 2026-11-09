@@ -288,7 +288,7 @@ pocketbase:
   url: https://pb.example.com
   auth_identity: service@example.com
   auth_password: !vault:master ...
-  # renew the token once fewer seconds remain
+  # renew the token once fewer seconds remain, null only once it ran out
   auth_token_min_valid_seconds: 60
   # confirm the login on the server after these seconds
   auth_check_seconds: 60
