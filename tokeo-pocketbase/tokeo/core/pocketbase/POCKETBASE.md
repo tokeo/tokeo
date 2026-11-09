@@ -97,6 +97,14 @@ pb.before_request = AuthKeeper(pb, login, min_valid_seconds=60, check_seconds=60
 A login of the client itself, e.g. a new impersonation, counts as
 confirmed; ```pb.login_cnt``` counts them, a refresh does not.
 
+```min_valid_seconds``` is the time the token must at least stay valid.
+Before each request the ```AuthKeeper``` checks how long the token is still
+valid; with less time left it renews the token first. So a request, or an
+action of several requests, can still run to its end and the token does not
+expire halfway. Within a Tokeo app it is the config
+```auth_token_min_valid_seconds```; null there renews a token only once it
+has run out.
+
 ### Impersonation
 
 A superuser acts as a user without knowing its password. The client of the
@@ -304,6 +312,9 @@ pocketbase:
 - The service identity logs in on first use and is kept by an
   ```AuthKeeper```: a changed password or a deleted service identity raises
   within ```auth_check_seconds``` instead of running on as a guest
+- ```auth_token_min_valid_seconds``` is checked before each request: a
+  token valid for less time is renewed first, so an action does not lose
+  its login halfway (section 3)
 - ```app.db.get_list('orders', filter=...)``` and the other CRUD methods are
   short forms of ```app.db.collection('orders')```
 - ```app.db.impersonate('users', user_id)``` gives a client acting as the
