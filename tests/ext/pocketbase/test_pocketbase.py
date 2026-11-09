@@ -16,6 +16,7 @@ import itertools
 import re
 import threading
 import time
+import types
 from concurrent.futures import ThreadPoolExecutor
 
 import certifi
@@ -23,6 +24,7 @@ import httpx
 import pytest
 from cement.utils.misc import init_defaults
 from tokeo.core.exc import TokeoError
+from tokeo.core.pocketbase import client as pocketbase_client
 from tokeo.core.pocketbase import TokeoPocketBaseCollection, TokeoPocketBaseListResult, TokeoPocketBaseClient, TokeoPocketBaseRecord
 from tokeo.ext import pocketbase as pocketbase_ext
 from tokeo.ext.pocketbase import TokeoPocketBaseAuthError, TokeoPocketBaseError, TokeoPocketBase
@@ -730,23 +732,26 @@ def test_keep_auth_concurrent_calls_log_in_once(server):
     assert server.calls.count(USERS_LOGIN) == 1
 
 
-# auth_check_seconds must be greater than 0, a nanosecond is always over
-# between two requests, so each request asks the server again
-ASK_EACH_TIME = 1e-9
+@pytest.fixture
+def clock(monkeypatch):
+    """The clock of the AuthKeeper, auth_check_seconds later at each look."""
+    looks = itertools.count(0, TokeoPocketBase.Meta.config_defaults['auth_check_seconds'])
+    # only the client module looks at it, httpx keeps the real time
+    monkeypatch.setattr(pocketbase_client, 'time', types.SimpleNamespace(monotonic=lambda: next(looks)))
 
 
-def test_keep_auth_confirms_the_login_on_the_server_after_auth_check_seconds(server):
-    """With a tiny auth_check_seconds each request asks the server first."""
-    with PocketbaseTest(dict(SERVICE, auth_check_seconds=ASK_EACH_TIME)) as app:
+def test_keep_auth_confirms_the_login_on_the_server_after_auth_check_seconds(server, clock):
+    """Once auth_check_seconds are over, the next request asks the server first."""
+    with PocketbaseTest(SERVICE) as app:
         app.db.get_one('posts', 'abc')
         app.db.get_one('posts', 'abc')
     get = ('GET', '/api/collections/posts/records/abc')
     assert server.calls == [USERS_LOGIN, get, USERS_REFRESH, get]
 
 
-def test_keep_auth_login_refused_on_the_server_logs_in_anew(server):
+def test_keep_auth_login_refused_on_the_server_logs_in_anew(server, clock):
     """A token revoked on the server, e.g. by a new password, logs in anew."""
-    with PocketbaseTest(dict(SERVICE, auth_check_seconds=ASK_EACH_TIME)) as app:
+    with PocketbaseTest(SERVICE) as app:
         app.db.get_one('posts', 'abc')
         server.tokens.clear()
         del server.requests[:]
@@ -756,9 +761,9 @@ def test_keep_auth_login_refused_on_the_server_logs_in_anew(server):
     assert server.requests[2].headers['Authorization'] == token
 
 
-def test_keep_auth_changed_password_raises_instead_of_a_guest_request(server):
+def test_keep_auth_changed_password_raises_instead_of_a_guest_request(server, clock):
     """A revoked token and a changed password raise, nothing goes as guest."""
-    with PocketbaseTest(dict(SERVICE, auth_check_seconds=ASK_EACH_TIME)) as app:
+    with PocketbaseTest(SERVICE) as app:
         app.db.get_one('posts', 'abc')
         server.tokens.clear()
         server.accounts.clear()
@@ -786,10 +791,10 @@ def test_impersonate_gives_a_client_of_its_own_acting_as_the_record(server):
         client.close()
 
 
-def test_impersonate_renews_a_login_refused_on_the_server_by_a_new_impersonation(server):
+def test_impersonate_renews_a_login_refused_on_the_server_by_a_new_impersonation(server, clock):
     """A revoked token of the record is impersonated anew for the request."""
     server.accounts = {('_superusers', 'admin@example.com'): 'secret'}
-    with PocketbaseTest(dict(SUPERUSER, auth_check_seconds=ASK_EACH_TIME)) as app:
+    with PocketbaseTest(SUPERUSER) as app:
         client = app.db.impersonate('users', 'u1')
         old = client.token
         del server.tokens[old]
