@@ -209,6 +209,28 @@ def _make_task_ref(**kwprotected):
     return dict(kwargs={}, kwprotected=dict(dict(protect='strict', sanitize=True, env={}), **kwprotected))
 
 
+def test_remote_context_without_config_gets_the_default_of_invoke():
+    """A remote context built without a config has the default config of invoke."""
+    context = TokeoAutomateRemoteContext(host='h', task_ref=_make_task_ref())
+    assert isinstance(context.config, invoke.Config)
+    assert context.host == 'h'
+
+
+@pytest.mark.parametrize(
+    'context, names',
+    [
+        (lambda: TokeoAutomateLocalContext(task_ref=_make_task_ref()), ['task_ref', 'protect']),
+        (lambda: TokeoAutomateRemoteContext(host='h', task_ref=_make_task_ref()), ['host', 'task_ref', 'client']),
+    ],
+    ids=['local', 'remote'],
+)
+def test_context_keeps_its_attributes_out_of_the_invoke_config(context, names):
+    """The attributes of a context are its own, not keys of the invoke config."""
+    built = context()
+    assert [name for name in names if name in built.config] == []
+    assert [name for name in names if name in vars(built)] == [name for name in names if name != 'client']
+
+
 def test_local_run_gets_the_env_values_as_they_are(monkeypatch):
     """A local run gets the env values unquoted, a bad name is dropped."""
     env = {'GREETING': 'hello world', 'BAD-NAME': 'x'}

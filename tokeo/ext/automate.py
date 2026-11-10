@@ -125,13 +125,12 @@ class _SudoResponder(invoke.watchers.Responder):
             break
 
 
-class TokeoAutomateLocalContext(invoke.Context):
+class _TaskContext(invoke.Context):
     """
-    Internal context that runs commands locally through invoke's default runner.
+    Base of the local and the remote context: the task and its protect rules.
 
-    Mirrors the remote variant's interface so both can be driven the same way;
-    task-configured protect/sanitize rules and the protected kwargs (pty, env,
-    timeout, encoding) are applied via protect_kwargs_inplace before each run.
+    The attributes are declared on class level, as invoke.Context stores
+    every attribute it does not know in its config.
 
     ### Args
 
@@ -142,37 +141,31 @@ class TokeoAutomateLocalContext(invoke.Context):
 
     """
 
+    #: The task definition
+    task_ref = None
+    #: The protect and sanitize rules of the task
+    task_kwprotected = None
+    #: A copy of the kwargs of the task
+    task_kwargs = None
+    #: How the protected kwargs of a run are handled
+    protect = None
+    #: Whether the env of a run is sanitized
+    env_sanitized = None
+
     def __init__(self, config=None, task_ref=None):
         super().__init__(config=config)
-        #: The task definition
         self.task_ref = task_ref
-        #: The protect and sanitize rules of the task
         self.task_kwprotected = task_ref['kwprotected']
-        #: A copy of the kwargs of the task
         self.task_kwargs = copy.deepcopy(task_ref['kwargs'])
-        #: How the protected kwargs of a run are handled
         self.protect = self.task_kwprotected['protect']
-        #: Whether the env of a run is sanitized
         self.env_sanitized = self.task_kwprotected['sanitize']
 
-    @staticmethod
-    def generate_sudo_env_match_token(self):
+    def _generate_sudo_env_match_token(self):
         # a unique, shell-safe SUDO_PROMPT we set and match 1:1 in env mode
         return f'__tokeo_automate_sudo_{secrets.token_hex(14)}__'
 
-    def close(self):
-        """Nothing to close for a local run, the same call as on a remote one."""
-
-    @staticmethod
-    def protect_kwargs_inplace(self, kwargs):
-        """
-        Apply task-configured protect/sanitize rules to a kwargs dict in place.
-
-        Declared as a static method so the remote context can share the same
-        logic without subclassing; both contexts call it as
-        TokeoAutomateLocalContext.protect_kwargs_inplace(self, kwargs).
-
-        """
+    def _protect_kwargs_inplace(self, kwargs):
+        """Apply the protect and sanitize rules of the task to kwargs in place."""
         # get the protected values
         pty = self.task_kwprotected.get('pty', False)
         env = copy.deepcopy(self.task_kwprotected.get('env', {}))
@@ -201,6 +194,27 @@ class TokeoAutomateLocalContext(invoke.Context):
         kwargs['env'] = env
         kwargs['timeout'] = timeout
         kwargs['encoding'] = encoding
+
+
+class TokeoAutomateLocalContext(_TaskContext):
+    """
+    Internal context that runs commands locally through invoke's default runner.
+
+    Mirrors the remote variant's interface so both can be driven the same way;
+    task-configured protect/sanitize rules and the protected kwargs (pty, env,
+    timeout, encoding) are applied before each run.
+
+    ### Args
+
+    - **config** (invoke.Config, optional): Config for the invoke base
+        context
+    - **task_ref** (dict): Task definition; its 'kwprotected' and
+        'kwargs' drive the protect/sanitize handling on each run
+
+    """
+
+    def close(self):
+        """Nothing to close for a local run, the same call as on a remote one."""
 
     def run(self, command, **kwargs):
         """
@@ -240,7 +254,7 @@ class TokeoAutomateLocalContext(invoke.Context):
 
         """
         # take care of kwargs
-        TokeoAutomateLocalContext.protect_kwargs_inplace(self, kwargs)
+        self._protect_kwargs_inplace(kwargs)
 
         # check for the sudo config
         sudo_config = self.config.get('sudo')
@@ -253,7 +267,7 @@ class TokeoAutomateLocalContext(invoke.Context):
             # local values of the sudo config
             sudo_mode = sudo_config.get('mode')
             if sudo_mode == 'env':
-                sudo_match = TokeoAutomateLocalContext.generate_sudo_env_match_token(self)
+                sudo_match = self._generate_sudo_env_match_token()
                 kwargs['env']['SUDO_PROMPT'] = sudo_match
             else:
                 sudo_match = sudo_config.get('match')
@@ -276,7 +290,7 @@ class TokeoAutomateLocalContext(invoke.Context):
             raise TokeoAutomateCommandTimedOutError(e.result, e.timeout) from e
 
 
-class TokeoAutomateRemoteContext(invoke.Context):
+class TokeoAutomateRemoteContext(_TaskContext):
     """
     Internal connection to route invoke-style runs through Paramiko lazily.
 
@@ -303,6 +317,21 @@ class TokeoAutomateRemoteContext(invoke.Context):
 
     """
 
+    #: Target hostname or IP
+    host = None
+    #: SSH username
+    user = None
+    #: SSH port
+    port = None
+    #: Known host keys, None adds unknown hosts
+    host_keys = None
+    #: Whether to forward the SSH agent
+    forward_agent = None
+    #: Extra kwargs for the connect() of paramiko
+    connect_kwargs = None
+    #: The paramiko client, None until the first run connects
+    client = None
+
     def __init__(
         self,
         host=None,
@@ -314,33 +343,13 @@ class TokeoAutomateRemoteContext(invoke.Context):
         connect_kwargs=None,
         task_ref=None,
     ):
-        super().__init__(config=config)
-        #: Target hostname or IP
+        super().__init__(config=config, task_ref=task_ref)
         self.host = host
-        #: SSH username
         self.user = user
-        #: SSH port
         self.port = port
-        #: Config of the invoke base context
-        self.config = config
-        #: Known host keys, None adds unknown hosts
         self.host_keys = host_keys
-        #: Whether to forward the SSH agent
         self.forward_agent = forward_agent
-        #: Extra kwargs for the connect() of paramiko
         self.connect_kwargs = connect_kwargs
-        #: The task definition
-        self.task_ref = task_ref
-        #: The protect and sanitize rules of the task
-        self.task_kwprotected = task_ref['kwprotected']
-        #: A copy of the kwargs of the task
-        self.task_kwargs = copy.deepcopy(task_ref['kwargs'])
-        #: How the protected kwargs of a run are handled
-        self.protect = self.task_kwprotected['protect']
-        #: Whether the env of a run is sanitized
-        self.env_sanitized = self.task_kwprotected['sanitize']
-        #: The paramiko client, None until the first run connects
-        self.client = None
 
     def _connect(self):
         """
@@ -429,7 +438,7 @@ class TokeoAutomateRemoteContext(invoke.Context):
         hide_err = hide == 'both' or hide is True or hide == 'stderr' or hide == 'err'
 
         # take care of kwargs
-        TokeoAutomateLocalContext.protect_kwargs_inplace(self, kwargs)
+        self._protect_kwargs_inplace(kwargs)
 
         # get encoding
         encoding = kwargs.get('encoding', None)
@@ -446,7 +455,7 @@ class TokeoAutomateRemoteContext(invoke.Context):
             sudo_mode = sudo_config.get('mode')
             sudo_tail_chars = sudo_config.get('tail_chars')
             if sudo_mode == 'env':
-                sudo_match = TokeoAutomateLocalContext.generate_sudo_env_match_token(self)
+                sudo_match = self._generate_sudo_env_match_token()
                 sudo_prompt = sudo_match
             else:
                 sudo_match = sudo_config.get('match')
@@ -557,7 +566,7 @@ class TokeoAutomateRemoteContext(invoke.Context):
         Close the underlying Paramiko SSH connection if one is open.
 
         """
-        if getattr(self, 'client', None) is not None:
+        if self.client is not None:
             self.client.close()
             self.client = None
 
@@ -1583,7 +1592,7 @@ class TokeoAutomate(MetaMixin):
                                 task['func'](
                                     run_connection['context'].run,
                                     verbose=verbose,
-                                    **run_connection['context']['task_ref']['kwargs'],
+                                    **run_connection['context'].task_ref['kwargs'],
                                 ),
                             )
                         )
