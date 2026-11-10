@@ -191,38 +191,6 @@ class SmtpdEvents:
         #: Target of the default on_logging_event, bound by the server
         self._server_logger = None
 
-    @staticmethod
-    def authenticated(ctx):
-        """
-        True when the connection has authenticated.
-
-        ### Args
-
-        - **ctx** (SmtpdContext): The per-connection context
-
-        ### Returns
-
-        - **bool**: Whether ```ctx.server.authenticated_at``` is not None
-
-        """
-        return ctx.server.authenticated_at is not None
-
-    @staticmethod
-    def encrypted(ctx):
-        """
-        True when the connection is TLS-encrypted.
-
-        ### Args
-
-        - **ctx** (SmtpdContext): The per-connection context
-
-        ### Returns
-
-        - **bool**: Whether ```ctx.server.encrypted_at``` is not None
-
-        """
-        return ctx.server.encrypted_at is not None
-
     # ---- connection lifecycle -----------------------------------------------
 
     def on_connect_event(self, ctx):

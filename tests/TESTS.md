@@ -476,7 +476,7 @@ A test waits for a condition, not for a fixed time.
 
 ```python
 assert wait_until(lambda: len(list(tmp_path.glob('pid_*'))) == 3, 3.0)
-assert await wait_until_async(lambda: srv.connections == 0)
+assert await wait_until_async(lambda: srv.connection_cnt == 0)
 assert wait_process_group_ended(proc.pid)        # the master and all its workers
 ```
 
@@ -504,7 +504,7 @@ def test_thread_safety_with_multiple_connections():
         srv, port = await start_smtpd(ev, options=OPTIONS)
         try:
             ...
-            assert await wait_until_async(lambda: srv.processings == 0)
+            assert await wait_until_async(lambda: srv.processing_cnt == 0)
         finally:
             await srv.stop(wait_seconds_before_close=1.0)
 

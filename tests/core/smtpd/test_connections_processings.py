@@ -19,9 +19,9 @@ from tests.core.smtpd.lib.smtpd_tests_helper import send_mail, start_smtpd
 def test_counters_are_zero_when_idle():
     """A new server counts 0 connections and 0 processings."""
     srv = SmtpdServer(CaptureSmtpdEvents(), options={})
-    assert srv.connections == 0
+    assert srv.connection_cnt == 0
     assert srv.has_connections() is False
-    assert srv.processings == 0
+    assert srv.processing_cnt == 0
     assert srv.has_processings() is False
 
 
@@ -32,19 +32,19 @@ def test_connections_counter_tracks_open_clients():
         srv, port = await start_smtpd(CaptureSmtpdEvents(), options={})
         writers = []
         try:
-            assert srv.connections == 0 and srv.has_connections() is False
+            assert srv.connection_cnt == 0 and srv.has_connections() is False
             # each opened client raises the counter by one
             for expected in (1, 2, 3):
                 reader, writer = await asyncio.open_connection('127.0.0.1', port)
                 writers.append(writer)
                 await reader.readline()  # consume the 220 greeting
-                assert await wait_until_async(lambda e=expected: srv.connections == e)
+                assert await wait_until_async(lambda e=expected: srv.connection_cnt == e)
                 assert srv.has_connections() is True
             # closing them one by one lowers it back to zero
             for closed_cnt, writer in enumerate(writers, start=1):
                 writer.close()
                 remaining = len(writers) - closed_cnt
-                assert await wait_until_async(lambda r=remaining: srv.connections == r)
+                assert await wait_until_async(lambda r=remaining: srv.connection_cnt == r)
             assert srv.has_connections() is False
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
@@ -63,7 +63,7 @@ class _RecordingEvents(CaptureSmtpdEvents):
 
     def on_message_data_event(self, ctx):
         super().on_message_data_event(ctx)
-        self.processings_during = self.server_ref.processings
+        self.processings_during = self.server_ref.processing_cnt
         self.has_processings_during = self.server_ref.has_processings()
 
 
@@ -76,7 +76,7 @@ def test_processings_counter_tracks_message_processing():
         events.server_ref = srv
         loop = asyncio.get_event_loop()
         try:
-            assert srv.processings == 0 and srv.has_processings() is False
+            assert srv.processing_cnt == 0 and srv.has_processings() is False
             await loop.run_in_executor(
                 None,
                 lambda: send_mail(port, 'from@example.org', 'to@example.org', 'Subject: x\r\n\r\nhi'),
@@ -85,7 +85,7 @@ def test_processings_counter_tracks_message_processing():
             assert events.processings_during >= 1
             assert events.has_processings_during is True
             # and released again after delivery
-            assert await wait_until_async(lambda: srv.processings == 0)
+            assert await wait_until_async(lambda: srv.processing_cnt == 0)
             assert srv.has_processings() is False
         finally:
             await srv.stop(wait_seconds_before_close=0.3)

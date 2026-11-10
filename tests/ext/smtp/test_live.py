@@ -165,7 +165,7 @@ def test_closes_connection_on_error(smtp, error):
                 app.mail.send('body')
         # ... and the connection was closed anyway
         assert smtpd.events.disconnected_event.wait(2)
-        assert wait_until(lambda: smtpd.server.connections == 0, 2)
+        assert wait_until(lambda: smtpd.server.connection_cnt == 0, 2)
 
     assert smtpd.events.messages == []
 

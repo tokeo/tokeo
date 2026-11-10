@@ -61,8 +61,8 @@ def test_release_on_service_a_wakes_waiter_on_service_b():
 
             mail_b = loop.run_in_executor(None, lambda: send_mail(port_b, 'b@x.org', 'to@x.org', 'Subject: b\r\n\r\nB'))
             # B is connected and waits for the slot ...
-            assert await wait_until_async(lambda: srv_b.connections == 1)
-            assert srv_b.processings == 0 and events_b.delivered_messages == []  # ... and did not get through yet
+            assert await wait_until_async(lambda: srv_b.connection_cnt == 1)
+            assert srv_b.processing_cnt == 0 and events_b.delivered_messages == []  # ... and did not get through yet
 
             events_a.gate.set()  # A finishes -> releases the slot
             events_b.gate.set()  # let B pass once admitted
@@ -106,8 +106,8 @@ def test_external_counter_release_is_seen_via_wait_for_slot_override():
         try:
             gl.processing_cnt = 1  # as if another process holds the slot
             mail = loop.run_in_executor(None, lambda: send_mail(port, 'a@x.org', 'to@x.org', 'Subject: x\r\n\r\nhi'))
-            assert await wait_until_async(lambda: srv.connections == 1)
-            assert srv.processings == 0 and events.delivered_messages == []  # throttled by the "foreign" slot
+            assert await wait_until_async(lambda: srv.connection_cnt == 1)
+            assert srv.processing_cnt == 0 and events.delivered_messages == []  # throttled by the "foreign" slot
 
             gl.processing_cnt = 0  # foreign process releases: NO event
             code, _ = await asyncio.wait_for(mail, 5.0)

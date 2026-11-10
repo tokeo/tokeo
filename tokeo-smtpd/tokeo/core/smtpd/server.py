@@ -669,7 +669,7 @@ class SmtpdServer:
         self._slot_free.set()
         # graceful shutdown state
         self._shutdown_requested = False
-        self._stopped = True
+        self._listeners_stopped = True
         self._sessions = set()
         self._asyncio_shutdown_signal = None
         self._serve_task = None
@@ -723,7 +723,7 @@ class SmtpdServer:
     async def _bind(self, listeners):
         """Bind every listener and record it."""
         self._shutdown_requested = False
-        self._stopped = False
+        self._listeners_stopped = False
         self._asyncio_running_loop = asyncio.get_running_loop()
         self._asyncio_shutdown_signal = self._asyncio_running_loop.create_future()
         if listeners is None:
@@ -762,7 +762,7 @@ class SmtpdServer:
             # cancelled by stop(); the listeners are already closed
             pass
         finally:
-            self._stopped = True
+            self._listeners_stopped = True
 
     async def serve(self, listeners=None):
         """
@@ -806,16 +806,16 @@ class SmtpdServer:
         if self._asyncio_shutdown_signal is not None and not self._asyncio_shutdown_signal.done():
             self._asyncio_shutdown_signal.set_result(b'')
 
-    def is_shutdown_requested(self):
+    def shutdown_requested(self):
         """True once a shutdown was scheduled."""
         return self._shutdown_requested
 
-    def is_stopped(self):
+    def stopped(self):
         """True once serving has fully stopped."""
-        return self._stopped and not self._sessions
+        return self._listeners_stopped and not self._sessions
 
     @property
-    def connections(self):
+    def connection_cnt(self):
         """Number of connected clients."""
         return self._connection_cnt
 
@@ -824,7 +824,7 @@ class SmtpdServer:
         return self._connection_cnt > 0
 
     @property
-    def processings(self):
+    def processing_cnt(self):
         """Number of clients processing a message."""
         return self._processing_cnt
 
@@ -871,11 +871,11 @@ class SmtpdServer:
             if not self._sessions:
                 break
             await asyncio.sleep(0.01)
-        self._stopped = True
+        self._listeners_stopped = True
 
     async def join(self, poll_seconds=0.1):
         """Block until the server has fully stopped."""
-        while not self.is_stopped():
+        while not self.stopped():
             await asyncio.sleep(poll_seconds)
 
     def close(self):

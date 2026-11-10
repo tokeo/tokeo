@@ -38,12 +38,12 @@ def test_threaded_on_the_receiving_event_is_refused():
 def test_authenticated_and_encrypted_follow_the_context():
     """authenticated and encrypted are False until their time is set."""
     ctx = SmtpdContext(id='x')
-    assert SmtpdEvents.authenticated(ctx) is False
-    assert SmtpdEvents.encrypted(ctx) is False
+    assert ctx.server.authenticated is False
+    assert ctx.server.encrypted is False
     ctx.server.authenticated_at = get_utc_now()
     ctx.server.encrypted_at = get_utc_now()
-    assert SmtpdEvents.authenticated(ctx) is True
-    assert SmtpdEvents.encrypted(ctx) is True
+    assert ctx.server.authenticated is True
+    assert ctx.server.encrypted is True
 
 
 @pytest.mark.parametrize(

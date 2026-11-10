@@ -248,16 +248,6 @@ class MailHandler(SmtpdEvents):
 per-line events and never to ```async def``` events (a coroutine can already
 ```await```).
 
-### Helpers
-
-Inside a handler, two helpers report connection state:
-```self.authenticated(ctx)``` is true once the client has authenticated, and
-```self.encrypted(ctx)``` is true once the connection is running over TLS.
-They only report whether ```ctx.server.authenticated_at``` and
-```ctx.server.encrypted_at``` are set: the server checks these fields itself,
-so overriding a helper does not change its decisions, unlike
-```authenticated?```/```encrypted?``` of the original.
-
 ## 5. The context object
 
 Every event receives the same per-connection ```ctx``` (an ```SmtpdContext```),
@@ -269,6 +259,11 @@ which carries the whole state of the conversation. It has three parts:
 ```connected_at```, ```authorization_id```, ```authentication_id```,
 ```authenticated_at```, ```encrypted_at```, plus ```exception_cnt``` and
 ```errors``` accumulated during the session.
+
+```ctx.server.authenticated``` is true once the client has authenticated,
+```ctx.server.encrypted``` once the connection runs over TLS. Both are read
+from ```authenticated_at``` and ```encrypted_at```; MidiSmtpServer names them
+```authenticated?(ctx)``` and ```encrypted?(ctx)```.
 
 ```ctx.envelope``` holds the current transaction:
 ```mail_from``` (the sender), ```rcpt_tos``` (the list of recipients),
@@ -837,8 +832,8 @@ only after ```on_message_data_event```.
 <tr><td>await join()</td><td>wait until the server is stopped</td></tr>
 <tr><td>await stop(wait_seconds_before_close=2.0, gracefully=True)</td><td>stop accepting, drain in-flight connections, then close</td></tr>
 <tr><td>shutdown()</td><td>request a shutdown</td></tr>
-<tr><td>is_shutdown_requested() / is_stopped()</td><td>whether a shutdown was requested / serving has fully stopped</td></tr>
-<tr><td>connections / processings</td><td>active connection / processing counts</td></tr>
+<tr><td>shutdown_requested() / stopped()</td><td>whether a shutdown was requested / serving has fully stopped</td></tr>
+<tr><td>connection_cnt / processing_cnt</td><td>active connection / processing counts</td></tr>
 <tr><td>has_connections() / has_processings()</td><td>whether any is currently active</td></tr>
 </tbody>
 </table>

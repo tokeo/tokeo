@@ -53,7 +53,7 @@ def test_020_tcp_2_simultan_connects():
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
             b1 = await _read_welcome(r1)
             r2, w2 = await asyncio.open_connection('127.0.0.1', port)
-            assert await wait_until_async(lambda: srv.connections == 2)
+            assert await wait_until_async(lambda: srv.connection_cnt == 2)
             # channel 2 waits for a processing slot -> no welcome yet
             blocked = False
             try:
@@ -83,7 +83,7 @@ def test_030_tcp_3_simultan_connects_and_1_abort():
             r1, w1 = await asyncio.open_connection('127.0.0.1', port)
             b1 = await _read_welcome(r1)
             r2, w2 = await asyncio.open_connection('127.0.0.1', port)
-            assert await wait_until_async(lambda: srv.connections == 2)
+            assert await wait_until_async(lambda: srv.connection_cnt == 2)
             r3, w3 = await asyncio.open_connection('127.0.0.1', port)
             # channel 3 exceeds max_connections -> abort message + close
             b3 = await asyncio.wait_for(_read_welcome(r3), timeout=2)

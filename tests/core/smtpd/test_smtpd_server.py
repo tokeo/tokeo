@@ -1090,7 +1090,7 @@ def test_proxy_event_error_aborts_421():
 
 
 def test_stop_stops_accepting_new_connections():
-    """After stop a new connection is refused and is_stopped() is True."""
+    """After stop a new connection is refused and stopped() is True."""
 
     async def go():
         srv, port = await start_smtpd(RecordingEvents(), options={})
@@ -1103,7 +1103,7 @@ def test_stop_stops_accepting_new_connections():
             await asyncio.open_connection('127.0.0.1', port)
         except OSError:
             refused = True
-        return greeting, refused, srv.is_stopped()
+        return greeting, refused, srv.stopped()
 
     greeting, refused, stopped = asyncio.run(go())
     assert greeting[0].startswith('220')
@@ -1271,7 +1271,7 @@ def test_graceful_stop_cancels_idle_connection():
         # the connection is idle (blocked reading); a graceful stop drains it
         await srv.stop(wait_seconds_before_close=0.3)
         writer.close()
-        return active_before, srv.is_stopped(), len(srv._sessions)
+        return active_before, srv.stopped(), len(srv._sessions)
 
     active_before, stopped, active_after = asyncio.run(go())
     assert active_before == 1
@@ -1280,18 +1280,18 @@ def test_graceful_stop_cancels_idle_connection():
 
 
 def test_lifecycle_state_flags():
-    """is_stopped() and is_shutdown_requested() follow start, shutdown and stop."""
+    """stopped() and shutdown_requested() follow start, shutdown and stop."""
 
     async def go():
         srv = SmtpdServer(RecordingEvents(), options={})
-        before = srv.is_stopped()
+        before = srv.stopped()
         await srv.start([{'host': '127.0.0.1', 'port': 0}])
-        serving = srv.is_stopped()
-        req_before = srv.is_shutdown_requested()
+        serving = srv.stopped()
+        req_before = srv.shutdown_requested()
         srv.shutdown()
-        req_after = srv.is_shutdown_requested()
+        req_after = srv.shutdown_requested()
         await srv.stop(wait_seconds_before_close=0.1)
-        after = srv.is_stopped()
+        after = srv.stopped()
         return before, serving, req_before, req_after, after
 
     before, serving, req_before, req_after, after = asyncio.run(go())
@@ -1315,7 +1315,7 @@ def test_serve_blocks_until_stop_and_join_returns_then():
         await srv.stop(wait_seconds_before_close=0.1)
         await asyncio.wait_for(srv.join(poll_seconds=0.01), 2)
         await asyncio.wait_for(task, 2)
-        return greeting, srv.is_stopped()
+        return greeting, srv.stopped()
 
     greeting, stopped = asyncio.run(go())
     assert greeting[0].startswith('220')
@@ -1346,7 +1346,7 @@ def test_shutdown_before_start_only_marks_the_request():
     """A shutdown before start() marks the request and sends nothing."""
     srv = SmtpdServer(RecordingEvents(), options={})
     srv.shutdown()
-    assert srv.is_shutdown_requested() is True
+    assert srv.shutdown_requested() is True
 
 
 def test_stop_without_start_and_with_a_slow_session_ends_stopped():
@@ -1366,7 +1366,7 @@ def test_stop_without_start_and_with_a_slow_session_ends_stopped():
         await read_reply(reader)
         await srv.stop(gracefully=False)
         writer.close()
-        return srv._stopped
+        return srv._listeners_stopped
 
     assert asyncio.run(go()) is True
 

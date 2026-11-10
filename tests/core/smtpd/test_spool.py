@@ -304,7 +304,7 @@ def _abort_mid_data(tmp_path, debug):
 
         try:
             await loop.run_in_executor(None, run_client)
-            assert await wait_until_async(lambda: srv.connections == 0)
+            assert await wait_until_async(lambda: srv.connection_cnt == 0)
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 
@@ -343,7 +343,7 @@ def test_max_data_bytes_cap_works_in_spool_mode(tmp_path):
 
         try:
             await loop.run_in_executor(None, run_client)
-            assert await wait_until_async(lambda: srv.connections == 0)
+            assert await wait_until_async(lambda: srv.connection_cnt == 0)
         finally:
             await srv.stop(wait_seconds_before_close=0.3)
 

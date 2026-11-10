@@ -70,6 +70,16 @@ class ServerCtx:
     #: When STARTTLS completed (UTC datetime), None while plain
     encrypted_at: object = None
 
+    @property
+    def authenticated(self):
+        """True once the client has authenticated, read from authenticated_at."""
+        return self.authenticated_at is not None
+
+    @property
+    def encrypted(self):
+        """True once the connection runs over TLS, read from encrypted_at."""
+        return self.encrypted_at is not None
+
     def reset_on_starttls(self):
         """Drop the HELO and the AUTH state the client gave before TLS."""
         self.helo = ''

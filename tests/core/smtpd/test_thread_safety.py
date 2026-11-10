@@ -53,7 +53,7 @@ def test_thread_safety_with_multiple_connections():
         try:
             with ThreadPoolExecutor(max_workers=count) as pool:
                 await asyncio.gather(*(loop.run_in_executor(pool, send_one, i) for i in range(count)))
-            assert await wait_until_async(lambda: srv.processings == 0)
+            assert await wait_until_async(lambda: srv.processing_cnt == 0)
         finally:
             await srv.stop(wait_seconds_before_close=1.0)
 
