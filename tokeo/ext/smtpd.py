@@ -378,7 +378,7 @@ class TokeoSmtpd(MetaMixin):
     app = None
 
     def __init__(self, app, *args, **kw):
-        super(TokeoSmtpd, self).__init__(*args, **kw)
+        super().__init__(*args, **kw)
         self._setup(app)
 
     def _setup(self, app):
@@ -661,7 +661,7 @@ class TokeoSmtpdController(Controller):
 
     def _setup(self, app):
         """Cement controller setup hook; delegates to the parent."""
-        super(TokeoSmtpdController, self)._setup(app)
+        super()._setup(app)
 
     @ex(
         help='list the configured smtpd services',

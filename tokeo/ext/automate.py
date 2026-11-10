@@ -719,7 +719,7 @@ class TokeoAutomate(MetaMixin):
         )
 
     def __init__(self, app, *args, **kw):
-        super(TokeoAutomate, self).__init__(*args, **kw)
+        super().__init__(*args, **kw)
         #: The Cement application instance
         self.app = app
         # copy from list of tasks with expanded entries
@@ -2334,7 +2334,7 @@ class TokeoAutomateController(Controller):
         epilog = f'Example: {basename(argv[0])} automate shell'
 
     def _setup(self, app):
-        super(TokeoAutomateController, self)._setup(app)
+        super()._setup(app)
 
     @ex(
         help='run task(s)',

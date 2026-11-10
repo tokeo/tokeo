@@ -44,7 +44,7 @@ class TokeoDramatiqController(Controller):
 
     def _setup(self, app):
         """Cement controller setup hook; delegates to the parent."""
-        super(TokeoDramatiqController, self)._setup(app)
+        super()._setup(app)
 
     def _get_worker_option(self, option, key, allow_auto=False, config_min_value=1):
         """

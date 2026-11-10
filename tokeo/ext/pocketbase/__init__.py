@@ -163,7 +163,7 @@ class TokeoPocketBase(MetaMixin):
     realtime_options = None
 
     def __init__(self, app, *args, **kw):
-        super(TokeoPocketBase, self).__init__(*args, **kw)
+        super().__init__(*args, **kw)
         #: The Cement application instance
         self.app = app
 

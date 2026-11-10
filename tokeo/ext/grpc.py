@@ -122,7 +122,7 @@ class TokeoGrpc(MetaMixin):
         )
 
     def __init__(self, app, *args, **kw):
-        super(TokeoGrpc, self).__init__(*args, **kw)
+        super().__init__(*args, **kw)
         #: The Cement application instance
         self.app = app
         self._server = None
@@ -485,7 +485,7 @@ class TokeoGrpcController(Controller):
         epilog = f'Example: {basename(argv[0])} grpc serve'
 
     def _setup(self, app):
-        super(TokeoGrpcController, self)._setup(app)
+        super()._setup(app)
 
     @ex(
         help='start grpc service',

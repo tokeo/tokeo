@@ -260,7 +260,7 @@ class TokeoScheduler(MetaMixin):
         )
 
     def __init__(self, app, *args, **kw):
-        super(TokeoScheduler, self).__init__(*args, **kw)
+        super().__init__(*args, **kw)
         #: The Cement application instance
         self.app = app
         self._command_parser = None
@@ -1119,7 +1119,7 @@ class TokeoSchedulerController(Controller):
             for the controller.
 
         """
-        super(TokeoSchedulerController, self)._setup(app)
+        super()._setup(app)
 
     @ex(
         help='start the scheduler service',

@@ -103,7 +103,7 @@ class TokeoVaultConfigHandler(TokeoYamlConfigHandler):
         - **app**: The Tokeo application instance
 
         """
-        super(TokeoVaultConfigHandler, self)._setup(app)
+        super()._setup(app)
         # registry of vault handler instances keyed by their config ```type```;
         # enc and scrypt load on first use, so plain runs without cryptography
         self._handlers = {}
