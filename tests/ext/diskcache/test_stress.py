@@ -194,9 +194,9 @@ class Participant:
 
     def run_op_throttle(self, rnd):
         name = rnd.choice(list(THROTTLES))
-        ran = self.throttles[name]()
-        if ran:
-            self.record('throttles', name, ran)
+        ran_at = self.throttles[name]()
+        if ran_at:
+            self.record('throttles', name, ran_at)
 
     def run_op_mutex(self, rnd):
         with self.app.cache.locks.lock('stress_m'):
@@ -330,15 +330,15 @@ def _run_stress(directory, monkeypatch, purge):
     result_queue = ctx.Queue()
     with DiskcacheTest(directory) as app:
         app.cache.set('counter', 0)
-        procs = [
+        processes = [
             ctx.Process(target=_run_stress_worker, args=(directory, index, seed + index, SECONDS, purge, result_queue))
             for index in range(1, PROCESSES + 1)
         ]
-        for proc in procs:
-            proc.start()
+        for process in processes:
+            process.start()
         own = Participant(app, 0, seed, SECONDS, purge).run()
         results = collect_results(result_queue, PROCESSES, total_timeout=SECONDS + 60)
-        stop_processes(procs)
+        stop_processes(processes)
         assert [payload for kind, payload in results if kind == 'error'] == []
         assert len(results) == PROCESSES
         report = _merge([own] + [payload for _, payload in results])

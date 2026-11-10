@@ -398,15 +398,15 @@ def test_temper_process_max_concurrency(tmp):
     ctx = get_spawn_context()
     result_queue = ctx.Queue()
     # fmt: off
-    procs = [
+    processes = [
         ctx.Process(target=_temper_worker, args=(tmp.dir, count, 0.4, result_queue))
         for _ in range(workers)
     ]
     # fmt: on
-    for proc in procs:
-        proc.start()
+    for process in processes:
+        process.start()
     results = collect_results(result_queue, workers, total_timeout=60)
-    stop_processes(procs)
+    stop_processes(processes)
 
     # every worker reported and none failed during setup or execution
     assert len(results) == workers
@@ -507,17 +507,17 @@ def test_throttle_process_max_rate(tmp):
     per_seconds = 3600
     ctx = get_spawn_context()
     result_queue = ctx.Queue()
-    procs = [
+    processes = [
         ctx.Process(
             target=_throttle_worker,
             args=(tmp.dir, count, per_seconds, result_queue),
         )
         for _ in range(workers)
     ]
-    for proc in procs:
-        proc.start()
+    for process in processes:
+        process.start()
     results = collect_results(result_queue, workers, total_timeout=60)
-    stop_processes(procs)
+    stop_processes(processes)
 
     # every worker reported and none failed during setup or execution
     assert len(results) == workers

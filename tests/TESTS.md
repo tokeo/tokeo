@@ -477,7 +477,7 @@ A test waits for a condition, not for a fixed time.
 ```python
 assert wait_until(lambda: len(list(tmp_path.glob('pid_*'))) == 3, 3.0)
 assert await wait_until_async(lambda: srv.connection_cnt == 0)
-assert wait_process_group_ended(proc.pid)        # the master and all its workers
+assert wait_process_group_ended(process.pid)        # the master and all its workers
 ```
 
 ```wait_until``` and ```wait_until_async``` wait 5 seconds unless a timeout

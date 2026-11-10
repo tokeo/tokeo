@@ -136,9 +136,9 @@ def test_shared_limits_count_across_processes():
 
     # the extension inherits the counters via os.fork; mirror that in the
     # test (the spawn default on macOS would also have to pickle 'run_child')
-    proc = multiprocessing.get_context('fork').Process(target=run_child, args=(limits,))
-    proc.start()
-    proc.join(5)
+    process = multiprocessing.get_context('fork').Process(target=run_child, args=(limits,))
+    process.start()
+    process.join(5)
     assert limits.connection_cnt == 2 and limits.processing_cnt == 1
     limits.release()
     limits.end_processing()
@@ -161,11 +161,11 @@ def test_shared_limits_give_the_last_slot_to_one_process_only():
             with taken_cnt.get_lock():
                 taken_cnt.value += 1
 
-    procs = [context.Process(target=run_child) for _ in range(8)]
-    for proc in procs:
-        proc.start()
-    for proc in procs:
-        proc.join(5)
+    processes = [context.Process(target=run_child) for _ in range(8)]
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(5)
     assert taken_cnt.value == 1 and limits.processing_cnt == 1
 
 

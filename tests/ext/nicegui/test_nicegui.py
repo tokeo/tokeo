@@ -391,10 +391,10 @@ def test_hotload_loop_shuts_nicegui_down_after_the_settle_time(monkeypatch):
     monkeypatch.setattr(nicegui_app, 'shutdown', lambda: shutdowns.append(time.monotonic()))
     with NiceguiTest(hotload_interval_seconds=0.01, hotload_settle_seconds=0.2) as app:
         app.nicegui._watchdog_on_event()
-        changed = time.monotonic()
+        changed_at = time.monotonic()
         asyncio.run(app.nicegui._watch_file_changes())
     (shutdown,) = shutdowns
-    assert shutdown - changed >= 0.2
+    assert shutdown - changed_at >= 0.2
 
 
 # serve

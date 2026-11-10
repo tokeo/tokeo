@@ -276,30 +276,30 @@ def test_locks_temper_keeps_worker_threads_apart(tmp, start_worker):
 def test_locks_throttle_hands_surplus_messages_to_the_callback(tmp, start_worker):
     """A throttle of 2 per hour runs 2 of 5 messages, the callback gets 3."""
     with DramatiqMiddlewareTest(tmp) as app:
-        ran, locked_values = [], []
+        ran_values, locked_values = [], []
 
         @app.dramatiq.actor(actor_name='call_api')
         @app.dramatiq.locks.throttle(
             count=2, per_seconds=3600, name='api', cb_on_locked=lambda **kw: locked_values.append(kw['value']), verbose=False
         )
         def call_api(value):
-            ran.append(value)
+            ran_values.append(value)
 
         start_worker(app.dramatiq.broker)
         for value in range(5):
             call_api.send(value)
         _join(app.dramatiq.broker)
-    assert (len(ran), len(locked_values), sorted(ran + locked_values)) == (2, 3, [0, 1, 2, 3, 4])
+    assert (len(ran_values), len(locked_values), sorted(ran_values + locked_values)) == (2, 3, [0, 1, 2, 3, 4])
 
 
 def test_locks_purge_command_frees_a_lock_an_actor_waits_for(tmp, start_worker, capsys):
     """dramatiq locks --purge drops a lock left behind, the waiting actor runs."""
     with DramatiqMiddlewareTest(tmp, ['dramatiq', 'locks', '--purge'], locks_sleep_seconds=0.01) as app:
-        ran = threading.Event()
+        ran_event = threading.Event()
 
         def report():
             with app.dramatiq.locks.lock('report'):
-                ran.set()
+                ran_event.set()
 
         actor = app.dramatiq.actor(report, actor_name='report')
         # a lock of a crashed worker, it would hold for an hour
@@ -307,9 +307,9 @@ def test_locks_purge_command_frees_a_lock_an_actor_waits_for(tmp, start_worker, 
         start_worker(app.dramatiq.broker)
         actor.send()
         # the actor keeps waiting while the lock is held
-        assert not ran.wait(0.3)
+        assert not ran_event.wait(0.3)
         app.run()
-        assert ran.wait(5)
+        assert ran_event.wait(5)
     assert capsys.readouterr().out.strip() == 'Purged 1 dramatiq locks from cache.'
 
 

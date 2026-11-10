@@ -103,10 +103,10 @@ def collect_results(result_queue, expected, total_timeout):
     return items
 
 
-def stop_processes(procs):
+def stop_processes(processes):
     # join with a small grace period and terminate stragglers to keep the
     # test suite from hanging on a misbehaving child
-    for proc in procs:
-        proc.join(timeout=5)
-        if proc.is_alive():
-            proc.terminate()
+    for process in processes:
+        process.join(timeout=5)
+        if process.is_alive():
+            process.terminate()

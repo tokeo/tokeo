@@ -950,25 +950,25 @@ class SidebarEntries(HTMLParser):
         self._details_depth = 0
         self._wrapper = None
         self._div_depth = 0
-        self._pending = None
+        self._pending_entry = None
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         if tag == 'details':
             self._details_depth += 1
-            self._pending = 'expandable'
+            self._pending_entry = 'expandable'
         elif tag == 'div':
             self._div_depth += 1
             css = attrs.get('class', '')
             if self._details_depth == 0 and css.startswith('py-0.5'):
                 self._wrapper = (css, self._div_depth)
-                self._pending = css
+                self._pending_entry = css
         elif tag == 'a':
             href = attrs.get('href', '')
             # only the top-level entry link, not a member link inside details
-            if href.startswith('#') and '.' not in href and self._pending:
-                self.entries[href[1:]] = self._pending
-                self._pending = None
+            if href.startswith('#') and '.' not in href and self._pending_entry:
+                self.entries[href[1:]] = self._pending_entry
+                self._pending_entry = None
 
     def handle_endtag(self, tag):
         if tag == 'details':

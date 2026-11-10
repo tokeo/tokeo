@@ -1762,11 +1762,11 @@ class AuthForEvents(AuthEvents):
         return super().on_mail_from_event(ctx, mail_from)
 
 
-def _run_auth_for(trusted, login, mails):
+def _run_auth_for(trusted_ids, login, mails):
     """Runs the MAILs, logged in as "user" or not, and returns them recorded."""
     ev = AuthForEvents()
     auth = [b'AUTH PLAIN ' + make_auth_plain('', 'user', 'secret').encode() + b'\r\n'] if login else []
-    options = {'auth_mode': 'AUTH_OPTIONAL', 'trusted_relay_auth_ids': trusted}
+    options = {'auth_mode': 'AUTH_OPTIONAL', 'trusted_relay_auth_ids': trusted_ids}
     commands = [b'EHLO me\r\n', *auth]
     for mail in mails:
         commands += [b'MAIL FROM:' + mail + b'\r\n', b'RSET\r\n']
@@ -1777,7 +1777,7 @@ def _run_auth_for(trusted, login, mails):
 
 
 @pytest.mark.parametrize(
-    'trusted, login, param, auth_for_id, auth_for_id_raw',
+    'trusted_ids, login, param, auth_for_id, auth_for_id_raw',
     [
         # trusted relay: the decoded xtext names the submitter
         (['user'], True, b'AUTH=e+3Dmc2@example.com', 'e=mc2@example.com', 'e=mc2@example.com'),
@@ -1795,9 +1795,9 @@ def _run_auth_for(trusted, login, mails):
         (['user'], False, b'AUTH=bob@example.com', '', 'bob@example.com'),
     ],
 )
-def test_mail_from_auth_parameter(trusted, login, param, auth_for_id, auth_for_id_raw):
+def test_mail_from_auth_parameter(trusted_ids, login, param, auth_for_id, auth_for_id_raw):
     """AUTH= leaves the sender, auth_for_id carries it only from a trusted relay."""
-    mails = _run_auth_for(trusted, login, [b'<a@x> ' + param])
+    mails = _run_auth_for(trusted_ids, login, [b'<a@x> ' + param])
     assert mails == [('<a@x>', auth_for_id, auth_for_id_raw)]
 
 
