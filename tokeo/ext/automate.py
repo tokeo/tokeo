@@ -1592,7 +1592,7 @@ class TokeoAutomate(MetaMixin):
                                 task['func'](
                                     run_connection['context'].run,
                                     verbose=verbose,
-                                    **run_connection['context'].task_ref['kwargs'],
+                                    **run_connection['context'].task_kwargs,
                                 ),
                             )
                         )

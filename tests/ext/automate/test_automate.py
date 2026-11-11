@@ -204,6 +204,32 @@ def test_run_closes_the_connections_of_every_host(monkeypatch):
     assert [result.exited for result in results] == [0, 0, -1]
 
 
+def test_run_gives_every_runner_its_own_copy_of_the_kwargs():
+    """A task changing a nested kwarg changes no other host and not the task."""
+    seen_items = []
+
+    def func(run, verbose=False, items=None, **kwargs):
+        seen_items.append(list(items))
+        items.append('changed')
+        return dict(stdout='', stderr='', command='', exited=0)
+
+    test_defaults = init_defaults('automate')
+    test_defaults['automate']['tasks'] = dict(
+        task1=dict(
+            module='tests.ext.automate.automate_tests_helper',
+            connection=dict(hosts=['10.0.0.1', '10.0.0.2']),
+            kwargs=dict(items=['a']),
+        ),
+    )
+    with AutomateTest(config_defaults=test_defaults) as app:
+        task = app.automate.tasks['task1']
+        task['func'] = func
+        app.automate.run(task)
+        app.automate.run(task)
+        assert task['kwargs']['items'] == ['a']
+    assert seen_items == [['a']] * 4
+
+
 def _make_task_ref(**kwprotected):
     # a task reference for a context, strict and sanitized unless given
     return dict(kwargs={}, kwprotected=dict(dict(protect='strict', sanitize=True, env={}), **kwprotected))
