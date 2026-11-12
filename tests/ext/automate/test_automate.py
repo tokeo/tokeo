@@ -4,7 +4,9 @@ read from the config and the results of a task run.
 """
 
 import io
+import sys
 import copy
+import subprocess
 from unittest import mock
 
 import invoke
@@ -18,6 +20,7 @@ from tokeo.ext.automate import (
     TokeoAutomateLocalContext,
     TokeoAutomateRemoteContext,
 )
+from tests.utils import ROOT_DIR
 from tests.ext.automate.automate_tests_helper import (
     AutomateTest,
     DEFAULTS,
@@ -233,6 +236,13 @@ def test_run_gives_every_runner_its_own_copy_of_the_kwargs():
 def _make_task_ref(**kwprotected):
     # a task reference for a context, strict and sanitized unless given
     return dict(kwargs={}, kwprotected=dict(dict(protect='strict', sanitize=True, env={}), **kwprotected))
+
+
+def test_loading_automate_imports_no_paramiko():
+    """The extension loads without paramiko, only a remote host imports it."""
+    code = "import sys, tokeo.ext.automate; print('paramiko' in sys.modules)"
+    done_process = subprocess.run([sys.executable, '-c', code], cwd=ROOT_DIR, capture_output=True, text=True, timeout=30)
+    assert done_process.stdout == 'False\n', done_process.stderr
 
 
 def test_remote_context_without_config_gets_the_default_of_invoke():

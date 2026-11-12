@@ -51,9 +51,6 @@ from concurrent import futures as concurrent_futures
 import importlib
 import invoke
 import invoke.watchers
-import paramiko
-import paramiko.agent
-from paramiko.hostkeys import HostKeys, HostKeyEntry
 from argparse import ArgumentParser
 import shlex
 from cement.core.meta import MetaMixin
@@ -372,6 +369,9 @@ class TokeoAutomateRemoteContext(_TaskContext):
 
         """
         if self.client is None:
+            # lazy: only a remote host needs paramiko
+            import paramiko
+
             self.client = paramiko.SSHClient()
             # update connections
             if self.host_keys:
@@ -472,6 +472,8 @@ class TokeoAutomateRemoteContext(_TaskContext):
         channel = transport.open_session()
 
         if self.forward_agent:
+            import paramiko.agent
+
             paramiko.agent.AgentRequestHandler(channel)
 
         if kwargs.get('pty', False):
@@ -1529,7 +1531,9 @@ class TokeoAutomate(MetaMixin):
                     # if just string rebuild to list
                     if isinstance(known_hosts, str):
                         known_hosts = tuple((known_hosts,))
-                    # create a memory host_keys
+                    # create a memory host_keys; only a remote host needs paramiko
+                    from paramiko.hostkeys import HostKeys, HostKeyEntry
+
                     host_keys = HostKeys()
                     # append keys
                     for k in known_hosts:
