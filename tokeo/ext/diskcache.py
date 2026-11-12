@@ -39,6 +39,7 @@ suitable for web applications, microservices, and other distributed systems.
     ```
 """
 
+import os
 import sys
 import uuid
 import bisect
@@ -47,7 +48,7 @@ import weakref
 from os.path import basename
 from tokeo.ext.argparse import Controller
 from tokeo.core.exc import TokeoError
-from tokeo.core.utils.validate import is_int_gt, is_number, is_number_gt, is_filled_str
+from tokeo.core.utils.validate import is_int, is_int_gt, is_number, is_number_gt, is_filled_str
 from cement import ex
 from cement.core import cache
 from contextlib import contextmanager
@@ -78,6 +79,52 @@ _MISSING = object()
 # the messages of the checks, formatted with the name and the value
 _ERR_SECONDS_GT_0 = '{} must be a number of seconds greater than 0, not {!r}'
 _ERR_INT_GT_0 = '{} must be an integer greater than 0, not {!r}'
+
+# pid and start time of this process for the temper slots, read once per process
+_own_holder = None
+
+
+def _get_process_start(pid):
+    # the start time of a process in clock ticks since boot, None off Linux
+    try:
+        with open(f'/proc/{pid}/stat', 'rb') as f:
+            stat = f.read()
+    except OSError:
+        return None
+    # the name in parentheses may hold spaces, the fields follow the last ')'
+    return int(stat.rsplit(b')', 1)[1].split()[19])
+
+
+def _get_own_holder():
+    # a forked child is another holder, so the pid is checked on every call
+    global _own_holder
+    pid = os.getpid()
+    if _own_holder is None or _own_holder[0] != pid:
+        _own_holder = (pid, _get_process_start(pid))
+    return _own_holder
+
+
+def _is_temper_slot(slot):
+    # a slot of temper is [expire_time, pid, start], start None off Linux
+    return type(slot) is list and len(slot) == 3 and is_number(slot[0]) and is_int_gt(slot[1], 0) and (slot[2] is None or is_int(slot[2]))
+
+
+def _holder_ended(pid, start):
+    # a slot of a process that no longer exists is free
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        # the process exists, it belongs to another user
+        pass
+    # the same pid with another start time is a new process
+    return start is not None and _get_process_start(pid) != start
+
+
+def _get_expire_time(slot):
+    # the sort key of the temper slots
+    return slot[0]
 
 
 class _ThreadConnection:
@@ -548,13 +595,14 @@ class TokeoDiskCacheLocksHandler:
         is kept in DiskCache, so the limit is shared by all processes and
         threads that use the same cache.
 
-        The decorator keeps the sorted expire times of the holders. Acquiring a
-        slot drops the past expire times and adds its own, now plus expire,
-        when fewer than max_calls are left; finishing the call removes its own
-        expire time again. A holder that was killed keeps its slot only until
-        its own expire time. When no slot is free, the call either waits and
-        retries or, if cb_on_locked is set, runs that callback instead of
-        the wrapped function.
+        The decorator keeps a slot per holder: its expire time, its pid and
+        the start time of its process. Acquiring a slot drops the past expire
+        times and adds its own, now plus expire, when fewer than max_calls are
+        left; finishing the call removes its own slot again. When no slot is
+        free, the slots of processes that no longer exist are dropped, so a
+        killed holder frees its slot at once. When still no slot is free, the
+        call either waits and retries or, if cb_on_locked is set, runs that
+        callback instead of the wrapped function.
 
         ### Args
 
@@ -622,7 +670,11 @@ class TokeoDiskCacheLocksHandler:
             breach the limit temporarily as well.
 
         : All processes on one cache must run the same version: an older
-            one reads the expire times as an invalid counter and resets it.
+            one reads the slots as an invalid counter and resets it.
+
+        : All processes on one cache run on one host, the pid of a holder
+            is checked there. Off Linux the start time is not known, a pid
+            reused by a new process keeps the slot until its expire.
 
         ### Reminders
 
@@ -677,38 +729,46 @@ class TokeoDiskCacheLocksHandler:
                 while True:
                     # run in a transaction
                     with self._cache.transact(retry=True):
-                        # the sorted expire times of the holders, none without key
+                        # the slots of the holders by expire time, none without key
                         value = self._cache.get(key)
-                        expire_times = value if type(value) is list else []
+                        slots = value if type(value) is list else []
                         # take the current timestamp
                         now = time.time()
-                        try:
+                        if all(_is_temper_slot(slot) for slot in slots):
                             # the past expire times are at the start of the list,
                             # they might be from dead or crashed jobs that
-                            # couldn't drop their own expire time
-                            expired_cnt = bisect.bisect_right(expire_times, now)
-                        except TypeError:
+                            # couldn't drop their own slot
+                            expired_cnt = bisect.bisect_right(slots, now, key=_get_expire_time)
+                        else:
                             # the existing cache entry is invalid,
-                            # it's a list of anything else than valid expire times
-                            expire_times, expired_cnt = [], len(expire_times)
+                            # it's a list of anything else than valid slots
+                            slots, expired_cnt = [], len(slots)
                         # drop the past expire times, they block temper otherwise
-                        del expire_times[:expired_cnt]
+                        del slots[:expired_cnt]
+                        # without a free slot, the slots of ended processes are free
+                        ended_cnt = 0
+                        if len(slots) >= max_calls:
+                            living_slots = [slot for slot in slots if not _holder_ended(slot[1], slot[2])]
+                            ended_cnt = len(slots) - len(living_slots)
+                            slots = living_slots
                         # check for a free slot
-                        has_slot = len(expire_times) < max_calls
+                        has_slot = len(slots) < max_calls
                         if has_slot:
-                            # add our own expire time to the sorted list
-                            expire_time = now + expire
-                            bisect.insort(expire_times, expire_time)
+                            # add our own slot to the list sorted by expire time
+                            own_slot = [now + expire, *_get_own_holder()]
+                            bisect.insort(slots, own_slot, key=_get_expire_time)
                         # if anything needs to change on the cache value, save it
-                        if has_slot or expired_cnt:
+                        if has_slot or expired_cnt or ended_cnt:
                             # the key lives until the latest expire time
-                            self._cache.set(key, expire_times, expire=expire_times[-1] - now, tag=self._tag)
+                            self._cache.set(key, slots, expire=slots[-1][0] - now, tag=self._tag)
 
                     # Attention! This must be run outside the transact block,
                     # otherwise this will HOLD the code with no end (DEADLOCK)
 
                     if expired_cnt:
                         self.app.log.warning(f'@temper {key} dropped {expired_cnt} expired slot(s)')
+                    if ended_cnt:
+                        self.app.log.warning(f'@temper {key} dropped {ended_cnt} slot(s) of ended processes')
 
                     # has a slot, run the function outside the lock
                     if has_slot:
@@ -733,10 +793,10 @@ class TokeoDiskCacheLocksHandler:
                         # run in a transaction
                         with self._cache.transact(retry=True):
                             # re-read; other processes may have changed it
-                            expire_times = self._cache.get(key)
+                            slots = self._cache.get(key)
                             try:
-                                # release only the own expire time
-                                expire_times.remove(expire_time)
+                                # release only the own slot
+                                slots.remove(own_slot)
                             except (AttributeError, ValueError):
                                 # gone by purge, expire or another value, no new key
                                 lost = True
@@ -745,12 +805,12 @@ class TokeoDiskCacheLocksHandler:
                                 # take a new current timestamp
                                 now = time.time()
                                 # cleanup cache, drop the expired ones
-                                del expire_times[: bisect.bisect_right(expire_times, now)]
-                                if expire_times:
+                                del slots[: bisect.bisect_right(slots, now, key=_get_expire_time)]
+                                if slots:
                                     # the key lives until the latest expire time
-                                    self._cache.set(key, expire_times, expire=expire_times[-1] - now, tag=self._tag)
+                                    self._cache.set(key, slots, expire=slots[-1][0] - now, tag=self._tag)
                                 else:
-                                    # without any expire time left, drop the entry
+                                    # without any slot left, drop the entry
                                     self._cache.delete(key)
                         if lost:
                             self.app.log.warning(f'@temper {key} slot was lost before release')

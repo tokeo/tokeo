@@ -4,14 +4,17 @@ temper (concurrency limit) and throttle (rate limit), alone, across threads
 and across processes.
 """
 
+import os
 import re
+import sys
 import time
+import subprocess
 import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from tokeo.ext.diskcache import TokeoDiskCacheError, _ThreadConnection
+from tokeo.ext.diskcache import TokeoDiskCacheError, _ThreadConnection, _get_process_start
 from tests.ext.diskcache.diskcache_tests_helper import (
     DiskcacheTest,
     Connections,
@@ -620,11 +623,23 @@ def test_throttle_and_temper_log_nothing_by_default(tmp, monkeypatch):
         assert infos == []
 
 
-# ---- temper: the expire times of the holders --------------------------------
+# ---- temper: the slots of the holders ---------------------------------------
+
+
+def _get_own_slot(expire_time):
+    # a slot of this process, still alive
+    return [expire_time, os.getpid(), _get_process_start(os.getpid())]
+
+
+def _get_ended_pid():
+    # the pid of a process that ended
+    process = subprocess.Popen([sys.executable, '-c', 'pass'])
+    process.wait()
+    return process.pid
 
 
 def test_temper_holds_its_slot_by_an_expire_time(tmp):
-    """A call holds one expire time of now plus expire, the key lives as long."""
+    """A call holds a slot of now plus expire and its pid, the key lives as long."""
     with DiskcacheTest(tmp.dir) as app:
 
         @app.cache.locks.temper(max_calls=2, name='expire_time', expire=60, verbose=False)
@@ -632,9 +647,10 @@ def test_temper_holds_its_slot_by_an_expire_time(tmp):
             return app.cache.get('dc_expire_time'), _get_expire_seconds(app, 'dc_expire_time')
 
         start_time = time.time()
-        expire_times, expire_seconds = job()
-        assert len(expire_times) == 1
-        assert start_time + 60 <= expire_times[0] <= time.time() + 60
+        slots, expire_seconds = job()
+        assert len(slots) == 1
+        assert start_time + 60 <= slots[0][0] <= time.time() + 60
+        assert slots[0][1:] == [os.getpid(), _get_process_start(os.getpid())]
         assert 59 < expire_seconds <= 60
 
 
@@ -644,15 +660,61 @@ def test_temper_drops_an_expired_holder_while_others_run(tmp, monkeypatch):
         logged_lines = _collect_warnings(app, monkeypatch)
         now = time.time()
         # count 2 is full: a killed holder and one still running
-        app.cache.set('dc_dead', [now - 1, now + 100], expire=100)
+        app.cache.set('dc_dead', [_get_own_slot(now - 1), _get_own_slot(now + 100)], expire=100)
 
         @app.cache.locks.temper(max_calls=2, name='dead', cb_on_locked=lambda **kw: 'locked', verbose=False)
         def job():
             return len(app.cache.get('dc_dead'))
 
         assert job() == 2
-        assert app.cache.get('dc_dead') == [now + 100]
+        assert app.cache.get('dc_dead') == [_get_own_slot(now + 100)]
         assert logged_lines == ['@temper dc_dead dropped 1 expired slot(s)']
+
+
+def test_temper_frees_the_slot_of_an_ended_process(tmp, monkeypatch):
+    """The slot of a process that ended is free at once, long before its expire."""
+    with DiskcacheTest(tmp.dir) as app:
+        logged_lines = _collect_warnings(app, monkeypatch)
+        now = time.time()
+        app.cache.set('dc_ended', [[now + 100, _get_ended_pid(), None]], expire=100)
+
+        @app.cache.locks.temper(max_calls=1, name='ended', cb_on_locked=lambda **kw: 'locked', verbose=False)
+        def job():
+            return 'ran'
+
+        assert job() == 'ran'
+        assert app.cache.get('dc_ended') is None
+        assert logged_lines == ['@temper dc_ended dropped 1 slot(s) of ended processes']
+
+
+def test_temper_keeps_the_slot_of_a_living_process(tmp):
+    """The slot of a process that still runs stays until its release or expire."""
+    with DiskcacheTest(tmp.dir) as app:
+        now = time.time()
+        app.cache.set('dc_living', [_get_own_slot(now + 100)], expire=100)
+
+        @app.cache.locks.temper(max_calls=1, name='living', cb_on_locked=lambda **kw: 'locked', verbose=False)
+        def job():
+            return 'ran'
+
+        assert job() == 'locked'
+        assert app.cache.get('dc_living') == [_get_own_slot(now + 100)]
+
+
+@pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the start time of a process is read from /proc')
+def test_temper_frees_the_slot_of_a_reused_pid(tmp):
+    """A slot whose pid now runs a process with another start time is free."""
+    with DiskcacheTest(tmp.dir) as app:
+        now = time.time()
+        slot = _get_own_slot(now + 100)
+        slot[2] += 1
+        app.cache.set('dc_reused', [slot], expire=100)
+
+        @app.cache.locks.temper(max_calls=1, name='reused', cb_on_locked=lambda **kw: 'locked', verbose=False)
+        def job():
+            return 'ran'
+
+        assert job() == 'ran'
 
 
 def test_temper_key_lives_until_the_latest_expire_time(tmp):
@@ -660,14 +722,14 @@ def test_temper_key_lives_until_the_latest_expire_time(tmp):
     with DiskcacheTest(tmp.dir) as app:
         now = time.time()
         # another call with expire 3600 holds a slot under the same name
-        app.cache.set('dc_shared', [now + 3600], expire=3600)
+        app.cache.set('dc_shared', [_get_own_slot(now + 3600)], expire=3600)
 
         @app.cache.locks.temper(max_calls=2, name='shared', expire=60, verbose=False)
         def job():
             return _get_expire_seconds(app, 'dc_shared')
 
         assert 3599 < job() <= 3600
-        assert app.cache.get('dc_shared') == [now + 3600]
+        assert app.cache.get('dc_shared') == [_get_own_slot(now + 3600)]
         assert 3599 < _get_expire_seconds(app, 'dc_shared') <= 3600
 
 
