@@ -1,11 +1,13 @@
 """
-Tests for create_certificate of tokeo.core.utils.tls.
+Tests for tokeo.core.utils.tls: create_ssl_context and create_certificate.
 
-The key types and sizes, the subject alt names typed as ip or dns name, the
-random serial number, a CA and a certificate signed by it, and the refused
+The ssl context of each verification option, the pinned hostname and a CA
+file; the key types and sizes, the subject alt names typed as ip or dns name,
+the random serial number, a CA and a certificate signed by it, and the refused
 arguments.
 """
 
+import ssl
 import ipaddress
 from datetime import timedelta
 
@@ -14,7 +16,43 @@ from cryptography import x509
 from cryptography.x509.oid import ExtendedKeyUsageOID
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
-from tokeo.core.utils.tls import create_certificate
+from tokeo.core.utils.tls import create_ssl_context, create_certificate
+
+# ---- create_ssl_context ----------------------------------------------------
+
+
+def test_create_ssl_context_leaves_the_secure_defaults_to_the_caller():
+    """With all options at their secure defaults there is no context and no name."""
+    assert create_ssl_context() == (None, None)
+
+
+@pytest.mark.parametrize(
+    'kwargs, verify_mode, check_hostname, server_hostname',
+    [
+        (dict(verify_cert=False), ssl.CERT_NONE, False, None),
+        (dict(verify_hostname=False), ssl.CERT_REQUIRED, False, None),
+        (dict(verify_hostname='mx.example.org'), ssl.CERT_REQUIRED, True, 'mx.example.org'),
+    ],
+    ids=['no_cert', 'no_hostname', 'pinned_hostname'],
+)
+def test_create_ssl_context_relaxes_or_pins_the_verification(kwargs, verify_mode, check_hostname, server_hostname):
+    """Each option relaxes the checks, a hostname as text keeps them and pins it."""
+    context, pinned = create_ssl_context(**kwargs)
+    assert (context.verify_mode, context.check_hostname, pinned) == (verify_mode, check_hostname, server_hostname)
+
+
+def test_create_ssl_context_trusts_the_ca_of_ca_path(tmp_path):
+    """A ca_path builds a context that trusts exactly the CA of that file."""
+    _, _, ca_pem, _ = create_certificate('Tokeo Test CA', is_ca=True)
+    ca_path = tmp_path / 'ca.pem'
+    ca_path.write_bytes(ca_pem)
+    context, pinned = create_ssl_context(ca_path=str(ca_path))
+    assert (context.verify_mode, context.check_hostname, pinned) == (ssl.CERT_REQUIRED, True, None)
+    common_names = [dict(entry[0] for entry in ca['subject'])['commonName'] for ca in context.get_ca_certs()]
+    assert 'Tokeo Test CA' in common_names
+
+
+# ---- create_certificate ----------------------------------------------------
 
 
 def _get_extension(certificate, extension_class):
