@@ -28,6 +28,7 @@ from cement import ex
 from concurrent import futures
 import grpc
 from tokeo.core.utils.modules import resolve_object
+from tokeo.core.utils.tls import create_certificate
 from tokeo.core.utils.validate import as_list, is_bool, is_filled_str, is_int_gt
 
 
@@ -315,8 +316,9 @@ class TokeoGrpc(MetaMixin):
 
         ### Notes
 
-        : The cryptography package is imported lazily here, so it stays out
-            of the non-tls and custom-cert code paths entirely
+        : The certificate comes from ```create_certificate``` of
+            ```tokeo.core.utils.tls```, which imports the cryptography package
+            only then, so it stays out of the non-tls and custom-cert paths
 
         : The host from the address plus every tls_cert_sans entry become SANs,
             each added as an ip address when it parses as one, otherwise as a
@@ -326,14 +328,6 @@ class TokeoGrpc(MetaMixin):
             unset the address host is used
 
         """
-        # lazy import: cryptography is only needed for the auto cert path
-        import ipaddress
-        from datetime import datetime, timedelta, timezone
-        from cryptography import x509
-        from cryptography.x509.oid import NameOID
-        from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import rsa, ec
-
         # derive the host from a "host:port" address (strip ipv6 brackets); the
         # host is both the cn fallback and the first san
         host = self._config('address').rsplit(':', 1)[0].strip('[]') or 'localhost'
@@ -346,59 +340,25 @@ class TokeoGrpc(MetaMixin):
         key_size = self._config('tls_key_size')
         if not is_int_gt(key_size, 0):
             raise TokeoGrpcError(f'tls_key_size must be an integer greater than 0, not {key_size!r}')
-        # generate key but validate also sensible key_size
+        # validate a sensible key_size
         if key_type == 'rsa':
             if key_size < 2048:
                 raise TokeoGrpcError(f'tls_key_size {key_size} is not valid for rsa (use 2048 or greater)')
-            key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
         elif key_type == 'ec':
-            curves = {256: ec.SECP256R1, 384: ec.SECP384R1}
-            if key_size not in curves:
+            if key_size not in (256, 384):
                 raise TokeoGrpcError(f'tls_key_size {key_size} is not valid for ec (use 256 or 384, grpc does no handshake with 521)')
-            key = ec.generate_private_key(curves[key_size]())
         else:
             raise TokeoGrpcError(f"tls_key_type '{key_type}' is not supported (use 'rsa' or 'ec')")
-
-        # subject/issuer cn: tls_cert_cn override or the address host
-        cn = self._config('tls_cert_cn') or host
-        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
-
-        # build sans from host + tls_cert_sans, dedup, typed as ip or dns name
-        sans = []
-        seen_names = set()
-        for entry in [host, *as_list(self._config('tls_cert_sans'))]:
-            if not entry or entry in seen_names:
-                continue
-            seen_names.add(entry)
-            # using the builtin validation and exception to check whether an entry
-            # is an ip address or DNS name
-            try:
-                sans.append(x509.IPAddress(ipaddress.ip_address(entry)))
-            except ValueError:
-                sans.append(x509.DNSName(entry))
 
         valid_days = self._config('tls_valid_days')
         if not is_int_gt(valid_days, 0):
             raise TokeoGrpcError(f'tls_valid_days must be an integer greater than 0, not {valid_days!r}')
 
-        now = datetime.now(timezone.utc)
-        cert = (
-            x509.CertificateBuilder()
-            .subject_name(name)
-            .issuer_name(name)
-            .public_key(key.public_key())
-            .serial_number(x509.random_serial_number())
-            .not_valid_before(now)
-            .not_valid_after(now + timedelta(days=valid_days))
-            .add_extension(x509.SubjectAlternativeName(sans), critical=False)
-            .sign(key, hashes.SHA256())
-        )
-        key_pem = key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
-        cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+        # subject cn: tls_cert_cn override or the address host; sans from host
+        # and tls_cert_sans, typed as ip or dns name by the generator
+        cn = self._config('tls_cert_cn') or host
+        sans = [entry for entry in [host, *as_list(self._config('tls_cert_sans'))] if entry]
+        _, _, cert_pem, key_pem = create_certificate(cn, sans=sans, key_type=key_type, key_size=key_size, valid_days=valid_days)
         return key_pem, cert_pem
 
     def startup(self):

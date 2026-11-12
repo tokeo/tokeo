@@ -589,15 +589,16 @@ A combined ```.pem``` holding the trust chain and the private key in one file
 works as well: pass it as ```tls_cert_path``` alone and leave
 ```tls_key_path``` unset - the key is then read from the same file.
 
-The self-signed certificate is generated in-process with ```cryptography```
-(EC P-384, SHA256, valid for 90 days, serverAuth) - no subprocess and no temp
-file is involved. It is meant for tests and debugging only, never for
+The self-signed certificate is created in memory by ```create_certificate```
+of ```tokeo.core.utils.tls``` (EC P-384, SHA256, valid for 90 days, a random
+serial number) - no subprocess and no temp file is involved. It is meant for tests and debugging only, never for
 production. Every server generates its own, so the workers of ```pre_fork```
 present different ones; configure a certificate (```tls_cert_path``` or
 ```tls_cert```) when all have to present the same. To prevent client errors
 like ```hostname does not match``` its CN and subject alt names derive from
 the hosts and addresses configured on the server (reference behaviour): every
-name becomes a subject alt name, a loopback-only setup gets the generic CN
+name becomes a subject alt name (an IP address as IP entry, any other name as
+DNS entry), a loopback-only setup gets the generic CN
 ```localhost.local```, otherwise the first name is used - and a configured
 ```tls_cert_cn``` / ```tls_cert_sans``` always wins over the derivation.
 

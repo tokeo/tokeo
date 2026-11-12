@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 from tokeo.core.smtpd.tls import TlsTransport, TLS_METHODS_LEGACY, TLS_CIPHERS_LEGACY
 from tokeo.core.smtpd.exc import SmtpdConfigError
+from tokeo.core.utils.tls import create_certificate
 from tests.core.smtpd.lib.smtpd_tests_capture_events_helper import CaptureSmtpdEvents
 from tests.core.smtpd.lib.smtpd_tests_helper import (
     read_message,
@@ -26,7 +27,6 @@ from tests.core.smtpd.lib.smtpd_tests_helper import (
     run_server_client,
     make_insecure_tls_context,
     make_verifying_tls_context,
-    make_cert,
     start_smtpd,
 )
 
@@ -49,19 +49,19 @@ def certs(tmp_path_factory):
         return os.path.join(tmp, name)
 
     # a self-signed server certificate valid for 127.0.0.1
-    _, _, simple_cert, simple_key = make_cert('127.0.0.1', san_ips=['127.0.0.1'])
+    _, _, simple_cert, simple_key = create_certificate('127.0.0.1', sans=['127.0.0.1'])
     _write(get_path('srv.simple.pem'), simple_cert)
     _write(get_path('srv.key.pem'), simple_key)
     # a CA and a server certificate signed by it (for the chain cases)
-    ca_cert_obj, ca_key_obj, ca_pem, _ = make_cert('Tokeo Test CA', is_ca=True)
-    _, _, chain_cert, chain_key = make_cert('127.0.0.1', san_ips=['127.0.0.1'], issuer_cert=ca_cert_obj, issuer_key=ca_key_obj)
+    ca_cert_obj, ca_key_obj, ca_pem, _ = create_certificate('Tokeo Test CA', is_ca=True)
+    _, _, chain_cert, chain_key = create_certificate('127.0.0.1', sans=['127.0.0.1'], issuer=(ca_cert_obj, ca_key_obj))
     _write(get_path('ca.pem'), ca_pem)
     _write(get_path('chain.key.pem'), chain_key)
     # chain file = server cert + CA cert; and a combined chain + key file
     _write(get_path('chain.pem'), chain_cert, ca_pem)
     _write(get_path('chain-and-key.pem'), chain_cert, ca_pem, chain_key)
     # an invalid certificate whose name does not match 127.0.0.1
-    _, _, invalid_cert, invalid_key = make_cert('invalid.hostname', san_dns=['invalid.hostname'])
+    _, _, invalid_cert, invalid_key = create_certificate('invalid.hostname', sans=['invalid.hostname'])
     _write(get_path('invalid.pem'), invalid_cert)
     _write(get_path('invalid.key.pem'), invalid_key)
     return dict(
@@ -237,7 +237,8 @@ def _get_cert_names(certificate):
 
     cn = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
     sans = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
-    return cn, sans.get_values_for_type(x509.DNSName)
+    # the dns names, then the ip addresses as text
+    return cn, sans.get_values_for_type(x509.DNSName) + [str(ip) for ip in sans.get_values_for_type(x509.IPAddress)]
 
 
 def test_get_tls_cert_names_derivation_rules():
@@ -261,9 +262,9 @@ def test_get_tls_cert_names_derivation_rules():
 def test_self_signed_derives_names_from_hosts():
     """Bound to 127.0.0.1 the certificate is localhost.local with the ip."""
     certificate = _get_peer_certificate({'encrypt_mode': 'TLS_OPTIONAL'}, hosts=['127.0.0.1'])
-    cn, dns = _get_cert_names(certificate)
+    cn, names = _get_cert_names(certificate)
     assert cn == 'localhost.local'
-    assert '127.0.0.1' in dns and 'localhost.local' in dns
+    assert '127.0.0.1' in names and 'localhost.local' in names
 
 
 def test_self_signed_uses_configured_names():
@@ -275,9 +276,9 @@ def test_self_signed_uses_configured_names():
             'tls_cert_sans': 'alt.tokeo.test',
         }
     )
-    cn, dns = _get_cert_names(certificate)
+    cn, names = _get_cert_names(certificate)
     assert cn == 'mx.tokeo.test'
-    assert set(dns) == {'mx.tokeo.test', 'alt.tokeo.test'}
+    assert set(names) == {'mx.tokeo.test', 'alt.tokeo.test'}
 
 
 # ---- cryptography is lazy: only the self-signed generator needs it ----------

@@ -26,14 +26,13 @@ method/cipher options can still be supplied.
 
 import os
 import ssl
-import ipaddress
 from enum import Enum, auto
-from datetime import datetime, timedelta, timezone
 
 
 from .logger import Severity
 from .exc import SmtpdConfigError
 from tokeo.core.utils.memfd import open_memory_paths
+from tokeo.core.utils.tls import create_certificate
 
 # Cipher strings and TLS floor presets, roughly Mozilla Modern / Intermediate /
 # Old. The defaults (ADVANCED*) follow the current "Intermediate" profile (ECDHE
@@ -197,18 +196,11 @@ class TlsTransport:
 
         ### Notes
 
-        : EC P-384, 90-day validity, SHA256, subject CN and subject alt names
-            (DNS for every SAN plus IP entries for those that are IP addresses),
-            generated in-process with ```cryptography``` and loaded from memory
+        : EC P-384, 90-day validity, subject CN and subject alt names (an IP
+            address as IP entry, any other name as DNS entry), created in
+            memory by ```create_certificate``` of ```tokeo.core.utils.tls```
 
         """
-        # lazy: the cryptography package is only needed to GENERATE the
-        # test certificate; loading configured certificates is stdlib ssl
-        from cryptography import x509
-        from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
-        from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import ec
-
         # normalize the subject alt name list
         if cert_sans is None:
             cert_sans = []
@@ -216,59 +208,10 @@ class TlsTransport:
             cert_sans = [s.strip() for s in cert_sans.split(',') if s.strip()]
         cn = cert_cn or 'localhost'
         sans = list(dict.fromkeys([cn] + list(cert_sans)))
-        # DNS for every SAN, plus IP entries for the ones that are IP addresses
-        alt_names = [x509.DNSName(san) for san in sans]
-        for san in sans:
-            try:
-                alt_names.append(x509.IPAddress(ipaddress.ip_address(san)))
-            except ValueError:
-                pass
         self._log(Severity.DEBUG, f'SSL: using self generated test certificate! CN={cn} SAN=[{",".join(sans)}]')
-        # generate the key and the self-signed certificate
         # EC P-384 like the grpc auto cert: generated in about a millisecond,
         # a key per process is cheap
-        key = ec.generate_private_key(ec.SECP384R1())
-        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
-        now = datetime.now(timezone.utc)
-        certificate = (
-            x509.CertificateBuilder()
-            .subject_name(name)
-            # the subject and the issuer are identical only for test certificate
-            .issuer_name(name)
-            .public_key(key.public_key())
-            .serial_number(1)
-            .not_valid_before(now)
-            # valid for 90 days
-            .not_valid_after(now + timedelta(days=90))
-            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=False)
-            .add_extension(
-                x509.KeyUsage(
-                    digital_signature=True,
-                    content_commitment=False,
-                    # an EC key only signs, the key exchange is ECDHE
-                    key_encipherment=False,
-                    data_encipherment=False,
-                    key_agreement=False,
-                    key_cert_sign=False,
-                    crl_sign=False,
-                    encipher_only=False,
-                    decipher_only=False,
-                ),
-                critical=True,
-            )
-            .add_extension(
-                x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
-                critical=False,
-            )
-            .add_extension(x509.SubjectAlternativeName(alt_names), critical=False)
-            .sign(key, hashes.SHA256())
-        )
-        cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
+        _, _, cert_pem, key_pem = create_certificate(cn, sans=sans, key_type='ec', key_size=384, valid_days=90)
         self._log(Severity.DEBUG, f'SSL: generated test certificate\n{cert_pem.decode()}')
-        key_pem = key.private_bytes(
-            serialization.Encoding.PEM,
-            serialization.PrivateFormat.TraditionalOpenSSL,
-            serialization.NoEncryption(),
-        )
         # load the generated cert + key from memory (never touches disk)
         self._load_from_memory(cert_pem, key_pem)

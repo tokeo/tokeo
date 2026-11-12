@@ -15,17 +15,18 @@ import contextlib
 import ipaddress
 from types import SimpleNamespace
 from concurrent import futures
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import grpc
 import pytest
 from cryptography import x509
 from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cement.core.exc import CaughtSignal
 from tokeo.ext.grpc import TokeoGrpcError
 from tokeo.core.utils.modules import TokeoModulesLoadError
+from tokeo.core.utils.tls import create_certificate
 from tests.utils import find_free_port, wait_until
 from tests.ext.grpc.grpc_tests_helper import GrpcTest, SERVICE, ADD_SERVICER, SERVICER, INTERCEPTORS
 
@@ -52,36 +53,6 @@ def _get_refused_code(port, **kw):
     return err_info.value.code()
 
 
-def _make_key():
-    # a fast ec key for the certificates of the tests
-    return ec.generate_private_key(ec.SECP256R1())
-
-
-def _make_cert(name, key, issuer=None, issuer_key=None, ca=False):
-    # a certificate for name with name as dns san, self signed without issuer
-    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)])
-    now = datetime.now(timezone.utc)
-    builder = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(issuer.subject if issuer else subject)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now - timedelta(minutes=1))
-        .not_valid_after(now + timedelta(days=1))
-        .add_extension(x509.BasicConstraints(ca=ca, path_length=None), critical=True)
-        .add_extension(x509.SubjectAlternativeName([x509.DNSName(name)]), critical=False)
-    )
-    return builder.sign(issuer_key or key, hashes.SHA256())
-
-
-def _get_pem(obj):
-    # the pem bytes of a certificate or a private key
-    if isinstance(obj, x509.Certificate):
-        return obj.public_bytes(serialization.Encoding.PEM)
-    return obj.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
-
-
 def _write(directory, name, data):
     # write data as file name into directory and return its path as str
     path = directory / name
@@ -93,19 +64,19 @@ def _write(directory, name, data):
 def certs(tmp_path_factory):
     """A ca with server and client cert, a client cert of a foreign ca."""
     tmp = tmp_path_factory.mktemp('certs')
-    ca_key, foreign_key, server_key, client_key, stranger_key = _make_key(), _make_key(), _make_key(), _make_key(), _make_key()
-    ca = _make_cert('tokeo test ca', ca_key, ca=True)
-    foreign = _make_cert('foreign test ca', foreign_key, ca=True)
-    server = _make_cert('localhost', server_key, ca, ca_key)
-    client = _make_cert('client.tokeo.test', client_key, ca, ca_key)
-    stranger = _make_cert('stranger.tokeo.test', stranger_key, foreign, foreign_key)
+    # (certificate, key, cert_pem, key_pem), fast ec keys of 256 bits
+    ca = create_certificate('tokeo test ca', key_size=256, is_ca=True)
+    foreign = create_certificate('foreign test ca', key_size=256, is_ca=True)
+    server = create_certificate('localhost', sans=['localhost'], key_size=256, issuer=ca[:2])
+    client = create_certificate('client.tokeo.test', sans=['client.tokeo.test'], key_size=256, issuer=ca[:2])
+    stranger = create_certificate('stranger.tokeo.test', sans=['stranger.tokeo.test'], key_size=256, issuer=foreign[:2])
     return SimpleNamespace(
-        ca=_get_pem(ca),
-        ca_file=_write(tmp, 'ca.pem', _get_pem(ca)),
-        server_cert_file=_write(tmp, 'server.pem', _get_pem(server)),
-        server_key_file=_write(tmp, 'server.key', _get_pem(server_key)),
-        client=(_get_pem(client_key), _get_pem(client)),
-        stranger=(_get_pem(stranger_key), _get_pem(stranger)),
+        ca=ca[2],
+        ca_file=_write(tmp, 'ca.pem', ca[2]),
+        server_cert_file=_write(tmp, 'server.pem', server[2]),
+        server_key_file=_write(tmp, 'server.key', server[3]),
+        client=(client[3], client[2]),
+        stranger=(stranger[3], stranger[2]),
     )
 
 

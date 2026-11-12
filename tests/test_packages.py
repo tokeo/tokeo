@@ -18,10 +18,11 @@ import pytest
 from tokeo.core.version import get_version
 from tests.utils import ROOT_DIR
 
-# the imports a package may use besides the standard library
+# the imports a package may use besides the standard library; tokeo-base
+# imports cryptography only to create a certificate
 ALLOWED = {
-    'tokeo-base': ('tokeo.core.exc', 'tokeo.core.utils'),
-    'tokeo-smtpd': ('tokeo.core.exc', 'tokeo.core.utils', 'tokeo.core.smtpd', 'cryptography'),
+    'tokeo-base': ('tokeo.core.exc', 'tokeo.core.utils', 'cryptography'),
+    'tokeo-smtpd': ('tokeo.core.exc', 'tokeo.core.utils', 'tokeo.core.smtpd'),
     'tokeo-pocketbase': ('tokeo.core.exc', 'tokeo.core.utils', 'tokeo.core.pocketbase', 'httpx'),
     'tokeo-diskcache': ('tokeo.core.diskcache',),
 }

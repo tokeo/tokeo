@@ -178,7 +178,7 @@ from tests.utils.tui import Terminal                           # shared base
 from tests.ext.tui.tui_tests_helper import TuiInputTest         # own subject
 
 # never from another subject, a conftest.py or a test file, never by a bare name
-from tests.core.smtpd.lib.smtpd_tests_helper import make_cert   # wrong
+from tests.core.smtpd.lib.smtpd_tests_helper import send_mail   # wrong
 from tests.ext.diskcache.test_diskcache import _collect_warnings  # wrong
 from tui_tests_helper import TuiInputTest                       # wrong
 ```

@@ -14,13 +14,6 @@ import ssl
 import base64
 import asyncio
 import smtplib
-import ipaddress
-from datetime import datetime, timedelta, timezone
-
-from cryptography import x509
-from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 
 from tokeo.core.smtpd.server import SmtpdServer
 from tokeo.core.smtpd.events import SmtpdEvents
@@ -51,89 +44,6 @@ def run_line(smtpd, session, line, line_break=b'\r\n'):
 
 
 # test rules exception: kept in the helper on purpose, more cert tests will use it
-def make_cert(common_name, san_ips=(), san_dns=(), issuer_cert=None, issuer_key=None, is_ca=False):
-    """
-    Generate a certificate and key with ```cryptography``` (no subprocess).
-
-    ### Args
-
-    - **common_name** (str): The subject common name
-    - **san_ips** / **san_dns** (iterable): Subject alt name IPs / DNS names
-    - **issuer_cert** / **issuer_key**: Sign with this CA (else self-signed)
-    - **is_ca** (bool): Mark the certificate as a CA
-
-    ### Returns
-
-    - **tuple**: ```(certificate, key, cert_pem_bytes, key_pem_bytes)```
-
-    """
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
-    issuer_name = issuer_cert.subject if issuer_cert is not None else subject
-    signing_key = issuer_key if issuer_key is not None else key
-    alt = [x509.DNSName(d) for d in san_dns] + [x509.IPAddress(ipaddress.ip_address(ip)) for ip in san_ips]
-    now = datetime.now(timezone.utc)
-    builder = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(issuer_name)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now)
-        .not_valid_after(now + timedelta(days=90))
-    )
-    if is_ca:
-        builder = builder.add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
-        # a CA needs certificate/CRL signing key usage under strict verification
-        builder = builder.add_extension(
-            x509.KeyUsage(
-                digital_signature=True,
-                content_commitment=False,
-                key_encipherment=False,
-                data_encipherment=False,
-                key_agreement=False,
-                key_cert_sign=True,
-                crl_sign=True,
-                encipher_only=False,
-                decipher_only=False,
-            ),
-            critical=True,
-        )
-    else:
-        builder = builder.add_extension(
-            x509.KeyUsage(
-                digital_signature=True,
-                content_commitment=False,
-                key_encipherment=True,
-                data_encipherment=False,
-                key_agreement=False,
-                key_cert_sign=False,
-                crl_sign=False,
-                encipher_only=False,
-                decipher_only=False,
-            ),
-            critical=True,
-        )
-        # server authentication for the leaf certificate
-        builder = builder.add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
-    if alt:
-        builder = builder.add_extension(x509.SubjectAlternativeName(alt), critical=False)
-    # subject key identifier on every cert, and an authority key identifier that
-    # points at the issuer's key; both are required for strict chain verification
-    # (Python 3.13's ssl rejects a chain that is missing these)
-    builder = builder.add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
-    if issuer_cert is not None:
-        builder = builder.add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_cert.public_key()), critical=False)
-    certificate = builder.sign(signing_key, hashes.SHA256())
-    cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
-    key_pem = key.private_bytes(
-        serialization.Encoding.PEM,
-        serialization.PrivateFormat.TraditionalOpenSSL,
-        serialization.NoEncryption(),
-    )
-    return certificate, key, cert_pem, key_pem
-
-
 def read_message(name):
     """Read a message file and convert it to RFC CRLF line endings."""
     with open(os.path.join(_DATA_DIR, name), 'r') as handle:

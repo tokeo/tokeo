@@ -5,18 +5,14 @@ middleware and the config values that register hands over to dramatiq.
 
 import os
 import re
-from datetime import datetime, timedelta, timezone
 
 import pytest
 import dramatiq
-from cryptography import x509
-from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from dramatiq import broker as dramatiq_broker
 from dramatiq.asyncio import get_event_loop_thread
 from dramatiq.brokers import rabbitmq as dramatiq_rabbitmq
 from tokeo.ext.dramatiq import TokeoDramatiqConfigError, TokeoDramatiqAsyncIO
+from tokeo.core.utils.tls import create_certificate
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest, DramatiqBrokerTest, DramatiqMiddlewareTest
 
 
@@ -31,25 +27,6 @@ def keep_dead_message_ttl(monkeypatch):
     """Restores DEAD_MESSAGE_TTL of dramatiq after the test, register sets it."""
     monkeypatch.setattr(dramatiq_rabbitmq, 'DEAD_MESSAGE_TTL', dramatiq_rabbitmq.DEAD_MESSAGE_TTL)
     return dramatiq_rabbitmq.DEAD_MESSAGE_TTL
-
-
-def _make_ca_cert(name):
-    # a self-signed certificate in pem, enough as ca file of the broker
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)])
-    now = datetime.now(timezone.utc)
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(subject)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now - timedelta(minutes=5))
-        .not_valid_after(now + timedelta(days=1))
-        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
-        .sign(key, hashes.SHA256())
-    )
-    return cert.public_bytes(serialization.Encoding.PEM).decode()
 
 
 # ---- asyncio middleware -----------------------------------------------------
@@ -102,7 +79,7 @@ def test_register_confirm_delivery_with_tls_parameters(tmp):
     """amqps with a ca builds pika parameters with ssl, confirm stays on."""
     rabbitmq = dict(url='amqps://localhost:5671/', tls_ca_path=os.path.join(tmp.dir, 'ca.pem'))
     with open(rabbitmq['tls_ca_path'], 'w') as f:
-        f.write(_make_ca_cert('localhost'))
+        f.write(create_certificate('localhost', is_ca=True)[2].decode())
     with DramatiqBrokerTest(tmp, rabbitmq):
         broker = dramatiq.get_broker()
         assert broker.parameters[0].ssl_options is not None
@@ -114,7 +91,7 @@ def test_register_tls_parameters_keep_the_options_of_the_url(tmp):
     url = 'amqps://u:p@localhost:5671/vh?heartbeat=30&connection_attempts=3&blocked_connection_timeout=10'
     rabbitmq = dict(url=url, tls_ca_path=os.path.join(tmp.dir, 'ca.pem'))
     with open(rabbitmq['tls_ca_path'], 'w') as f:
-        f.write(_make_ca_cert('localhost'))
+        f.write(create_certificate('localhost', is_ca=True)[2].decode())
     with DramatiqBrokerTest(tmp, rabbitmq):
         (params,) = dramatiq.get_broker().parameters
     assert (params.heartbeat, params.connection_attempts, params.blocked_connection_timeout) == (30, 3, 10)

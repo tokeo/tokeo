@@ -12,7 +12,6 @@ the process group and the port becoming bindable again.
 import ssl
 import asyncio
 import hashlib
-import datetime
 import multiprocessing
 import re
 import signal
@@ -23,13 +22,11 @@ import time
 import json
 
 import pytest
-from cryptography import x509
-from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization
 
 from tokeo.core.smtpd import GlobalLimits
 from tokeo.core.utils.modules import TokeoModulesLoadError
+from tokeo.core.utils.tls import create_certificate
 from tokeo.ext.smtpd import (
     TokeoSmtpdError,
     SharedGlobalLimits,
@@ -574,22 +571,9 @@ def test_prefork_logs_the_started_service_of_every_process():
 @pytest.fixture(scope='module')
 def cert_files(tmp_path_factory):
     """A self-signed certificate and its key as files, with its SHA256."""
-    key = ec.generate_private_key(ec.SECP256R1())
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'localhost')])
-    now = datetime.datetime.now(datetime.timezone.utc)
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(name)
-        .issuer_name(name)
-        .public_key(key.public_key())
-        .serial_number(1)
-        .not_valid_before(now)
-        .not_valid_after(now + datetime.timedelta(days=1))
-        .sign(key, hashes.SHA256())
-    )
+    cert, _, cert_pem, key_pem = create_certificate('localhost', sans=['localhost'], key_size=256, valid_days=1)
     tmp = tmp_path_factory.mktemp('certs')
-    (tmp / 'cert.pem').write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-    key_pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    (tmp / 'cert.pem').write_bytes(cert_pem)
     (tmp / 'key.pem').write_bytes(key_pem)
     return str(tmp / 'cert.pem'), str(tmp / 'key.pem'), hashlib.sha256(cert.public_bytes(serialization.Encoding.DER)).hexdigest()
 

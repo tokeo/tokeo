@@ -8,11 +8,11 @@ macOS) and raising when the platform offers neither backing (as on Windows).
 
 import os
 import ssl
-from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from tokeo.core.utils.memfd import open_memory_paths, TokeoMemfdError
+from tokeo.core.utils.tls import create_certificate
 
 needs_devfd = pytest.mark.skipif(not os.path.isdir('/dev/fd'), reason='needs /dev/fd')
 
@@ -55,39 +55,9 @@ def test_no_blobs_yields_empty():
         assert paths == ()
 
 
-def _make_self_signed_pem():
-    # generated in-process with cryptography, the same library the tls module
-    # uses for its self-signed test certificate (no external openssl needed)
-    from cryptography import x509
-    from cryptography.x509.oid import NameOID
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa
-
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'localhost')])
-    now = datetime.now(timezone.utc)
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(name)
-        .issuer_name(name)
-        .public_key(private_key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now)
-        .not_valid_after(now + timedelta(days=1))
-        .sign(private_key, hashes.SHA256())
-    )
-    cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode()
-    key_pem = private_key.private_bytes(
-        serialization.Encoding.PEM,
-        serialization.PrivateFormat.PKCS8,
-        serialization.NoEncryption(),
-    ).decode()
-    return cert_pem, key_pem
-
-
 def test_loads_ssl_cert_chain_from_memory():
     """ssl loads a certificate and key from the paths in memory."""
-    cert_pem, key_pem = _make_self_signed_pem()
+    _, _, cert_pem, key_pem = create_certificate('localhost')
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     with open_memory_paths(cert_pem, key_pem) as (cert_ref, key_ref):
         context.load_cert_chain(cert_ref, key_ref)  # must not raise

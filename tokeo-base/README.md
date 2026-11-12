@@ -66,7 +66,7 @@ done within 5 seconds
 <br/>
 <br/>
 
-It depends on no other package. Tokeo, tokeo-smtpd and tokeo-pocketbase build on it.
+It depends on no other package; only ```create_certificate``` of ```tokeo.core.utils.tls``` needs the cryptography package, imported when it runs. Tokeo, tokeo-smtpd and tokeo-pocketbase build on it.
 
 <br/>
 <br/>
