@@ -94,6 +94,26 @@ class TokeoAutomateCommandTimedOutError(TokeoAutomateError, invoke.CommandTimedO
         return template.format(command, self.timeout)
 
 
+class _LocalRunner(invoke.runners.Local):
+    """
+    The local runner of invoke that also closes the pipes of its process.
+
+    ### Notes
+
+    : invoke 3.0.3 closes only a pty in ```stop()```, the pipes of a run
+        without pty stay open until the garbage collector finds them
+
+    """
+
+    def stop(self):
+        """Stop the run like invoke, then close the pipes of the process."""
+        super().stop()
+        if not self.using_pty and self.process is not None:
+            for pipe in (self.process.stdin, self.process.stdout, self.process.stderr):
+                if pipe is not None:
+                    pipe.close()
+
+
 class _SudoResponder(invoke.watchers.Responder):
     """
     Invoke responder that answers the first prompt match exactly once.
@@ -209,6 +229,11 @@ class TokeoAutomateLocalContext(_TaskContext):
         'kwargs' drive the protect/sanitize handling on each run
 
     """
+
+    def __init__(self, config=None, task_ref=None):
+        super().__init__(config=config, task_ref=task_ref)
+        # the local runner of invoke leaves the pipes of its process open
+        self.config.runners.local = _LocalRunner
 
     def close(self):
         """Nothing to close for a local run, the same call as on a remote one."""

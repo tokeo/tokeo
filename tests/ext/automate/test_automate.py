@@ -267,6 +267,22 @@ def test_context_keeps_its_attributes_out_of_the_invoke_config(context, names):
     assert [name for name in names if name in vars(built)] == [name for name in names if name != 'client']
 
 
+def test_local_run_leaves_no_pipe_open():
+    """A local run without pty closes its pipes, no ResourceWarning remains."""
+    code = '\n'.join(
+        [
+            'import gc, io, sys',
+            'from tokeo.ext.automate import TokeoAutomateLocalContext',
+            "sys.stdin = io.StringIO('')",
+            "task_ref = dict(kwargs={}, kwprotected=dict(protect='strict', sanitize=True, env={}))",
+            "TokeoAutomateLocalContext(task_ref=task_ref).run('true', hide=True)",
+            'gc.collect()',
+        ]
+    )
+    done_process = subprocess.run([sys.executable, '-X', 'dev', '-c', code], cwd=ROOT_DIR, capture_output=True, text=True, timeout=30)
+    assert done_process.returncode == 0 and 'ResourceWarning' not in done_process.stderr, done_process.stderr
+
+
 def test_local_run_gets_the_env_values_as_they_are(monkeypatch):
     """A local run gets the env values unquoted, a bad name is dropped."""
     env = {'GREETING': 'hello world', 'BAD-NAME': 'x'}
