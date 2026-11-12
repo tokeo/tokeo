@@ -26,6 +26,7 @@ The shell and its lists build on the extensions ```tokeo.ext.tui.input``` and
 from sys import argv
 from os.path import basename
 from tokeo.ext.argparse import Controller
+from tokeo.core.cement.service import start_service
 from cement.core.meta import MetaMixin
 from cement import ex
 from apscheduler.schedulers.base import STATE_RUNNING
@@ -1150,6 +1151,7 @@ class TokeoSchedulerController(Controller):
         foreground.
 
         """
+        start_service(self.app, 'scheduler')
         self.app.scheduler.launch(with_shell=self.app.pargs.shell, paused=self.app.pargs.paused)
 
 

@@ -21,6 +21,7 @@ and configuration management.
 from sys import argv
 from os.path import basename
 from tokeo.ext.argparse import Controller
+from tokeo.core.cement.service import start_service
 from tokeo.core.exc import TokeoError
 from cement.core.meta import MetaMixin
 from cement.core.exc import CaughtSignal
@@ -459,6 +460,7 @@ class TokeoGrpcController(Controller):
         This command starts the gRPC server and blocks until interrupted.
         It delegates to the app.grpc.serve() method of the TokeoGrpc extension.
         """
+        start_service(self.app, 'grpc')
         self.app.grpc.serve()
 
 

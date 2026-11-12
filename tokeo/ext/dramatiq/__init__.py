@@ -8,6 +8,8 @@ management as ```app.dramatiq.queues```, worker monitoring as
 .. include:: ./DRAMATIQ.md
 """
 
+import os
+import multiprocessing
 import dramatiq
 from dramatiq import actor as dramatiq_actor
 from tokeo.ext.dramatiq.exc import (  # noqa: F401
@@ -24,8 +26,9 @@ from tokeo.ext.dramatiq.base import (  # noqa: F401
     TokeoDramatiqRabbitmqBroker,
     TokeoDramatiq,
 )
-from tokeo.ext.dramatiq.controller import TokeoDramatiqController
+from tokeo.ext.dramatiq.controller import TokeoDramatiqController, DRAMATIQ_SERVE_ENV
 from tokeo.core.cement.extensions import check_required_extensions
+from tokeo.core.cement.service import start_service
 
 
 def tokeo_dramatiq_pdoc_pre_render(app):
@@ -131,10 +134,16 @@ def tokeo_dramatiq_extend_app(app):
     : It creates the TokeoDramatiq instance and attaches it to the app
         as app.dramatiq
 
+    : A worker process of ```dramatiq serve``` names itself
+        ```<app label>-worker-<n>``` by ```start_service```
+
     """
     check_required_extensions(app, 'tokeo.ext.dramatiq', 'tokeo.ext.tui.output')
     app.extend('dramatiq', TokeoDramatiq(app))
     app.dramatiq._setup(app)
+    # a worker process of dramatiq serve names itself, e.g. <app>-worker-1
+    if os.environ.get(DRAMATIQ_SERVE_ENV) and multiprocessing.parent_process() is not None:
+        start_service(app, 'worker', multiprocessing.current_process().name.rsplit('-', 1)[-1])
 
 
 def tokeo_dramatiq_shutdown(app):

@@ -69,6 +69,10 @@ services and all apps on the system.
   in full, 8 MB each. Linux enforces it since kernel 4.7, macOS does not.
 - When a container or the system runs out of memory, the kernel kills a
   process (SIGKILL) without a trace in the app log. See below how to find it.
+- A hard crash (segfault, abort) writes the stacks of all threads into the
+  crash file of the service when ```crash_dir``` of the app config is set; a
+  service that hangs writes them on ```thread_dump_signal```, e.g.
+  ```kill -USR1 <pid>```. Both are null by default.
 
 ## Linux
 
@@ -105,8 +109,16 @@ grep -E 'VmRSS|VmHWM|Threads' /proc/<pid>/status
   journalctl -k | grep -i 'killed process'   # on the host
   ```
 
-- Processes of the same app often carry the same name; the kernel log names
-  the process, so give services distinct names where possible.
+- The kernel log names the process. Every service of tokeo names its process
+  ```<app label>-<service>[-<n>]```, e.g. ```fairy-scheduler```,
+  ```fairy-worker-2``` or ```fairy-smtpd-1```; the kernel keeps 15 bytes of
+  it.
+- Limit the memory of a service by its environment, not inside the process:
+  ```MemoryMax=``` of a systemd unit, ```--memory``` of docker or
+  ```memory.max``` of the cgroup of a container. The kernel then kills the
+  service that grows too much, not another process on the host. A limit by
+  ```RLIMIT_DATA``` counts every thread stack in full and does not work on
+  macOS, see above.
 
 ## macOS
 

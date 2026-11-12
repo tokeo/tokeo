@@ -43,6 +43,10 @@ class Tokeo(App):
         config_defaults = dict(
             # run the app in debug mode
             debug=False,
+            # directory of the crash files of the services, null writes none
+            crash_dir=None,
+            # signal that dumps the stacks of all threads, null dumps none
+            thread_dump_signal=None,
         )
 
         # call sys.exit() on close

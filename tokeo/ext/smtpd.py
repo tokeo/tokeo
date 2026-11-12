@@ -91,6 +91,7 @@ from tokeo.core.utils.modules import resolve_object
 from tokeo.core.utils.validate import is_int_ge
 from tokeo.core.smtpd import SmtpdServer, GlobalLimits, SmtpdEvents
 from tokeo.ext.argparse import Controller
+from tokeo.core.cement.service import start_service
 
 
 class TokeoSmtpdError(TokeoError):
@@ -571,8 +572,10 @@ class TokeoSmtpd(MetaMixin):
         # so a stop sent right after the fork stays pending and is not lost
         mask = signal.pthread_sigmask(signal.SIG_BLOCK, (signal.SIGINT, signal.SIGTERM))
         try:
+            worker_number = 0
             for svc, count in plan['forks']:
                 for _ in range(count):
+                    worker_number += 1
                     pid = os.fork()
                     if pid == 0:
                         _set_pdeathsig(signal.SIGTERM)
@@ -582,6 +585,7 @@ class TokeoSmtpd(MetaMixin):
                             os._exit(0)
                         status = 0
                         try:
+                            start_service(self.app, 'smtpd', worker_number)
                             self._run_worker(svc, global_limits, plan['reuse'])
                         except Exception as err:
                             self.app.log.error(f"smtpd: worker {os.getpid()} of service '{svc.get('name')}' failed: {err}")
@@ -701,6 +705,7 @@ class TokeoSmtpdController(Controller):
             names = None
         elif not names:
             raise TokeoSmtpdError('smtpd: give service names or --all')
+        start_service(self.app, 'smtpd')
         self.app.smtpd.serve(names)
 
 

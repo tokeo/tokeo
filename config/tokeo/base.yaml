@@ -67,6 +67,12 @@ tokeo:
   # plugin_config_dir: /etc/tokeo/plugins.d/
   ### Where external templates are loaded from
   # template_dir: /var/lib/tokeo/templates/
+  ### Directory of the crash files of the services, one per process name,
+  ### with the stacks of all threads of a hard crash (segfault, abort)
+  # crash_dir: /var/log/tokeo/
+  ### Signal that writes the stacks of all threads into the crash file, or to
+  ### stderr without crash_dir, the process runs on
+  # thread_dump_signal: SIGUSR1
 
 
 

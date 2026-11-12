@@ -31,6 +31,7 @@ from time import monotonic
 from asyncio import sleep as asyncio_sleep
 
 from tokeo.ext.argparse import Controller
+from tokeo.core.cement.service import start_service
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.modules import resolve_module, resolve_object
 from cement.core.meta import MetaMixin
@@ -811,6 +812,7 @@ class TokeoNiceguiController(Controller):
             triggers restart
 
         """
+        start_service(self.app, 'nicegui')
         self.app.nicegui.startup(
             hotload_dir=self.app.pargs.hotload_dir,
             hotload=self.app.pargs.hotload,

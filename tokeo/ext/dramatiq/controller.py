@@ -16,9 +16,14 @@ from cement import ex
 from tokeo.core.utils.json import dump_json
 from dramatiq import cli
 from tokeo.ext.argparse import Controller
+from tokeo.core.cement.service import start_service
 from tokeo.ext.dramatiq.base import _check_number
 from tokeo.core.utils.validate import is_bool
 from tokeo.ext.dramatiq.exc import TokeoDramatiqError, TokeoDramatiqConfigError
+
+#: The environment variable dramatiq serve sets, its worker processes name
+#: themselves by it
+DRAMATIQ_SERVE_ENV = 'TOKEO_DRAMATIQ_SERVE'
 
 
 class TokeoDramatiqController(Controller):
@@ -483,6 +488,9 @@ class TokeoDramatiqController(Controller):
         # signal hook
         for res in self.app.hook.run('tokeo_dramatiq_pre_serve', self.app):
             pass
+        start_service(self.app, 'dramatiq')
+        # the worker processes inherit it and name themselves by it
+        os.environ[DRAMATIQ_SERVE_ENV] = '1'
         # go and run dramatiq workers with the parsed args (blocks)
         result = cli.main(args)
         # signal hook
