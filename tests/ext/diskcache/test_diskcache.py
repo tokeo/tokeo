@@ -11,6 +11,7 @@ import time
 import subprocess
 import sqlite3
 import threading
+from unittest import mock
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -253,7 +254,7 @@ def test_locks_lock_waits_by_locks_sleep_seconds(tmp, monkeypatch):
         assert _collect_sleeps_of_a_waiting_lock(app, monkeypatch) == [0.2]
 
 
-def test_temper_waits_by_locks_sleep_seconds(tmp):
+def test_temper_waits_by_locks_sleep_seconds(tmp, monkeypatch):
     """A blocked temper call sleeps locks_sleep_seconds of the config by default."""
     slept = []
 
@@ -261,9 +262,10 @@ def test_temper_waits_by_locks_sleep_seconds(tmp):
         slept.append(seconds)
         raise RuntimeError('stop waiting')
 
+    monkeypatch.setattr('tokeo.ext.diskcache.time', mock.Mock(time=time.time, sleep=sleep))
     with DiskcacheTest(tmp.dir, diskcache_config={'locks_sleep_seconds': 0.2}) as app:
 
-        @app.cache.locks.temper(max_calls=1, name='busy', sleep_func=sleep, verbose=False)
+        @app.cache.locks.temper(max_calls=1, name='busy', verbose=False)
         def inner():
             pass
 
@@ -461,6 +463,28 @@ def test_throttle_refills_over_time(tmp):
         # wait long enough for one token to refill
         time.sleep(0.7)
         assert job() == 'ran'
+
+
+def test_throttle_counts_from_now_after_a_clock_set_back(tmp, monkeypatch):
+    """A clock set back 500 s makes the next call wait one interval, not 501 s."""
+    now = [1000.0]
+    delays = []
+
+    def sleep(seconds):
+        delays.append(seconds)
+        now[0] += seconds
+
+    monkeypatch.setattr('tokeo.ext.diskcache.time', mock.Mock(time=lambda: now[0], sleep=sleep))
+    with DiskcacheTest(tmp.dir) as app:
+
+        @app.cache.locks.throttle(count=1, per_seconds=1, name='clock', verbose=False)
+        def job():
+            return 'ran'
+
+        assert job() == 'ran'
+        now[0] -= 500
+        assert job() == 'ran'
+    assert delays == [1.0]
 
 
 def test_throttle_blocking_delays(tmp):

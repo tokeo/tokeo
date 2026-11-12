@@ -24,8 +24,6 @@ it when the function completes.
     arguments
 - **expire** (float, optional): Seconds a call holds its slot at most, longer than
     the longest call. Defaults to 3600.
-- **sleep_func** (callable, optional): Sleep function on resource limit. Defaults to
-    time.sleep.
 - **sleep_seconds** (float, optional): Seconds to wait between retries while
     blocked. Defaults to the config ```locks_sleep_seconds```, 0.1.
 - **cb_on_locked** (callable, optional): Function to call on limit instead of

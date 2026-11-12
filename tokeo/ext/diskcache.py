@@ -383,8 +383,6 @@ class TokeoDiskCacheLocksHandler:
         name=None,
         name_format=None,
         expire=None,
-        time_func=time.time,
-        sleep_func=time.sleep,
         cb_on_locked=None,
         verbose=False,
     ):
@@ -418,14 +416,9 @@ class TokeoDiskCacheLocksHandler:
             the throttle key expires and the bucket starts full again. Must
             not be below per_seconds, otherwise the bucket is full too early.
             Defaults to per_seconds plus 10.
-        - **time_func** (callable, optional): Function to get the current
-            time. Defaults to time.time.
-        - **sleep_func** (callable, optional): Function to sleep while rate
-            limited. Defaults to time.sleep. If falsy and no cb_on_locked
-            is set, a limited call returns immediately without running the
-            wrapped function.
         - **cb_on_locked** (callable, optional): Function to call when rate
-            limited, instead of waiting.
+            limited, instead of waiting; it receives the unpacked function
+            arguments.
         - **verbose** (bool, optional): Whether to log throttling
             information. Defaults to False.
 
@@ -508,7 +501,7 @@ class TokeoDiskCacheLocksHandler:
                         # read the current bucket state from cache
                         values = self._cache.get(key)
                         # accept only a valid (number, number) bucket, the cache
-                        # hands it back as list; time_func may return int or float
+                        # hands it back as list
                         if type(values) in (tuple, list) and len(values) == 2 and is_number(values[0]) and is_number(values[1]):
                             # unpack the cached bucket state
                             last, tally = values
@@ -523,13 +516,17 @@ class TokeoDiskCacheLocksHandler:
                         # (re)initialize the bucket when no valid state exists
                         if values is None:
                             # initialize the variables
-                            last = time_func()
+                            last = time.time()
                             tally = count
                             # initialize the cache immediately
                             self._cache.set(key, (last, tally), expire=expire, tag=self._tag)
 
                         # refill tokens based on the elapsed time
-                        now = time_func()
+                        now = time.time()
+                        # a clock set back leaves last in the future, count from now
+                        if now < last:
+                            last = now
+                            self._cache.set(key, (last, tally), expire=expire, tag=self._tag)
                         tally += (now - last) * rate
                         delay = 0
 
@@ -554,15 +551,11 @@ class TokeoDiskCacheLocksHandler:
                     if cb_on_locked:
                         break
 
-                    # no callback and no sleep: give up without running
-                    if not sleep_func:
-                        break
-
                     # wait before the next attempt
-                    sleep_func(delay)
+                    time.sleep(delay)
 
-                # call the wrapped function or callback if set
-                result = func(*args, **kwargs) if delay == 0 else cb_on_locked(**arguments) if cb_on_locked else None
+                # call the wrapped function or the callback
+                result = func(*args, **kwargs) if delay == 0 else cb_on_locked(**arguments)
 
                 # return the @decorated result
                 return result
@@ -579,7 +572,6 @@ class TokeoDiskCacheLocksHandler:
         name=None,
         name_format=None,
         expire=3600,
-        sleep_func=time.sleep,
         sleep_seconds=None,
         cb_on_locked=None,
         verbose=False,
@@ -614,10 +606,6 @@ class TokeoDiskCacheLocksHandler:
             from the function arguments.
         - **expire** (float, optional): Seconds a call holds its slot at
             most, also when it was killed. Defaults to 3600.
-        - **sleep_func** (callable, optional): Sleep function used while
-            waiting for a free slot. Defaults to time.sleep. If falsy and
-            no cb_on_locked is set, a blocked call returns immediately
-            without running the wrapped function.
         - **sleep_seconds** (float, optional): Seconds to wait between retries
             while blocked. Defaults to the config ```locks_sleep_seconds```, 0.1.
         - **cb_on_locked** (callable, optional): Function to call when no
@@ -668,6 +656,10 @@ class TokeoDiskCacheLocksHandler:
         : Purging the cache while calls are in flight is destructive: it
             clears the very expire times that enforce the limit, so it can
             breach the limit temporarily as well.
+
+        : A clock set forward by more than the remaining expire of a running
+            call makes its slot look expired, the limit can be breached
+            until that call ends.
 
         : All processes on one cache must run the same version: an older
             one reads the slots as an invalid counter and resets it.
@@ -778,12 +770,8 @@ class TokeoDiskCacheLocksHandler:
                     if cb_on_locked:
                         break
 
-                    # no callback and no sleep: give up without running
-                    if not sleep_func:
-                        break
-
                     # wait before the next attempt
-                    sleep_func(sleep_seconds)
+                    time.sleep(sleep_seconds)
 
                 if has_slot:
                     try:
@@ -815,8 +803,8 @@ class TokeoDiskCacheLocksHandler:
                         if lost:
                             self.app.log.warning(f'@temper {key} slot was lost before release')
                 else:
-                    # call callback if set
-                    result = cb_on_locked(**arguments) if cb_on_locked else None
+                    # no slot free, the callback answers
+                    result = cb_on_locked(**arguments)
 
                 # return the @decorated result
                 return result
