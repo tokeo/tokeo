@@ -12,13 +12,15 @@ import faulthandler
 _PR_SET_NAME = 15
 
 
-def set_process_name(name):
+def set_process_name(name, short_name=None):
     """
     Set the name of the process that ps, top and the kernel log show.
 
     ### Args
 
     - **name** (str): The name of the process
+    - **short_name** (str, optional): The name the kernel keeps, at most 15
+        bytes; the name without it
 
     ### Returns
 
@@ -44,7 +46,7 @@ def set_process_name(name):
         named = True
     if sys.platform.startswith('linux'):
         libc = ctypes.CDLL(None, use_errno=True)
-        named = libc.prctl(_PR_SET_NAME, name.encode()[:15], 0, 0, 0) == 0 or named
+        named = libc.prctl(_PR_SET_NAME, (short_name or name).encode()[:15], 0, 0, 0) == 0 or named
     return named
 
 

@@ -110,9 +110,12 @@ grep -E 'VmRSS|VmHWM|Threads' /proc/<pid>/status
   ```
 
 - The kernel log names the process. Every service of tokeo names its process
-  ```<app label>-<service>[-<n>]```, e.g. ```fairy-scheduler```,
-  ```fairy-worker-2``` or ```fairy-smtpd-1```; the kernel keeps 15 bytes of
-  it.
+  for the kernel, which keeps 15 bytes, ```<app label:6>-<short>[<n>]```:
+  ```sched```, ```drtiq```, ```wrk<n>``` for a dramatiq worker, ```smtpd```,
+  ```smtpd<n>``` for a smtpd worker, ```grpc``` and ```niceg```, e.g.
+  ```fairy-sched``` or ```fairya-wrk2``` of an app ```fairyapp```. With
+  setproctitle installed ps shows the long name, e.g.
+  ```fairyapp-dramatiq-worker-2```, the name of the log lines as well.
 - Limit the memory of a service by its environment, not inside the process:
   ```MemoryMax=``` of a systemd unit, ```--memory``` of docker or
   ```memory.max``` of the cgroup of a container. The kernel then kills the

@@ -460,7 +460,7 @@ class TokeoGrpcController(Controller):
         This command starts the gRPC server and blocks until interrupted.
         It delegates to the app.grpc.serve() method of the TokeoGrpc extension.
         """
-        start_service(self.app, 'grpc')
+        start_service(self.app, 'grpc', 'grpc')
         self.app.grpc.serve()
 
 

@@ -44,14 +44,17 @@ def _log_end(app, name, started_at, caught_signums):
     app.log.debug(f'service {name} ended {reason} after {runtime:.1f} s (exit code {app.exit_code})')
 
 
-def start_service(app, service, number=None):
+def start_service(app, service, short, number=None):
     """
     Prepare the process of a service: name, crash file, thread dump, start line.
 
     ### Args
 
     - **app** (Application): The Cement application instance
-    - **service** (str): The name of the service, e.g. ```scheduler```
+    - **service** (str): The name of the service, e.g. ```scheduler``` or
+        ```dramatiq-worker```
+    - **short** (str): The short name of the service for the kernel, e.g.
+        ```sched``` or ```wrk```
     - **number** (int|str, optional): The number of a worker process
 
     ### Raises
@@ -61,9 +64,11 @@ def start_service(app, service, number=None):
 
     ### Notes
 
-    : The process is named ```<app label>-<service>[-<number>]```; the kernel
-        keeps 15 bytes of it. Off Linux without setproctitle the name is not
-        set and a warning tells so.
+    : The process is named ```<app label>-<service>[-<number>]```, the name
+        of setproctitle, the log lines and the crash file. The kernel keeps 15
+        bytes, it gets ```<app label:6>-<short>[<number>]```, e.g.
+        ```fairya-wrk3```. Off Linux without setproctitle the name is not set
+        and a warning tells so.
 
     : ```crash_dir``` and ```thread_dump_signal``` of the config section of the
         app are null by default: no crash file, no thread dump. The crash file
@@ -84,7 +89,10 @@ def start_service(app, service, number=None):
     if dump_signal is not None and not isinstance(dump_signum, signal.Signals):
         raise TokeoServiceError(f'{app._meta.label}.thread_dump_signal must name a signal like SIGUSR1, not {dump_signal!r}')
     name = f'{app._meta.label}-{service}' + ('' if number is None else f'-{number}')
-    if not set_process_name(name):
+    # the app label keeps 6 bytes, so the longest short name, wrk and 5 digits,
+    # fits the 15 bytes of the kernel
+    short_name = f'{app._meta.label[:6]}-{short}' + ('' if number is None else str(number))
+    if not set_process_name(name, short_name):
         app.log.warning(f'service {name}: the process name is not set on this platform')
     crash_file = None
     if crash_dir is not None:

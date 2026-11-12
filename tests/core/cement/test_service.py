@@ -32,12 +32,12 @@ def _run_probe(body, settings='{}'):
 
 
 def test_start_service_names_the_process_and_logs_start_and_end():
-    """The worker 3 of a probe service is named, its start and end are logged."""
-    done_process = _run_probe(["start_service(app, 'probe', 3)", "print(open('/proc/self/comm').read().strip())"])
+    """The kernel gets the short name of worker 3, the log lines the long name."""
+    done_process = _run_probe(["start_service(app, 'probe-worker', 'prb', 3)", "print(open('/proc/self/comm').read().strip())"])
     if sys.platform.startswith('linux'):
-        assert done_process.stdout.splitlines() == ['tokeo_test-prob']
-    assert 'service tokeo_test-probe-3 started (pid ' in done_process.stderr
-    assert 'service tokeo_test-probe-3 ended normally after ' in done_process.stderr
+        assert done_process.stdout.splitlines() == ['tokeo_-prb3']
+    assert 'service tokeo_test-probe-worker-3 started (pid ' in done_process.stderr
+    assert 'service tokeo_test-probe-worker-3 ended normally after ' in done_process.stderr
     assert '(exit code 0)' in done_process.stderr
 
 
@@ -45,14 +45,14 @@ def test_start_service_tells_the_signal_that_ended_it():
     """A caught SIGTERM is the reason of the end line."""
     # cement runs the hook signal like this before it raises CaughtSignal; the
     # run is a generator, list() runs it
-    done_process = _run_probe(["start_service(app, 'probe')", "list(app.hook.run('signal', app, signal.SIGTERM, None))"])
+    done_process = _run_probe(["start_service(app, 'probe', 'prb')", "list(app.hook.run('signal', app, signal.SIGTERM, None))"])
     assert 'service tokeo_test-probe ended by SIGTERM after ' in done_process.stderr
 
 
 def test_start_service_writes_a_thread_dump_into_the_crash_file(tmp_path):
     """With crash_dir and SIGUSR1 the signal writes the stacks to the crash file."""
     settings = f'{{"crash_dir": "{tmp_path}", "thread_dump_signal": "SIGUSR1"}}'
-    done_process = _run_probe(["start_service(app, 'probe')", 'os.kill(os.getpid(), signal.SIGUSR1)'], settings)
+    done_process = _run_probe(["start_service(app, 'probe', 'prb')", 'os.kill(os.getpid(), signal.SIGUSR1)'], settings)
     assert done_process.returncode == 0, done_process.stderr
     assert 'Current thread' in (tmp_path / 'tokeo_test-probe.crash').read_text()
 
@@ -72,5 +72,5 @@ def test_start_service_refuses_a_wrong_setting(settings, expected):
     """A wrong crash_dir or thread_dump_signal raises before the process changes."""
     with TokeoTest(config_defaults={'tokeo_test': settings}) as app:
         with pytest.raises(TokeoServiceError) as err_info:
-            start_service(app, 'probe')
+            start_service(app, 'probe', 'prb')
     assert str(err_info.value) == expected

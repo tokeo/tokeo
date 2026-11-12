@@ -21,6 +21,20 @@ def _run_probe(code, *args):
 
 
 @pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the kernel name of a process is read from /proc')
+def test_set_process_name_gives_the_kernel_the_short_name():
+    """The kernel gets the short name, the long one goes to setproctitle."""
+    code = '\n'.join(
+        [
+            'from tokeo.core.utils.process import set_process_name',
+            "print(set_process_name('tokeo-probe-worker-1', 'tokeo-prb1'))",
+            "print(open('/proc/self/comm').read().strip())",
+        ]
+    )
+    done_process = _run_probe(code)
+    assert done_process.stdout.splitlines() == ['True', 'tokeo-prb1']
+
+
+@pytest.mark.skipif(not sys.platform.startswith('linux'), reason='the kernel name of a process is read from /proc')
 def test_set_process_name_sets_the_kernel_name():
     """The kernel keeps 15 bytes of the name, set_process_name returns True."""
     code = '\n'.join(

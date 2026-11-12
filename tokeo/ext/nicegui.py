@@ -865,7 +865,7 @@ class TokeoNiceguiController(Controller):
             triggers restart
 
         """
-        start_service(self.app, 'nicegui')
+        start_service(self.app, 'nicegui', 'niceg')
         self.app.nicegui.startup(
             hotload_dir=self.app.pargs.hotload_dir,
             hotload=self.app.pargs.hotload,

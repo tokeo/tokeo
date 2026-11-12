@@ -1151,7 +1151,7 @@ class TokeoSchedulerController(Controller):
         foreground.
 
         """
-        start_service(self.app, 'scheduler')
+        start_service(self.app, 'scheduler', 'sched')
         self.app.scheduler.launch(with_shell=self.app.pargs.shell, paused=self.app.pargs.paused)
 
 

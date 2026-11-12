@@ -135,15 +135,16 @@ def tokeo_dramatiq_extend_app(app):
         as app.dramatiq
 
     : A worker process of ```dramatiq serve``` names itself
-        ```<app label>-worker-<n>``` by ```start_service```
+        ```<app label>-dramatiq-worker-<n>```, short ```wrk<n>```, by
+        ```start_service```
 
     """
     check_required_extensions(app, 'tokeo.ext.dramatiq', 'tokeo.ext.tui.output')
     app.extend('dramatiq', TokeoDramatiq(app))
     app.dramatiq._setup(app)
-    # a worker process of dramatiq serve names itself, e.g. <app>-worker-1
+    # a worker process of dramatiq serve names itself, e.g. <app>-dramatiq-worker-1
     if os.environ.get(DRAMATIQ_SERVE_ENV) and multiprocessing.parent_process() is not None:
-        start_service(app, 'worker', multiprocessing.current_process().name.rsplit('-', 1)[-1])
+        start_service(app, 'dramatiq-worker', 'wrk', multiprocessing.current_process().name.rsplit('-', 1)[-1])
 
 
 def tokeo_dramatiq_shutdown(app):

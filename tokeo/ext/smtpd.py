@@ -585,7 +585,7 @@ class TokeoSmtpd(MetaMixin):
                             os._exit(0)
                         status = 0
                         try:
-                            start_service(self.app, 'smtpd', worker_number)
+                            start_service(self.app, 'smtpd-worker', 'smtpd', worker_number)
                             self._run_worker(svc, global_limits, plan['reuse'])
                         except Exception as err:
                             self.app.log.error(f"smtpd: worker {os.getpid()} of service '{svc.get('name')}' failed: {err}")
@@ -705,7 +705,7 @@ class TokeoSmtpdController(Controller):
             names = None
         elif not names:
             raise TokeoSmtpdError('smtpd: give service names or --all')
-        start_service(self.app, 'smtpd')
+        start_service(self.app, 'smtpd', 'smtpd')
         self.app.smtpd.serve(names)
 
 

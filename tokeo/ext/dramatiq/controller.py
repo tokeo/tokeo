@@ -488,7 +488,7 @@ class TokeoDramatiqController(Controller):
         # signal hook
         for res in self.app.hook.run('tokeo_dramatiq_pre_serve', self.app):
             pass
-        start_service(self.app, 'dramatiq')
+        start_service(self.app, 'dramatiq', 'drtiq')
         # the worker processes inherit it and name themselves by it
         os.environ[DRAMATIQ_SERVE_ENV] = '1'
         # go and run dramatiq workers with the parsed args (blocks)
