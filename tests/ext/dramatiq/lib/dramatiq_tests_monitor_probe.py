@@ -7,7 +7,7 @@ The monitor gets a fixed snapshot instead of listening to rabbitmq.
 
 import sys
 import time
-from cement.utils import fs
+from tests.utils import Tmp
 from tests.ext.dramatiq.lib.dramatiq_tests_helper import DramatiqTest
 
 
@@ -26,7 +26,7 @@ def snapshot(wait_seconds=0):
 
 if __name__ == '__main__':
     # the first argument is the directory of the test, its tmp stays there
-    tmp = fs.Tmp(dir=sys.argv[1])
+    tmp = Tmp(dir=sys.argv[1])
     with DramatiqMonitorProbeTest(tmp, sys.argv[2:]) as app:
         app.dramatiq.monitor.snapshot = snapshot
         app.run()
