@@ -18,6 +18,8 @@ polling mechanism.
 - Lets other extensions add their parts to ```app.nicegui``` by the hook
   ```tokeo_nicegui_extend```, e.g. the pocketbase extension its live data as
   ```app.nicegui.pb```
+- Imports NiceGUI only on the first access to ```app.nicegui```, so a process
+  that never touches it, e.g. a worker, does not carry NiceGUI
 - Ships sensible configuration defaults for most use cases
 - Manages the full server lifecycle through Tokeo application hooks
 
@@ -36,10 +38,6 @@ from tokeo.core.exc import TokeoError
 from tokeo.core.utils.modules import resolve_module, resolve_object
 from cement.core.meta import MetaMixin
 from cement import ex
-from nicegui import ui, app as fastapi_app, context, core as nicegui_core
-from nicegui.slot import Slot
-from nicegui.element import Element
-from nicegui.elements.mixins.text_element import TextElement
 
 
 class TokeoNiceguiError(TokeoError):
@@ -186,6 +184,10 @@ def check_user_context():
         nicegui in the global scope
 
     """
+    # lazy: only a page that is built needs nicegui
+    from nicegui import context, core as nicegui_core
+    from nicegui.slot import Slot
+
     # no slot means no page runs; context.client would make a script client
     # of nicegui then, so it is not touched before
     if not Slot.get_stack():
@@ -265,6 +267,9 @@ class NiceguiElementHelper:
         """
 
         def wrapper(text=None, *args, **kwargs):
+            from nicegui.element import Element
+            from nicegui.elements.mixins.text_element import TextElement
+
             # check multi-user safety BEFORE creating the new element
             check_user_context()
 
@@ -377,15 +382,69 @@ class TokeoNicegui(MetaMixin):
     #: (Application) The Cement application instance, set on setup
     app = None
 
-    #: (module) The ```ui``` module of NiceGUI for the elements of a page, set on
-    #: setup
-    ui = None
+    # whether NiceGUI is imported and the other extensions added their parts
+    _loaded = False
 
-    #: (App) The FastAPI app of NiceGUI for routes and apis, set on setup
-    fastapi_app = None
+    @property
+    def ui(self):
+        """(module) The ```ui``` module of NiceGUI for the elements of a page."""
+        if not self._loaded:
+            self._load()
+        return self._ui
 
-    #: (NiceguiElementHelper) Helper that creates any HTML element, set on setup
-    ux = None
+    @property
+    def fastapi_app(self):
+        """(App) The FastAPI app of NiceGUI for routes and apis."""
+        if not self._loaded:
+            self._load()
+        return self._fastapi_app
+
+    @property
+    def ux(self):
+        """(NiceguiElementHelper) Helper that creates any HTML element."""
+        if not self._loaded:
+            self._load()
+        return self._ux
+
+    def __getattr__(self, name):
+        # a part of another extension, e.g. pb, appears with the first access
+        if name.startswith('_') or self._loaded:
+            raise AttributeError(name)
+        self._load()
+        return getattr(self, name)
+
+    def _load(self):
+        """
+        Import NiceGUI and let the other extensions add their parts, once.
+
+        Runs on the first access to ```ui```, ```fastapi_app```, ```ux``` or a
+        part of another extension, so a process that never touches
+        ```app.nicegui``` does not import NiceGUI. The hook
+        ```tokeo_nicegui_extend``` runs here; a function of the hook adds its
+        part by ```app.nicegui.extend(name, obj)```.
+
+        ### Example
+
+        ```python
+        def myext_extend_nicegui(app):
+            app.nicegui.extend('my', MyNiceguiPart(app))
+
+        def load(app):
+            # without the nicegui extension the hook is not defined, Cement
+            # ignores a function hooked to it
+            app.hook.register('tokeo_nicegui_extend', myext_extend_nicegui)
+        ```
+
+        """
+        self._loaded = True
+        # lazy: importing NiceGUI costs about 49 MB per process
+        from nicegui import ui, app as fastapi_app
+
+        self._ui = ui
+        self._fastapi_app = fastapi_app
+        self._ux = NiceguiElementHelper()
+        for res in self.app.hook.run('tokeo_nicegui_extend', self.app):
+            pass
 
     def extend(self, name, obj):
         """
@@ -404,7 +463,7 @@ class TokeoNicegui(MetaMixin):
         ### Notes
 
         : Called by a function of the hook ```tokeo_nicegui_extend```, which
-            runs only when the nicegui extension is loaded
+            runs on the first access to ```app.nicegui```
 
         """
         if hasattr(self, name):
@@ -428,12 +487,6 @@ class TokeoNicegui(MetaMixin):
         self.app = app
         # prepare the config
         self.app.config.merge({self._meta.config_section: self._meta.config_defaults}, override=False)
-        # allow easy access to ui
-        self.ui = ui
-        # allow easy access to fastapi app
-        self.fastapi_app = fastapi_app
-        # add the ux helper
-        self.ux = NiceguiElementHelper()
         # the routes function as module:function, resolved at startup
         self._routes = self._config('routes')
         self._openapi_custom_module = self._config('openapi_custom_module')
@@ -546,7 +599,7 @@ class TokeoNicegui(MetaMixin):
         settle = float(self._config('hotload_settle_seconds'))
         while True:
             if self._watchdog_hotload_requested and monotonic() - self._watchdog_last_event_time >= settle:
-                fastapi_app.shutdown()
+                self.fastapi_app.shutdown()
                 break
             await asyncio_sleep(interval)
 
@@ -613,15 +666,15 @@ class TokeoNicegui(MetaMixin):
                 # activate watchdog
                 self._setup_watchdog()
                 # Create the file monitor task to run in the FastAPI's event loop
-                fastapi_app.on_startup(self._watch_file_changes)
+                self.fastapi_app.on_startup(self._watch_file_changes)
             else:
                 self.app.log.warning(f'Hotload is off, the dir to watch does not exist: {self._hotload_dir}')
 
         # use custom welcome message
-        fastapi_app.on_startup(
+        self.fastapi_app.on_startup(
             # fmt: off
             lambda: self.app.log.info(
-                f'{self._welcome_message} {", ".join([x for x in fastapi_app.urls])}'
+                f'{self._welcome_message} {", ".join([x for x in self.fastapi_app.urls])}'
             )
             # fmt: on
         )
@@ -640,11 +693,11 @@ class TokeoNicegui(MetaMixin):
             except (TokeoError, AttributeError) as err:
                 raise TokeoNiceguiError(f'openapi_custom_module {self._openapi_custom_module!r} cannot serve the openapi: {err}') from err
             # define general openapi.json url
-            fastapi_app.openapi_url = self._openapi_url
+            self.fastapi_app.openapi_url = self._openapi_url
             # setup openapi
-            fastapi_app.setup()
+            self.fastapi_app.setup()
             # customize get_openapi options
-            fastapi_app.openapi = get_openapi_custom
+            self.fastapi_app.openapi = get_openapi_custom
             # launch swagger doc
             if swagger_ui_html:
                 self.fastapi_app.get(self._openapi_swagger_url, include_in_schema=False)(swagger_ui_html)
@@ -688,7 +741,7 @@ class TokeoNicegui(MetaMixin):
             for k, v in overwrite_with_run_kwargs.items():
                 nicegui_run_config[k] = v
         # spin up the service
-        ui.run(**nicegui_run_config)
+        self.ui.run(**nicegui_run_config)
 
     def shutdown(self):
         """
@@ -919,42 +972,6 @@ def tokeo_nicegui_extend_app(app):
     app.nicegui._setup(app)
 
 
-def tokeo_nicegui_extend_by_others(app):
-    """
-    Let other extensions add their parts to app.nicegui.
-
-    Runs the hook ```tokeo_nicegui_extend``` at the end of the setup, after
-    every extension set itself up; a function of the hook adds its part by
-    ```app.nicegui.extend(name, obj)```.
-
-    ### Args
-
-    - **app** (Application): The Cement application instance
-
-    ### Example
-
-    ```python
-    def myext_extend_nicegui(app):
-        app.nicegui.extend('my', MyNiceguiPart(app))
-
-    def myext_setup(app):
-        # in post_setup the hook is defined, if nicegui is loaded
-        app.hook.register('tokeo_nicegui_extend', myext_extend_nicegui)
-
-    def load(app):
-        app.hook.register('post_setup', myext_setup)
-    ```
-
-    ### Notes
-
-    : Without the nicegui extension the hook is not defined, Cement ignores
-        a function hooked to it; so an extension never needs nicegui itself
-
-    """
-    for res in app.hook.run('tokeo_nicegui_extend', app):
-        pass
-
-
 def tokeo_nicegui_shutdown(app):
     """
     Handle application shutdown for NiceGUI.
@@ -1014,15 +1031,14 @@ def load(app):
     - Registers the TokeoNiceguiController for CLI commands
     - Sets up hooks for application lifecycle integration
     - Integrates with pdoc for documentation generation
-    - Defines the hook ```tokeo_nicegui_extend```, run late in post_setup, so
-        other extensions add their parts to ```app.nicegui``` whatever
+    - Defines the hook ```tokeo_nicegui_extend```, run on the first access
+        to ```app.nicegui```, so other extensions add their parts whatever
         their order of loading
 
     """
     app.handler.register(TokeoNiceguiController)
     app.hook.define('tokeo_nicegui_extend')
     app.hook.register('post_setup', tokeo_nicegui_extend_app)
-    app.hook.register('post_setup', tokeo_nicegui_extend_by_others, weight=100)
     app.hook.register('pre_close', tokeo_nicegui_shutdown)
     app.hook.register('post_close', tokeo_nicegui_hotload)
     app.hook.register('tokeo_pdoc_render_decorator', tokeo_nicegui_pdoc_render_decorator)

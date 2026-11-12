@@ -332,8 +332,9 @@ topics on a feed and loads what it shows by the client of the feed.
 It is there when the app loads both extensions, ```tokeo.ext.pocketbase``` and
 ```tokeo.ext.nicegui```, in any order: the pocketbase extension adds
 ```app.nicegui.pb``` by the hook ```tokeo_nicegui_extend``` of the nicegui
-extension; without nicegui that hook is not defined and nothing of nicegui
-is loaded. The code is ```tokeo.ext.pocketbase.live```.
+extension, on the first access to ```app.nicegui```; a process that never
+touches it, e.g. a worker, loads nothing of nicegui, and without nicegui that
+hook is not defined. The code is ```tokeo.ext.pocketbase.live```.
 
 ### A dashboard for everybody, by the service identity
 

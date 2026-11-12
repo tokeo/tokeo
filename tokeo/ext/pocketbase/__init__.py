@@ -723,7 +723,7 @@ def tokeo_pocketbase_extend_nicegui(app):
     Add the live data of PocketBase to nicegui as app.nicegui.pb.
 
     Runs by the hook ```tokeo_nicegui_extend``` of the nicegui extension,
-    only when it is loaded.
+    only when it is loaded, on the first access to ```app.nicegui```.
 
     ### Args
 

@@ -12,6 +12,7 @@ with the global state of nicegui reset.
 
 import ast
 import sys
+import subprocess
 import time
 import types
 import asyncio
@@ -31,7 +32,7 @@ from tokeo.ext.nicegui import (
     TokeoNiceguiWatchdogEventHandler,
     tokeo_nicegui_pdoc_render_decorator,
 )
-from tests.utils import wait_until
+from tests.utils import ROOT_DIR, wait_until
 from tests.utils.nicegui import NiceguiSimulation
 
 #: The routes of the tests, _map_pages of this module
@@ -110,6 +111,25 @@ def runs(monkeypatch):
 
 
 # setup
+
+
+def test_nicegui_is_imported_only_on_the_first_access():
+    """An app with the nicegui extension imports NiceGUI only when it uses it."""
+    code = '\n'.join(
+        [
+            'import sys',
+            'from tokeo.main import TokeoTest',
+            'class AppTest(TokeoTest):',
+            '    class Meta:',
+            "        extensions = ['tokeo.ext.print', 'tokeo.ext.nicegui']",
+            'with AppTest() as app:',
+            "    print('nicegui' in sys.modules)",
+            '    app.nicegui.ui',
+            "    print('nicegui' in sys.modules)",
+        ]
+    )
+    done_process = subprocess.run([sys.executable, '-c', code], cwd=ROOT_DIR, capture_output=True, text=True, timeout=60)
+    assert done_process.stdout.splitlines() == ['False', 'True'], done_process.stderr
 
 
 def test_setup_gives_ui_fastapi_app_and_ux():
