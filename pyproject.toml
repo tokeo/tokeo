@@ -75,7 +75,7 @@ include-package-data = true
 "tokeo.templates" = ["**/*", "**/.*"]
 
 [tool.setuptools.exclude-package-data]
-"tokeo.templates" = ["**/__pycache__/*", "**/*.pyc"]
+"*" = ["**/__pycache__/*", "**/*.pyc"]
 
 [tool.setuptools.dynamic]
 version = {attr = "tokeo.core.version.get_version"}
