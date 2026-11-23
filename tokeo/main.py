@@ -44,6 +44,8 @@ class Tokeo(App):
             'tokeo': dict(
                 # run the app in debug mode
                 debug=False,
+                # absolute folder of the local config of the machine, null for none
+                local_config_dir=None,
                 # directory of the crash files of the services, null writes none
                 crash_dir=None,
                 # signal that dumps the stacks of all threads, null dumps none
