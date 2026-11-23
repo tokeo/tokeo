@@ -1,14 +1,26 @@
 """
 Tests for tokeo.ext.appenv: the environment variable of the app names a known
-environment or none, an unknown name raises.
+environment or none, an unknown name raises, and the app reads only the config
+files of its config dir, none of the places cement reads by itself.
 """
 
 import types
 
 import pytest
 
+from tokeo.main import Tokeo
 from tokeo.core.exc import TokeoError
 from tokeo.ext.appenv import TokeoAppEnv
+
+
+class AppenvApp(Tokeo):
+    """
+    The app of tokeo itself, not its test app: the TestApp of cement clears the
+    config places of cement already, so only a real app shows what appenv does.
+    """
+
+    class Meta:
+        exit_on_close = False
 
 
 @pytest.mark.parametrize('value', ['prd', 'live', 'Development2'])
@@ -94,3 +106,11 @@ def test_partial_and_local_configs(monkeypatch, tmp_path):
             'production.d/sub/2-b.local.yaml',
         ]
     ]
+
+
+def test_app_reads_only_its_config_dir(monkeypatch):
+    """No /etc/tokeo or ~/.tokeo.yaml of cement, only config/tokeo/base.yaml."""
+    monkeypatch.delenv('TOKEO_ENV', raising=False)
+    with AppenvApp(argv=[]) as app:
+        assert app._meta.config_files == [f'{app.env.APP_CONFIG_DIR}/base.yaml']
+        assert app._meta.config_dirs == []

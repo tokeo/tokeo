@@ -73,6 +73,9 @@ class TokeoAppEnv:
         in the same place
     - If no environment is detected (APP_ENV is None), only the base config
         files are loaded and all IS_*_MODE flags are False
+    - Removes the config files and dirs cement reads by itself, e.g.
+        ```/etc/<label>/<label>.yaml```, ```~/.config/<label>/``` and
+        ```~/.<label>.yaml```; only the files of ```config/<label>``` are read
 
     ### Raises
 
@@ -142,6 +145,11 @@ class TokeoAppEnv:
         # build the config dir
         #: The configuration directory of the application
         self.APP_CONFIG_DIR = fs.abspath(os.path.join(self.APP_DIR, 'config', self.APP_LABEL))
+        # remove all default cement config loadings
+        app._meta.core_system_config_files = []
+        app._meta.core_system_config_dirs = []
+        app._meta.core_user_config_files = []
+        app._meta.core_user_config_dirs = []
         # add base configs
         app._meta.config_files = self.get_config_files(app_config_file_suffix=app._meta.config_file_suffix)
         # add environment configs on top of base, but only if an
