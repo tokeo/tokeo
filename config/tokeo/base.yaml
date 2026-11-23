@@ -17,6 +17,8 @@
 ###    ```config/tokeo/[environment].d/*.yaml```
 ### 1. Local configuration: ```[environment].local.yaml``` and the ```*.local.yaml``` of
 ###    ```[environment].d```, never for base
+### 1. Machine configuration: the same .local files of ```[environment]``` from the absolute
+###    folder of ```tokeo.local_config_dir```, when it is set, never for base
 ###
 ### <p>
 ### Where ```[environment]``` can be one of:
