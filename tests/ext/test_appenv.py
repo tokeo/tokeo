@@ -54,11 +54,12 @@ def test_long_and_short_names(monkeypatch, value, env):
 
 @pytest.mark.parametrize('value', [None, 'production', 'prd'])
 def test_test_app_runs_in_testing(monkeypatch, value):
-    """A "<app>_test" app runs in testing, whatever SHOP_ENV says."""
-    if value is None:
-        monkeypatch.delenv('SHOP_ENV', raising=False)
-    else:
-        monkeypatch.setenv('SHOP_ENV', value)
+    """A "<app>_test" app runs in testing, whatever SHOP_ENV or SHOP_TEST_ENV is."""
+    for name in ['SHOP_ENV', 'SHOP_TEST_ENV']:
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
     app = types.SimpleNamespace(_meta=types.SimpleNamespace(label='shop_test', main_dir='/tmp', config_file_suffix='.yaml'))
     appenv = TokeoAppEnv(app)
     assert (appenv.APP_ENV, appenv.APP_ENV_VAR_VALUE, app._meta.label) == ('testing', 'test', 'shop')
