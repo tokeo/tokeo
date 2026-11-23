@@ -40,14 +40,16 @@ class Tokeo(App):
         main_dir = os.path.dirname(fs.abspath(__file__))
 
         # Defaults of the config section
-        config_defaults = dict(
-            # run the app in debug mode
-            debug=False,
-            # directory of the crash files of the services, null writes none
-            crash_dir=None,
-            # signal that dumps the stacks of all threads, null dumps none
-            thread_dump_signal=None,
-        )
+        config_defaults = {
+            'tokeo': dict(
+                # run the app in debug mode
+                debug=False,
+                # directory of the crash files of the services, null writes none
+                crash_dir=None,
+                # signal that dumps the stacks of all threads, null dumps none
+                thread_dump_signal=None,
+            ),
+        }
 
         # call sys.exit() on close
         exit_on_close = True
