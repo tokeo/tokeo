@@ -68,9 +68,9 @@ class TokeoAppEnv:
     - Detects environment from environment variables or app name suffix
     - Configures application paths and directories
     - Includes environment-specific configuration files
-    - Handles the cement test app class in a specific manner. Replaces
-        the "_test" suffix to allow easily the usage for testing configuration
-        in the same place
+    - Handles the cement test app class in a specific manner. Strips the
+        "_test" suffix to use the config of the app, and runs it always in
+        testing, whatever ```<APP_LABEL>_ENV``` says
     - If no environment is detected (APP_ENV is None), only the base config
         files are loaded and all IS_*_MODE flags are False
     - Removes the config files and dirs cement reads by itself, e.g.
@@ -92,12 +92,22 @@ class TokeoAppEnv:
         # get the app label
         #: The lowercase application label
         self.APP_LABEL = app._meta.label.strip().lower()
+        # an "<app>_test" app reuses the identity of its base app: the
+        # "_test" suffix gets stripped, so label, env var name and (most
+        # important) config dir resolve to "<app>" instead of "<app>_test"
+        is_test_app = self.APP_LABEL.endswith('_test')
+        if is_test_app:
+            app._meta.label = self.APP_LABEL = self.APP_LABEL[: -len('_test')]
         # build the main ENV_VAR_NAME from app meta label
         #: The environment variable name for app environment
         self.APP_ENV_VAR_NAME = self.APP_LABEL.upper() + '_ENV'
-        # get the started ENV
-        #: The value of the environment variable
-        self.APP_ENV_VAR_VALUE = os.environ.get(self.APP_ENV_VAR_NAME, default='').strip().lower()
+        # get the started ENV, a test app runs always in testing, a set
+        # "<APP>_ENV=prod" of the shell must not run the tests on production
+        if is_test_app:
+            #: The value of the environment variable
+            self.APP_ENV_VAR_VALUE = 'test'
+        else:
+            self.APP_ENV_VAR_VALUE = os.environ.get(self.APP_ENV_VAR_NAME, default='').strip().lower()
         # check the started ENV
         if self.APP_ENV_VAR_VALUE in ['dev', 'development']:
             self.APP_ENV = DEVELOPMENT
@@ -107,23 +117,11 @@ class TokeoAppEnv:
             self.APP_ENV = STAGING
         elif self.APP_ENV_VAR_VALUE in ['test', 'testing']:
             self.APP_ENV = TESTING
-        elif self.APP_LABEL.endswith('_test'):
-            # an "<app>_test" app runs automatically in testing mode but
-            # reuses its base app identity. The "_test" suffix gets stripped
-            # so label, env var name and (most important) config dir will
-            # resolve and align to "<app>" instead of "<app>_test".
-            # Otherwise it would be necessary to have a different testing
-            # config dir and files when running tests by cements test app.
-            app._meta.label = self.APP_LABEL[: -len('_test')]
-            self.APP_LABEL = app._meta.label
-            self.APP_ENV_VAR_NAME = self.APP_LABEL.upper() + '_ENV'
-            self.APP_ENV_VAR_VALUE = 'test'
-            self.APP_ENV = TESTING
         elif self.APP_ENV_VAR_VALUE:
             # a typo must not run with the base config only
             raise TokeoError(
                 f'{self.APP_ENV_VAR_NAME}={self.APP_ENV_VAR_VALUE!r} is no environment, '
-                'use development, staging, production or test (or dev, stage, prod, testing)'
+                'use dev, development, prod, production, stage, staging, test or testing'
             )
         else:
             self.APP_ENV = None

@@ -28,7 +28,7 @@ def test_unknown_environment_raises(monkeypatch, value):
     """An env value that names no environment raises, naming variable and value."""
     monkeypatch.setenv('SHOP_ENV', value)
     app = types.SimpleNamespace(_meta=types.SimpleNamespace(label='shop', main_dir='/tmp'))
-    with pytest.raises(TokeoError, match=f"^SHOP_ENV='{value.lower()}' is no environment, use development, staging, "):
+    with pytest.raises(TokeoError, match=f"^SHOP_ENV='{value.lower()}' is no environment, use dev, development, prod, production, "):
         TokeoAppEnv(app)
 
 
@@ -52,9 +52,13 @@ def test_long_and_short_names(monkeypatch, value, env):
     assert TokeoAppEnv(app).APP_ENV == env
 
 
-def test_test_app_runs_in_testing(monkeypatch):
-    """A "<app>_test" app runs in testing, its variable says test."""
-    monkeypatch.delenv('SHOP_ENV', raising=False)
+@pytest.mark.parametrize('value', [None, 'production', 'prd'])
+def test_test_app_runs_in_testing(monkeypatch, value):
+    """A "<app>_test" app runs in testing, whatever SHOP_ENV says."""
+    if value is None:
+        monkeypatch.delenv('SHOP_ENV', raising=False)
+    else:
+        monkeypatch.setenv('SHOP_ENV', value)
     app = types.SimpleNamespace(_meta=types.SimpleNamespace(label='shop_test', main_dir='/tmp', config_file_suffix='.yaml'))
     appenv = TokeoAppEnv(app)
     assert (appenv.APP_ENV, appenv.APP_ENV_VAR_VALUE, app._meta.label) == ('testing', 'test', 'shop')
