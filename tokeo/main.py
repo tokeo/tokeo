@@ -102,8 +102,10 @@ class TokeoTest(TestApp, Tokeo):
     ### Notes
 
     - Uses standard logging instead of colorlog for cleaner test output
-    - Includes a smaller set of extensions to reduce test complexity
-    - Appends '_test' to the app label to distinguish from production instances
+    - Includes a smaller set of extensions to reduce test complexity: appenv,
+        print and yaml, a test app sets its own list for more
+    - Appends '_test' to the app label; appenv strips it again and runs the
+        app in the testing environment with the config of ```config/tokeo```
 
     """
 
@@ -113,7 +115,9 @@ class TokeoTest(TestApp, Tokeo):
 
         # load additional framework extensions
         extensions = [
+            'tokeo.ext.appenv',
             'tokeo.ext.print',
+            'tokeo.ext.yaml',
         ]
 
         # set the log handler

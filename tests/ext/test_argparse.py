@@ -104,14 +104,14 @@ def test_controller_parsers_use_the_tokeo_argparse_help_formatter():
 def test_controller_without_a_command_prints_its_help(capsys):
     """Without a command the base controller prints its help and returns."""
     text = _get_help([], capsys)
-    assert text.startswith('usage: tokeo_test')
+    assert text.startswith('usage: tokeo [-h]')
     assert 'sub-commands:' in text
 
 
 def test_controller_nested_without_a_command_prints_its_help(capsys):
     """'nested' without a command prints the help of the nested controller."""
     text = _get_help(['nested'], capsys)
-    assert text.startswith('usage: tokeo_test nested')
+    assert text.startswith('usage: tokeo nested')
     assert _get_commands(text) == ['  inner    inner help']
 
 
@@ -164,7 +164,7 @@ def test_help_aligns_the_help_of_the_commands(capsys):
 
 def test_help_of_a_command_is_expanded(capsys):
     """%(prog)s and %% in the help of a command are expanded."""
-    assert '  alpha     alpha help of tokeo_test at 100%' in _get_commands(_get_help(['--help'], capsys))
+    assert '  alpha     alpha help of tokeo at 100%' in _get_commands(_get_help(['--help'], capsys))
 
 
 def test_format_action_of_a_command_without_help_shows_its_name():
