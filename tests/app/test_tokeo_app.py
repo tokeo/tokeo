@@ -31,6 +31,13 @@ def test_tokeo_reads_its_config_by_appenv(monkeypatch):
     assert os.path.join(ROOT_DIR, 'config', 'tokeo', 'production.yaml') in config_files
 
 
+def test_tokeo_has_its_defaults_in_its_section():
+    """debug False, crash_dir and thread_dump_signal None are in section tokeo."""
+    with TokeoTest() as app:
+        assert [app.config.get('tokeo', key) for key in ['debug', 'crash_dir', 'thread_dump_signal']] == [False, None, None]
+        assert not app.config.has_section('crash_dir')
+
+
 def test_tokeo_debug():
     """The app with --debug runs in debug mode."""
     argv = ['--debug']
