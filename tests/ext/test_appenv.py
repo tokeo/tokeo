@@ -1,9 +1,10 @@
 """
 Tests for tokeo.ext.appenv: the environment variable of the app names a known
-environment or none, an unknown name raises, and the app reads only the config
-files of its config dir, none of the places cement reads by itself. The local
-config of the machine is read last, only from an absolute folder outside of the
-config dir with private folders and files.
+environment or none, the general APP_ENV counts while the variable of the app
+is not set, an unknown name raises, and the app reads only the config files of
+its config dir, none of the places cement reads by itself. The local config of
+the machine is read last, only from an absolute folder outside of the config
+dir with private folders and files.
 """
 
 import os
@@ -36,6 +37,12 @@ def _make_local(tmp_path, *names):
 def _make_appenv(tmp_path):
     # an appenv of the app shop in tmp_path, without an environment
     return TokeoAppEnv(_make_app(label='shop', main_dir=str(tmp_path / 'shop'), config_file_suffix='.yaml'))
+
+
+@pytest.fixture(autouse=True)
+def no_app_env(monkeypatch):
+    # the general APP_ENV of the shell changes no test that does not set it
+    monkeypatch.delenv('APP_ENV', raising=False)
 
 
 class AppenvApp(Tokeo):
@@ -79,8 +86,8 @@ def test_long_and_short_names(monkeypatch, value, env):
 
 @pytest.mark.parametrize('value', [None, 'production', 'prd'])
 def test_test_app_runs_in_testing(monkeypatch, value):
-    """A "<app>_test" app runs in testing, whatever SHOP_ENV or SHOP_TEST_ENV is."""
-    for name in ['SHOP_ENV', 'SHOP_TEST_ENV']:
+    """A "<app>_test" app runs in testing, whatever any of its variables is."""
+    for name in ['SHOP_ENV', 'SHOP_TEST_ENV', 'APP_ENV']:
         if value is None:
             monkeypatch.delenv(name, raising=False)
         else:
@@ -88,6 +95,34 @@ def test_test_app_runs_in_testing(monkeypatch, value):
     app = _make_app(label='shop_test', main_dir='/tmp', config_file_suffix='.yaml')
     appenv = TokeoAppEnv(app)
     assert (appenv.APP_ENV, appenv.APP_ENV_VAR_VALUE, app._meta.label) == ('testing', 'test', 'shop')
+
+
+@pytest.mark.parametrize(
+    'shop_env, app_env, var_name, env',
+    [
+        (None, 'production', 'APP_ENV', 'production'),
+        ('dev', 'production', 'SHOP_ENV', 'development'),
+        ('', 'production', 'SHOP_ENV', None),
+    ],
+    ids=['fallback', 'app_wins', 'empty_app_wins'],
+)
+def test_app_env_is_the_fallback_of_the_variable_of_the_app(monkeypatch, shop_env, app_env, var_name, env):
+    """APP_ENV=production counts only while SHOP_ENV is unset, an empty one wins."""
+    if shop_env is None:
+        monkeypatch.delenv('SHOP_ENV', raising=False)
+    else:
+        monkeypatch.setenv('SHOP_ENV', shop_env)
+    monkeypatch.setenv('APP_ENV', app_env)
+    appenv = TokeoAppEnv(_make_app(label='shop', main_dir='/tmp', config_file_suffix='.yaml'))
+    assert (appenv.APP_ENV_VAR_NAME, appenv.APP_ENV) == (var_name, env)
+
+
+def test_unknown_app_env_names_app_env(monkeypatch):
+    """APP_ENV=prd without SHOP_ENV raises and names APP_ENV."""
+    monkeypatch.delenv('SHOP_ENV', raising=False)
+    monkeypatch.setenv('APP_ENV', 'prd')
+    with pytest.raises(TokeoError, match="^APP_ENV='prd' is no environment, use dev, development, "):
+        TokeoAppEnv(_make_app(label='shop', main_dir='/tmp'))
 
 
 def test_no_environment_reads_base_only(monkeypatch, tmp_path):

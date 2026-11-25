@@ -11,6 +11,12 @@ or ```test```, e.g. ```SHOP_ENV=test```. ```testing``` and the short names
 ```dev```, ```stage``` and ```prod``` work too. The config files carry the long
 name of the environment, e.g. ```testing.yaml```.
 
+When ```<APP_LABEL>_ENV``` is not set, the general variable ```APP_ENV``` names
+the environment, with the same values. A set ```<APP_LABEL>_ENV``` always wins,
+also an empty one, which names no environment. A message about a wrong value
+names the variable it was read from. A test app (label ```<app>_test```)
+always runs in testing, neither variable changes that.
+
 When the appenv extension is used, the normal cement config file behavior
 is replaced by tokeo's environment based configuration. A cement
 runtime configuration is built from base plus a detected environment.
@@ -48,6 +54,9 @@ import glob
 from tokeo.core.exc import TokeoError
 from tokeo.core.utils.sort import get_natural_sort_key
 
+#: The variable read for the environment when ```<APP>_ENV``` is not set,
+#: like lumenon sets it for each call of an app (```APP_ENV=production```)
+APP_ENV_GENERAL_VAR_NAME = 'APP_ENV'
 #: The environment of production
 PRODUCTION = 'production'
 #: The environment of staging
@@ -84,9 +93,9 @@ class TokeoAppEnv:
     - Includes environment-specific configuration files
     - Handles the cement test app class in a specific manner. Strips the
         "_test" suffix to use the config of the app, and runs it always in
-        testing, whatever ```<APP_LABEL>_ENV``` says
-    - If no environment is detected (APP_ENV is None), only the base config
-        files are loaded and all IS_*_MODE flags are False
+        testing, whatever ```<APP_LABEL>_ENV``` or ```APP_ENV``` says
+    - If no environment is detected (the attribute APP_ENV is None), only the
+        base config files are loaded and all IS_*_MODE flags are False
     - Removes the config files and dirs cement reads by itself, e.g.
         ```/etc/<label>/<label>.yaml```, ```~/.config/<label>/``` and
         ```~/.<label>.yaml```; only the files of ```config/<label>``` are read
@@ -116,8 +125,13 @@ class TokeoAppEnv:
         if is_test_app:
             app._meta.label = self.APP_LABEL = self.APP_LABEL[: -len('_test')]
         # build the main ENV_VAR_NAME from app meta label
-        #: The environment variable name for app environment
+        #: The environment variable name for app environment, ```<APP>_ENV```,
+        #: else ```APP_ENV``` when the one of the app is not set
         self.APP_ENV_VAR_NAME = self.APP_LABEL.upper() + '_ENV'
+        # the general variable when the one of the app is not set, never for a
+        # test app, which reads no variable
+        if not is_test_app and self.APP_ENV_VAR_NAME not in os.environ:
+            self.APP_ENV_VAR_NAME = APP_ENV_GENERAL_VAR_NAME
         # get the started ENV, a test app runs always in testing, a set
         # "<APP>_ENV=prod" of the shell must not run the tests on production
         if is_test_app:
